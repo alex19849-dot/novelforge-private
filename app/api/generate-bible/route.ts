@@ -32,12 +32,10 @@ Safety rules:
 - Do not frame coercion or abuse as romantic.
 - If a user-selected setup risks unsafe content, age up characters and make the relationship legal, consensual and adult.
 
-Writing quality rules:
+Core writing rules:
 - Write like polished commercial romance fiction.
 - Make it emotionally grounded and human.
-- Avoid AI-sounding phrases, melodrama, clichés and therapy-speak.
 - Use natural dialogue with subtext.
-- Use strong scene setting and sensory detail without purple prose.
 - Keep character voices distinct.
 - Honour the selected POV exactly.
 - Do not rush the romance.
@@ -45,6 +43,37 @@ Writing quality rules:
 - Chapter 1 should hook the reader and end with a reason to continue.
 - Target length: 4,000 to 6,000 words.
 - Use UK spelling unless the setting clearly requires otherwise.
+
+Anti-AI style rules:
+- Do not use em dashes.
+- Do not use long dash interruptions.
+- Do not overuse similes.
+- Avoid repeated sentence openings, especially "Like..." or "As if...".
+- Avoid stacked metaphors.
+- Avoid purple prose.
+- Avoid therapy-speak.
+- Avoid characters explaining their feelings too neatly.
+- Avoid overly polished banter every line.
+- Avoid constant body-part descriptions.
+- Avoid phrases like "his jaw clenched", "his breath hitched", "something in his chest", unless genuinely needed.
+- Do not make every paragraph sound poetic or dramatic.
+- Keep the prose varied, grounded and readable.
+- Let tension come from behaviour, dialogue, conflict and withheld information.
+
+Tone handling:
+- If tone is gritty, write leaner, rawer and more direct.
+- Gritty does not mean poetic misery.
+- Gritty should feel physical, lived-in, tense and believable.
+- Use shorter sentences when tension rises.
+- Use humour sparingly and naturally.
+- Keep emotional moments restrained, not overwritten.
+- Avoid fancy comparisons unless they feel natural to the narrator.
+
+POV handling:
+- If POV is first person, keep the voice intimate and natural.
+- If POV is first person dual POV, Chapter 1 may use one POV character only, or clearly labelled sections if both are needed.
+- Do not switch POV mid-scene without a clear section break.
+- Do not write repeated "Chapter One / Character Name" headers unless useful. Use one clean chapter title.
 
 Story inputs:
 
@@ -94,10 +123,10 @@ Pacing: ${body.pacing}
 Plot Intensity: ${body.intensity}
 
 Important:
-If the subgenre is Sports Romance and Subgenre Detail is a specific sport, keep that sport consistent.
-For example, if Subgenre Detail is Ice hockey, do not change it to wrestling, football, rugby or another sport.
-If POV is first person dual POV, use a clear chapter structure with one POV character for Chapter 1, or clearly labelled sections if switching POV.
-Now write Chapter 1 only.
+- If the subgenre is Sports Romance and Subgenre Detail is a specific sport, keep that sport consistent.
+- For example, if Subgenre Detail is Ice hockey, do not change it to wrestling, football, rugby or another sport.
+- If the user selected things they do not want, avoid them completely.
+- Write Chapter 1 only.
 `;
 
   try {
