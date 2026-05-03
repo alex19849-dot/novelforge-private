@@ -274,3 +274,54 @@ function Select({ label, field, value, updateField, options }: any) {
     </label>
   );
 }
+function CheckboxGroup({
+  label,
+  field,
+  selected,
+  options,
+  updateField,
+}: any) {
+  function toggleOption(option: string) {
+    const current = selected
+      ? selected.split(", ").filter(Boolean)
+      : [];
+
+    const updated = current.includes(option)
+      ? current.filter((item: string) => item !== option)
+      : [...current, option];
+
+    updateField(field, updated.join(", "));
+  }
+
+  const selectedArray = selected
+    ? selected.split(", ").filter(Boolean)
+    : [];
+
+  return (
+    <div className="grid gap-3">
+      <span className="text-sm text-zinc-300">{label}</span>
+
+      <div className="flex flex-wrap gap-2">
+        {options.map((option: string) => {
+          const active = selectedArray.includes(option);
+
+          return (
+            <button
+              type="button"
+              key={option}
+              onClick={() => toggleOption(option)}
+              className={`rounded-full px-4 py-2 text-sm border transition ${
+                active
+                  ? "bg-rose-500 border-rose-400 text-white"
+                  : "bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400"
+              }`}
+            >
+              {active ? "✓ " : ""}
+              {option}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
