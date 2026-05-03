@@ -1,7 +1,66 @@
 "use client";
 
 import { useState } from "react";
+const TROPE_OPTIONS = [
+  "Enemies to lovers",
+  "Friends to lovers",
+  "Forced proximity",
+  "Fake dating",
+  "Second chance",
+  "Grumpy / sunshine",
+  "Only one bed",
+  "Hurt / comfort",
+  "Forbidden attraction",
+  "Workplace romance",
+  "Small town romance",
+  "Sports romance",
+  "Celebrity romance",
+  "Single parent",
+  "Secret relationship",
+  "Opposites attract",
+  "Slow burn",
+  "High angst",
+  "Protective lead",
+  "Found family",
+  "Jealousy",
+];
 
+const TRAIT_OPTIONS = [
+  "Grumpy",
+  "Sunshine",
+  "Guarded",
+  "Confident",
+  "Shy",
+  "Funny",
+  "Sarcastic",
+  "Soft-hearted",
+  "Hot-headed",
+  "Protective",
+  "Ambitious",
+  "Chaotic",
+  "Quiet",
+  "Dominant",
+  "Nurturing",
+  "Flirty",
+  "Awkward",
+  "Loyal",
+  "Broken but trying",
+];
+
+const FLAW_OPTIONS = [
+  "Trust issues",
+  "Commitment issues",
+  "Jealous",
+  "Emotionally closed off",
+  "People pleaser",
+  "Impulsive",
+  "Workaholic",
+  "Self-sabotaging",
+  "Afraid of vulnerability",
+  "Bad temper",
+  "Overprotective",
+  "Runs from conflict",
+];
 export default function Home() {
   const [form, setForm] = useState({
     title: "",
