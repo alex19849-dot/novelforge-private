@@ -26,6 +26,48 @@ const TROPE_OPTIONS = [
   "Jealousy",
 ];
 
+const SPORT_OPTIONS = [
+  "Ice hockey",
+  "Football",
+  "Rugby",
+  "Boxing",
+  "MMA",
+  "Wrestling",
+  "Basketball",
+  "Baseball",
+  "Motor racing",
+  "Swimming",
+  "Athletics",
+  "Dance",
+  "Other / custom",
+];
+
+const JOB_OPTIONS = [
+  "Ice hockey player",
+  "Footballer",
+  "Rugby player",
+  "Coach",
+  "Team doctor",
+  "Physio",
+  "Sports journalist",
+  "Agent",
+  "Club owner",
+  "Business owner",
+  "Tradesperson",
+  "Doctor / Nurse",
+  "Teacher",
+  "Artist",
+  "Musician",
+  "Writer",
+  "Chef",
+  "Bar owner",
+  "Police / Firefighter",
+  "Military",
+  "Adult student",
+  "Unemployed / rebuilding life",
+  "Other / custom",
+];
+
 const TRAIT_OPTIONS = [
   "Grumpy",
   "Sunshine",
@@ -104,21 +146,104 @@ const SECRET_OPTIONS = [
   "Other / custom",
 ];
 
-const JOB_OPTIONS = [
-  "Business owner",
-  "Tradesperson",
-  "Doctor / Nurse",
-  "Teacher",
-  "Artist",
-  "Musician",
-  "Athlete",
-  "Writer",
-  "Chef",
-  "Bar owner",
-  "Police / Firefighter",
-  "Military",
-  "Adult student",
-  "Unemployed / rebuilding life",
+const SETTING_OPTIONS = [
+  "Small town",
+  "Big city",
+  "Coastal town",
+  "Countryside",
+  "Workplace office",
+  "Restaurant / bar",
+  "Hospital",
+  "University, adult students only",
+  "Sports team",
+  "Ice rink",
+  "Tour bus / celebrity world",
+  "Ranch / farm",
+  "Mountain lodge",
+  "Island getaway",
+  "Fantasy kingdom",
+  "Paranormal town",
+  "Historical",
+  "Mafia underworld",
+  "Luxury world",
+  "Working class / gritty",
+  "Other / custom",
+];
+
+const CONFLICT_OPTIONS = [
+  "Trust issues",
+  "Opposite lifestyles",
+  "Family disapproval",
+  "Career conflict",
+  "Long distance",
+  "Secret identity",
+  "One is leaving town",
+  "Rivalry",
+  "Class difference",
+  "Hidden past",
+  "Commitment fear",
+  "Third party complication",
+  "Forced separation",
+  "Light miscommunication",
+  "Danger / threat",
+  "Grief / healing",
+  "Revenge motive",
+  "Other / custom",
+];
+
+const KEEPS_APART_OPTIONS = [
+  "Emotional walls",
+  "Fear of commitment",
+  "Wrong timing",
+  "Existing relationship",
+  "Family pressure",
+  "Professional conflict",
+  "Physical distance",
+  "Pride",
+  "Shame / secret",
+  "Social expectations",
+  "Trauma",
+  "Mistrust",
+  "They think feelings are not returned",
+  "Other / custom",
+];
+
+const MUST_HAVE_OPTIONS = [
+  "First accidental touch",
+  "Jealousy moment",
+  "Forced close proximity",
+  "Rain kiss",
+  "Angry confession",
+  "Caretaking while sick / injured",
+  "Bed sharing",
+  "First intimate scene",
+  "Public declaration",
+  "Big breakup",
+  "Grovel scene",
+  "Reunion",
+  "Wedding / commitment ending",
+  "Pregnancy ending, MF only",
+  "Found family moment",
+  "Protective rescue",
+  "Holiday scene",
+  "Locker room tension",
+  "After-game celebration",
+  "Other / custom",
+];
+
+const MUST_NOT_HAVE_OPTIONS = [
+  "Cheating",
+  "Love triangle",
+  "Pregnancy plot",
+  "Insta-love",
+  "Billionaire trope",
+  "Miscommunication breakup",
+  "Dark themes",
+  "Death ending",
+  "Cliffhanger",
+  "Public humiliation",
+  "Third act breakup",
+  "Toxic alpha behaviour",
   "Other / custom",
 ];
 
@@ -126,17 +251,19 @@ export default function Home() {
   const [form, setForm] = useState({
     title: "",
     relationship: "MM Romance",
-    subgenre: "Contemporary",
+    subgenre: "Sports Romance",
+    sportType: "Ice hockey",
     tropes: "",
     tone: "Emotional",
     heat: "Spicy",
     pov: "Third person",
     ending: "Happy ending",
+    length: "Short novel",
 
     c1Name: "",
     c1Age: "",
     c1Appearance: "",
-    c1Job: "Business owner",
+    c1Job: "Ice hockey player",
     c1Personality: "",
     c1Flaws: "",
     c1Desire: "",
@@ -147,7 +274,7 @@ export default function Home() {
     c2Name: "",
     c2Age: "",
     c2Appearance: "",
-    c2Job: "Business owner",
+    c2Job: "Ice hockey player",
     c2Personality: "",
     c2Flaws: "",
     c2Desire: "",
@@ -155,13 +282,14 @@ export default function Home() {
     c2Secret: "No major secret",
     c2CustomNotes: "",
 
-    setting: "",
+    setting: "Sports team, Ice rink",
     plot: "",
     conflict: "",
     keepsApart: "",
     mustHave: "",
     mustNotHave: "",
-    length: "Short novel",
+    pacing: "Slow burn",
+    intensity: "Dramatic",
   });
 
   const [result, setResult] = useState("");
@@ -180,6 +308,7 @@ export default function Home() {
       ["Elliot Vale", "Ronan Hayes"],
       ["Callum Reed", "Jude Bennett"],
       ["Finn Archer", "Miles Hart"],
+      ["Nate Calder", "Rowan Blake"],
     ];
 
     const mfNames = [
@@ -187,6 +316,7 @@ export default function Home() {
       ["Maya Hart", "Logan Reed"],
       ["Clara Vale", "Noah Mercer"],
       ["Ivy Brooks", "Daniel Hayes"],
+      ["Lena Brooks", "Cole Maddox"],
     ];
 
     const list = form.relationship === "MF Romance" ? mfNames : mmNames;
@@ -236,25 +366,27 @@ export default function Home() {
 
           <div className="grid gap-8">
             <Section title="Story Setup">
-              <Input
-                label="Story Title"
-                field="title"
-                form={form}
-                updateField={updateField}
-              />
+              <Input label="Story Title" field="title" form={form} updateField={updateField} />
 
               <div className="grid md:grid-cols-2 gap-4">
                 <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
+
                 <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={["Contemporary", "Small Town", "Sports Romance", "Dark Romance", "Workplace", "Celebrity", "Paranormal", "Billionaire", "Second Chance"]} />
+
+                <Select label="Sport Type" field="sportType" value={form.sportType} updateField={updateField} options={SPORT_OPTIONS} />
+
                 <Select label="Tone" field="tone" value={form.tone} updateField={updateField} options={["Emotional", "Funny", "Dark", "Soft", "Gritty", "Angsty", "Sweet", "Filthy but heartfelt"]} />
+
                 <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
+
                 <Select label="POV" field="pov" value={form.pov} updateField={updateField} options={["First person", "Third person", "Dual POV", "Alternating POV"]} />
+
                 <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
+
+                <Select label="Length" field="length" value={form.length} updateField={updateField} options={["Novella", "Short novel", "Full novel"]} />
               </div>
 
               <CheckboxGroup label="Tropes" field="tropes" selected={form.tropes} options={TROPE_OPTIONS} updateField={updateField} />
-
-              <Select label="Length" field="length" value={form.length} updateField={updateField} options={["Novella", "Short novel", "Full novel"]} />
             </Section>
 
             <button
@@ -265,27 +397,33 @@ export default function Home() {
               Generate Character Names
             </button>
 
-            <CharacterSection
-              title="Character 1"
-              prefix="c1"
-              form={form}
-              updateField={updateField}
-            />
+            <CharacterSection title="Character 1" prefix="c1" form={form} updateField={updateField} />
+            <CharacterSection title="Character 2" prefix="c2" form={form} updateField={updateField} />
 
-            <CharacterSection
-              title="Character 2"
-              prefix="c2"
-              form={form}
-              updateField={updateField}
-            />
+            <Section title="Plot Builder">
+              <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
 
-            <Section title="Plot">
-              <TextArea label="Setting" field="setting" form={form} updateField={updateField} />
-              <TextArea label="Basic Plot Idea" field="plot" form={form} updateField={updateField} />
-              <TextArea label="Main Conflict" field="conflict" form={form} updateField={updateField} />
-              <TextArea label="What Keeps Them Apart?" field="keepsApart" form={form} updateField={updateField} />
-              <TextArea label="Must-Have Scene" field="mustHave" form={form} updateField={updateField} />
-              <TextArea label="Must-Not-Have" field="mustNotHave" form={form} updateField={updateField} />
+              <CheckboxGroup label="Main Conflict" field="conflict" selected={form.conflict} options={CONFLICT_OPTIONS} updateField={updateField} />
+
+              <CheckboxGroup label="What Keeps Them Apart?" field="keepsApart" selected={form.keepsApart} options={KEEPS_APART_OPTIONS} updateField={updateField} />
+
+              <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={MUST_HAVE_OPTIONS} updateField={updateField} />
+
+              <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <Select label="Pacing" field="pacing" value={form.pacing} updateField={updateField} options={["Fast burn", "Medium burn", "Slow burn", "Torture me slowly"]} />
+
+                <Select label="Plot Intensity" field="intensity" value={form.intensity} updateField={updateField} options={["Cozy", "Balanced", "Dramatic", "Heavy angst", "Chaotic soap opera"]} />
+              </div>
+
+              <TextArea
+                label="Optional Plot Notes"
+                field="plot"
+                form={form}
+                updateField={updateField}
+                placeholder="Add anything specific, e.g. rival hockey players, one gets injured, secret dating, championship final..."
+              />
             </Section>
 
             <button
@@ -332,18 +470,18 @@ function CharacterSection({ title, prefix, form, updateField }: any) {
 
       <Select label="Secret" field={`${prefix}Secret`} value={form[`${prefix}Secret`]} updateField={updateField} options={SECRET_OPTIONS} />
 
-      <TextArea label="Extra Character Notes" field={`${prefix}CustomNotes`} form={form} updateField={updateField} placeholder="Anything specific you want included..." />
+      <TextArea
+        label="Extra Character Notes"
+        field={`${prefix}CustomNotes`}
+        form={form}
+        updateField={updateField}
+        placeholder="Anything specific you want included..."
+      />
     </Section>
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border border-white/10 rounded-3xl p-6 bg-black/20">
       <h3 className="text-2xl font-bold mb-5 text-rose-200">{title}</h3>
@@ -396,13 +534,7 @@ function Select({ label, field, value, updateField, options }: any) {
   );
 }
 
-function CheckboxGroup({
-  label,
-  field,
-  selected,
-  options,
-  updateField,
-}: any) {
+function CheckboxGroup({ label, field, selected, options, updateField }: any) {
   function toggleOption(option: string) {
     const current = selected ? selected.split(", ").filter(Boolean) : [];
 
