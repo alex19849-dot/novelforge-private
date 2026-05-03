@@ -63,6 +63,65 @@ const FLAW_OPTIONS = [
   "Runs from conflict",
 ];
 
+const DESIRE_OPTIONS = [
+  "To be loved properly",
+  "To feel safe",
+  "To escape their past",
+  "To prove themselves",
+  "To build a family",
+  "To belong somewhere",
+  "To be chosen",
+  "To start over",
+  "To protect someone",
+  "To finally trust",
+];
+
+const FEAR_OPTIONS = [
+  "Being abandoned",
+  "Being rejected",
+  "Losing control",
+  "Getting hurt again",
+  "Being trapped",
+  "Being truly known",
+  "Letting someone down",
+  "Repeating the past",
+  "Being vulnerable",
+  "Failing the people they love",
+];
+
+const SECRET_OPTIONS = [
+  "No major secret",
+  "Hidden debt",
+  "Secret child",
+  "Criminal past",
+  "Family scandal",
+  "Fake identity",
+  "Secret illness",
+  "Secret inheritance",
+  "Hidden heartbreak",
+  "Secret engagement",
+  "Carrying guilt",
+  "Other / custom",
+];
+
+const JOB_OPTIONS = [
+  "Business owner",
+  "Tradesperson",
+  "Doctor / Nurse",
+  "Teacher",
+  "Artist",
+  "Musician",
+  "Athlete",
+  "Writer",
+  "Chef",
+  "Bar owner",
+  "Police / Firefighter",
+  "Military",
+  "Adult student",
+  "Unemployed / rebuilding life",
+  "Other / custom",
+];
+
 export default function Home() {
   const [form, setForm] = useState({
     title: "",
@@ -77,22 +136,24 @@ export default function Home() {
     c1Name: "",
     c1Age: "",
     c1Appearance: "",
-    c1Job: "",
+    c1Job: "Business owner",
     c1Personality: "",
     c1Flaws: "",
     c1Desire: "",
     c1Fear: "",
-    c1Secret: "",
+    c1Secret: "No major secret",
+    c1CustomNotes: "",
 
     c2Name: "",
     c2Age: "",
     c2Appearance: "",
-    c2Job: "",
+    c2Job: "Business owner",
     c2Personality: "",
     c2Flaws: "",
     c2Desire: "",
     c2Fear: "",
-    c2Secret: "",
+    c2Secret: "No major secret",
+    c2CustomNotes: "",
 
     setting: "",
     plot: "",
@@ -111,6 +172,28 @@ export default function Home() {
       ...prev,
       [field]: value,
     }));
+  }
+
+  function generateNames() {
+    const mmNames = [
+      ["Theo Mercer", "Lucas Hale"],
+      ["Elliot Vale", "Ronan Hayes"],
+      ["Callum Reed", "Jude Bennett"],
+      ["Finn Archer", "Miles Hart"],
+    ];
+
+    const mfNames = [
+      ["Sophie Bennett", "Ethan Cole"],
+      ["Maya Hart", "Logan Reed"],
+      ["Clara Vale", "Noah Mercer"],
+      ["Ivy Brooks", "Daniel Hayes"],
+    ];
+
+    const list = form.relationship === "MF Romance" ? mfNames : mmNames;
+    const pair = list[Math.floor(Math.random() * list.length)];
+
+    updateField("c1Name", pair[0]);
+    updateField("c2Name", pair[1]);
   }
 
   async function generateStory() {
@@ -161,284 +244,48 @@ export default function Home() {
               />
 
               <div className="grid md:grid-cols-2 gap-4">
-                <Select
-                  label="Relationship Type"
-                  field="relationship"
-                  value={form.relationship}
-                  updateField={updateField}
-                  options={["MM Romance", "MF Romance"]}
-                />
-
-                <Select
-                  label="Subgenre"
-                  field="subgenre"
-                  value={form.subgenre}
-                  updateField={updateField}
-                  options={[
-                    "Contemporary",
-                    "Small Town",
-                    "Sports Romance",
-                    "Dark Romance",
-                    "Workplace",
-                    "Celebrity",
-                    "Paranormal",
-                    "Billionaire",
-                    "Second Chance",
-                  ]}
-                />
-
-                <Select
-                  label="Tone"
-                  field="tone"
-                  value={form.tone}
-                  updateField={updateField}
-                  options={[
-                    "Emotional",
-                    "Funny",
-                    "Dark",
-                    "Soft",
-                    "Gritty",
-                    "Angsty",
-                    "Sweet",
-                    "Filthy but heartfelt",
-                  ]}
-                />
-
-                <Select
-                  label="Heat Level"
-                  field="heat"
-                  value={form.heat}
-                  updateField={updateField}
-                  options={[
-                    "Fade to black",
-                    "Mild",
-                    "Spicy",
-                    "Explicit adult",
-                  ]}
-                />
-
-                <Select
-                  label="POV"
-                  field="pov"
-                  value={form.pov}
-                  updateField={updateField}
-                  options={[
-                    "First person",
-                    "Third person",
-                    "Dual POV",
-                    "Alternating POV",
-                  ]}
-                />
-
-                <Select
-                  label="Ending"
-                  field="ending"
-                  value={form.ending}
-                  updateField={updateField}
-                  options={[
-                    "Happy ending",
-                    "Happy for now",
-                    "Bittersweet",
-                    "Cliffhanger",
-                  ]}
-                />
+                <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
+                <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={["Contemporary", "Small Town", "Sports Romance", "Dark Romance", "Workplace", "Celebrity", "Paranormal", "Billionaire", "Second Chance"]} />
+                <Select label="Tone" field="tone" value={form.tone} updateField={updateField} options={["Emotional", "Funny", "Dark", "Soft", "Gritty", "Angsty", "Sweet", "Filthy but heartfelt"]} />
+                <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
+                <Select label="POV" field="pov" value={form.pov} updateField={updateField} options={["First person", "Third person", "Dual POV", "Alternating POV"]} />
+                <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
               </div>
 
-              <CheckboxGroup
-                label="Tropes"
-                field="tropes"
-                selected={form.tropes}
-                options={TROPE_OPTIONS}
-                updateField={updateField}
-              />
+              <CheckboxGroup label="Tropes" field="tropes" selected={form.tropes} options={TROPE_OPTIONS} updateField={updateField} />
 
-              <Select
-                label="Length"
-                field="length"
-                value={form.length}
-                updateField={updateField}
-                options={["Novella", "Short novel", "Full novel"]}
-              />
+              <Select label="Length" field="length" value={form.length} updateField={updateField} options={["Novella", "Short novel", "Full novel"]} />
             </Section>
 
-            <Section title="Character 1">
-              <div className="grid md:grid-cols-2 gap-4">
-                <Input
-                  label="Name"
-                  field="c1Name"
-                  form={form}
-                  updateField={updateField}
-                />
-                <Input
-                  label="Age"
-                  field="c1Age"
-                  form={form}
-                  updateField={updateField}
-                />
-              </div>
+            <button
+              type="button"
+              onClick={generateNames}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10"
+            >
+              Generate Character Names
+            </button>
 
-              <TextArea
-                label="Appearance"
-                field="c1Appearance"
-                form={form}
-                updateField={updateField}
-              />
+            <CharacterSection
+              title="Character 1"
+              prefix="c1"
+              form={form}
+              updateField={updateField}
+            />
 
-              <Input
-                label="Job / Role"
-                field="c1Job"
-                form={form}
-                updateField={updateField}
-              />
-
-              <CheckboxGroup
-                label="Personality"
-                field="c1Personality"
-                selected={form.c1Personality}
-                options={TRAIT_OPTIONS}
-                updateField={updateField}
-              />
-
-              <CheckboxGroup
-                label="Flaws"
-                field="c1Flaws"
-                selected={form.c1Flaws}
-                options={FLAW_OPTIONS}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Biggest Desire"
-                field="c1Desire"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Biggest Fear"
-                field="c1Fear"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Secret"
-                field="c1Secret"
-                form={form}
-                updateField={updateField}
-              />
-            </Section>
-
-            <Section title="Character 2">
-              <div className="grid md:grid-cols-2 gap-4">
-                <Input
-                  label="Name"
-                  field="c2Name"
-                  form={form}
-                  updateField={updateField}
-                />
-                <Input
-                  label="Age"
-                  field="c2Age"
-                  form={form}
-                  updateField={updateField}
-                />
-              </div>
-
-              <TextArea
-                label="Appearance"
-                field="c2Appearance"
-                form={form}
-                updateField={updateField}
-              />
-
-              <Input
-                label="Job / Role"
-                field="c2Job"
-                form={form}
-                updateField={updateField}
-              />
-
-              <CheckboxGroup
-                label="Personality"
-                field="c2Personality"
-                selected={form.c2Personality}
-                options={TRAIT_OPTIONS}
-                updateField={updateField}
-              />
-
-              <CheckboxGroup
-                label="Flaws"
-                field="c2Flaws"
-                selected={form.c2Flaws}
-                options={FLAW_OPTIONS}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Biggest Desire"
-                field="c2Desire"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Biggest Fear"
-                field="c2Fear"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Secret"
-                field="c2Secret"
-                form={form}
-                updateField={updateField}
-              />
-            </Section>
+            <CharacterSection
+              title="Character 2"
+              prefix="c2"
+              form={form}
+              updateField={updateField}
+            />
 
             <Section title="Plot">
-              <TextArea
-                label="Setting"
-                field="setting"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Basic Plot Idea"
-                field="plot"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Main Conflict"
-                field="conflict"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="What Keeps Them Apart?"
-                field="keepsApart"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Must-Have Scene"
-                field="mustHave"
-                form={form}
-                updateField={updateField}
-              />
-
-              <TextArea
-                label="Must-Not-Have"
-                field="mustNotHave"
-                form={form}
-                updateField={updateField}
-              />
+              <TextArea label="Setting" field="setting" form={form} updateField={updateField} />
+              <TextArea label="Basic Plot Idea" field="plot" form={form} updateField={updateField} />
+              <TextArea label="Main Conflict" field="conflict" form={form} updateField={updateField} />
+              <TextArea label="What Keeps Them Apart?" field="keepsApart" form={form} updateField={updateField} />
+              <TextArea label="Must-Have Scene" field="mustHave" form={form} updateField={updateField} />
+              <TextArea label="Must-Not-Have" field="mustNotHave" form={form} updateField={updateField} />
             </Section>
 
             <button
@@ -460,6 +307,33 @@ export default function Home() {
         )}
       </section>
     </main>
+  );
+}
+
+function CharacterSection({ title, prefix, form, updateField }: any) {
+  return (
+    <Section title={title}>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Input label="Name" field={`${prefix}Name`} form={form} updateField={updateField} />
+        <Input label="Age" field={`${prefix}Age`} form={form} updateField={updateField} />
+      </div>
+
+      <TextArea label="Appearance" field={`${prefix}Appearance`} form={form} updateField={updateField} />
+
+      <Select label="Job / Role" field={`${prefix}Job`} value={form[`${prefix}Job`]} updateField={updateField} options={JOB_OPTIONS} />
+
+      <CheckboxGroup label="Personality" field={`${prefix}Personality`} selected={form[`${prefix}Personality`]} options={TRAIT_OPTIONS} updateField={updateField} />
+
+      <CheckboxGroup label="Flaws" field={`${prefix}Flaws`} selected={form[`${prefix}Flaws`]} options={FLAW_OPTIONS} updateField={updateField} />
+
+      <CheckboxGroup label="Biggest Desire" field={`${prefix}Desire`} selected={form[`${prefix}Desire`]} options={DESIRE_OPTIONS} updateField={updateField} />
+
+      <CheckboxGroup label="Biggest Fear" field={`${prefix}Fear`} selected={form[`${prefix}Fear`]} options={FEAR_OPTIONS} updateField={updateField} />
+
+      <Select label="Secret" field={`${prefix}Secret`} value={form[`${prefix}Secret`]} updateField={updateField} options={SECRET_OPTIONS} />
+
+      <TextArea label="Extra Character Notes" field={`${prefix}CustomNotes`} form={form} updateField={updateField} placeholder="Anything specific you want included..." />
+    </Section>
   );
 }
 
