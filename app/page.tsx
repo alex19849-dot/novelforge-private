@@ -14,6 +14,14 @@ const SUBGENRES = [
   "Second Chance",
 ];
 
+const POV_OPTIONS = [
+  "First person, single POV",
+  "First person, dual POV",
+  "Third person, single POV",
+  "Third person, dual POV",
+  "Alternating POV",
+];
+
 const SPORT_OPTIONS = [
   "Ice hockey",
   "Football",
@@ -360,7 +368,7 @@ export default function Home() {
     tropes: "",
     tone: "Emotional",
     heat: "Spicy",
-    pov: "Third person",
+    pov: "First person, dual POV",
     ending: "Happy ending",
     length: "Short novel",
 
@@ -503,36 +511,137 @@ export default function Home() {
 
           <div className="grid gap-8">
             <Section title="Story Setup">
-              <Input label="Story Title" field="title" form={form} updateField={updateField} />
+              <Input
+                label="Story Title"
+                field="title"
+                form={form}
+                updateField={updateField}
+              />
 
               <div className="grid md:grid-cols-2 gap-4">
-                <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
-                <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={SUBGENRES} />
+                <Select
+                  label="Relationship Type"
+                  field="relationship"
+                  value={form.relationship}
+                  updateField={updateField}
+                  options={["MM Romance", "MF Romance"]}
+                />
+
+                <Select
+                  label="Subgenre"
+                  field="subgenre"
+                  value={form.subgenre}
+                  updateField={updateField}
+                  options={SUBGENRES}
+                />
 
                 {form.subgenre === "Sports Romance" && (
-                  <Select label="Sport Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={SPORT_OPTIONS} />
+                  <Select
+                    label="Sport Type"
+                    field="subgenreDetail"
+                    value={form.subgenreDetail}
+                    updateField={updateField}
+                    options={SPORT_OPTIONS}
+                  />
                 )}
 
                 {form.subgenre === "Small Town" && (
-                  <Select label="Town Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={TOWN_OPTIONS} />
+                  <Select
+                    label="Town Type"
+                    field="subgenreDetail"
+                    value={form.subgenreDetail}
+                    updateField={updateField}
+                    options={TOWN_OPTIONS}
+                  />
                 )}
 
                 {form.subgenre === "Celebrity" && (
-                  <Select label="Celebrity Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={CELEBRITY_OPTIONS} />
+                  <Select
+                    label="Celebrity Type"
+                    field="subgenreDetail"
+                    value={form.subgenreDetail}
+                    updateField={updateField}
+                    options={CELEBRITY_OPTIONS}
+                  />
                 )}
 
                 {form.subgenre === "Paranormal" && (
-                  <Select label="Paranormal World" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={PARANORMAL_OPTIONS} />
+                  <Select
+                    label="Paranormal World"
+                    field="subgenreDetail"
+                    value={form.subgenreDetail}
+                    updateField={updateField}
+                    options={PARANORMAL_OPTIONS}
+                  />
                 )}
 
-                <Select label="Tone" field="tone" value={form.tone} updateField={updateField} options={["Emotional", "Funny", "Dark", "Soft", "Gritty", "Angsty", "Sweet", "Filthy but heartfelt"]} />
-                <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
-                <Select label="POV" field="pov" value={form.pov} updateField={updateField} options={["First person", "Third person", "Dual POV", "Alternating POV"]} />
-                <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
-                <Select label="Length" field="length" value={form.length} updateField={updateField} options={["Novella", "Short novel", "Full novel"]} />
+                <Select
+                  label="Tone"
+                  field="tone"
+                  value={form.tone}
+                  updateField={updateField}
+                  options={[
+                    "Emotional",
+                    "Funny",
+                    "Dark",
+                    "Soft",
+                    "Gritty",
+                    "Angsty",
+                    "Sweet",
+                    "Filthy but heartfelt",
+                  ]}
+                />
+
+                <Select
+                  label="Heat Level"
+                  field="heat"
+                  value={form.heat}
+                  updateField={updateField}
+                  options={[
+                    "Fade to black",
+                    "Mild",
+                    "Spicy",
+                    "Explicit adult",
+                  ]}
+                />
+
+                <Select
+                  label="POV"
+                  field="pov"
+                  value={form.pov}
+                  updateField={updateField}
+                  options={POV_OPTIONS}
+                />
+
+                <Select
+                  label="Ending"
+                  field="ending"
+                  value={form.ending}
+                  updateField={updateField}
+                  options={[
+                    "Happy ending",
+                    "Happy for now",
+                    "Bittersweet",
+                    "Cliffhanger",
+                  ]}
+                />
+
+                <Select
+                  label="Length"
+                  field="length"
+                  value={form.length}
+                  updateField={updateField}
+                  options={["Novella", "Short novel", "Full novel"]}
+                />
               </div>
 
-              <CheckboxGroup label="Tropes" field="tropes" selected={form.tropes} options={TROPE_OPTIONS} updateField={updateField} />
+              <CheckboxGroup
+                label="Tropes"
+                field="tropes"
+                selected={form.tropes}
+                options={TROPE_OPTIONS}
+                updateField={updateField}
+              />
             </Section>
 
             <button
@@ -543,22 +652,99 @@ export default function Home() {
               Generate Character Names
             </button>
 
-            <CharacterSection title="Character 1" prefix="c1" form={form} updateField={updateField} jobOptions={jobOptions} />
-            <CharacterSection title="Character 2" prefix="c2" form={form} updateField={updateField} jobOptions={jobOptions} />
+            <CharacterSection
+              title="Character 1"
+              prefix="c1"
+              form={form}
+              updateField={updateField}
+              jobOptions={jobOptions}
+            />
+
+            <CharacterSection
+              title="Character 2"
+              prefix="c2"
+              form={form}
+              updateField={updateField}
+              jobOptions={jobOptions}
+            />
 
             <Section title="Plot Builder">
-              <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
-              <CheckboxGroup label="Main Conflict" field="conflict" selected={form.conflict} options={CONFLICT_OPTIONS} updateField={updateField} />
-              <CheckboxGroup label="What Keeps Them Apart?" field="keepsApart" selected={form.keepsApart} options={KEEPS_APART_OPTIONS} updateField={updateField} />
-              <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={sceneOptions} updateField={updateField} />
-              <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
+              <CheckboxGroup
+                label="Setting"
+                field="setting"
+                selected={form.setting}
+                options={SETTING_OPTIONS}
+                updateField={updateField}
+              />
+
+              <CheckboxGroup
+                label="Main Conflict"
+                field="conflict"
+                selected={form.conflict}
+                options={CONFLICT_OPTIONS}
+                updateField={updateField}
+              />
+
+              <CheckboxGroup
+                label="What Keeps Them Apart?"
+                field="keepsApart"
+                selected={form.keepsApart}
+                options={KEEPS_APART_OPTIONS}
+                updateField={updateField}
+              />
+
+              <CheckboxGroup
+                label="Must-Have Scenes"
+                field="mustHave"
+                selected={form.mustHave}
+                options={sceneOptions}
+                updateField={updateField}
+              />
+
+              <CheckboxGroup
+                label="Must-Not-Have"
+                field="mustNotHave"
+                selected={form.mustNotHave}
+                options={MUST_NOT_HAVE_OPTIONS}
+                updateField={updateField}
+              />
 
               <div className="grid md:grid-cols-2 gap-4">
-                <Select label="Pacing" field="pacing" value={form.pacing} updateField={updateField} options={["Fast burn", "Medium burn", "Slow burn", "Torture me slowly"]} />
-                <Select label="Plot Intensity" field="intensity" value={form.intensity} updateField={updateField} options={["Cozy", "Balanced", "Dramatic", "Heavy angst", "Chaotic soap opera"]} />
+                <Select
+                  label="Pacing"
+                  field="pacing"
+                  value={form.pacing}
+                  updateField={updateField}
+                  options={[
+                    "Fast burn",
+                    "Medium burn",
+                    "Slow burn",
+                    "Torture me slowly",
+                  ]}
+                />
+
+                <Select
+                  label="Plot Intensity"
+                  field="intensity"
+                  value={form.intensity}
+                  updateField={updateField}
+                  options={[
+                    "Cozy",
+                    "Balanced",
+                    "Dramatic",
+                    "Heavy angst",
+                    "Chaotic soap opera",
+                  ]}
+                />
               </div>
 
-              <TextArea label="Optional Plot Notes" field="plot" form={form} updateField={updateField} placeholder="Add anything specific, if needed..." />
+              <TextArea
+                label="Optional Plot Notes"
+                field="plot"
+                form={form}
+                updateField={updateField}
+                placeholder="Add anything specific, if needed..."
+              />
             </Section>
 
             <button
@@ -603,23 +789,94 @@ function CharacterSection({ title, prefix, form, updateField, jobOptions }: any)
   return (
     <Section title={title}>
       <div className="grid md:grid-cols-2 gap-4">
-        <Input label="Name" field={`${prefix}Name`} form={form} updateField={updateField} />
-        <Input label="Age" field={`${prefix}Age`} form={form} updateField={updateField} />
+        <Input
+          label="Name"
+          field={`${prefix}Name`}
+          form={form}
+          updateField={updateField}
+        />
+
+        <Input
+          label="Age"
+          field={`${prefix}Age`}
+          form={form}
+          updateField={updateField}
+        />
       </div>
 
-      <TextArea label="Appearance" field={`${prefix}Appearance`} form={form} updateField={updateField} />
-      <Select label="Job / Role" field={`${prefix}Job`} value={form[`${prefix}Job`]} updateField={updateField} options={jobOptions} />
-      <CheckboxGroup label="Personality" field={`${prefix}Personality`} selected={form[`${prefix}Personality`]} options={TRAIT_OPTIONS} updateField={updateField} />
-      <CheckboxGroup label="Flaws" field={`${prefix}Flaws`} selected={form[`${prefix}Flaws`]} options={FLAW_OPTIONS} updateField={updateField} />
-      <CheckboxGroup label="Biggest Desire" field={`${prefix}Desire`} selected={form[`${prefix}Desire`]} options={DESIRE_OPTIONS} updateField={updateField} />
-      <CheckboxGroup label="Biggest Fear" field={`${prefix}Fear`} selected={form[`${prefix}Fear`]} options={FEAR_OPTIONS} updateField={updateField} />
-      <Select label="Secret" field={`${prefix}Secret`} value={form[`${prefix}Secret`]} updateField={updateField} options={SECRET_OPTIONS} />
-      <TextArea label="Extra Character Notes" field={`${prefix}CustomNotes`} form={form} updateField={updateField} placeholder="Anything specific you want included..." />
+      <TextArea
+        label="Appearance"
+        field={`${prefix}Appearance`}
+        form={form}
+        updateField={updateField}
+      />
+
+      <Select
+        label="Job / Role"
+        field={`${prefix}Job`}
+        value={form[`${prefix}Job`]}
+        updateField={updateField}
+        options={jobOptions}
+      />
+
+      <CheckboxGroup
+        label="Personality"
+        field={`${prefix}Personality`}
+        selected={form[`${prefix}Personality`]}
+        options={TRAIT_OPTIONS}
+        updateField={updateField}
+      />
+
+      <CheckboxGroup
+        label="Flaws"
+        field={`${prefix}Flaws`}
+        selected={form[`${prefix}Flaws`]}
+        options={FLAW_OPTIONS}
+        updateField={updateField}
+      />
+
+      <CheckboxGroup
+        label="Biggest Desire"
+        field={`${prefix}Desire`}
+        selected={form[`${prefix}Desire`]}
+        options={DESIRE_OPTIONS}
+        updateField={updateField}
+      />
+
+      <CheckboxGroup
+        label="Biggest Fear"
+        field={`${prefix}Fear`}
+        selected={form[`${prefix}Fear`]}
+        options={FEAR_OPTIONS}
+        updateField={updateField}
+      />
+
+      <Select
+        label="Secret"
+        field={`${prefix}Secret`}
+        value={form[`${prefix}Secret`]}
+        updateField={updateField}
+        options={SECRET_OPTIONS}
+      />
+
+      <TextArea
+        label="Extra Character Notes"
+        field={`${prefix}CustomNotes`}
+        form={form}
+        updateField={updateField}
+        placeholder="Anything specific you want included..."
+      />
     </Section>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="border border-white/10 rounded-3xl p-6 bg-black/20">
       <h3 className="text-2xl font-bold mb-5 text-rose-200">{title}</h3>
