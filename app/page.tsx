@@ -3,9 +3,7 @@
 import { useState } from "react";
 
 const SUBGENRES = ["Contemporary","Small Town","Sports Romance","Dark Romance","Workplace","Celebrity","Paranormal","Billionaire","Second Chance"];
-
 const POV_OPTIONS = ["First person, single POV","First person, dual POV","Third person, single POV","Third person, dual POV","Alternating POV"];
-
 const LOCALE_OPTIONS = ["British English","American English","Canadian English","Australian English","Irish English","Neutral International"];
 
 const REGION_OPTIONS: Record<string, string[]> = {
@@ -18,72 +16,46 @@ const REGION_OPTIONS: Record<string, string[]> = {
 };
 
 const VOICE_STYLE_OPTIONS = ["Commercial romance","Raw / gritty","Warm / cosy","Sharp / witty","Dark / intense","Emotional / deep","Fast / punchy","Literary but restrained"];
-
 const DIALOGUE_STYLE_OPTIONS = ["Natural / grounded","Bantery","Dry humour","Flirty","Tense / clipped","Emotionally loaded","Blunt and realistic"];
-
 const PROSE_DENSITY_OPTIONS = ["Lean","Balanced","Rich but controlled"];
-
 const BURN_OPTIONS = ["Instant attraction","Fast burn","Medium burn","Slow burn","Agonising slow burn"];
-
 const CHAPTER_OPENER_OPTIONS = ["Quiet opener","Immediate chemistry","Tension heavy","Plot heavy","High conflict opener","Character-first opener"];
-
 const AGE_BRACKET_OPTIONS = ["18 to 21","22 to 30","30 to 45","45+"];
+const LENGTH_OPTIONS = ["Novella","Short Novel","Long Novel"];
 
 const SPORT_OPTIONS = ["Ice hockey","Football","Rugby","Boxing","MMA","Wrestling","Basketball","Baseball","Motor racing","Swimming","Athletics","Dance","Other / custom"];
-
 const TOWN_OPTIONS = ["Seaside town","Mountain town","Rural farming town","Tourist town","Historic town","Working class town","Close-knit village","Other / custom"];
-
 const CELEBRITY_OPTIONS = ["Actor","Musician","Athlete","Influencer","Author","Reality star","Royal / aristocrat","Other / custom"];
-
 const PARANORMAL_OPTIONS = ["Vampire","Werewolf","Witch","Demon","Fae","Shifter","Ghost","Mixed supernatural world","Other / custom"];
 
 const TROPE_OPTIONS = ["Enemies to lovers","Friends to lovers","Forced proximity","Fake dating","Second chance","Grumpy / sunshine","Only one bed","Hurt / comfort","Forbidden attraction","Workplace romance","Small town romance","Sports romance","Celebrity romance","Secret relationship","Opposites attract","Slow burn","High angst","Protective lead","Found family","Jealousy"];
 
 const BASE_JOB_OPTIONS = ["Business owner","Tradesperson","Doctor / Nurse","Teacher","Artist","Musician","Writer","Chef","Bar owner","Police / Firefighter","Military","Adult student","Unemployed / rebuilding life","Other / custom"];
-
 const SPORTS_JOBS = ["Ice hockey player","Footballer","Rugby player","Coach","Team doctor","Physio","Sports journalist","Agent","Club owner"];
-
 const SMALL_TOWN_JOBS = ["Cafe owner","Farmer","Vet","Builder","Local bartender","Shop owner","Mechanic","Teacher"];
-
 const CELEBRITY_JOBS = ["Actor","Singer","Famous athlete","Celebrity assistant","Bodyguard","Manager","Journalist"];
-
 const PARANORMAL_JOBS = ["Vampire","Werewolf","Witch","Hunter","Pack leader","Coven leader","Supernatural healer"];
 
 const TRAIT_OPTIONS = ["Grumpy","Sunshine","Guarded","Confident","Shy","Funny","Sarcastic","Soft-hearted","Hot-headed","Protective","Ambitious","Chaotic","Quiet","Dominant","Nurturing","Flirty","Awkward","Loyal","Broken but trying"];
-
 const SPEECH_QUIRK_OPTIONS = ["Swears naturally","Dry sarcasm","Blunt speaker","Shy speaker","Affectionate teasing","Emotionally guarded","Playful flirt","Quiet intensity","Uses humour to deflect","Short answers under stress"];
-
 const FLAW_OPTIONS = ["Trust issues","Commitment issues","Jealous","Emotionally closed off","People pleaser","Impulsive","Workaholic","Self-sabotaging","Afraid of vulnerability","Bad temper","Overprotective","Runs from conflict"];
-
 const DESIRE_OPTIONS = ["To be loved properly","To feel safe","To escape their past","To prove themselves","To build a family","To belong somewhere","To be chosen","To start over","To protect someone","To finally trust"];
-
 const FEAR_OPTIONS = ["Being abandoned","Being rejected","Losing control","Getting hurt again","Being trapped","Being truly known","Letting someone down","Repeating the past","Being vulnerable","Failing the people they love"];
-
 const SECRET_OPTIONS = ["No major secret","Hidden debt","Secret child","Criminal past","Family scandal","Fake identity","Secret illness","Secret inheritance","Hidden heartbreak","Secret engagement","Carrying guilt","Other / custom"];
 
 const SETTING_OPTIONS = ["Small town","Big city","Coastal town","Countryside","Workplace office","Restaurant / bar","Hospital","University, adult students only","Sports team","Ice rink","Tour bus / celebrity world","Ranch / farm","Mountain lodge","Island getaway","Fantasy kingdom","Paranormal town","Historical","Mafia underworld","Luxury world","Working class / gritty","Other / custom"];
-
 const CONFLICT_OPTIONS = ["Trust issues","Opposite lifestyles","Family disapproval","Career conflict","Long distance","Secret identity","One is leaving town","Rivalry","Class difference","Hidden past","Commitment fear","Forced separation","Danger / threat","Grief / healing","Other / custom"];
-
 const KEEPS_APART_OPTIONS = ["Emotional walls","Fear of commitment","Wrong timing","Existing relationship","Family pressure","Professional conflict","Physical distance","Pride","Shame / secret","Social expectations","Trauma","Mistrust","They think feelings are not returned","Other / custom"];
 
 const BASE_SCENES = ["First accidental touch","Jealousy moment","Forced close proximity","Rain kiss","Angry confession","Caretaking while sick / injured","Bed sharing","First intimate scene","Public declaration","Big breakup","Grovel scene","Reunion","Found family moment","Protective rescue","Holiday scene","Other / custom"];
-
 const SPORTS_SCENES = ["Locker room tension","After-game celebration","Injury recovery","Championship final","Secret kiss at the rink"];
-
 const SMALL_TOWN_SCENES = ["Town fair","Community event","Local gossip spreads","Snowstorm stuck together","Bonfire night"];
-
 const CELEBRITY_SCENES = ["Paparazzi scandal","Secret hotel meeting","Award show","Tour life","Public reveal"];
-
 const PARANORMAL_SCENES = ["First reveal of supernatural identity","Bite / bond moment","Pack or coven conflict","Dangerous full moon","Forbidden magic"];
 
 const MUST_NOT_HAVE_OPTIONS = ["Cheating","Love triangle","Pregnancy plot","Insta-love","Billionaire trope","Miscommunication breakup","Dark themes","Death ending","Cliffhanger","Public humiliation","Third act breakup","Toxic alpha behaviour","Other / custom"];
-
 const GROUNDING_OPTIONS = ["Mundane everyday detail","Work stress","Family baggage","Money worries","Domestic intimacy","Friendship dynamics","Class differences","Physical exhaustion","Realistic awkwardness","Messy emotions"];
-
 const AVOID_STYLE_OPTIONS = ["Purple prose","Overused similes","Repeated Like openings","Repeated As if phrasing","Cheesy banter","Melodrama","Therapy-speak","Trauma dumping","Repetitive inner monologue","Over-description","Cliché romance beats","Long dashes","Poetic object descriptions"];
-
-const REWRITE_OPTIONS = ["Make it less AI sounding, more natural and grounded","Make the dialogue sharper and more realistic","Make it grittier and less polished","Make it more emotional but not melodramatic","Reduce repeated phrasing and remove awkward similes","Make the pacing tighter","Make the romantic tension stronger","Make it darker and more intense"];
 
 export default function Home() {
   const [form, setForm] = useState({
@@ -106,7 +78,7 @@ export default function Home() {
     heat: "Spicy",
     pov: "First person, dual POV",
     ending: "Happy ending",
-    length: "Short novel",
+    length: "Short Novel",
 
     c1Name: "",
     c1Age: "",
@@ -141,14 +113,17 @@ export default function Home() {
     intensity: "Dramatic",
   });
 
-  const [result, setResult] = useState("");
+  const [chapters, setChapters] = useState<string[]>([]);
+  const [activeChapterIndex, setActiveChapterIndex] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [continueLoading, setContinueLoading] = useState(false);
   const [rewriteLoading, setRewriteLoading] = useState(false);
   const [customRewrite, setCustomRewrite] = useState("");
 
   const jobOptions = getJobOptions(form.subgenre);
   const sceneOptions = getSceneOptions(form.subgenre);
   const regionOptions = REGION_OPTIONS[form.locale] || ["Neutral"];
+  const activeChapter = chapters[activeChapterIndex] || "";
 
   function updateField(field: string, value: string) {
     setForm((prev) => {
@@ -217,7 +192,8 @@ export default function Home() {
 
   async function generateStory() {
     setLoading(true);
-    setResult("");
+    setChapters([]);
+    setActiveChapterIndex(0);
 
     const res = await fetch("/api/generate-bible", {
       method: "POST",
@@ -226,24 +202,64 @@ export default function Home() {
     });
 
     const data = await res.json();
-    setResult(data.result || "Something went wrong.");
+    const chapter = data.result || "Something went wrong.";
+
+    setChapters([chapter]);
+    setActiveChapterIndex(0);
     setLoading(false);
   }
 
-  async function rewriteChapter(instruction: string) {
-    if (!result) return;
+  async function rewriteChapter() {
+    if (!activeChapter || !customRewrite.trim()) return;
 
     setRewriteLoading(true);
 
     const res = await fetch("/api/rewrite-chapter", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chapter: result, instruction }),
+      body: JSON.stringify({
+        chapter: activeChapter,
+        instruction: customRewrite,
+      }),
     });
 
     const data = await res.json();
-    setResult(data.result || "Rewrite failed.");
+    const rewritten = data.result || "Rewrite failed.";
+
+    setChapters((prev) => {
+      const next = [...prev];
+      next[activeChapterIndex] = rewritten;
+      return next;
+    });
+
     setRewriteLoading(false);
+  }
+
+  async function continueStory() {
+    if (!activeChapter) return;
+
+    setContinueLoading(true);
+
+    const previousChapters = chapters
+      .map((chapter, index) => `Chapter ${index + 1}\n${chapter}`)
+      .join("\n\n");
+
+    const res = await fetch("/api/continue-story", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        form,
+        previousChapter: previousChapters,
+        nextChapterNumber: chapters.length + 1,
+      }),
+    });
+
+    const data = await res.json();
+    const nextChapter = data.result || "Continue failed.";
+
+    setChapters((prev) => [...prev, nextChapter]);
+    setActiveChapterIndex(chapters.length);
+    setContinueLoading(false);
   }
 
   return (
@@ -286,7 +302,7 @@ export default function Home() {
                 <Select label="Age Bracket" field="ageBracket" value={form.ageBracket} updateField={updateField} options={AGE_BRACKET_OPTIONS} />
                 <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
                 <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
-                <Select label="Length" field="length" value={form.length} updateField={updateField} options={["Novella", "Short novel", "Full novel"]} />
+                <Select label="Length" field="length" value={form.length} updateField={updateField} options={LENGTH_OPTIONS} />
                 <Select label="Plot Intensity" field="intensity" value={form.intensity} updateField={updateField} options={["Cozy", "Balanced", "Dramatic", "Heavy angst", "Chaotic soap opera"]} />
               </div>
 
@@ -329,27 +345,57 @@ export default function Home() {
           </div>
         </div>
 
-        {result && (
+        {chapters.length > 0 && (
           <div className="max-w-4xl mx-auto mt-10 bg-black/30 rounded-3xl p-8 border border-white/10 whitespace-pre-wrap leading-8 text-zinc-200">
-            <h2 className="text-3xl font-bold text-rose-200 mb-6">Chapter 1</h2>
+            <div className="flex flex-wrap gap-2 mb-8">
+              {chapters.map((_, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setActiveChapterIndex(index)}
+                  className={`rounded-full px-4 py-2 text-sm border transition ${
+                    activeChapterIndex === index
+                      ? "bg-rose-500 border-rose-400 text-white"
+                      : "bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400"
+                  }`}
+                >
+                  Chapter {index + 1}
+                </button>
+              ))}
+            </div>
 
-            <div>{result}</div>
+            <h2 className="text-3xl font-bold text-rose-200 mb-6">
+              Chapter {activeChapterIndex + 1}
+            </h2>
+
+            <div>{activeChapter}</div>
 
             <div className="mt-10 border-t border-white/10 pt-8">
               <h3 className="text-2xl font-bold text-rose-200 mb-4">Rewrite Chapter</h3>
 
-              <div className="flex flex-wrap gap-2 mb-6">
-                {REWRITE_OPTIONS.map((option) => (
-                  <button key={option} type="button" onClick={() => rewriteChapter(option)} disabled={rewriteLoading} className="rounded-full px-4 py-2 text-sm border bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400 disabled:opacity-50">
-                    {option}
-                  </button>
-                ))}
-              </div>
+              <textarea
+                value={customRewrite}
+                onChange={(e) => setCustomRewrite(e.target.value)}
+                placeholder="Tell it what to change, e.g. make the dialogue less stiff, add more tension, make it less poetic..."
+                className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none min-h-[100px]"
+              />
 
-              <textarea value={customRewrite} onChange={(e) => setCustomRewrite(e.target.value)} placeholder="Custom rewrite instruction, e.g. make Callum less poetic and more blunt..." className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none min-h-[100px]" />
+              <button
+                type="button"
+                onClick={rewriteChapter}
+                disabled={rewriteLoading || !customRewrite.trim()}
+                className="mt-4 w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 disabled:opacity-50"
+              >
+                {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
+              </button>
 
-              <button type="button" onClick={() => rewriteChapter(customRewrite)} disabled={rewriteLoading || !customRewrite.trim()} className="mt-4 w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 disabled:opacity-50">
-                {rewriteLoading ? "Rewriting..." : "Rewrite With Custom Instruction"}
+              <button
+                type="button"
+                onClick={continueStory}
+                disabled={continueLoading}
+                className="mt-4 w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg disabled:opacity-50"
+              >
+                {continueLoading ? "Continuing story..." : `Continue to Chapter ${chapters.length + 1}`}
               </button>
             </div>
           </div>
@@ -467,4 +513,4 @@ function CheckboxGroup({ label, field, selected, options, updateField }: any) {
       </div>
     </div>
   );
-      }
+            }
