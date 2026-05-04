@@ -180,7 +180,7 @@ Important continuity rules:
       { status: 500 }
     );
   }
-}- Make it emotionally grounded and human.
+- Make it emotionally grounded and human.
 - Use natural dialogue with subtext.
 - Keep character voices distinct.
 - Honour the selected POV exactly.
