@@ -58,6 +58,17 @@ const GROUNDING_OPTIONS = ["Mundane everyday detail","Work stress","Family bagga
 const AVOID_STYLE_OPTIONS = ["Purple prose","Overused similes","Repeated Like openings","Repeated As if phrasing","Cheesy banter","Melodrama","Therapy-speak","Trauma dumping","Repetitive inner monologue","Over-description","Cliché romance beats","Long dashes","Poetic object descriptions"];
 
 export default function Home() {
+  const [step, setStep] = useState(1);
+
+  const steps = [
+    "Story Setup",
+    "Voice Engine",
+    "Character 1",
+    "Character 2",
+    "Plot Builder",
+    "Review & Generate",
+  ];
+
   const [form, setForm] = useState({
     title: "",
     relationship: "MM Romance",
@@ -283,65 +294,132 @@ export default function Home() {
         <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-8 max-w-4xl mx-auto">
           <h2 className="text-3xl font-bold mb-8">Create New Story</h2>
 
+          <div className="mb-8">
+            <div className="flex justify-between text-sm text-zinc-300 mb-3">
+              <span>Step {step} of {steps.length}</span>
+              <span>{steps[step - 1]}</span>
+            </div>
+
+            <div className="h-3 rounded-full bg-zinc-900 overflow-hidden border border-white/10">
+              <div
+                className="h-full bg-rose-500 transition-all"
+                style={{ width: `${(step / steps.length) * 100}%` }}
+              />
+            </div>
+          </div>
+
           <div className="grid gap-8">
-            <Section title="Story Setup">
-              <Input label="Story Title" field="title" form={form} updateField={updateField} />
+            {step === 1 && (
+              <Section title="Story Setup">
+                <Input label="Story Title" field="title" form={form} updateField={updateField} />
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
-                <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={SUBGENRES} />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
+                  <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={SUBGENRES} />
 
-                {form.subgenre === "Sports Romance" && <Select label="Sport Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={SPORT_OPTIONS} />}
-                {form.subgenre === "Small Town" && <Select label="Town Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={TOWN_OPTIONS} />}
-                {form.subgenre === "Celebrity" && <Select label="Celebrity Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={CELEBRITY_OPTIONS} />}
-                {form.subgenre === "Paranormal" && <Select label="Paranormal World" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={PARANORMAL_OPTIONS} />}
+                  {form.subgenre === "Sports Romance" && <Select label="Sport Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={SPORT_OPTIONS} />}
+                  {form.subgenre === "Small Town" && <Select label="Town Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={TOWN_OPTIONS} />}
+                  {form.subgenre === "Celebrity" && <Select label="Celebrity Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={CELEBRITY_OPTIONS} />}
+                  {form.subgenre === "Paranormal" && <Select label="Paranormal World" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={PARANORMAL_OPTIONS} />}
 
-                <Select label="Locale / Language Flavour" field="locale" value={form.locale} updateField={updateField} options={LOCALE_OPTIONS} />
-                <Select label="Regional Voice" field="regionVoice" value={form.regionVoice} updateField={updateField} options={regionOptions} />
-                <Select label="POV" field="pov" value={form.pov} updateField={updateField} options={POV_OPTIONS} />
-                <Select label="Age Bracket" field="ageBracket" value={form.ageBracket} updateField={updateField} options={AGE_BRACKET_OPTIONS} />
-                <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
-                <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
-                <Select label="Length" field="length" value={form.length} updateField={updateField} options={LENGTH_OPTIONS} />
-                <Select label="Plot Intensity" field="intensity" value={form.intensity} updateField={updateField} options={["Cozy", "Balanced", "Dramatic", "Heavy angst", "Chaotic soap opera"]} />
-              </div>
+                  <Select label="Locale / Language Flavour" field="locale" value={form.locale} updateField={updateField} options={LOCALE_OPTIONS} />
+                  <Select label="Regional Voice" field="regionVoice" value={form.regionVoice} updateField={updateField} options={regionOptions} />
+                  <Select label="POV" field="pov" value={form.pov} updateField={updateField} options={POV_OPTIONS} />
+                  <Select label="Age Bracket" field="ageBracket" value={form.ageBracket} updateField={updateField} options={AGE_BRACKET_OPTIONS} />
+                  <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
+                  <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
+                  <Select label="Length" field="length" value={form.length} updateField={updateField} options={LENGTH_OPTIONS} />
+                  <Select label="Plot Intensity" field="intensity" value={form.intensity} updateField={updateField} options={["Cozy", "Balanced", "Dramatic", "Heavy angst", "Chaotic soap opera"]} />
+                </div>
 
-              <CheckboxGroup label="Tropes" field="tropes" selected={form.tropes} options={TROPE_OPTIONS} updateField={updateField} />
-            </Section>
+                <CheckboxGroup label="Tropes" field="tropes" selected={form.tropes} options={TROPE_OPTIONS} updateField={updateField} />
+              </Section>
+            )}
 
-            <Section title="Voice Engine">
-              <div className="grid md:grid-cols-2 gap-4">
-                <Select label="Writing Style" field="voiceStyle" value={form.voiceStyle} updateField={updateField} options={VOICE_STYLE_OPTIONS} />
-                <Select label="Dialogue Style" field="dialogueStyle" value={form.dialogueStyle} updateField={updateField} options={DIALOGUE_STYLE_OPTIONS} />
-                <Select label="Prose Density" field="proseDensity" value={form.proseDensity} updateField={updateField} options={PROSE_DENSITY_OPTIONS} />
-                <Select label="Burn Pacing" field="burnPacing" value={form.burnPacing} updateField={updateField} options={BURN_OPTIONS} />
-                <Select label="Chapter Opener" field="chapterOpener" value={form.chapterOpener} updateField={updateField} options={CHAPTER_OPENER_OPTIONS} />
-              </div>
+            {step === 2 && (
+              <Section title="Voice Engine">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <Select label="Writing Style" field="voiceStyle" value={form.voiceStyle} updateField={updateField} options={VOICE_STYLE_OPTIONS} />
+                  <Select label="Dialogue Style" field="dialogueStyle" value={form.dialogueStyle} updateField={updateField} options={DIALOGUE_STYLE_OPTIONS} />
+                  <Select label="Prose Density" field="proseDensity" value={form.proseDensity} updateField={updateField} options={PROSE_DENSITY_OPTIONS} />
+                  <Select label="Burn Pacing" field="burnPacing" value={form.burnPacing} updateField={updateField} options={BURN_OPTIONS} />
+                  <Select label="Chapter Opener" field="chapterOpener" value={form.chapterOpener} updateField={updateField} options={CHAPTER_OPENER_OPTIONS} />
+                </div>
 
-              <CheckboxGroup label="Real-World Grounding" field="grounding" selected={form.grounding} options={GROUNDING_OPTIONS} updateField={updateField} />
-              <CheckboxGroup label="Avoid AI Waffle" field="avoidStyle" selected={form.avoidStyle} options={AVOID_STYLE_OPTIONS} updateField={updateField} />
-            </Section>
+                <CheckboxGroup label="Real-World Grounding" field="grounding" selected={form.grounding} options={GROUNDING_OPTIONS} updateField={updateField} />
+                <CheckboxGroup label="Avoid AI Waffle" field="avoidStyle" selected={form.avoidStyle} options={AVOID_STYLE_OPTIONS} updateField={updateField} />
+              </Section>
+            )}
 
-            <button type="button" onClick={generateNames} className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10">
-              Generate Character Names
-            </button>
+            {step === 3 && (
+              <>
+                <button type="button" onClick={generateNames} className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10">
+                  Generate Character Names
+                </button>
 
-            <CharacterSection title="Character 1" prefix="c1" form={form} updateField={updateField} jobOptions={jobOptions} />
-            <CharacterSection title="Character 2" prefix="c2" form={form} updateField={updateField} jobOptions={jobOptions} />
+                <CharacterSection title="Character 1" prefix="c1" form={form} updateField={updateField} jobOptions={jobOptions} />
+              </>
+            )}
 
-            <Section title="Plot Builder">
-              <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
-              <CheckboxGroup label="Main Conflict" field="conflict" selected={form.conflict} options={CONFLICT_OPTIONS} updateField={updateField} />
-              <CheckboxGroup label="What Keeps Them Apart?" field="keepsApart" selected={form.keepsApart} options={KEEPS_APART_OPTIONS} updateField={updateField} />
-              <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={sceneOptions} updateField={updateField} />
-              <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
+            {step === 4 && (
+              <CharacterSection title="Character 2" prefix="c2" form={form} updateField={updateField} jobOptions={jobOptions} />
+            )}
 
-              <TextArea label="Optional Plot Notes" field="plot" form={form} updateField={updateField} placeholder="Add anything specific, if needed..." />
-            </Section>
+            {step === 5 && (
+              <Section title="Plot Builder">
+                <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
+                <CheckboxGroup label="Main Conflict" field="conflict" selected={form.conflict} options={CONFLICT_OPTIONS} updateField={updateField} />
+                <CheckboxGroup label="What Keeps Them Apart?" field="keepsApart" selected={form.keepsApart} options={KEEPS_APART_OPTIONS} updateField={updateField} />
+                <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={sceneOptions} updateField={updateField} />
+                <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
 
-            <button onClick={generateStory} className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg">
-              {loading ? "Generating your story..." : "Generate Story"}
-            </button>
+                <TextArea label="Optional Plot Notes" field="plot" form={form} updateField={updateField} placeholder="Add anything specific, if needed..." />
+              </Section>
+            )}
+
+            {step === 6 && (
+              <Section title="Review & Generate">
+                <div className="grid gap-3 text-zinc-200">
+                  <p><strong>Title:</strong> {form.title || "Untitled"}</p>
+                  <p><strong>Relationship:</strong> {form.relationship}</p>
+                  <p><strong>Subgenre:</strong> {form.subgenre} {form.subgenreDetail && `, ${form.subgenreDetail}`}</p>
+                  <p><strong>Locale:</strong> {form.locale}, {form.regionVoice}</p>
+                  <p><strong>Voice:</strong> {form.voiceStyle}, {form.dialogueStyle}, {form.proseDensity}</p>
+                  <p><strong>Burn:</strong> {form.burnPacing}</p>
+                  <p><strong>Heat:</strong> {form.heat}</p>
+                  <p><strong>POV:</strong> {form.pov}</p>
+                  <p><strong>Characters:</strong> {form.c1Name || "Character 1"} + {form.c2Name || "Character 2"}</p>
+                  <p><strong>Tropes:</strong> {form.tropes || "None selected"}</p>
+                  <p><strong>Conflict:</strong> {form.conflict || "Not selected"}</p>
+                  <p><strong>Must not have:</strong> {form.mustNotHave || "None selected"}</p>
+                </div>
+
+                <button onClick={generateStory} className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg mt-6">
+                  {loading ? "Generating your story..." : "Generate Story"}
+                </button>
+              </Section>
+            )}
+
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={() => setStep((prev) => Math.max(1, prev - 1))}
+                disabled={step === 1}
+                className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 disabled:opacity-40"
+              >
+                Back
+              </button>
+
+              {step < steps.length && (
+                <button
+                  type="button"
+                  onClick={() => setStep((prev) => Math.min(steps.length, prev + 1))}
+                  className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-3 font-bold"
+                >
+                  Next
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -504,7 +582,16 @@ function CheckboxGroup({ label, field, selected, options, updateField }: any) {
           const active = selectedArray.includes(option);
 
           return (
-            <button type="button" key={option} onClick={() => toggleOption(option)} className={`rounded-full px-4 py-2 text-sm border transition ${active ? "bg-rose-500 border-rose-400 text-white" : "bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400"}`}>
+            <button
+              type="button"
+              key={option}
+              onClick={() => toggleOption(option)}
+              className={`rounded-full px-4 py-2 text-sm border transition ${
+                active
+                  ? "bg-rose-500 border-rose-400 text-white"
+                  : "bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400"
+              }`}
+            >
               {active ? "✓ " : ""}
               {option}
             </button>
@@ -513,4 +600,4 @@ function CheckboxGroup({ label, field, selected, options, updateField }: any) {
       </div>
     </div>
   );
-            }
+}
