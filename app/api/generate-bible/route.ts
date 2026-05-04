@@ -31,7 +31,13 @@ Safety rules:
 - Do not include incest.
 - Do not frame coercion or abuse as romantic.
 - If a user-selected setup risks unsafe content, age up characters and make the relationship legal, consensual and adult.
-
+Length discipline:
+- If Book Length is Novella, Chapter 1 must be 900 to 1,500 words.
+- If Book Length is Short Novel, Chapter 1 must be 1,800 to 2,800 words.
+- If Book Length is Long Novel, Chapter 1 must be 2,800 to 4,000 words.
+- Do not exceed the selected range.
+- End after one strong hook or emotional turn.
+- Do not over-expand scenes.
 Story controls:
 Title: ${body.title}
 Relationship Type: ${body.relationship}
