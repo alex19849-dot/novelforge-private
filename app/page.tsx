@@ -23,14 +23,14 @@ const CHAPTER_OPENER_OPTIONS = ["Quiet opener","Immediate chemistry","Tension he
 const AGE_BRACKET_OPTIONS = ["18 to 21","22 to 30","30 to 45","45+"];
 const LENGTH_OPTIONS = ["Novella","Short Novel","Long Novel"];
 
-const SPORT_OPTIONS = ["Ice hockey","Football","Rugby","Boxing","MMA","Wrestling","Basketball","Baseball","Motor racing","Swimming","Athletics","Dance","Other / custom"];
-const TOWN_OPTIONS = ["Seaside town","Mountain town","Rural farming town","Tourist town","Historic town","Working class town","Close-knit village","Other / custom"];
-const CELEBRITY_OPTIONS = ["Actor","Musician","Athlete","Influencer","Author","Reality star","Royal / aristocrat","Other / custom"];
-const PARANORMAL_OPTIONS = ["Vampire","Werewolf","Witch","Demon","Fae","Shifter","Ghost","Mixed supernatural world","Other / custom"];
+const SPORT_OPTIONS = ["Ice hockey","Football","Rugby","Boxing","MMA","Wrestling","Basketball","Baseball","Motor racing","Swimming","Athletics","Dance","Custom"];
+const TOWN_OPTIONS = ["Seaside town","Mountain town","Rural farming town","Tourist town","Historic town","Working class town","Close-knit village","Custom"];
+const CELEBRITY_OPTIONS = ["Actor","Musician","Athlete","Influencer","Author","Reality star","Royal / aristocrat","Custom"];
+const PARANORMAL_OPTIONS = ["Vampire","Werewolf","Witch","Demon","Fae","Shifter","Ghost","Mixed supernatural world","Custom"];
 
 const TROPE_OPTIONS = ["Enemies to lovers","Friends to lovers","Forced proximity","Fake dating","Second chance","Grumpy / sunshine","Only one bed","Hurt / comfort","Forbidden attraction","Workplace romance","Small town romance","Sports romance","Celebrity romance","Secret relationship","Opposites attract","Slow burn","High angst","Protective lead","Found family","Jealousy"];
 
-const BASE_JOB_OPTIONS = ["Business owner","Tradesperson","Doctor / Nurse","Teacher","Artist","Musician","Writer","Chef","Bar owner","Police / Firefighter","Military","Adult student","Unemployed / rebuilding life","Other / custom"];
+const BASE_JOB_OPTIONS = ["Business owner","Tradesperson","Doctor / Nurse","Teacher","Artist","Musician","Writer","Chef","Bar owner","Police / Firefighter","Military","Adult student","Unemployed / rebuilding life","Custom"];
 const SPORTS_JOBS = ["Ice hockey player","Footballer","Rugby player","Coach","Team doctor","Physio","Sports journalist","Agent","Club owner"];
 const SMALL_TOWN_JOBS = ["Cafe owner","Farmer","Vet","Builder","Local bartender","Shop owner","Mechanic","Teacher"];
 const CELEBRITY_JOBS = ["Actor","Singer","Famous athlete","Celebrity assistant","Bodyguard","Manager","Journalist"];
@@ -41,19 +41,19 @@ const SPEECH_QUIRK_OPTIONS = ["Swears naturally","Dry sarcasm","Blunt speaker","
 const FLAW_OPTIONS = ["Trust issues","Commitment issues","Jealous","Emotionally closed off","People pleaser","Impulsive","Workaholic","Self-sabotaging","Afraid of vulnerability","Bad temper","Overprotective","Runs from conflict"];
 const DESIRE_OPTIONS = ["To be loved properly","To feel safe","To escape their past","To prove themselves","To build a family","To belong somewhere","To be chosen","To start over","To protect someone","To finally trust"];
 const FEAR_OPTIONS = ["Being abandoned","Being rejected","Losing control","Getting hurt again","Being trapped","Being truly known","Letting someone down","Repeating the past","Being vulnerable","Failing the people they love"];
-const SECRET_OPTIONS = ["No major secret","Hidden debt","Secret child","Criminal past","Family scandal","Fake identity","Secret illness","Secret inheritance","Hidden heartbreak","Secret engagement","Carrying guilt","Other / custom"];
+const SECRET_OPTIONS = ["No major secret","Hidden debt","Secret child","Criminal past","Family scandal","Fake identity","Secret illness","Secret inheritance","Hidden heartbreak","Secret engagement","Carrying guilt","Custom"];
 
-const SETTING_OPTIONS = ["Small town","Big city","Coastal town","Countryside","Workplace office","Restaurant / bar","Hospital","University, adult students only","Sports team","Ice rink","Tour bus / celebrity world","Ranch / farm","Mountain lodge","Island getaway","Fantasy kingdom","Paranormal town","Historical","Mafia underworld","Luxury world","Working class / gritty","Other / custom"];
-const CONFLICT_OPTIONS = ["Trust issues","Opposite lifestyles","Family disapproval","Career conflict","Long distance","Secret identity","One is leaving town","Rivalry","Class difference","Hidden past","Commitment fear","Forced separation","Danger / threat","Grief / healing","Other / custom"];
-const KEEPS_APART_OPTIONS = ["Emotional walls","Fear of commitment","Wrong timing","Existing relationship","Family pressure","Professional conflict","Physical distance","Pride","Shame / secret","Social expectations","Trauma","Mistrust","They think feelings are not returned","Other / custom"];
+const SETTING_OPTIONS = ["Small town","Big city","Coastal town","Countryside","Workplace office","Restaurant / bar","Hospital","University, adult students only","Sports team","Ice rink","Tour bus / celebrity world","Ranch / farm","Mountain lodge","Island getaway","Fantasy kingdom","Paranormal town","Historical","Mafia underworld","Luxury world","Working class / gritty","Custom"];
+const CONFLICT_OPTIONS = ["Trust issues","Opposite lifestyles","Family disapproval","Career conflict","Long distance","Secret identity","One is leaving town","Rivalry","Class difference","Hidden past","Commitment fear","Forced separation","Danger / threat","Grief / healing","Custom"];
+const KEEPS_APART_OPTIONS = ["Emotional walls","Fear of commitment","Wrong timing","Existing relationship","Family pressure","Professional conflict","Physical distance","Pride","Shame / secret","Social expectations","Trauma","Mistrust","They think feelings are not returned","Custom"];
 
-const BASE_SCENES = ["First accidental touch","Jealousy moment","Forced close proximity","Rain kiss","Angry confession","Caretaking while sick / injured","Bed sharing","First intimate scene","Public declaration","Big breakup","Grovel scene","Reunion","Found family moment","Protective rescue","Holiday scene","Other / custom"];
+const BASE_SCENES = ["First accidental touch","Jealousy moment","Forced close proximity","Rain kiss","Angry confession","Caretaking while sick / injured","Bed sharing","First intimate scene","Public declaration","Big breakup","Grovel scene","Reunion","Found family moment","Protective rescue","Holiday scene","Custom"];
 const SPORTS_SCENES = ["Locker room tension","After-game celebration","Injury recovery","Championship final","Secret kiss at the rink"];
 const SMALL_TOWN_SCENES = ["Town fair","Community event","Local gossip spreads","Snowstorm stuck together","Bonfire night"];
 const CELEBRITY_SCENES = ["Paparazzi scandal","Secret hotel meeting","Award show","Tour life","Public reveal"];
 const PARANORMAL_SCENES = ["First reveal of supernatural identity","Bite / bond moment","Pack or coven conflict","Dangerous full moon","Forbidden magic"];
 
-const MUST_NOT_HAVE_OPTIONS = ["Cheating","Love triangle","Pregnancy plot","Insta-love","Billionaire trope","Miscommunication breakup","Dark themes","Death ending","Cliffhanger","Public humiliation","Third act breakup","Toxic alpha behaviour","Other / custom"];
+const MUST_NOT_HAVE_OPTIONS = ["Cheating","Love triangle","Pregnancy plot","Insta-love","Billionaire trope","Miscommunication breakup","Dark themes","Death ending","Cliffhanger","Public humiliation","Third act breakup","Toxic alpha behaviour","Custom"];
 const GROUNDING_OPTIONS = ["Mundane everyday detail","Work stress","Family baggage","Money worries","Domestic intimacy","Friendship dynamics","Class differences","Physical exhaustion","Realistic awkwardness","Messy emotions"];
 const AVOID_STYLE_OPTIONS = ["Purple prose","Overused similes","Repeated Like openings","Repeated As if phrasing","Cheesy banter","Melodrama","Therapy-speak","Trauma dumping","Repetitive inner monologue","Over-description","Cliché romance beats","Long dashes","Poetic object descriptions"];
 
@@ -74,6 +74,7 @@ export default function Home() {
     relationship: "MM Romance",
     subgenre: "Sports Romance",
     subgenreDetail: "Ice hockey",
+    subgenreDetailCustom: "",
     locale: "Canadian English",
     regionVoice: "Urban Canadian",
     voiceStyle: "Commercial romance",
@@ -95,32 +96,41 @@ export default function Home() {
     c1Age: "",
     c1Appearance: "",
     c1Job: "Ice hockey player",
+    c1JobCustom: "",
     c1Personality: "",
     c1Speech: "",
     c1Flaws: "",
     c1Desire: "",
     c1Fear: "",
     c1Secret: "No major secret",
+    c1SecretCustom: "",
     c1CustomNotes: "",
 
     c2Name: "",
     c2Age: "",
     c2Appearance: "",
     c2Job: "Ice hockey player",
+    c2JobCustom: "",
     c2Personality: "",
     c2Speech: "",
     c2Flaws: "",
     c2Desire: "",
     c2Fear: "",
     c2Secret: "No major secret",
+    c2SecretCustom: "",
     c2CustomNotes: "",
 
     setting: "Sports team, Ice rink",
+    settingCustom: "",
     plot: "",
     conflict: "",
+    conflictCustom: "",
     keepsApart: "",
+    keepsApartCustom: "",
     mustHave: "",
+    mustHaveCustom: "",
     mustNotHave: "",
+    mustNotHaveCustom: "",
     intensity: "Dramatic",
   });
 
@@ -135,6 +145,20 @@ export default function Home() {
   const sceneOptions = getSceneOptions(form.subgenre);
   const regionOptions = REGION_OPTIONS[form.locale] || ["Neutral"];
   const activeChapter = chapters[activeChapterIndex] || "";
+
+  const preparedForm = {
+    ...form,
+    subgenreDetail: resolveCustom(form.subgenreDetail, form.subgenreDetailCustom),
+    c1Job: resolveCustom(form.c1Job, form.c1JobCustom),
+    c2Job: resolveCustom(form.c2Job, form.c2JobCustom),
+    c1Secret: resolveCustom(form.c1Secret, form.c1SecretCustom),
+    c2Secret: resolveCustom(form.c2Secret, form.c2SecretCustom),
+    setting: resolveCustomList(form.setting, form.settingCustom),
+    conflict: resolveCustomList(form.conflict, form.conflictCustom),
+    keepsApart: resolveCustomList(form.keepsApart, form.keepsApartCustom),
+    mustHave: resolveCustomList(form.mustHave, form.mustHaveCustom),
+    mustNotHave: resolveCustomList(form.mustNotHave, form.mustNotHaveCustom),
+  };
 
   function updateField(field: string, value: string) {
     setForm((prev) => {
@@ -209,7 +233,7 @@ export default function Home() {
     const res = await fetch("/api/generate-bible", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify(preparedForm),
     });
 
     const data = await res.json();
@@ -259,7 +283,7 @@ export default function Home() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        form,
+        form: preparedForm,
         previousChapter: previousChapters,
         nextChapterNumber: chapters.length + 1,
       }),
@@ -317,10 +341,33 @@ export default function Home() {
                   <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
                   <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={SUBGENRES} />
 
-                  {form.subgenre === "Sports Romance" && <Select label="Sport Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={SPORT_OPTIONS} />}
-                  {form.subgenre === "Small Town" && <Select label="Town Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={TOWN_OPTIONS} />}
-                  {form.subgenre === "Celebrity" && <Select label="Celebrity Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={CELEBRITY_OPTIONS} />}
-                  {form.subgenre === "Paranormal" && <Select label="Paranormal World" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={PARANORMAL_OPTIONS} />}
+                  {form.subgenre === "Sports Romance" && (
+                    <>
+                      <Select label="Sport Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={SPORT_OPTIONS} />
+                      {form.subgenreDetail === "Custom" && <Input label="Custom Sport Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
+                    </>
+                  )}
+
+                  {form.subgenre === "Small Town" && (
+                    <>
+                      <Select label="Town Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={TOWN_OPTIONS} />
+                      {form.subgenreDetail === "Custom" && <Input label="Custom Town Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
+                    </>
+                  )}
+
+                  {form.subgenre === "Celebrity" && (
+                    <>
+                      <Select label="Celebrity Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={CELEBRITY_OPTIONS} />
+                      {form.subgenreDetail === "Custom" && <Input label="Custom Celebrity Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
+                    </>
+                  )}
+
+                  {form.subgenre === "Paranormal" && (
+                    <>
+                      <Select label="Paranormal World" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={PARANORMAL_OPTIONS} />
+                      {form.subgenreDetail === "Custom" && <Input label="Custom Paranormal World" field="subgenreDetailCustom" form={form} updateField={updateField} />}
+                    </>
+                  )}
 
                   <Select label="Locale / Language Flavour" field="locale" value={form.locale} updateField={updateField} options={LOCALE_OPTIONS} />
                   <Select label="Regional Voice" field="regionVoice" value={form.regionVoice} updateField={updateField} options={regionOptions} />
@@ -368,10 +415,19 @@ export default function Home() {
             {step === 5 && (
               <Section title="Plot Builder">
                 <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
+                {hasCustom(form.setting) && <Input label="Custom Setting" field="settingCustom" form={form} updateField={updateField} />}
+
                 <CheckboxGroup label="Main Conflict" field="conflict" selected={form.conflict} options={CONFLICT_OPTIONS} updateField={updateField} />
+                {hasCustom(form.conflict) && <Input label="Custom Main Conflict" field="conflictCustom" form={form} updateField={updateField} />}
+
                 <CheckboxGroup label="What Keeps Them Apart?" field="keepsApart" selected={form.keepsApart} options={KEEPS_APART_OPTIONS} updateField={updateField} />
+                {hasCustom(form.keepsApart) && <Input label="Custom Reason Keeping Them Apart" field="keepsApartCustom" form={form} updateField={updateField} />}
+
                 <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={sceneOptions} updateField={updateField} />
+                {hasCustom(form.mustHave) && <Input label="Custom Must-Have Scene" field="mustHaveCustom" form={form} updateField={updateField} />}
+
                 <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
+                {hasCustom(form.mustNotHave) && <Input label="Custom Must-Not-Have" field="mustNotHaveCustom" form={form} updateField={updateField} />}
 
                 <TextArea label="Optional Plot Notes" field="plot" form={form} updateField={updateField} placeholder="Add anything specific, if needed..." />
               </Section>
@@ -380,18 +436,21 @@ export default function Home() {
             {step === 6 && (
               <Section title="Review & Generate">
                 <div className="grid gap-3 text-zinc-200">
-                  <p><strong>Title:</strong> {form.title || "Untitled"}</p>
-                  <p><strong>Relationship:</strong> {form.relationship}</p>
-                  <p><strong>Subgenre:</strong> {form.subgenre} {form.subgenreDetail && `, ${form.subgenreDetail}`}</p>
-                  <p><strong>Locale:</strong> {form.locale}, {form.regionVoice}</p>
-                  <p><strong>Voice:</strong> {form.voiceStyle}, {form.dialogueStyle}, {form.proseDensity}</p>
-                  <p><strong>Burn:</strong> {form.burnPacing}</p>
-                  <p><strong>Heat:</strong> {form.heat}</p>
-                  <p><strong>POV:</strong> {form.pov}</p>
-                  <p><strong>Characters:</strong> {form.c1Name || "Character 1"} + {form.c2Name || "Character 2"}</p>
-                  <p><strong>Tropes:</strong> {form.tropes || "None selected"}</p>
-                  <p><strong>Conflict:</strong> {form.conflict || "Not selected"}</p>
-                  <p><strong>Must not have:</strong> {form.mustNotHave || "None selected"}</p>
+                  <p><strong>Title:</strong> {preparedForm.title || "Untitled"}</p>
+                  <p><strong>Relationship:</strong> {preparedForm.relationship}</p>
+                  <p><strong>Subgenre:</strong> {preparedForm.subgenre} {preparedForm.subgenreDetail && `, ${preparedForm.subgenreDetail}`}</p>
+                  <p><strong>Locale:</strong> {preparedForm.locale}, {preparedForm.regionVoice}</p>
+                  <p><strong>Voice:</strong> {preparedForm.voiceStyle}, {preparedForm.dialogueStyle}, {preparedForm.proseDensity}</p>
+                  <p><strong>Burn:</strong> {preparedForm.burnPacing}</p>
+                  <p><strong>Heat:</strong> {preparedForm.heat}</p>
+                  <p><strong>POV:</strong> {preparedForm.pov}</p>
+                  <p><strong>Characters:</strong> {preparedForm.c1Name || "Character 1"} + {preparedForm.c2Name || "Character 2"}</p>
+                  <p><strong>Jobs:</strong> {preparedForm.c1Job} + {preparedForm.c2Job}</p>
+                  <p><strong>Tropes:</strong> {preparedForm.tropes || "None selected"}</p>
+                  <p><strong>Setting:</strong> {preparedForm.setting || "Not selected"}</p>
+                  <p><strong>Conflict:</strong> {preparedForm.conflict || "Not selected"}</p>
+                  <p><strong>Must have:</strong> {preparedForm.mustHave || "None selected"}</p>
+                  <p><strong>Must not have:</strong> {preparedForm.mustNotHave || "None selected"}</p>
                 </div>
 
                 <button onClick={generateStory} className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg mt-6">
@@ -483,6 +542,30 @@ export default function Home() {
   );
 }
 
+function resolveCustom(value: string, customValue: string) {
+  if (value === "Custom" && customValue.trim()) return customValue.trim();
+  return value;
+}
+
+function hasCustom(value: string) {
+  return value
+    .split(", ")
+    .filter(Boolean)
+    .includes("Custom");
+}
+
+function resolveCustomList(value: string, customValue: string) {
+  if (!value) return customValue.trim();
+
+  const parts = value.split(", ").filter(Boolean);
+  const cleaned = parts.map((part) => {
+    if (part === "Custom" && customValue.trim()) return customValue.trim();
+    return part;
+  });
+
+  return cleaned.join(", ");
+}
+
 function getJobOptions(subgenre: string) {
   if (subgenre === "Sports Romance") return [...SPORTS_JOBS, ...BASE_JOB_OPTIONS];
   if (subgenre === "Small Town") return [...SMALL_TOWN_JOBS, ...BASE_JOB_OPTIONS];
@@ -500,6 +583,11 @@ function getSceneOptions(subgenre: string) {
 }
 
 function CharacterSection({ title, prefix, form, updateField, jobOptions }: any) {
+  const jobField = `${prefix}Job`;
+  const customJobField = `${prefix}JobCustom`;
+  const secretField = `${prefix}Secret`;
+  const customSecretField = `${prefix}SecretCustom`;
+
   return (
     <Section title={title}>
       <div className="grid md:grid-cols-2 gap-4">
@@ -508,13 +596,19 @@ function CharacterSection({ title, prefix, form, updateField, jobOptions }: any)
       </div>
 
       <TextArea label="Appearance" field={`${prefix}Appearance`} form={form} updateField={updateField} />
-      <Select label="Job / Role" field={`${prefix}Job`} value={form[`${prefix}Job`]} updateField={updateField} options={jobOptions} />
+
+      <Select label="Job / Role" field={jobField} value={form[jobField]} updateField={updateField} options={jobOptions} />
+      {form[jobField] === "Custom" && <Input label="Custom Job / Role" field={customJobField} form={form} updateField={updateField} />}
+
       <CheckboxGroup label="Personality" field={`${prefix}Personality`} selected={form[`${prefix}Personality`]} options={TRAIT_OPTIONS} updateField={updateField} />
       <CheckboxGroup label="Speech Quirks" field={`${prefix}Speech`} selected={form[`${prefix}Speech`]} options={SPEECH_QUIRK_OPTIONS} updateField={updateField} />
       <CheckboxGroup label="Flaws" field={`${prefix}Flaws`} selected={form[`${prefix}Flaws`]} options={FLAW_OPTIONS} updateField={updateField} />
       <CheckboxGroup label="Biggest Desire" field={`${prefix}Desire`} selected={form[`${prefix}Desire`]} options={DESIRE_OPTIONS} updateField={updateField} />
       <CheckboxGroup label="Biggest Fear" field={`${prefix}Fear`} selected={form[`${prefix}Fear`]} options={FEAR_OPTIONS} updateField={updateField} />
-      <Select label="Secret" field={`${prefix}Secret`} value={form[`${prefix}Secret`]} updateField={updateField} options={SECRET_OPTIONS} />
+
+      <Select label="Secret" field={secretField} value={form[secretField]} updateField={updateField} options={SECRET_OPTIONS} />
+      {form[secretField] === "Custom" && <Input label="Custom Secret" field={customSecretField} form={form} updateField={updateField} />}
+
       <TextArea label="Extra Character Notes" field={`${prefix}CustomNotes`} form={form} updateField={updateField} placeholder="Anything specific you want included..." />
     </Section>
   );
