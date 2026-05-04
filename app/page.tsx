@@ -2,362 +2,88 @@
 
 import { useState } from "react";
 
-const SUBGENRES = [
-  "Contemporary",
-  "Small Town",
-  "Sports Romance",
-  "Dark Romance",
-  "Workplace",
-  "Celebrity",
-  "Paranormal",
-  "Billionaire",
-  "Second Chance",
-];
+const SUBGENRES = ["Contemporary","Small Town","Sports Romance","Dark Romance","Workplace","Celebrity","Paranormal","Billionaire","Second Chance"];
 
-const POV_OPTIONS = [
-  "First person, single POV",
-  "First person, dual POV",
-  "Third person, single POV",
-  "Third person, dual POV",
-  "Alternating POV",
-];
+const POV_OPTIONS = ["First person, single POV","First person, dual POV","Third person, single POV","Third person, dual POV","Alternating POV"];
 
-const SPORT_OPTIONS = [
-  "Ice hockey",
-  "Football",
-  "Rugby",
-  "Boxing",
-  "MMA",
-  "Wrestling",
-  "Basketball",
-  "Baseball",
-  "Motor racing",
-  "Swimming",
-  "Athletics",
-  "Dance",
-  "Other / custom",
-];
+const LOCALE_OPTIONS = ["British English","American English","Canadian English","Australian English","Irish English","Neutral International"];
 
-const TOWN_OPTIONS = [
-  "Seaside town",
-  "Mountain town",
-  "Rural farming town",
-  "Tourist town",
-  "Historic town",
-  "Working class town",
-  "Close-knit village",
-  "Other / custom",
-];
+const REGION_OPTIONS: Record<string, string[]> = {
+  "British English": ["Neutral British","Northern UK","Lancashire","Yorkshire","Midlands","London / South East","Scottish","Welsh"],
+  "American English": ["Neutral American","Midwest US","East Coast US","Southern US","West Coast US","New York","California"],
+  "Canadian English": ["Neutral Canadian","Urban Canadian","Small town Canadian","French Canadian influence"],
+  "Australian English": ["Neutral Australian","Urban Australian","Rural Australian"],
+  "Irish English": ["Neutral Irish","Dublin","Rural Irish"],
+  "Neutral International": ["Neutral"],
+};
 
-const CELEBRITY_OPTIONS = [
-  "Actor",
-  "Musician",
-  "Athlete",
-  "Influencer",
-  "Author",
-  "Reality star",
-  "Royal / aristocrat",
-  "Other / custom",
-];
+const VOICE_STYLE_OPTIONS = ["Commercial romance","Raw / gritty","Warm / cosy","Sharp / witty","Dark / intense","Emotional / deep","Fast / punchy","Literary but restrained"];
 
-const PARANORMAL_OPTIONS = [
-  "Vampire",
-  "Werewolf",
-  "Witch",
-  "Demon",
-  "Fae",
-  "Shifter",
-  "Ghost",
-  "Mixed supernatural world",
-  "Other / custom",
-];
+const DIALOGUE_STYLE_OPTIONS = ["Natural / grounded","Bantery","Dry humour","Flirty","Tense / clipped","Emotionally loaded","Blunt and realistic"];
 
-const TROPE_OPTIONS = [
-  "Enemies to lovers",
-  "Friends to lovers",
-  "Forced proximity",
-  "Fake dating",
-  "Second chance",
-  "Grumpy / sunshine",
-  "Only one bed",
-  "Hurt / comfort",
-  "Forbidden attraction",
-  "Workplace romance",
-  "Small town romance",
-  "Sports romance",
-  "Celebrity romance",
-  "Secret relationship",
-  "Opposites attract",
-  "Slow burn",
-  "High angst",
-  "Protective lead",
-  "Found family",
-  "Jealousy",
-];
+const PROSE_DENSITY_OPTIONS = ["Lean","Balanced","Rich but controlled"];
 
-const BASE_JOB_OPTIONS = [
-  "Business owner",
-  "Tradesperson",
-  "Doctor / Nurse",
-  "Teacher",
-  "Artist",
-  "Musician",
-  "Writer",
-  "Chef",
-  "Bar owner",
-  "Police / Firefighter",
-  "Military",
-  "Adult student",
-  "Unemployed / rebuilding life",
-  "Other / custom",
-];
+const BURN_OPTIONS = ["Instant attraction","Fast burn","Medium burn","Slow burn","Agonising slow burn"];
 
-const SPORTS_JOBS = [
-  "Ice hockey player",
-  "Footballer",
-  "Rugby player",
-  "Coach",
-  "Team doctor",
-  "Physio",
-  "Sports journalist",
-  "Agent",
-  "Club owner",
-];
+const CHAPTER_OPENER_OPTIONS = ["Quiet opener","Immediate chemistry","Tension heavy","Plot heavy","High conflict opener","Character-first opener"];
 
-const SMALL_TOWN_JOBS = [
-  "Cafe owner",
-  "Farmer",
-  "Vet",
-  "Builder",
-  "Local bartender",
-  "Shop owner",
-  "Mechanic",
-  "Teacher",
-];
+const AGE_BRACKET_OPTIONS = ["18 to 21","22 to 30","30 to 45","45+"];
 
-const CELEBRITY_JOBS = [
-  "Actor",
-  "Singer",
-  "Famous athlete",
-  "Celebrity assistant",
-  "Bodyguard",
-  "Manager",
-  "Journalist",
-];
+const SPORT_OPTIONS = ["Ice hockey","Football","Rugby","Boxing","MMA","Wrestling","Basketball","Baseball","Motor racing","Swimming","Athletics","Dance","Other / custom"];
 
-const PARANORMAL_JOBS = [
-  "Vampire",
-  "Werewolf",
-  "Witch",
-  "Hunter",
-  "Pack leader",
-  "Coven leader",
-  "Supernatural healer",
-];
+const TOWN_OPTIONS = ["Seaside town","Mountain town","Rural farming town","Tourist town","Historic town","Working class town","Close-knit village","Other / custom"];
 
-const TRAIT_OPTIONS = [
-  "Grumpy",
-  "Sunshine",
-  "Guarded",
-  "Confident",
-  "Shy",
-  "Funny",
-  "Sarcastic",
-  "Soft-hearted",
-  "Hot-headed",
-  "Protective",
-  "Ambitious",
-  "Chaotic",
-  "Quiet",
-  "Dominant",
-  "Nurturing",
-  "Flirty",
-  "Awkward",
-  "Loyal",
-  "Broken but trying",
-];
+const CELEBRITY_OPTIONS = ["Actor","Musician","Athlete","Influencer","Author","Reality star","Royal / aristocrat","Other / custom"];
 
-const FLAW_OPTIONS = [
-  "Trust issues",
-  "Commitment issues",
-  "Jealous",
-  "Emotionally closed off",
-  "People pleaser",
-  "Impulsive",
-  "Workaholic",
-  "Self-sabotaging",
-  "Afraid of vulnerability",
-  "Bad temper",
-  "Overprotective",
-  "Runs from conflict",
-];
+const PARANORMAL_OPTIONS = ["Vampire","Werewolf","Witch","Demon","Fae","Shifter","Ghost","Mixed supernatural world","Other / custom"];
 
-const DESIRE_OPTIONS = [
-  "To be loved properly",
-  "To feel safe",
-  "To escape their past",
-  "To prove themselves",
-  "To build a family",
-  "To belong somewhere",
-  "To be chosen",
-  "To start over",
-  "To protect someone",
-  "To finally trust",
-];
+const TROPE_OPTIONS = ["Enemies to lovers","Friends to lovers","Forced proximity","Fake dating","Second chance","Grumpy / sunshine","Only one bed","Hurt / comfort","Forbidden attraction","Workplace romance","Small town romance","Sports romance","Celebrity romance","Secret relationship","Opposites attract","Slow burn","High angst","Protective lead","Found family","Jealousy"];
 
-const FEAR_OPTIONS = [
-  "Being abandoned",
-  "Being rejected",
-  "Losing control",
-  "Getting hurt again",
-  "Being trapped",
-  "Being truly known",
-  "Letting someone down",
-  "Repeating the past",
-  "Being vulnerable",
-  "Failing the people they love",
-];
+const BASE_JOB_OPTIONS = ["Business owner","Tradesperson","Doctor / Nurse","Teacher","Artist","Musician","Writer","Chef","Bar owner","Police / Firefighter","Military","Adult student","Unemployed / rebuilding life","Other / custom"];
 
-const SECRET_OPTIONS = [
-  "No major secret",
-  "Hidden debt",
-  "Secret child",
-  "Criminal past",
-  "Family scandal",
-  "Fake identity",
-  "Secret illness",
-  "Secret inheritance",
-  "Hidden heartbreak",
-  "Secret engagement",
-  "Carrying guilt",
-  "Other / custom",
-];
+const SPORTS_JOBS = ["Ice hockey player","Footballer","Rugby player","Coach","Team doctor","Physio","Sports journalist","Agent","Club owner"];
 
-const SETTING_OPTIONS = [
-  "Small town",
-  "Big city",
-  "Coastal town",
-  "Countryside",
-  "Workplace office",
-  "Restaurant / bar",
-  "Hospital",
-  "University, adult students only",
-  "Sports team",
-  "Ice rink",
-  "Tour bus / celebrity world",
-  "Ranch / farm",
-  "Mountain lodge",
-  "Island getaway",
-  "Fantasy kingdom",
-  "Paranormal town",
-  "Historical",
-  "Mafia underworld",
-  "Luxury world",
-  "Working class / gritty",
-  "Other / custom",
-];
+const SMALL_TOWN_JOBS = ["Cafe owner","Farmer","Vet","Builder","Local bartender","Shop owner","Mechanic","Teacher"];
 
-const CONFLICT_OPTIONS = [
-  "Trust issues",
-  "Opposite lifestyles",
-  "Family disapproval",
-  "Career conflict",
-  "Long distance",
-  "Secret identity",
-  "One is leaving town",
-  "Rivalry",
-  "Class difference",
-  "Hidden past",
-  "Commitment fear",
-  "Forced separation",
-  "Danger / threat",
-  "Grief / healing",
-  "Other / custom",
-];
+const CELEBRITY_JOBS = ["Actor","Singer","Famous athlete","Celebrity assistant","Bodyguard","Manager","Journalist"];
 
-const KEEPS_APART_OPTIONS = [
-  "Emotional walls",
-  "Fear of commitment",
-  "Wrong timing",
-  "Existing relationship",
-  "Family pressure",
-  "Professional conflict",
-  "Physical distance",
-  "Pride",
-  "Shame / secret",
-  "Social expectations",
-  "Trauma",
-  "Mistrust",
-  "They think feelings are not returned",
-  "Other / custom",
-];
+const PARANORMAL_JOBS = ["Vampire","Werewolf","Witch","Hunter","Pack leader","Coven leader","Supernatural healer"];
 
-const BASE_SCENES = [
-  "First accidental touch",
-  "Jealousy moment",
-  "Forced close proximity",
-  "Rain kiss",
-  "Angry confession",
-  "Caretaking while sick / injured",
-  "Bed sharing",
-  "First intimate scene",
-  "Public declaration",
-  "Big breakup",
-  "Grovel scene",
-  "Reunion",
-  "Found family moment",
-  "Protective rescue",
-  "Holiday scene",
-  "Other / custom",
-];
+const TRAIT_OPTIONS = ["Grumpy","Sunshine","Guarded","Confident","Shy","Funny","Sarcastic","Soft-hearted","Hot-headed","Protective","Ambitious","Chaotic","Quiet","Dominant","Nurturing","Flirty","Awkward","Loyal","Broken but trying"];
 
-const SPORTS_SCENES = [
-  "Locker room tension",
-  "After-game celebration",
-  "Injury recovery",
-  "Championship final",
-  "Secret kiss at the rink",
-];
+const SPEECH_QUIRK_OPTIONS = ["Swears naturally","Dry sarcasm","Blunt speaker","Shy speaker","Affectionate teasing","Emotionally guarded","Playful flirt","Quiet intensity","Uses humour to deflect","Short answers under stress"];
 
-const SMALL_TOWN_SCENES = [
-  "Town fair",
-  "Community event",
-  "Local gossip spreads",
-  "Snowstorm stuck together",
-  "Bonfire night",
-];
+const FLAW_OPTIONS = ["Trust issues","Commitment issues","Jealous","Emotionally closed off","People pleaser","Impulsive","Workaholic","Self-sabotaging","Afraid of vulnerability","Bad temper","Overprotective","Runs from conflict"];
 
-const CELEBRITY_SCENES = [
-  "Paparazzi scandal",
-  "Secret hotel meeting",
-  "Award show",
-  "Tour life",
-  "Public reveal",
-];
+const DESIRE_OPTIONS = ["To be loved properly","To feel safe","To escape their past","To prove themselves","To build a family","To belong somewhere","To be chosen","To start over","To protect someone","To finally trust"];
 
-const PARANORMAL_SCENES = [
-  "First reveal of supernatural identity",
-  "Bite / bond moment",
-  "Pack or coven conflict",
-  "Dangerous full moon",
-  "Forbidden magic",
-];
+const FEAR_OPTIONS = ["Being abandoned","Being rejected","Losing control","Getting hurt again","Being trapped","Being truly known","Letting someone down","Repeating the past","Being vulnerable","Failing the people they love"];
 
-const MUST_NOT_HAVE_OPTIONS = [
-  "Cheating",
-  "Love triangle",
-  "Pregnancy plot",
-  "Insta-love",
-  "Billionaire trope",
-  "Miscommunication breakup",
-  "Dark themes",
-  "Death ending",
-  "Cliffhanger",
-  "Public humiliation",
-  "Third act breakup",
-  "Toxic alpha behaviour",
-  "Other / custom",
-];
+const SECRET_OPTIONS = ["No major secret","Hidden debt","Secret child","Criminal past","Family scandal","Fake identity","Secret illness","Secret inheritance","Hidden heartbreak","Secret engagement","Carrying guilt","Other / custom"];
+
+const SETTING_OPTIONS = ["Small town","Big city","Coastal town","Countryside","Workplace office","Restaurant / bar","Hospital","University, adult students only","Sports team","Ice rink","Tour bus / celebrity world","Ranch / farm","Mountain lodge","Island getaway","Fantasy kingdom","Paranormal town","Historical","Mafia underworld","Luxury world","Working class / gritty","Other / custom"];
+
+const CONFLICT_OPTIONS = ["Trust issues","Opposite lifestyles","Family disapproval","Career conflict","Long distance","Secret identity","One is leaving town","Rivalry","Class difference","Hidden past","Commitment fear","Forced separation","Danger / threat","Grief / healing","Other / custom"];
+
+const KEEPS_APART_OPTIONS = ["Emotional walls","Fear of commitment","Wrong timing","Existing relationship","Family pressure","Professional conflict","Physical distance","Pride","Shame / secret","Social expectations","Trauma","Mistrust","They think feelings are not returned","Other / custom"];
+
+const BASE_SCENES = ["First accidental touch","Jealousy moment","Forced close proximity","Rain kiss","Angry confession","Caretaking while sick / injured","Bed sharing","First intimate scene","Public declaration","Big breakup","Grovel scene","Reunion","Found family moment","Protective rescue","Holiday scene","Other / custom"];
+
+const SPORTS_SCENES = ["Locker room tension","After-game celebration","Injury recovery","Championship final","Secret kiss at the rink"];
+
+const SMALL_TOWN_SCENES = ["Town fair","Community event","Local gossip spreads","Snowstorm stuck together","Bonfire night"];
+
+const CELEBRITY_SCENES = ["Paparazzi scandal","Secret hotel meeting","Award show","Tour life","Public reveal"];
+
+const PARANORMAL_SCENES = ["First reveal of supernatural identity","Bite / bond moment","Pack or coven conflict","Dangerous full moon","Forbidden magic"];
+
+const MUST_NOT_HAVE_OPTIONS = ["Cheating","Love triangle","Pregnancy plot","Insta-love","Billionaire trope","Miscommunication breakup","Dark themes","Death ending","Cliffhanger","Public humiliation","Third act breakup","Toxic alpha behaviour","Other / custom"];
+
+const GROUNDING_OPTIONS = ["Mundane everyday detail","Work stress","Family baggage","Money worries","Domestic intimacy","Friendship dynamics","Class differences","Physical exhaustion","Realistic awkwardness","Messy emotions"];
+
+const AVOID_STYLE_OPTIONS = ["Purple prose","Overused similes","Repeated Like openings","Repeated As if phrasing","Cheesy banter","Melodrama","Therapy-speak","Trauma dumping","Repetitive inner monologue","Over-description","Cliché romance beats","Long dashes","Poetic object descriptions"];
+
+const REWRITE_OPTIONS = ["Make it less AI sounding, more natural and grounded","Make the dialogue sharper and more realistic","Make it grittier and less polished","Make it more emotional but not melodramatic","Reduce repeated phrasing and remove awkward similes","Make the pacing tighter","Make the romantic tension stronger","Make it darker and more intense"];
 
 export default function Home() {
   const [form, setForm] = useState({
@@ -365,6 +91,16 @@ export default function Home() {
     relationship: "MM Romance",
     subgenre: "Sports Romance",
     subgenreDetail: "Ice hockey",
+    locale: "Canadian English",
+    regionVoice: "Urban Canadian",
+    voiceStyle: "Commercial romance",
+    dialogueStyle: "Natural / grounded",
+    proseDensity: "Lean",
+    burnPacing: "Medium burn",
+    chapterOpener: "Tension heavy",
+    ageBracket: "22 to 30",
+    avoidStyle: "Purple prose, Overused similes, Repeated Like openings, Repeated As if phrasing, Therapy-speak, Long dashes, Poetic object descriptions",
+    grounding: "Mundane everyday detail, Physical exhaustion, Realistic awkwardness, Messy emotions",
     tropes: "",
     tone: "Emotional",
     heat: "Spicy",
@@ -377,6 +113,7 @@ export default function Home() {
     c1Appearance: "",
     c1Job: "Ice hockey player",
     c1Personality: "",
+    c1Speech: "",
     c1Flaws: "",
     c1Desire: "",
     c1Fear: "",
@@ -388,6 +125,7 @@ export default function Home() {
     c2Appearance: "",
     c2Job: "Ice hockey player",
     c2Personality: "",
+    c2Speech: "",
     c2Flaws: "",
     c2Desire: "",
     c2Fear: "",
@@ -400,19 +138,25 @@ export default function Home() {
     keepsApart: "",
     mustHave: "",
     mustNotHave: "",
-    pacing: "Slow burn",
     intensity: "Dramatic",
   });
 
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
+  const [rewriteLoading, setRewriteLoading] = useState(false);
+  const [customRewrite, setCustomRewrite] = useState("");
 
   const jobOptions = getJobOptions(form.subgenre);
   const sceneOptions = getSceneOptions(form.subgenre);
+  const regionOptions = REGION_OPTIONS[form.locale] || ["Neutral"];
 
   function updateField(field: string, value: string) {
     setForm((prev) => {
       const updated = { ...prev, [field]: value };
+
+      if (field === "locale") {
+        updated.regionVoice = (REGION_OPTIONS[value] || ["Neutral"])[0];
+      }
 
       if (field === "subgenre") {
         if (value === "Sports Romance") {
@@ -477,15 +221,29 @@ export default function Home() {
 
     const res = await fetch("/api/generate-bible", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
 
     const data = await res.json();
     setResult(data.result || "Something went wrong.");
     setLoading(false);
+  }
+
+  async function rewriteChapter(instruction: string) {
+    if (!result) return;
+
+    setRewriteLoading(true);
+
+    const res = await fetch("/api/rewrite-chapter", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chapter: result, instruction }),
+    });
+
+    const data = await res.json();
+    setResult(data.result || "Rewrite failed.");
+    setRewriteLoading(false);
   }
 
   return (
@@ -501,8 +259,8 @@ export default function Home() {
           </h1>
 
           <p className="text-zinc-300 text-lg max-w-2xl mx-auto">
-            Build romance stories from characters, tropes, heat level, plot
-            ideas and emotional arcs.
+            Build romance stories from characters, tropes, voice, pacing,
+            setting and emotional arcs.
           </p>
         </div>
 
@@ -511,246 +269,61 @@ export default function Home() {
 
           <div className="grid gap-8">
             <Section title="Story Setup">
-              <Input
-                label="Story Title"
-                field="title"
-                form={form}
-                updateField={updateField}
-              />
+              <Input label="Story Title" field="title" form={form} updateField={updateField} />
 
               <div className="grid md:grid-cols-2 gap-4">
-                <Select
-                  label="Relationship Type"
-                  field="relationship"
-                  value={form.relationship}
-                  updateField={updateField}
-                  options={["MM Romance", "MF Romance"]}
-                />
+                <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
+                <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={SUBGENRES} />
 
-                <Select
-                  label="Subgenre"
-                  field="subgenre"
-                  value={form.subgenre}
-                  updateField={updateField}
-                  options={SUBGENRES}
-                />
+                {form.subgenre === "Sports Romance" && <Select label="Sport Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={SPORT_OPTIONS} />}
+                {form.subgenre === "Small Town" && <Select label="Town Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={TOWN_OPTIONS} />}
+                {form.subgenre === "Celebrity" && <Select label="Celebrity Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={CELEBRITY_OPTIONS} />}
+                {form.subgenre === "Paranormal" && <Select label="Paranormal World" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={PARANORMAL_OPTIONS} />}
 
-                {form.subgenre === "Sports Romance" && (
-                  <Select
-                    label="Sport Type"
-                    field="subgenreDetail"
-                    value={form.subgenreDetail}
-                    updateField={updateField}
-                    options={SPORT_OPTIONS}
-                  />
-                )}
-
-                {form.subgenre === "Small Town" && (
-                  <Select
-                    label="Town Type"
-                    field="subgenreDetail"
-                    value={form.subgenreDetail}
-                    updateField={updateField}
-                    options={TOWN_OPTIONS}
-                  />
-                )}
-
-                {form.subgenre === "Celebrity" && (
-                  <Select
-                    label="Celebrity Type"
-                    field="subgenreDetail"
-                    value={form.subgenreDetail}
-                    updateField={updateField}
-                    options={CELEBRITY_OPTIONS}
-                  />
-                )}
-
-                {form.subgenre === "Paranormal" && (
-                  <Select
-                    label="Paranormal World"
-                    field="subgenreDetail"
-                    value={form.subgenreDetail}
-                    updateField={updateField}
-                    options={PARANORMAL_OPTIONS}
-                  />
-                )}
-
-                <Select
-                  label="Tone"
-                  field="tone"
-                  value={form.tone}
-                  updateField={updateField}
-                  options={[
-                    "Emotional",
-                    "Funny",
-                    "Dark",
-                    "Soft",
-                    "Gritty",
-                    "Angsty",
-                    "Sweet",
-                    "Filthy but heartfelt",
-                  ]}
-                />
-
-                <Select
-                  label="Heat Level"
-                  field="heat"
-                  value={form.heat}
-                  updateField={updateField}
-                  options={[
-                    "Fade to black",
-                    "Mild",
-                    "Spicy",
-                    "Explicit adult",
-                  ]}
-                />
-
-                <Select
-                  label="POV"
-                  field="pov"
-                  value={form.pov}
-                  updateField={updateField}
-                  options={POV_OPTIONS}
-                />
-
-                <Select
-                  label="Ending"
-                  field="ending"
-                  value={form.ending}
-                  updateField={updateField}
-                  options={[
-                    "Happy ending",
-                    "Happy for now",
-                    "Bittersweet",
-                    "Cliffhanger",
-                  ]}
-                />
-
-                <Select
-                  label="Length"
-                  field="length"
-                  value={form.length}
-                  updateField={updateField}
-                  options={["Novella", "Short novel", "Full novel"]}
-                />
+                <Select label="Locale / Language Flavour" field="locale" value={form.locale} updateField={updateField} options={LOCALE_OPTIONS} />
+                <Select label="Regional Voice" field="regionVoice" value={form.regionVoice} updateField={updateField} options={regionOptions} />
+                <Select label="POV" field="pov" value={form.pov} updateField={updateField} options={POV_OPTIONS} />
+                <Select label="Age Bracket" field="ageBracket" value={form.ageBracket} updateField={updateField} options={AGE_BRACKET_OPTIONS} />
+                <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
+                <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
+                <Select label="Length" field="length" value={form.length} updateField={updateField} options={["Novella", "Short novel", "Full novel"]} />
+                <Select label="Plot Intensity" field="intensity" value={form.intensity} updateField={updateField} options={["Cozy", "Balanced", "Dramatic", "Heavy angst", "Chaotic soap opera"]} />
               </div>
 
-              <CheckboxGroup
-                label="Tropes"
-                field="tropes"
-                selected={form.tropes}
-                options={TROPE_OPTIONS}
-                updateField={updateField}
-              />
+              <CheckboxGroup label="Tropes" field="tropes" selected={form.tropes} options={TROPE_OPTIONS} updateField={updateField} />
             </Section>
 
-            <button
-              type="button"
-              onClick={generateNames}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10"
-            >
+            <Section title="Voice Engine">
+              <div className="grid md:grid-cols-2 gap-4">
+                <Select label="Writing Style" field="voiceStyle" value={form.voiceStyle} updateField={updateField} options={VOICE_STYLE_OPTIONS} />
+                <Select label="Dialogue Style" field="dialogueStyle" value={form.dialogueStyle} updateField={updateField} options={DIALOGUE_STYLE_OPTIONS} />
+                <Select label="Prose Density" field="proseDensity" value={form.proseDensity} updateField={updateField} options={PROSE_DENSITY_OPTIONS} />
+                <Select label="Burn Pacing" field="burnPacing" value={form.burnPacing} updateField={updateField} options={BURN_OPTIONS} />
+                <Select label="Chapter Opener" field="chapterOpener" value={form.chapterOpener} updateField={updateField} options={CHAPTER_OPENER_OPTIONS} />
+              </div>
+
+              <CheckboxGroup label="Real-World Grounding" field="grounding" selected={form.grounding} options={GROUNDING_OPTIONS} updateField={updateField} />
+              <CheckboxGroup label="Avoid AI Waffle" field="avoidStyle" selected={form.avoidStyle} options={AVOID_STYLE_OPTIONS} updateField={updateField} />
+            </Section>
+
+            <button type="button" onClick={generateNames} className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10">
               Generate Character Names
             </button>
 
-            <CharacterSection
-              title="Character 1"
-              prefix="c1"
-              form={form}
-              updateField={updateField}
-              jobOptions={jobOptions}
-            />
-
-            <CharacterSection
-              title="Character 2"
-              prefix="c2"
-              form={form}
-              updateField={updateField}
-              jobOptions={jobOptions}
-            />
+            <CharacterSection title="Character 1" prefix="c1" form={form} updateField={updateField} jobOptions={jobOptions} />
+            <CharacterSection title="Character 2" prefix="c2" form={form} updateField={updateField} jobOptions={jobOptions} />
 
             <Section title="Plot Builder">
-              <CheckboxGroup
-                label="Setting"
-                field="setting"
-                selected={form.setting}
-                options={SETTING_OPTIONS}
-                updateField={updateField}
-              />
+              <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
+              <CheckboxGroup label="Main Conflict" field="conflict" selected={form.conflict} options={CONFLICT_OPTIONS} updateField={updateField} />
+              <CheckboxGroup label="What Keeps Them Apart?" field="keepsApart" selected={form.keepsApart} options={KEEPS_APART_OPTIONS} updateField={updateField} />
+              <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={sceneOptions} updateField={updateField} />
+              <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
 
-              <CheckboxGroup
-                label="Main Conflict"
-                field="conflict"
-                selected={form.conflict}
-                options={CONFLICT_OPTIONS}
-                updateField={updateField}
-              />
-
-              <CheckboxGroup
-                label="What Keeps Them Apart?"
-                field="keepsApart"
-                selected={form.keepsApart}
-                options={KEEPS_APART_OPTIONS}
-                updateField={updateField}
-              />
-
-              <CheckboxGroup
-                label="Must-Have Scenes"
-                field="mustHave"
-                selected={form.mustHave}
-                options={sceneOptions}
-                updateField={updateField}
-              />
-
-              <CheckboxGroup
-                label="Must-Not-Have"
-                field="mustNotHave"
-                selected={form.mustNotHave}
-                options={MUST_NOT_HAVE_OPTIONS}
-                updateField={updateField}
-              />
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <Select
-                  label="Pacing"
-                  field="pacing"
-                  value={form.pacing}
-                  updateField={updateField}
-                  options={[
-                    "Fast burn",
-                    "Medium burn",
-                    "Slow burn",
-                    "Torture me slowly",
-                  ]}
-                />
-
-                <Select
-                  label="Plot Intensity"
-                  field="intensity"
-                  value={form.intensity}
-                  updateField={updateField}
-                  options={[
-                    "Cozy",
-                    "Balanced",
-                    "Dramatic",
-                    "Heavy angst",
-                    "Chaotic soap opera",
-                  ]}
-                />
-              </div>
-
-              <TextArea
-                label="Optional Plot Notes"
-                field="plot"
-                form={form}
-                updateField={updateField}
-                placeholder="Add anything specific, if needed..."
-              />
+              <TextArea label="Optional Plot Notes" field="plot" form={form} updateField={updateField} placeholder="Add anything specific, if needed..." />
             </Section>
 
-            <button
-              onClick={generateStory}
-              className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg"
-            >
+            <button onClick={generateStory} className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg">
               {loading ? "Generating your story..." : "Generate Story"}
             </button>
           </div>
@@ -758,10 +331,27 @@ export default function Home() {
 
         {result && (
           <div className="max-w-4xl mx-auto mt-10 bg-black/30 rounded-3xl p-8 border border-white/10 whitespace-pre-wrap leading-8 text-zinc-200">
-            <h2 className="text-3xl font-bold text-rose-200 mb-6">
-              Chapter 1
-            </h2>
-            {result}
+            <h2 className="text-3xl font-bold text-rose-200 mb-6">Chapter 1</h2>
+
+            <div>{result}</div>
+
+            <div className="mt-10 border-t border-white/10 pt-8">
+              <h3 className="text-2xl font-bold text-rose-200 mb-4">Rewrite Chapter</h3>
+
+              <div className="flex flex-wrap gap-2 mb-6">
+                {REWRITE_OPTIONS.map((option) => (
+                  <button key={option} type="button" onClick={() => rewriteChapter(option)} disabled={rewriteLoading} className="rounded-full px-4 py-2 text-sm border bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400 disabled:opacity-50">
+                    {option}
+                  </button>
+                ))}
+              </div>
+
+              <textarea value={customRewrite} onChange={(e) => setCustomRewrite(e.target.value)} placeholder="Custom rewrite instruction, e.g. make Callum less poetic and more blunt..." className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none min-h-[100px]" />
+
+              <button type="button" onClick={() => rewriteChapter(customRewrite)} disabled={rewriteLoading || !customRewrite.trim()} className="mt-4 w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 disabled:opacity-50">
+                {rewriteLoading ? "Rewriting..." : "Rewrite With Custom Instruction"}
+              </button>
+            </div>
           </div>
         )}
       </section>
@@ -789,94 +379,24 @@ function CharacterSection({ title, prefix, form, updateField, jobOptions }: any)
   return (
     <Section title={title}>
       <div className="grid md:grid-cols-2 gap-4">
-        <Input
-          label="Name"
-          field={`${prefix}Name`}
-          form={form}
-          updateField={updateField}
-        />
-
-        <Input
-          label="Age"
-          field={`${prefix}Age`}
-          form={form}
-          updateField={updateField}
-        />
+        <Input label="Name" field={`${prefix}Name`} form={form} updateField={updateField} />
+        <Input label="Age" field={`${prefix}Age`} form={form} updateField={updateField} />
       </div>
 
-      <TextArea
-        label="Appearance"
-        field={`${prefix}Appearance`}
-        form={form}
-        updateField={updateField}
-      />
-
-      <Select
-        label="Job / Role"
-        field={`${prefix}Job`}
-        value={form[`${prefix}Job`]}
-        updateField={updateField}
-        options={jobOptions}
-      />
-
-      <CheckboxGroup
-        label="Personality"
-        field={`${prefix}Personality`}
-        selected={form[`${prefix}Personality`]}
-        options={TRAIT_OPTIONS}
-        updateField={updateField}
-      />
-
-      <CheckboxGroup
-        label="Flaws"
-        field={`${prefix}Flaws`}
-        selected={form[`${prefix}Flaws`]}
-        options={FLAW_OPTIONS}
-        updateField={updateField}
-      />
-
-      <CheckboxGroup
-        label="Biggest Desire"
-        field={`${prefix}Desire`}
-        selected={form[`${prefix}Desire`]}
-        options={DESIRE_OPTIONS}
-        updateField={updateField}
-      />
-
-      <CheckboxGroup
-        label="Biggest Fear"
-        field={`${prefix}Fear`}
-        selected={form[`${prefix}Fear`]}
-        options={FEAR_OPTIONS}
-        updateField={updateField}
-      />
-
-      <Select
-        label="Secret"
-        field={`${prefix}Secret`}
-        value={form[`${prefix}Secret`]}
-        updateField={updateField}
-        options={SECRET_OPTIONS}
-      />
-
-      <TextArea
-        label="Extra Character Notes"
-        field={`${prefix}CustomNotes`}
-        form={form}
-        updateField={updateField}
-        placeholder="Anything specific you want included..."
-      />
+      <TextArea label="Appearance" field={`${prefix}Appearance`} form={form} updateField={updateField} />
+      <Select label="Job / Role" field={`${prefix}Job`} value={form[`${prefix}Job`]} updateField={updateField} options={jobOptions} />
+      <CheckboxGroup label="Personality" field={`${prefix}Personality`} selected={form[`${prefix}Personality`]} options={TRAIT_OPTIONS} updateField={updateField} />
+      <CheckboxGroup label="Speech Quirks" field={`${prefix}Speech`} selected={form[`${prefix}Speech`]} options={SPEECH_QUIRK_OPTIONS} updateField={updateField} />
+      <CheckboxGroup label="Flaws" field={`${prefix}Flaws`} selected={form[`${prefix}Flaws`]} options={FLAW_OPTIONS} updateField={updateField} />
+      <CheckboxGroup label="Biggest Desire" field={`${prefix}Desire`} selected={form[`${prefix}Desire`]} options={DESIRE_OPTIONS} updateField={updateField} />
+      <CheckboxGroup label="Biggest Fear" field={`${prefix}Fear`} selected={form[`${prefix}Fear`]} options={FEAR_OPTIONS} updateField={updateField} />
+      <Select label="Secret" field={`${prefix}Secret`} value={form[`${prefix}Secret`]} updateField={updateField} options={SECRET_OPTIONS} />
+      <TextArea label="Extra Character Notes" field={`${prefix}CustomNotes`} form={form} updateField={updateField} placeholder="Anything specific you want included..." />
     </Section>
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="border border-white/10 rounded-3xl p-6 bg-black/20">
       <h3 className="text-2xl font-bold mb-5 text-rose-200">{title}</h3>
@@ -889,11 +409,7 @@ function Input({ label, field, form, updateField }: any) {
   return (
     <label className="grid gap-2">
       <span className="text-sm text-zinc-300">{label}</span>
-      <input
-        value={form[field]}
-        onChange={(e) => updateField(field, e.target.value)}
-        className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none"
-      />
+      <input value={form[field]} onChange={(e) => updateField(field, e.target.value)} className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none" />
     </label>
   );
 }
@@ -902,12 +418,7 @@ function TextArea({ label, field, form, updateField, placeholder = "" }: any) {
   return (
     <label className="grid gap-2">
       <span className="text-sm text-zinc-300">{label}</span>
-      <textarea
-        value={form[field]}
-        onChange={(e) => updateField(field, e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none min-h-[100px]"
-      />
+      <textarea value={form[field]} onChange={(e) => updateField(field, e.target.value)} placeholder={placeholder} className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none min-h-[100px]" />
     </label>
   );
 }
@@ -916,11 +427,7 @@ function Select({ label, field, value, updateField, options }: any) {
   return (
     <label className="grid gap-2">
       <span className="text-sm text-zinc-300">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => updateField(field, e.target.value)}
-        className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none"
-      >
+      <select value={value} onChange={(e) => updateField(field, e.target.value)} className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none">
         {options.map((option: string) => (
           <option key={option}>{option}</option>
         ))}
@@ -951,16 +458,7 @@ function CheckboxGroup({ label, field, selected, options, updateField }: any) {
           const active = selectedArray.includes(option);
 
           return (
-            <button
-              type="button"
-              key={option}
-              onClick={() => toggleOption(option)}
-              className={`rounded-full px-4 py-2 text-sm border transition ${
-                active
-                  ? "bg-rose-500 border-rose-400 text-white"
-                  : "bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400"
-              }`}
-            >
+            <button type="button" key={option} onClick={() => toggleOption(option)} className={`rounded-full px-4 py-2 text-sm border transition ${active ? "bg-rose-500 border-rose-400 text-white" : "bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400"}`}>
               {active ? "✓ " : ""}
               {option}
             </button>
@@ -969,4 +467,4 @@ function CheckboxGroup({ label, field, selected, options, updateField }: any) {
       </div>
     </div>
   );
-}
+      }
