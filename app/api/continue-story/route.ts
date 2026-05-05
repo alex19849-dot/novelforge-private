@@ -133,6 +133,64 @@ Examples:
 - What’s eating you?
 - You look like hell.
 - Stop grimacing.
+NATURAL SPEECH RULE:
+Write like real modern people.
+
+Use natural contractions:
+- I'm
+- I've
+- I'd
+- I'll
+- you're
+- you've
+- you'll
+- we're
+- we've
+- we're not
+- he's
+- she's
+- it's
+- that's
+- there's
+- don't
+- doesn't
+- didn't
+- can't
+- couldn't
+- won't
+- wouldn't
+- isn't
+- aren't
+- wasn't
+- weren't
+
+Avoid stiff constructions unless a character is intentionally formal:
+
+Avoid:
+- I do not
+- I am not
+- It is
+- He is
+- She is
+- They are
+- That is
+- There is
+- I cannot
+- I will not
+
+Prefer:
+- I don't
+- I'm not
+- it's
+- he's
+- she's
+- they're
+- that's
+- there's
+- I can't
+- I won't
+
+Narration should also sound natural and modern, not formal, literary, or old-fashioned.
 `;
 
   try {
@@ -235,6 +293,64 @@ Examples:
 - What’s eating you?
 - You look like hell.
 - Stop grimacing.
+NATURAL SPEECH RULE:
+Write like real modern people.
+
+Use natural contractions:
+- I'm
+- I've
+- I'd
+- I'll
+- you're
+- you've
+- you'll
+- we're
+- we've
+- we're not
+- he's
+- she's
+- it's
+- that's
+- there's
+- don't
+- doesn't
+- didn't
+- can't
+- couldn't
+- won't
+- wouldn't
+- isn't
+- aren't
+- wasn't
+- weren't
+
+Avoid stiff constructions unless a character is intentionally formal:
+
+Avoid:
+- I do not
+- I am not
+- It is
+- He is
+- She is
+- They are
+- That is
+- There is
+- I cannot
+- I will not
+
+Prefer:
+- I don't
+- I'm not
+- it's
+- he's
+- she's
+- they're
+- that's
+- there's
+- I can't
+- I won't
+
+Narration should also sound natural and modern, not formal, literary, or old-fashioned.
 
 FINAL OUTPUT:
 Return only the polished final Chapter ${nextChapterNumber}.
