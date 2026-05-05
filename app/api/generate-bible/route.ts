@@ -411,7 +411,6 @@ Remove or rewrite:
 - lines that sound poetic but mean nothing
 - over-polished banter
 - long decorative descriptions
-- Rewrite stiff formal phrasing into natural modern phrasing.
 
 NATURAL SPEECH RULE:
 Write like real modern people.
