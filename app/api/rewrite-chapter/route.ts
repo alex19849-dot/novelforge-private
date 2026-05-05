@@ -118,6 +118,29 @@ For enemies-to-lovers:
 - Attraction and sexual tension may rise before trust.
 - Vulnerability should stay low until earned.
 - Jealousy can appear before emotional honesty.
+REWRITE RELATIONSHIP CONTROL:
+When rewriting, preserve or correct the relationship stage.
+
+If the chapter becomes too soft too early:
+- Add resistance.
+- Add pride.
+- Add awkwardness.
+- Add irritation.
+- Add denial.
+- Remove couple-like comfort unless earned.
+
+If Heat Level or user instruction asks for more heat:
+- Add sexual tension, body awareness, jealousy, charged proximity, or intrusive attraction thoughts.
+- Do not replace conflict with tenderness.
+- Make attraction feel inconvenient, unwanted, or irritating when enemies-to-lovers is selected.
+HEAT REWRITE RULE:
+If the user asks for more heat or the chapter belongs to Spicy / Explicit adult romance:
+- Increase sexual tension naturally.
+- Add charged looks, body awareness, proximity, jealousy, flirt tension, or unwanted attraction.
+- Do not jump straight to emotional intimacy.
+- Do not make characters suddenly soft unless the story has earned it.
+- Keep consent clear.
+- Keep all characters 18+.
 `;
 
   try {
