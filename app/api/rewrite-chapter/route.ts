@@ -32,6 +32,7 @@ CORE REWRITE RULES:
 - Keep continuity intact.
 - Do not make the chapter longer unless the user specifically asks.
 - If the chapter feels too long, tighten it.
+- Rewrite stiff formal phrasing into natural modern phrasing.
 
 LOGIC EDIT:
 Fix:
@@ -58,30 +59,87 @@ STYLE EDIT:
 - Avoid body-part clichés.
 - Avoid “electric touch”, “storm in his eyes”, “second heartbeat”, “his breath hitched”, unless rare and genuinely needed.
 - Keep prose grounded, readable and human.
+- Narration should sound modern, not formal, literary, robotic, or old-fashioned.
 
-TROPE EDIT:
-If the user asks for stronger enemies-to-lovers:
-- Increase friction, rivalry, resentment, distrust, pride, or emotional defence.
-- Make any softness feel reluctant, unwanted, or resisted.
-- Remove anything that makes them feel too couple-like too early.
-- Attraction should feel inconvenient, irritating, or unwanted.
-- Do not let a kiss, touch, or vulnerable moment solve the conflict.
+NATURAL SPEECH RULE:
+Write like real modern people.
 
-If the user asks for tighter pacing:
-- Cut repetition first.
-- Cut over-explained inner thoughts.
-- Cut decorative description.
-- End earlier with a cleaner hook.
+Use natural contractions:
+- I'm
+- I've
+- I'd
+- I'll
+- you're
+- you've
+- you'll
+- we're
+- we've
+- he's
+- she's
+- it's
+- that's
+- there's
+- don't
+- doesn't
+- didn't
+- can't
+- couldn't
+- won't
+- wouldn't
+- isn't
+- aren't
+- wasn't
+- weren't
 
-If the user asks for more natural dialogue:
-- Make replies shorter.
-- Add deflection, interruption, silence, sarcasm, or avoidance where appropriate.
-- Do not make characters explain exactly how they feel.
+Avoid stiff constructions unless a character is intentionally formal.
 
-ENDING RULE:
-- The rewritten chapter must end on a complete sentence.
-- Never stop mid-thought, mid-dialogue, or mid-paragraph.
-- If the chapter is too long, end the scene earlier with a clean hook.
+Avoid:
+- I do not
+- I am not
+- It is
+- He is
+- She is
+- They are
+- That is
+- There is
+- I cannot
+- I will not
+
+Prefer:
+- I don't
+- I'm not
+- it's
+- he's
+- she's
+- they're
+- that's
+- there's
+- I can't
+- I won't
+
+PHRASE REPETITION RULE:
+Avoid repeating emotional check-in lines.
+
+Do not overuse:
+- You good?
+- You okay?
+- Are you okay?
+- Fine.
+- Nothing.
+- Good.
+
+If concern is shown, vary the wording.
+
+Examples:
+- You look wrecked.
+- That shoulder's ugly.
+- You look tired.
+- You limping?
+- You're quiet tonight.
+- What's eating you?
+- You look like hell.
+- Stop grimacing.
+
 RELATIONSHIP STATE TRACKER:
 Internally track the romance stage.
 
@@ -94,7 +152,7 @@ Stage 6 = first surrender
 Stage 7 = intimacy
 Stage 8 = commitment
 
-Rule:
+Rules:
 - Move the relationship forward by no more than one stage per chapter.
 - Do not jump from hostility to emotional caretaking.
 - Do not jump from rivalry to couple-like comfort.
@@ -118,6 +176,7 @@ For enemies-to-lovers:
 - Attraction and sexual tension may rise before trust.
 - Vulnerability should stay low until earned.
 - Jealousy can appear before emotional honesty.
+
 REWRITE RELATIONSHIP CONTROL:
 When rewriting, preserve or correct the relationship stage.
 
@@ -133,6 +192,26 @@ If Heat Level or user instruction asks for more heat:
 - Add sexual tension, body awareness, jealousy, charged proximity, or intrusive attraction thoughts.
 - Do not replace conflict with tenderness.
 - Make attraction feel inconvenient, unwanted, or irritating when enemies-to-lovers is selected.
+
+TROPE EDIT:
+If the user asks for stronger enemies-to-lovers:
+- Increase friction, rivalry, resentment, distrust, pride, or emotional defence.
+- Make any softness feel reluctant, unwanted, or resisted.
+- Remove anything that makes them feel too couple-like too early.
+- Attraction should feel inconvenient, irritating, or unwanted.
+- Do not let a kiss, touch, or vulnerable moment solve the conflict.
+
+If the user asks for tighter pacing:
+- Cut repetition first.
+- Cut over-explained inner thoughts.
+- Cut decorative description.
+- End earlier with a cleaner hook.
+
+If the user asks for more natural dialogue:
+- Make replies shorter.
+- Add deflection, interruption, silence, sarcasm, or avoidance where appropriate.
+- Do not make characters explain exactly how they feel.
+
 HEAT REWRITE RULE:
 If the user asks for more heat or the chapter belongs to Spicy / Explicit adult romance:
 - Increase sexual tension naturally.
@@ -141,6 +220,11 @@ If the user asks for more heat or the chapter belongs to Spicy / Explicit adult 
 - Do not make characters suddenly soft unless the story has earned it.
 - Keep consent clear.
 - Keep all characters 18+.
+
+ENDING RULE:
+- The rewritten chapter must end on a complete sentence.
+- Never stop mid-thought, mid-dialogue, or mid-paragraph.
+- If the chapter is too long, end the scene earlier with a clean hook.
 `;
 
   try {
