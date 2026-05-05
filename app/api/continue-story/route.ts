@@ -110,6 +110,29 @@ STYLE RULES:
 - No purple prose.
 - No repeated symbolic closing lines.
 - No “electric touch”, “storm in his eyes”, “second heartbeat”, “his breath hitched”, unless rare and genuinely needed.
+PHRASE REPETITION RULE:
+Avoid repeating emotional check-in lines.
+
+Do not overuse:
+- You good?
+- You okay?
+- Are you okay?
+- Fine.
+- Nothing.
+- Good.
+
+If concern is shown:
+vary the wording.
+
+Examples:
+- You look wrecked.
+- That shoulder's ugly.
+- You look tired.
+- You limping?
+- You’re quiet tonight.
+- What’s eating you?
+- You look like hell.
+- Stop grimacing.
 `;
 
   try {
@@ -189,6 +212,29 @@ Remove or rewrite:
 - lines that sound poetic but mean nothing
 - over-polished banter
 - long decorative descriptions
+PHRASE REPETITION RULE:
+Avoid repeating emotional check-in lines.
+
+Do not overuse:
+- You good?
+- You okay?
+- Are you okay?
+- Fine.
+- Nothing.
+- Good.
+
+If concern is shown:
+vary the wording.
+
+Examples:
+- You look wrecked.
+- That shoulder's ugly.
+- You look tired.
+- You limping?
+- You’re quiet tonight.
+- What’s eating you?
+- You look like hell.
+- Stop grimacing.
 
 FINAL OUTPUT:
 Return only the polished final Chapter ${nextChapterNumber}.
