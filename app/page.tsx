@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from "../lib/supabaseClient";
 
 const SUBGENRES = ["Contemporary","Small Town","Sports Romance","Dark Romance","Workplace","Celebrity","Paranormal","Billionaire","Second Chance"];
 const POV_OPTIONS = ["First person, single POV","First person, dual POV","Third person, single POV","Third person, dual POV","Alternating POV"];
