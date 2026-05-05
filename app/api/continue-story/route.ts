@@ -209,11 +209,13 @@ VOICE RULES:
 `;
 
   try {
-    const response = await openai.responses.create({
-      model: "gpt-5",
-      input: prompt,
-      max_output_tokens: 4500,
-    });
+   const response = await openai.responses.create({
+  model: "gpt-5",
+  reasoning: { effort: "low" },
+  text: { verbosity: "low" },
+  input: prompt,
+  max_output_tokens: 8000,
+});
 
     return Response.json({
       result: response.output_text,
