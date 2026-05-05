@@ -165,7 +165,7 @@ export default function Home() {
   const regionOptions = REGION_OPTIONS[form.locale] || ["Neutral"];
   const activeChapter = chapters[activeChapterIndex] || "";
 
-  const preparedForm = {
+ const preparedForm: StoryForm = {
     ...form,
     subgenreDetail: resolveCustom(form.subgenreDetail, form.subgenreDetailCustom),
     c1Job: resolveCustom(form.c1Job, form.c1JobCustom),
