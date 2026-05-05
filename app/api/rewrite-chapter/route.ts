@@ -82,6 +82,42 @@ ENDING RULE:
 - The rewritten chapter must end on a complete sentence.
 - Never stop mid-thought, mid-dialogue, or mid-paragraph.
 - If the chapter is too long, end the scene earlier with a clean hook.
+RELATIONSHIP STATE TRACKER:
+Internally track the romance stage.
+
+Stage 1 = hostility
+Stage 2 = reluctant awareness
+Stage 3 = begrudging respect
+Stage 4 = unwanted attraction
+Stage 5 = emotional crack
+Stage 6 = first surrender
+Stage 7 = intimacy
+Stage 8 = commitment
+
+Rule:
+- Move the relationship forward by no more than one stage per chapter.
+- Do not jump from hostility to emotional caretaking.
+- Do not jump from rivalry to couple-like comfort.
+- Do not let physical heat automatically create emotional trust.
+- Heat can rise faster than trust.
+- Conflict and attraction can coexist.
+- If enemies-to-lovers is selected, keep irritation, pride and resistance alive even when attraction rises.
+
+Hidden chapter sliders:
+- Trust
+- Attraction
+- Irritation
+- Jealousy
+- Vulnerability
+- Sexual tension
+- Physical escalation
+
+For enemies-to-lovers:
+- Trust should rise slowly.
+- Irritation should stay high early.
+- Attraction and sexual tension may rise before trust.
+- Vulnerability should stay low until earned.
+- Jealousy can appear before emotional honesty.
 `;
 
   try {
