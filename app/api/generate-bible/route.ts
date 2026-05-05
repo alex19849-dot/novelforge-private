@@ -17,8 +17,9 @@ Internally create:
 - relationship arc
 - trope plan
 - continuity plan
+- heat escalation plan
 
-Do not show any of that planning.
+Do not show any planning.
 
 Return only Chapter 1 prose.
 
@@ -52,6 +53,39 @@ POV: ${body.pov}
 Ending Style: ${body.ending}
 Book Length: ${body.length}
 Plot Intensity: ${body.intensity}
+
+HEAT RULES:
+If Heat Level is Fade to black:
+- Build attraction and romance normally.
+- Keep intimate scenes closed door.
+
+If Heat Level is Mild:
+- Include clear attraction, body awareness, lingering looks, charged touch, and flirt tension.
+- Kissing and sensual moments may happen naturally.
+- Keep intimate scenes light and non-graphic.
+
+If Heat Level is Spicy:
+- Attraction should feel physical and distracting early.
+- Include body awareness, charged proximity, jealous reactions, intrusive attraction thoughts, and flirt tension.
+- Sexual tension should feel present, not absent.
+- Characters should notice mouths, scent, warmth, skin, voice, movement, closeness, and unwanted attraction.
+
+If Heat Level is Explicit adult:
+- Sexual tension must exist early.
+- Attraction should feel physical, intrusive, distracting, and difficult to ignore.
+- Characters should have unwanted attraction thoughts they resist.
+- Proximity should sometimes feel charged.
+- Jealousy, possessiveness, and body awareness should show up early.
+- Dialogue may carry flirt tension, dirty humour, or sharp chemistry.
+- For Medium burn:
+  Chapter 1 = noticeable attraction.
+  Chapter 2 = stronger tension.
+  Chapter 3 = obvious charged chemistry or near moments.
+  Chapter 4+ = escalating physical payoff.
+- Do not make them emotionally soft too quickly.
+- Keep conflict high while heat rises.
+- Attraction should annoy them.
+- Heat can rise faster than trust.
 
 CHARACTER 1:
 Name: ${body.c1Name}
@@ -98,10 +132,55 @@ CHAPTER 1 PURPOSE:
 - Introduce the story world clearly.
 - Establish both main characters.
 - Establish the central friction.
-- Establish the romantic tension without resolving it.
+- Establish romantic and sexual tension without resolving it.
 - Do not reveal every secret.
 - Do not write a complete story arc.
 - Do not resolve the main conflict.
+
+RELATIONSHIP STATE TRACKER:
+Internally track the romance stage.
+
+Stage 1 = hostility
+Stage 2 = reluctant awareness
+Stage 3 = begrudging respect
+Stage 4 = unwanted attraction
+Stage 5 = emotional crack
+Stage 6 = first surrender
+Stage 7 = intimacy
+Stage 8 = commitment
+
+Rule:
+- Move the relationship forward by no more than one stage per chapter.
+- Do not jump from hostility to emotional caretaking.
+- Do not jump from rivalry to couple-like comfort.
+- Do not let physical heat automatically create emotional trust.
+- Heat can rise faster than trust.
+- Conflict and attraction can coexist.
+- If enemies-to-lovers is selected, keep irritation, pride and resistance alive even when attraction rises.
+
+Hidden chapter sliders:
+- Trust
+- Attraction
+- Irritation
+- Jealousy
+- Vulnerability
+- Sexual tension
+- Physical escalation
+
+For enemies-to-lovers:
+- Trust should rise slowly.
+- Irritation should stay high early.
+- Attraction and sexual tension may rise before trust.
+- Vulnerability should stay low until earned.
+- Jealousy can appear before emotional honesty.
+
+CHAPTER 1 RELATIONSHIP STATE:
+- Start at Stage 1: hostility or Stage 2: reluctant awareness.
+- Trust should be low.
+- Irritation should be high.
+- Attraction should be present if Heat Level is Spicy or Explicit adult.
+- Sexual tension should be noticeable if Heat Level is Explicit adult.
+- Do not allow emotional comfort, caretaking softness, confession, or romantic safety yet.
 
 ENEMIES TO LOVERS RULE:
 If Tropes includes "Enemies to lovers":
@@ -145,49 +224,6 @@ STYLE RULES:
 - No “electric touch”, “storm in his eyes”, “second heartbeat”, “his breath hitched”, unless rare and genuinely needed.
 - Use the selected locale consistently.
 - Honour the selected POV exactly.
-RELATIONSHIP STATE TRACKER:
-Internally track the romance stage.
-
-Stage 1 = hostility
-Stage 2 = reluctant awareness
-Stage 3 = begrudging respect
-Stage 4 = unwanted attraction
-Stage 5 = emotional crack
-Stage 6 = first surrender
-Stage 7 = intimacy
-Stage 8 = commitment
-
-Rule:
-- Move the relationship forward by no more than one stage per chapter.
-- Do not jump from hostility to emotional caretaking.
-- Do not jump from rivalry to couple-like comfort.
-- Do not let physical heat automatically create emotional trust.
-- Heat can rise faster than trust.
-- Conflict and attraction can coexist.
-- If enemies-to-lovers is selected, keep irritation, pride and resistance alive even when attraction rises.
-
-Hidden chapter sliders:
-- Trust
-- Attraction
-- Irritation
-- Jealousy
-- Vulnerability
-- Sexual tension
-- Physical escalation
-
-For enemies-to-lovers:
-- Trust should rise slowly.
-- Irritation should stay high early.
-- Attraction and sexual tension may rise before trust.
-- Vulnerability should stay low until earned.
-- Jealousy can appear before emotional honesty.
-CHAPTER 1 RELATIONSHIP STATE:
-- Start at Stage 1: hostility or Stage 2: reluctant awareness.
-- Trust should be low.
-- Irritation should be high.
-- Attraction should be present if Heat Level is Spicy or Explicit adult.
-- Sexual tension should be noticeable if Heat Level is Explicit adult.
-- Do not allow emotional comfort, caretaking softness, confession, or romantic safety yet.
 `;
 
   try {
@@ -210,6 +246,7 @@ Return only final Chapter 1 prose. No notes.
 
 USER STORY SETTINGS:
 Tropes: ${body.tropes}
+Heat Level: ${body.heat}
 Burn Pacing: ${body.burnPacing}
 Book Length: ${body.length}
 POV: ${body.pov}
@@ -236,6 +273,20 @@ EDITOR TASKS:
 9. Keep the chapter ending complete and clean.
 10. Do not stop mid-sentence.
 11. Do not add notes, headings, bullet points, or commentary.
+12. Make heat level actually match the selected heat setting.
+13. If Spicy or Explicit adult is selected, increase sexual tension naturally.
+14. For Medium burn, make chemistry escalate steadily, not slowly stall.
+15. Add charged looks, body awareness, jealousy, flirt tension, proximity, and resisted attraction where appropriate.
+16. Keep conflict and heat rising together.
+
+RELATIONSHIP STATE EDIT:
+- Preserve the correct relationship stage.
+- Do not move the romance forward by more than one stage.
+- Do not let heat create sudden emotional trust.
+- Do not turn rivalry into comfort too early.
+- If the chapter becomes too soft too early, add resistance, pride, awkwardness, irritation, or denial.
+- Heat can rise faster than trust.
+- Attraction should not erase conflict.
 
 ENEMIES TO LOVERS EDIT:
 If "Enemies to lovers" is selected:
@@ -246,6 +297,19 @@ If "Enemies to lovers" is selected:
 - Attraction should feel inconvenient, irritating, or unwanted.
 - Do not include a kiss in Chapter 1.
 - Do not make them emotionally cosy in Chapter 1.
+
+HEAT EDIT:
+If Heat Level is Spicy:
+- Ensure attraction feels physical and noticeable.
+- Add body awareness, charged proximity, jealous reactions, intrusive attraction thoughts, and flirt tension where appropriate.
+
+If Heat Level is Explicit adult:
+- Ensure sexual tension exists early.
+- Make attraction feel physical, intrusive, distracting, and resisted.
+- Add charged proximity, body awareness, jealousy, dirty humour, sharp chemistry, or unwanted attraction where appropriate.
+- For Medium burn, Chapter 1 must contain noticeable attraction and sexual tension.
+- Do not make the scene emotionally soft just to make it hot.
+- Keep all attraction consensual and adult.
 
 LENGTH EDIT:
 - If Book Length is Novella, final chapter should be 1,000 to 1,500 words.
