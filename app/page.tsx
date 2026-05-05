@@ -60,11 +60,13 @@ const MUST_NOT_HAVE_OPTIONS = ["Cheating","Love triangle","Pregnancy plot","Inst
 const GROUNDING_OPTIONS = ["Mundane everyday detail","Work stress","Family baggage","Money worries","Domestic intimacy","Friendship dynamics","Class differences","Physical exhaustion","Realistic awkwardness","Messy emotions"];
 const AVOID_STYLE_OPTIONS = ["Purple prose","Overused similes","Repeated Like openings","Repeated As if phrasing","Cheesy banter","Melodrama","Therapy-speak","Trauma dumping","Repetitive inner monologue","Over-description","Cliché romance beats","Long dashes","Poetic object descriptions"];
 
+type StoryForm = Record<string, string>;
+
 type SavedStory = {
   id: string;
   title: string;
   updatedAt: string;
-  form: Record<string, string>;
+  form: StoryForm;
   chapters: string[];
   activeChapterIndex: number;
   customRewrite: string;
