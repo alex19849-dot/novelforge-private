@@ -228,6 +228,21 @@ For enemies-to-lovers:
 - Attraction and sexual tension may rise before trust.
 - Vulnerability should stay low until earned.
 - Jealousy can appear before emotional honesty.
+
+CHAPTER PROGRESSION RULE:
+Before writing, infer the current relationship stage from previous chapters.
+Move forward by no more than one stage.
+Do not repeat the same emotional beat from the last chapter.
+Do not soften the relationship unless the previous chapter earned it.
+If a vulnerable moment happens too early, make the character resist, snap, retreat, deny, or regret being seen.
+
+For Medium burn + Explicit adult + Novella:
+- Increase sexual tension quickly.
+- Increase emotional trust slowly.
+- By Chapter 2, attraction should be obvious but resisted.
+- By Chapter 3, chemistry should feel charged and hard to ignore.
+- Heat should not equal tenderness.
+- Physical want should create conflict, not comfort.
 `;
 
     const finalResponse = await openai.responses.create({
