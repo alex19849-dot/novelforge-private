@@ -11,49 +11,28 @@ export async function POST(req: Request) {
   const previousChapter = body.previousChapter;
   const nextChapterNumber = body.nextChapterNumber;
 
-  const prompt = `
+  const draftPrompt = `
 You are NovelForge, a romance novel continuation engine.
 
-Your job:
-Continue the existing story and write ONLY Chapter ${nextChapterNumber}.
+Write a DRAFT of Chapter ${nextChapterNumber}.
 
-Do not include:
-- story bible
-- outline
-- notes
-- analysis
-- bullet points
-- spoilers
-
-Return only finished prose for Chapter ${nextChapterNumber}.
-
-SAFETY RULES:
-- All characters must be 18+.
-- Do not sexualise minors.
-- Do not include illegal sexual content.
-- Explicit adult content is allowed only between consenting adults.
-- Do not include incest.
-- Do not frame coercion, stalking, abuse, or manipulation as romantic.
+Return only chapter prose. No notes. No outline.
 
 STORY CONTROLS:
 Title: ${form.title}
 Relationship Type: ${form.relationship}
 Subgenre: ${form.subgenre}
 Subgenre Detail: ${form.subgenreDetail}
-Locale / Language Flavour: ${form.locale}
+Locale: ${form.locale}
 Regional Voice: ${form.regionVoice}
 Writing Style: ${form.voiceStyle}
 Dialogue Style: ${form.dialogueStyle}
 Prose Density: ${form.proseDensity}
 Burn Pacing: ${form.burnPacing}
-Age Bracket: ${form.ageBracket}
-Avoid Style: ${form.avoidStyle}
-Real-World Grounding: ${form.grounding}
 Tropes: ${form.tropes}
 Tone: ${form.tone}
 Heat Level: ${form.heat}
 POV: ${form.pov}
-Ending Style: ${form.ending}
 Book Length: ${form.length}
 Plot Intensity: ${form.intensity}
 
@@ -94,131 +73,137 @@ Must-Not-Have: ${form.mustNotHave}
 PREVIOUS CHAPTERS:
 ${previousChapter}
 
-HARD LENGTH RULE:
-- If Book Length is Novella, this chapter must be 900 to 1,400 words.
-- If Book Length is Short Novel, this chapter must be 1,600 to 2,400 words.
-- If Book Length is Long Novel, this chapter must be 2,400 to 3,500 words.
-- Do not exceed the selected range.
-- End after one strong hook, reveal, tension beat, or emotional turn.
-- Do not over-expand scenes.
-- Do not write multiple chapters disguised as one chapter.
+STRICT LENGTH:
+- If Book Length is Novella, write 1,000 to 1,500 words.
+- If Book Length is Short Novel, write 1,600 to 2,400 words.
+- If Book Length is Long Novel, write 2,400 to 3,500 words.
+- Do not stop mid-sentence.
+- End with a clean hook, reveal, conflict beat, or emotional turn.
 
-CONTINUITY ENGINE:
-Before writing, silently extract and remember:
-- who said each memorable line
-- who knows each secret
-- who touched whom and when
-- current relationship status
-- current injuries and bruises
-- current living situation
-- unresolved threats
-- promises made
-- emotional state at the end of the previous chapter
-
-Do not contradict previous chapters.
-Do not assign a quote, memory, action, secret, or emotional beat to the wrong character.
-Do not repeat the same reveal as if it is new.
-
-QUOTE OWNERSHIP RULE:
-If a previous chapter shows one character saying a line, do not later claim the other character said it.
-If uncertain, avoid referencing the line.
-
-TROPE ENGINE:
+ENEMIES TO LOVERS RULE:
 If Tropes includes "Enemies to lovers":
-- Maintain genuine friction for several chapters.
-- Attraction may intensify, but trust should build slowly.
-- Do not soften them too quickly.
-- Do not make them behave like comfortable partners too early.
-- Make clashes, pride, rivalry, resentment, or distrust affect their choices.
-- If a kiss has not yet happened and Burn Pacing is Slow burn or Agonising slow burn, delay it.
-- If a kiss already happened too early, treat it as a problem, mistake, or source of conflict, not instant romance.
-- Do not let the kiss solve anything.
-- Keep emotional vulnerability reluctant and costly.
+- Keep genuine friction alive.
+- They must clash through pride, distrust, rivalry, resentment, or opposing choices.
+- Attraction can exist, but it should annoy, confuse, or unsettle them.
+- Do not make them emotionally cosy too quickly.
+- Do not make them act like comfortable partners too early.
+- If softness appears, undercut it with conflict, denial, pride, or avoidance.
+- Do not resolve romantic tension too early.
+- If they have kissed already, make it create awkwardness, conflict, denial, or fallout.
 
-If Tropes includes "Forced proximity":
-- Use proximity to create inconvenience, conflict, temptation, and tension.
-- Do not let shared space become cosy too quickly.
+CONTINUITY RULES:
+- Continue from previous chapters exactly.
+- Do not forget who said what.
+- Do not assign a quote to the wrong person.
+- Do not repeat old reveals as if new.
+- Track secrets, injuries, relationships, money problems, threats, living arrangements and emotional states.
+- Do not contradict previous events.
 
-If Tropes includes "Second chance":
-- Track old wounds accurately.
-- Do not resolve past hurt too soon.
-
-If Tropes includes "Slow burn" or Burn Pacing is Slow burn or Agonising slow burn:
-- Keep emotional and physical escalation restrained.
-- Use denial, longing, avoidance, jealousy, and small charged moments.
-- Do not rush into sex or confessions.
-
-LOGIC EDITOR:
-Before returning the chapter, silently check every paragraph for:
-- contradictions
-- dialogue replies that do not logically answer the previous line
-- impossible physical actions
-- unclear pronouns
-- accidentally switched POV
-- confusing metaphors
-- repeated wording
-- fake profound sentences that sound nice but mean nothing
-
-Fix them before returning.
-
-PHYSICAL ACTION RULE:
-Do not write impossible actions such as:
-- folding a pan into the sink
-- body parts acting independently in weird ways
-- eyes performing impossible actions
-
-Use plain physical verbs:
-- set
-- put
-- dropped
-- slid
-- carried
-- leaned
-- reached
-
-DIALOGUE RULES:
-- Dialogue must sound like real people speaking.
-- Use contractions naturally.
-- Avoid stiff phrasing unless intentional.
-- Let characters interrupt, dodge, joke, deflect and leave things unsaid.
-- Do not make every line witty.
-- Do not use dialogue as therapy.
-- Do not make characters explain their feelings too neatly.
-
-ANTI-AI STYLE RULES:
-- Do not use em dashes.
-- Do not use long dash interruptions.
-- Avoid repeated sentence openings.
-- Avoid purple prose.
-- Avoid stacked similes.
-- Avoid therapy-speak.
-- Avoid over-explaining emotions.
-- Avoid poetic object descriptions.
-- Avoid fake profound closing lines.
-- Avoid phrases like "his jaw clenched", "his breath hitched", "something in his chest", "his heart hammered", "electric touch", "second heartbeat", "storm in his eyes", unless genuinely needed and rare.
-- Keep metaphors rare and plain.
-- Keep prose grounded, readable and human.
-
-VOICE RULES:
-- Use the selected locale consistently.
-- Keep character voices distinct.
-- Honour the selected POV exactly.
-- Do not switch POV mid-scene without clear section break.
-- Continue naturally from the previous chapter.
-- Do not resolve the main conflict too early.
+STYLE RULES:
+- Natural commercial romance prose.
+- Distinct character voices.
+- Natural dialogue with subtext.
+- No em dashes.
+- No therapy-speak.
+- No fake profound lines.
+- No impossible physical actions.
+- No purple prose.
+- No repeated symbolic closing lines.
+- No “electric touch”, “storm in his eyes”, “second heartbeat”, “his breath hitched”, unless rare and genuinely needed.
 `;
 
   try {
-   const response = await openai.responses.create({
-  model: "gpt-5",
-  reasoning: { effort: "low" },
-  text: { verbosity: "low" },
-  input: prompt,
-  max_output_tokens: 8000,
-});
+    const draftResponse = await openai.responses.create({
+      model: "gpt-5",
+      reasoning: { effort: "low" },
+      text: { verbosity: "low" },
+      input: draftPrompt,
+      max_output_tokens: 8000,
+    });
+
+    const draft = draftResponse.output_text;
+
+    const editorPrompt = `
+You are NovelForge's strict human-style romance editor.
+
+Your job:
+Rewrite and clean this draft chapter into the FINAL version.
+
+Return only the final chapter prose. No notes.
+
+USER STORY SETTINGS:
+Tropes: ${form.tropes}
+Burn Pacing: ${form.burnPacing}
+Book Length: ${form.length}
+POV: ${form.pov}
+Locale: ${form.locale}
+Regional Voice: ${form.regionVoice}
+Writing Style: ${form.voiceStyle}
+Dialogue Style: ${form.dialogueStyle}
+Prose Density: ${form.proseDensity}
+Must-Not-Have: ${form.mustNotHave}
+
+PREVIOUS CHAPTERS FOR CONTINUITY:
+${previousChapter}
+
+DRAFT CHAPTER:
+${draft}
+
+EDITOR TASKS:
+1. Fix continuity.
+2. Fix quote ownership.
+3. Fix dialogue that does not logically answer the previous line.
+4. Fix impossible or weird physical actions.
+5. Remove pretty-but-meaningless lines.
+6. Tighten bloated paragraphs.
+7. Remove repeated phrases and repeated emotional beats.
+8. Strengthen enemies-to-lovers tension if selected.
+9. Keep the chapter ending complete and clean.
+10. Do not stop mid-sentence.
+11. Do not add notes, headings, bullet points, or commentary.
+
+ENEMIES TO LOVERS EDIT:
+If "Enemies to lovers" is selected:
+- Increase friction.
+- Make softness feel reluctant, unwanted, or resisted.
+- Add conflict through behaviour, competition, pride, suspicion, or emotional defence.
+- Remove anything that makes them feel too couple-like too early.
+- If attraction appears, make it inconvenient and irritating.
+- If one helps the other, make it grudging, practical, or tense, not openly tender too soon.
+
+LENGTH EDIT:
+- If Book Length is Novella, final chapter should be 1,000 to 1,500 words.
+- If Book Length is Short Novel, final chapter should be 1,600 to 2,400 words.
+- If Book Length is Long Novel, final chapter should be 2,400 to 3,500 words.
+- If too long, cut repetition and over-explaining.
+- If near the limit, end cleanly rather than adding another scene.
+
+ANTI-AI EDIT:
+Remove or rewrite:
+- fake profound sentences
+- therapy-speak
+- melodramatic inner monologue
+- body-part clichés
+- impossible actions
+- repeated “I don’t know” style closings
+- lines that sound poetic but mean nothing
+- over-polished banter
+- long decorative descriptions
+
+FINAL OUTPUT:
+Return only the polished final Chapter ${nextChapterNumber}.
+`;
+
+    const finalResponse = await openai.responses.create({
+      model: "gpt-5",
+      reasoning: { effort: "low" },
+      text: { verbosity: "low" },
+      input: editorPrompt,
+      max_output_tokens: 8000,
+    });
 
     return Response.json({
-      result: response.output_text,
+      result: finalResponse.output_text,
     });
   } catch (error) {
     console.error(error);
