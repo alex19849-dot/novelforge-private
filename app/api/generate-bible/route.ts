@@ -181,6 +181,13 @@ For enemies-to-lovers:
 - Attraction and sexual tension may rise before trust.
 - Vulnerability should stay low until earned.
 - Jealousy can appear before emotional honesty.
+CHAPTER 1 RELATIONSHIP STATE:
+- Start at Stage 1: hostility or Stage 2: reluctant awareness.
+- Trust should be low.
+- Irritation should be high.
+- Attraction should be present if Heat Level is Spicy or Explicit adult.
+- Sexual tension should be noticeable if Heat Level is Explicit adult.
+- Do not allow emotional comfort, caretaking softness, confession, or romantic safety yet.
 `;
 
   try {
