@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const STORAGE_KEY = "novelforge_saved_stories_v1";
-const ACTIVE_STORY_KEY = "novelforge_active_story_v1";
+import { supabase } from "@/lib/supabaseClient";
 
 const SUBGENRES = ["Contemporary","Small Town","Sports Romance","Dark Romance","Workplace","Celebrity","Paranormal","Billionaire","Second Chance"];
 const POV_OPTIONS = ["First person, single POV","First person, dual POV","Third person, single POV","Third person, dual POV","Alternating POV"];
@@ -65,14 +63,14 @@ type StoryForm = Record<string, string>;
 type SavedStory = {
   id: string;
   title: string;
-  updatedAt: string;
+  updated_at: string;
   form: StoryForm;
   chapters: string[];
-  activeChapterIndex: number;
-  customRewrite: string;
+  active_chapter_index: number;
+  custom_rewrite: string;
 };
 
-const defaultForm: Record<string, string> = {
+const defaultForm: StoryForm = {
   title: "",
   relationship: "MM Romance",
   subgenre: "Sports Romance",
@@ -138,10 +136,23 @@ const defaultForm: Record<string, string> = {
 };
 
 export default function Home() {
-  const [hydrated, setHydrated] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [email, setEmail] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
   const [step, setStep] = useState(1);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
+
+  const [form, setForm] = useState<StoryForm>(defaultForm);
+  const [chapters, setChapters] = useState<string[]>([]);
+  const [activeChapterIndex, setActiveChapterIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [continueLoading, setContinueLoading] = useState(false);
+  const [rewriteLoading, setRewriteLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [customRewrite, setCustomRewrite] = useState("");
 
   const steps = [
     "Story Setup",
@@ -152,20 +163,12 @@ export default function Home() {
     "Review & Generate",
   ];
 
-  const [form, setForm] = useState<Record<string, string>>(defaultForm);
-  const [chapters, setChapters] = useState<string[]>([]);
-  const [activeChapterIndex, setActiveChapterIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [continueLoading, setContinueLoading] = useState(false);
-  const [rewriteLoading, setRewriteLoading] = useState(false);
-  const [customRewrite, setCustomRewrite] = useState("");
-
   const jobOptions = getJobOptions(form.subgenre);
   const sceneOptions = getSceneOptions(form.subgenre);
   const regionOptions = REGION_OPTIONS[form.locale] || ["Neutral"];
   const activeChapter = chapters[activeChapterIndex] || "";
 
- const preparedForm: StoryForm = {
+  const preparedForm: StoryForm = {
     ...form,
     subgenreDetail: resolveCustom(form.subgenreDetail, form.subgenreDetailCustom),
     c1Job: resolveCustom(form.c1Job, form.c1JobCustom),
@@ -180,70 +183,83 @@ export default function Home() {
   };
 
   useEffect(() => {
-    try {
-      const rawStories = localStorage.getItem(STORAGE_KEY);
-      const rawActiveId = localStorage.getItem(ACTIVE_STORY_KEY);
-
-      const stories: SavedStory[] = rawStories ? JSON.parse(rawStories) : [];
-      setSavedStories(stories);
-
-      if (rawActiveId) {
-        const active = stories.find((story) => story.id === rawActiveId);
-
-        if (active) {
-          setActiveStoryId(active.id);
-          setForm({ ...defaultForm, ...active.form });
-          setChapters(active.chapters || []);
-          setActiveChapterIndex(active.activeChapterIndex || 0);
-          setCustomRewrite(active.customRewrite || "");
-        }
-      }
-    } catch (error) {
-      console.error("Failed to load saved stories", error);
-    } finally {
-      setHydrated(true);
+    async function initAuth() {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user || null);
+      setLoadingAuth(false);
     }
+
+    initAuth();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user || null);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
-
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedStories));
-
-      if (activeStoryId) {
-        localStorage.setItem(ACTIVE_STORY_KEY, activeStoryId);
-      } else {
-        localStorage.removeItem(ACTIVE_STORY_KEY);
-      }
-    } catch (error) {
-      console.error("Failed to save stories", error);
+    if (user) {
+      loadStories();
+    } else {
+      setSavedStories([]);
+      setActiveStoryId(null);
     }
-  }, [savedStories, activeStoryId, hydrated]);
+  }, [user]);
 
-  useEffect(() => {
-    if (!hydrated || !activeStoryId) return;
+  async function signIn() {
+    if (!email.trim()) {
+      setAuthMessage("Enter your email first, obviously. The computer is needy like that.");
+      return;
+    }
 
-    setSavedStories((prev) =>
-      prev.map((story) =>
-        story.id === activeStoryId
-          ? {
-              ...story,
-              title: getStoryTitle(form),
-              updatedAt: new Date().toISOString(),
-              form,
-              chapters,
-              activeChapterIndex,
-              customRewrite,
-            }
-          : story
-      )
-    );
-  }, [form, chapters, activeChapterIndex, customRewrite, activeStoryId, hydrated]);
+    setAuthMessage("Sending login link...");
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    if (error) {
+      setAuthMessage(error.message);
+      return;
+    }
+
+    setAuthMessage("Check your email for the magic login link.");
+  }
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    setUser(null);
+    setSavedStories([]);
+    setActiveStoryId(null);
+    setForm({ ...defaultForm });
+    setChapters([]);
+    setActiveChapterIndex(0);
+    setCustomRewrite("");
+  }
+
+  async function loadStories() {
+    const { data, error } = await supabase
+      .from("stories")
+      .select("*")
+      .order("updated_at", { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    setSavedStories((data || []) as SavedStory[]);
+  }
 
   function updateField(field: string, value: string) {
     setForm((prev) => {
-      const updated: Record<string, string> = { ...prev, [field]: value };
+      const updated: StoryForm = { ...prev, [field]: value };
 
       if (field === "locale") {
         updated.regionVoice = (REGION_OPTIONS[value] || ["Neutral"])[0];
@@ -307,83 +323,104 @@ export default function Home() {
   }
 
   function createNewStory() {
-    const id = crypto.randomUUID();
-    const newForm = { ...defaultForm };
-
-    const newStory: SavedStory = {
-      id,
-      title: "Untitled Story",
-      updatedAt: new Date().toISOString(),
-      form: newForm,
-      chapters: [],
-      activeChapterIndex: 0,
-      customRewrite: "",
-    };
-
-    setSavedStories((prev) => [newStory, ...prev]);
-    setActiveStoryId(id);
-    setForm(newForm);
+    setActiveStoryId(null);
+    setForm({ ...defaultForm });
     setChapters([]);
     setActiveChapterIndex(0);
     setCustomRewrite("");
     setStep(1);
   }
 
-  function saveCurrentStory() {
-    const id = activeStoryId || crypto.randomUUID();
+  async function saveCurrentStory() {
+    if (!user) {
+      setAuthMessage("Log in first so I can save it to the cloud, tragically useful as that is.");
+      return null;
+    }
 
-    const savedStory: SavedStory = {
-      id,
+    setSaving(true);
+
+    const payload = {
+      user_id: user.id,
       title: getStoryTitle(form),
-      updatedAt: new Date().toISOString(),
       form,
       chapters,
-      activeChapterIndex,
-      customRewrite,
+      active_chapter_index: activeChapterIndex,
+      custom_rewrite: customRewrite,
+      updated_at: new Date().toISOString(),
     };
 
-    setSavedStories((prev) => {
-      const exists = prev.some((story) => story.id === id);
+    if (activeStoryId) {
+      const { error } = await supabase
+        .from("stories")
+        .update(payload)
+        .eq("id", activeStoryId);
 
-      if (exists) {
-        return prev.map((story) => (story.id === id ? savedStory : story));
+      setSaving(false);
+
+      if (error) {
+        console.error(error);
+        return null;
       }
 
-      return [savedStory, ...prev];
-    });
+      await loadStories();
+      return activeStoryId;
+    }
 
-    setActiveStoryId(id);
+    const { data, error } = await supabase
+      .from("stories")
+      .insert(payload)
+      .select()
+      .single();
+
+    setSaving(false);
+
+    if (error) {
+      console.error(error);
+      return null;
+    }
+
+    setActiveStoryId(data.id);
+    await loadStories();
+    return data.id;
   }
 
   function loadStory(story: SavedStory) {
     setActiveStoryId(story.id);
     setForm({ ...defaultForm, ...story.form });
     setChapters(story.chapters || []);
-    setActiveChapterIndex(story.activeChapterIndex || 0);
-    setCustomRewrite(story.customRewrite || "");
+    setActiveChapterIndex(story.active_chapter_index || 0);
+    setCustomRewrite(story.custom_rewrite || "");
     setStep(1);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function deleteStory(id: string) {
+  async function deleteStory(id: string) {
     const confirmed = window.confirm("Delete this saved story? This cannot be undone.");
 
     if (!confirmed) return;
 
-    setSavedStories((prev) => prev.filter((story) => story.id !== id));
+    const { error } = await supabase
+      .from("stories")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      console.error(error);
+      return;
+    }
 
     if (activeStoryId === id) {
-      setActiveStoryId(null);
-      setForm({ ...defaultForm });
-      setChapters([]);
-      setActiveChapterIndex(0);
-      setCustomRewrite("");
-      setStep(1);
+      createNewStory();
     }
+
+    await loadStories();
   }
 
   async function generateStory() {
-    saveCurrentStory();
+    if (!user) {
+      setAuthMessage("Log in first so the story can save across devices.");
+      return;
+    }
 
     setLoading(true);
     setChapters([]);
@@ -401,6 +438,10 @@ export default function Home() {
     setChapters([chapter]);
     setActiveChapterIndex(0);
     setLoading(false);
+
+    setTimeout(() => {
+      saveCurrentStory();
+    }, 500);
   }
 
   async function rewriteChapter() {
@@ -427,6 +468,10 @@ export default function Home() {
     });
 
     setRewriteLoading(false);
+
+    setTimeout(() => {
+      saveCurrentStory();
+    }, 500);
   }
 
   async function continueStory() {
@@ -454,6 +499,18 @@ export default function Home() {
     setChapters((prev) => [...prev, nextChapter]);
     setActiveChapterIndex(chapters.length);
     setContinueLoading(false);
+
+    setTimeout(() => {
+      saveCurrentStory();
+    }, 500);
+  }
+
+  if (loadingAuth) {
+    return (
+      <main className="min-h-screen bg-zinc-950 text-white grid place-items-center">
+        <p className="text-zinc-300">Loading NovelForge...</p>
+      </main>
+    );
   }
 
   return (
@@ -474,317 +531,363 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-[320px_1fr] gap-8 items-start">
-          <aside className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-6">
-            <div className="flex items-center justify-between gap-3 mb-5">
-              <h2 className="text-2xl font-bold">My Stories</h2>
-              <button
-                type="button"
-                onClick={createNewStory}
-                className="bg-rose-500 hover:bg-rose-400 rounded-xl px-4 py-2 text-sm font-bold"
-              >
-                New
-              </button>
-            </div>
+        {!user && (
+          <div className="max-w-xl mx-auto bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-8">
+            <h2 className="text-3xl font-bold mb-4">Log in</h2>
+            <p className="text-zinc-300 mb-6">
+              Enter your email and Supabase will send you a magic login link.
+            </p>
+
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@email.com"
+              className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none mb-4"
+            />
 
             <button
               type="button"
-              onClick={saveCurrentStory}
-              className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 mb-5"
+              onClick={signIn}
+              className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold"
             >
-              Save Current Story
+              Send Login Link
             </button>
 
-            <div className="grid gap-3">
-              {savedStories.length === 0 && (
-                <p className="text-sm text-zinc-400">
-                  No saved stories yet. Tragic, but fixable.
-                </p>
-              )}
+            {authMessage && (
+              <p className="text-sm text-rose-200 mt-4">{authMessage}</p>
+            )}
+          </div>
+        )}
 
-              {savedStories.map((story) => (
-                <div
-                  key={story.id}
-                  className={`rounded-2xl border p-4 ${
-                    activeStoryId === story.id
-                      ? "border-rose-400 bg-rose-500/15"
-                      : "border-white/10 bg-black/20"
-                  }`}
-                >
-                  <h3 className="font-bold text-rose-100 mb-1">
-                    {story.title}
-                  </h3>
-
-                  <p className="text-xs text-zinc-400 mb-3">
-                    {story.chapters.length} chapter{story.chapters.length === 1 ? "" : "s"} · Updated {formatDate(story.updatedAt)}
-                  </p>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => loadStory(story)}
-                      className="flex-1 bg-zinc-800 hover:bg-zinc-700 rounded-xl px-3 py-2 text-sm font-semibold"
-                    >
-                      Load
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => deleteStory(story.id)}
-                      className="bg-black/30 hover:bg-red-500/30 border border-white/10 rounded-xl px-3 py-2 text-sm"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </aside>
-
-          <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-8">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
-              <div>
-                <h2 className="text-3xl font-bold">Create New Story</h2>
-                <p className="text-sm text-zinc-400 mt-2">
-                  Active save: {activeStoryId ? getStoryTitle(form) : "Unsaved draft"}
-                </p>
-              </div>
+        {user && (
+          <>
+            <div className="flex justify-between items-center mb-8 bg-black/20 border border-white/10 rounded-2xl px-5 py-4">
+              <p className="text-sm text-zinc-300">
+                Logged in as <span className="text-rose-200">{user.email}</span>
+              </p>
 
               <button
                 type="button"
-                onClick={saveCurrentStory}
-                className="bg-zinc-800 hover:bg-zinc-700 rounded-2xl px-5 py-3 font-semibold border border-white/10"
+                onClick={signOut}
+                className="bg-zinc-800 hover:bg-zinc-700 rounded-xl px-4 py-2 text-sm border border-white/10"
               >
-                Save
+                Log out
               </button>
             </div>
 
-            <div className="mb-8">
-              <div className="flex justify-between text-sm text-zinc-300 mb-3">
-                <span>Step {step} of {steps.length}</span>
-                <span>{steps[step - 1]}</span>
-              </div>
-
-              <div className="h-3 rounded-full bg-zinc-900 overflow-hidden border border-white/10">
-                <div
-                  className="h-full bg-rose-500 transition-all"
-                  style={{ width: `${(step / steps.length) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-8">
-              {step === 1 && (
-                <Section title="Story Setup">
-                  <Input label="Story Title" field="title" form={form} updateField={updateField} />
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
-                    <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={SUBGENRES} />
-
-                    {form.subgenre === "Sports Romance" && (
-                      <>
-                        <Select label="Sport Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={SPORT_OPTIONS} />
-                        {form.subgenreDetail === "Custom" && <Input label="Custom Sport Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
-                      </>
-                    )}
-
-                    {form.subgenre === "Small Town" && (
-                      <>
-                        <Select label="Town Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={TOWN_OPTIONS} />
-                        {form.subgenreDetail === "Custom" && <Input label="Custom Town Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
-                      </>
-                    )}
-
-                    {form.subgenre === "Celebrity" && (
-                      <>
-                        <Select label="Celebrity Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={CELEBRITY_OPTIONS} />
-                        {form.subgenreDetail === "Custom" && <Input label="Custom Celebrity Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
-                      </>
-                    )}
-
-                    {form.subgenre === "Paranormal" && (
-                      <>
-                        <Select label="Paranormal World" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={PARANORMAL_OPTIONS} />
-                        {form.subgenreDetail === "Custom" && <Input label="Custom Paranormal World" field="subgenreDetailCustom" form={form} updateField={updateField} />}
-                      </>
-                    )}
-
-                    <Select label="Locale / Language Flavour" field="locale" value={form.locale} updateField={updateField} options={LOCALE_OPTIONS} />
-                    <Select label="Regional Voice" field="regionVoice" value={form.regionVoice} updateField={updateField} options={regionOptions} />
-                    <Select label="POV" field="pov" value={form.pov} updateField={updateField} options={POV_OPTIONS} />
-                    <Select label="Age Bracket" field="ageBracket" value={form.ageBracket} updateField={updateField} options={AGE_BRACKET_OPTIONS} />
-                    <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
-                    <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
-                    <Select label="Length" field="length" value={form.length} updateField={updateField} options={LENGTH_OPTIONS} />
-                    <Select label="Plot Intensity" field="intensity" value={form.intensity} updateField={updateField} options={["Cozy", "Balanced", "Dramatic", "Heavy angst", "Chaotic soap opera"]} />
-                  </div>
-
-                  <CheckboxGroup label="Tropes" field="tropes" selected={form.tropes} options={TROPE_OPTIONS} updateField={updateField} />
-                </Section>
-              )}
-
-              {step === 2 && (
-                <Section title="Voice Engine">
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <Select label="Writing Style" field="voiceStyle" value={form.voiceStyle} updateField={updateField} options={VOICE_STYLE_OPTIONS} />
-                    <Select label="Dialogue Style" field="dialogueStyle" value={form.dialogueStyle} updateField={updateField} options={DIALOGUE_STYLE_OPTIONS} />
-                    <Select label="Prose Density" field="proseDensity" value={form.proseDensity} updateField={updateField} options={PROSE_DENSITY_OPTIONS} />
-                    <Select label="Burn Pacing" field="burnPacing" value={form.burnPacing} updateField={updateField} options={BURN_OPTIONS} />
-                    <Select label="Chapter Opener" field="chapterOpener" value={form.chapterOpener} updateField={updateField} options={CHAPTER_OPENER_OPTIONS} />
-                  </div>
-
-                  <CheckboxGroup label="Real-World Grounding" field="grounding" selected={form.grounding} options={GROUNDING_OPTIONS} updateField={updateField} />
-                  <CheckboxGroup label="Avoid AI Waffle" field="avoidStyle" selected={form.avoidStyle} options={AVOID_STYLE_OPTIONS} updateField={updateField} />
-                </Section>
-              )}
-
-              {step === 3 && (
-                <>
-                  <button type="button" onClick={generateNames} className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10">
-                    Generate Character Names
-                  </button>
-
-                  <CharacterSection title="Character 1" prefix="c1" form={form} updateField={updateField} jobOptions={jobOptions} />
-                </>
-              )}
-
-              {step === 4 && (
-                <CharacterSection title="Character 2" prefix="c2" form={form} updateField={updateField} jobOptions={jobOptions} />
-              )}
-
-              {step === 5 && (
-                <Section title="Plot Builder">
-                  <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
-                  {hasCustom(form.setting) && <Input label="Custom Setting" field="settingCustom" form={form} updateField={updateField} />}
-
-                  <CheckboxGroup label="Main Conflict" field="conflict" selected={form.conflict} options={CONFLICT_OPTIONS} updateField={updateField} />
-                  {hasCustom(form.conflict) && <Input label="Custom Main Conflict" field="conflictCustom" form={form} updateField={updateField} />}
-
-                  <CheckboxGroup label="What Keeps Them Apart?" field="keepsApart" selected={form.keepsApart} options={KEEPS_APART_OPTIONS} updateField={updateField} />
-                  {hasCustom(form.keepsApart) && <Input label="Custom Reason Keeping Them Apart" field="keepsApartCustom" form={form} updateField={updateField} />}
-
-                  <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={sceneOptions} updateField={updateField} />
-                  {hasCustom(form.mustHave) && <Input label="Custom Must-Have Scene" field="mustHaveCustom" form={form} updateField={updateField} />}
-
-                  <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
-                  {hasCustom(form.mustNotHave) && <Input label="Custom Must-Not-Have" field="mustNotHaveCustom" form={form} updateField={updateField} />}
-
-                  <TextArea label="Optional Plot Notes" field="plot" form={form} updateField={updateField} placeholder="Add anything specific, if needed..." />
-                </Section>
-              )}
-
-              {step === 6 && (
-                <Section title="Review & Generate">
-                  <div className="grid gap-3 text-zinc-200">
-                    <p><strong>Title:</strong> {preparedForm.title || "Untitled"}</p>
-                    <p><strong>Relationship:</strong> {preparedForm.relationship}</p>
-                    <p><strong>Subgenre:</strong> {preparedForm.subgenre} {preparedForm.subgenreDetail && `, ${preparedForm.subgenreDetail}`}</p>
-                    <p><strong>Locale:</strong> {preparedForm.locale}, {preparedForm.regionVoice}</p>
-                    <p><strong>Voice:</strong> {preparedForm.voiceStyle}, {preparedForm.dialogueStyle}, {preparedForm.proseDensity}</p>
-                    <p><strong>Burn:</strong> {preparedForm.burnPacing}</p>
-                    <p><strong>Heat:</strong> {preparedForm.heat}</p>
-                    <p><strong>POV:</strong> {preparedForm.pov}</p>
-                    <p><strong>Characters:</strong> {preparedForm.c1Name || "Character 1"} + {preparedForm.c2Name || "Character 2"}</p>
-                    <p><strong>Jobs:</strong> {preparedForm.c1Job} + {preparedForm.c2Job}</p>
-                    <p><strong>Tropes:</strong> {preparedForm.tropes || "None selected"}</p>
-                    <p><strong>Setting:</strong> {preparedForm.setting || "Not selected"}</p>
-                    <p><strong>Conflict:</strong> {preparedForm.conflict || "Not selected"}</p>
-                    <p><strong>Must have:</strong> {preparedForm.mustHave || "None selected"}</p>
-                    <p><strong>Must not have:</strong> {preparedForm.mustNotHave || "None selected"}</p>
-                  </div>
-
-                  <button onClick={generateStory} className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg mt-6">
-                    {loading ? "Generating your story..." : "Generate Story"}
-                  </button>
-                </Section>
-              )}
-
-              <div className="flex gap-4">
-                <button
-                  type="button"
-                  onClick={() => setStep((prev) => Math.max(1, prev - 1))}
-                  disabled={step === 1}
-                  className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 disabled:opacity-40"
-                >
-                  Back
-                </button>
-
-                {step < steps.length && (
+            <div className="grid lg:grid-cols-[320px_1fr] gap-8 items-start">
+              <aside className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-6">
+                <div className="flex items-center justify-between gap-3 mb-5">
+                  <h2 className="text-2xl font-bold">My Stories</h2>
                   <button
                     type="button"
-                    onClick={() => setStep((prev) => Math.min(steps.length, prev + 1))}
-                    className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-3 font-bold"
+                    onClick={createNewStory}
+                    className="bg-rose-500 hover:bg-rose-400 rounded-xl px-4 py-2 text-sm font-bold"
                   >
-                    Next
+                    New
                   </button>
-                )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveCurrentStory}
+                  className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 mb-5"
+                >
+                  {saving ? "Saving..." : "Save Current Story"}
+                </button>
+
+                <div className="grid gap-3">
+                  {savedStories.length === 0 && (
+                    <p className="text-sm text-zinc-400">
+                      No saved stories yet. Tragic, but fixable.
+                    </p>
+                  )}
+
+                  {savedStories.map((story) => (
+                    <div
+                      key={story.id}
+                      className={`rounded-2xl border p-4 ${
+                        activeStoryId === story.id
+                          ? "border-rose-400 bg-rose-500/15"
+                          : "border-white/10 bg-black/20"
+                      }`}
+                    >
+                      <h3 className="font-bold text-rose-100 mb-1">
+                        {story.title}
+                      </h3>
+
+                      <p className="text-xs text-zinc-400 mb-3">
+                        {(story.chapters || []).length} chapter{(story.chapters || []).length === 1 ? "" : "s"} · Updated {formatDate(story.updated_at)}
+                      </p>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => loadStory(story)}
+                          className="flex-1 bg-zinc-800 hover:bg-zinc-700 rounded-xl px-3 py-2 text-sm font-semibold"
+                        >
+                          Load
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => deleteStory(story.id)}
+                          className="bg-black/30 hover:bg-red-500/30 border border-white/10 rounded-xl px-3 py-2 text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </aside>
+
+              <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-8">
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+                  <div>
+                    <h2 className="text-3xl font-bold">Create New Story</h2>
+                    <p className="text-sm text-zinc-400 mt-2">
+                      Active save: {activeStoryId ? getStoryTitle(form) : "Unsaved draft"}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={saveCurrentStory}
+                    className="bg-zinc-800 hover:bg-zinc-700 rounded-2xl px-5 py-3 font-semibold border border-white/10"
+                  >
+                    {saving ? "Saving..." : "Save"}
+                  </button>
+                </div>
+
+                <div className="mb-8">
+                  <div className="flex justify-between text-sm text-zinc-300 mb-3">
+                    <span>Step {step} of {steps.length}</span>
+                    <span>{steps[step - 1]}</span>
+                  </div>
+
+                  <div className="h-3 rounded-full bg-zinc-900 overflow-hidden border border-white/10">
+                    <div
+                      className="h-full bg-rose-500 transition-all"
+                      style={{ width: `${(step / steps.length) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-8">
+                  {step === 1 && (
+                    <Section title="Story Setup">
+                      <Input label="Story Title" field="title" form={form} updateField={updateField} />
+
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <Select label="Relationship Type" field="relationship" value={form.relationship} updateField={updateField} options={["MM Romance", "MF Romance"]} />
+                        <Select label="Subgenre" field="subgenre" value={form.subgenre} updateField={updateField} options={SUBGENRES} />
+
+                        {form.subgenre === "Sports Romance" && (
+                          <>
+                            <Select label="Sport Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={SPORT_OPTIONS} />
+                            {form.subgenreDetail === "Custom" && <Input label="Custom Sport Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
+                          </>
+                        )}
+
+                        {form.subgenre === "Small Town" && (
+                          <>
+                            <Select label="Town Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={TOWN_OPTIONS} />
+                            {form.subgenreDetail === "Custom" && <Input label="Custom Town Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
+                          </>
+                        )}
+
+                        {form.subgenre === "Celebrity" && (
+                          <>
+                            <Select label="Celebrity Type" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={CELEBRITY_OPTIONS} />
+                            {form.subgenreDetail === "Custom" && <Input label="Custom Celebrity Type" field="subgenreDetailCustom" form={form} updateField={updateField} />}
+                          </>
+                        )}
+
+                        {form.subgenre === "Paranormal" && (
+                          <>
+                            <Select label="Paranormal World" field="subgenreDetail" value={form.subgenreDetail} updateField={updateField} options={PARANORMAL_OPTIONS} />
+                            {form.subgenreDetail === "Custom" && <Input label="Custom Paranormal World" field="subgenreDetailCustom" form={form} updateField={updateField} />}
+                          </>
+                        )}
+
+                        <Select label="Locale / Language Flavour" field="locale" value={form.locale} updateField={updateField} options={LOCALE_OPTIONS} />
+                        <Select label="Regional Voice" field="regionVoice" value={form.regionVoice} updateField={updateField} options={regionOptions} />
+                        <Select label="POV" field="pov" value={form.pov} updateField={updateField} options={POV_OPTIONS} />
+                        <Select label="Age Bracket" field="ageBracket" value={form.ageBracket} updateField={updateField} options={AGE_BRACKET_OPTIONS} />
+                        <Select label="Heat Level" field="heat" value={form.heat} updateField={updateField} options={["Fade to black", "Mild", "Spicy", "Explicit adult"]} />
+                        <Select label="Ending" field="ending" value={form.ending} updateField={updateField} options={["Happy ending", "Happy for now", "Bittersweet", "Cliffhanger"]} />
+                        <Select label="Length" field="length" value={form.length} updateField={updateField} options={LENGTH_OPTIONS} />
+                        <Select label="Plot Intensity" field="intensity" value={form.intensity} updateField={updateField} options={["Cozy", "Balanced", "Dramatic", "Heavy angst", "Chaotic soap opera"]} />
+                      </div>
+
+                      <CheckboxGroup label="Tropes" field="tropes" selected={form.tropes} options={TROPE_OPTIONS} updateField={updateField} />
+                    </Section>
+                  )}
+
+                  {step === 2 && (
+                    <Section title="Voice Engine">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <Select label="Writing Style" field="voiceStyle" value={form.voiceStyle} updateField={updateField} options={VOICE_STYLE_OPTIONS} />
+                        <Select label="Dialogue Style" field="dialogueStyle" value={form.dialogueStyle} updateField={updateField} options={DIALOGUE_STYLE_OPTIONS} />
+                        <Select label="Prose Density" field="proseDensity" value={form.proseDensity} updateField={updateField} options={PROSE_DENSITY_OPTIONS} />
+                        <Select label="Burn Pacing" field="burnPacing" value={form.burnPacing} updateField={updateField} options={BURN_OPTIONS} />
+                        <Select label="Chapter Opener" field="chapterOpener" value={form.chapterOpener} updateField={updateField} options={CHAPTER_OPENER_OPTIONS} />
+                      </div>
+
+                      <CheckboxGroup label="Real-World Grounding" field="grounding" selected={form.grounding} options={GROUNDING_OPTIONS} updateField={updateField} />
+                      <CheckboxGroup label="Avoid AI Waffle" field="avoidStyle" selected={form.avoidStyle} options={AVOID_STYLE_OPTIONS} updateField={updateField} />
+                    </Section>
+                  )}
+
+                  {step === 3 && (
+                    <>
+                      <button type="button" onClick={generateNames} className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10">
+                        Generate Character Names
+                      </button>
+
+                      <CharacterSection title="Character 1" prefix="c1" form={form} updateField={updateField} jobOptions={jobOptions} />
+                    </>
+                  )}
+
+                  {step === 4 && (
+                    <CharacterSection title="Character 2" prefix="c2" form={form} updateField={updateField} jobOptions={jobOptions} />
+                  )}
+
+                  {step === 5 && (
+                    <Section title="Plot Builder">
+                      <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
+                      {hasCustom(form.setting) && <Input label="Custom Setting" field="settingCustom" form={form} updateField={updateField} />}
+
+                      <CheckboxGroup label="Main Conflict" field="conflict" selected={form.conflict} options={CONFLICT_OPTIONS} updateField={updateField} />
+                      {hasCustom(form.conflict) && <Input label="Custom Main Conflict" field="conflictCustom" form={form} updateField={updateField} />}
+
+                      <CheckboxGroup label="What Keeps Them Apart?" field="keepsApart" selected={form.keepsApart} options={KEEPS_APART_OPTIONS} updateField={updateField} />
+                      {hasCustom(form.keepsApart) && <Input label="Custom Reason Keeping Them Apart" field="keepsApartCustom" form={form} updateField={updateField} />}
+
+                      <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={sceneOptions} updateField={updateField} />
+                      {hasCustom(form.mustHave) && <Input label="Custom Must-Have Scene" field="mustHaveCustom" form={form} updateField={updateField} />}
+
+                      <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
+                      {hasCustom(form.mustNotHave) && <Input label="Custom Must-Not-Have" field="mustNotHaveCustom" form={form} updateField={updateField} />}
+
+                      <TextArea label="Optional Plot Notes" field="plot" form={form} updateField={updateField} placeholder="Add anything specific, if needed..." />
+                    </Section>
+                  )}
+
+                  {step === 6 && (
+                    <Section title="Review & Generate">
+                      <div className="grid gap-3 text-zinc-200">
+                        <p><strong>Title:</strong> {preparedForm.title || "Untitled"}</p>
+                        <p><strong>Relationship:</strong> {preparedForm.relationship}</p>
+                        <p><strong>Subgenre:</strong> {preparedForm.subgenre} {preparedForm.subgenreDetail && `, ${preparedForm.subgenreDetail}`}</p>
+                        <p><strong>Locale:</strong> {preparedForm.locale}, {preparedForm.regionVoice}</p>
+                        <p><strong>Voice:</strong> {preparedForm.voiceStyle}, {preparedForm.dialogueStyle}, {preparedForm.proseDensity}</p>
+                        <p><strong>Burn:</strong> {preparedForm.burnPacing}</p>
+                        <p><strong>Heat:</strong> {preparedForm.heat}</p>
+                        <p><strong>POV:</strong> {preparedForm.pov}</p>
+                        <p><strong>Characters:</strong> {preparedForm.c1Name || "Character 1"} + {preparedForm.c2Name || "Character 2"}</p>
+                        <p><strong>Jobs:</strong> {preparedForm.c1Job} + {preparedForm.c2Job}</p>
+                        <p><strong>Tropes:</strong> {preparedForm.tropes || "None selected"}</p>
+                        <p><strong>Setting:</strong> {preparedForm.setting || "Not selected"}</p>
+                        <p><strong>Conflict:</strong> {preparedForm.conflict || "Not selected"}</p>
+                        <p><strong>Must have:</strong> {preparedForm.mustHave || "None selected"}</p>
+                        <p><strong>Must not have:</strong> {preparedForm.mustNotHave || "None selected"}</p>
+                      </div>
+
+                      <button onClick={generateStory} className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg mt-6">
+                        {loading ? "Generating your story..." : "Generate Story"}
+                      </button>
+                    </Section>
+                  )}
+
+                  <div className="flex gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setStep((prev) => Math.max(1, prev - 1))}
+                      disabled={step === 1}
+                      className="w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 disabled:opacity-40"
+                    >
+                      Back
+                    </button>
+
+                    {step < steps.length && (
+                      <button
+                        type="button"
+                        onClick={() => setStep((prev) => Math.min(steps.length, prev + 1))}
+                        className="w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-3 font-bold"
+                      >
+                        Next
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {chapters.length > 0 && (
-          <div className="max-w-4xl mx-auto mt-10 bg-black/30 rounded-3xl p-8 border border-white/10 whitespace-pre-wrap leading-8 text-zinc-200">
-            <div className="flex flex-wrap gap-2 mb-8">
-              {chapters.map((_, index) => (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => setActiveChapterIndex(index)}
-                  className={`rounded-full px-4 py-2 text-sm border transition ${
-                    activeChapterIndex === index
-                      ? "bg-rose-500 border-rose-400 text-white"
-                      : "bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400"
-                  }`}
-                >
-                  Chapter {index + 1}
-                </button>
-              ))}
-            </div>
+            {chapters.length > 0 && (
+              <div className="max-w-4xl mx-auto mt-10 bg-black/30 rounded-3xl p-8 border border-white/10 whitespace-pre-wrap leading-8 text-zinc-200">
+                <div className="flex flex-wrap gap-2 mb-8">
+                  {chapters.map((_, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setActiveChapterIndex(index)}
+                      className={`rounded-full px-4 py-2 text-sm border transition ${
+                        activeChapterIndex === index
+                          ? "bg-rose-500 border-rose-400 text-white"
+                          : "bg-zinc-950/70 border-white/10 text-zinc-300 hover:border-rose-400"
+                      }`}
+                    >
+                      Chapter {index + 1}
+                    </button>
+                  ))}
+                </div>
 
-            <h2 className="text-3xl font-bold text-rose-200 mb-6">
-              Chapter {activeChapterIndex + 1}
-            </h2>
+                <h2 className="text-3xl font-bold text-rose-200 mb-6">
+                  Chapter {activeChapterIndex + 1}
+                </h2>
 
-            <div>{activeChapter}</div>
+                <div>{activeChapter}</div>
 
-            <div className="mt-10 border-t border-white/10 pt-8">
-              <h3 className="text-2xl font-bold text-rose-200 mb-4">Rewrite Chapter</h3>
+                <div className="mt-10 border-t border-white/10 pt-8">
+                  <h3 className="text-2xl font-bold text-rose-200 mb-4">Rewrite Chapter</h3>
 
-              <textarea
-                value={customRewrite}
-                onChange={(e) => setCustomRewrite(e.target.value)}
-                placeholder="Tell it what to change, e.g. make the dialogue less stiff, add more tension, make it less poetic..."
-                className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none min-h-[100px]"
-              />
+                  <textarea
+                    value={customRewrite}
+                    onChange={(e) => setCustomRewrite(e.target.value)}
+                    placeholder="Tell it what to change, e.g. make the dialogue less stiff, add more tension, make it less poetic..."
+                    className="w-full rounded-2xl bg-zinc-950/70 border border-white/10 px-5 py-4 outline-none min-h-[100px]"
+                  />
 
-              <button
-                type="button"
-                onClick={rewriteChapter}
-                disabled={rewriteLoading || !customRewrite.trim()}
-                className="mt-4 w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 disabled:opacity-50"
-              >
-                {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
-              </button>
+                  <button
+                    type="button"
+                    onClick={rewriteChapter}
+                    disabled={rewriteLoading || !customRewrite.trim()}
+                    className="mt-4 w-full bg-zinc-800 hover:bg-zinc-700 rounded-2xl py-3 font-semibold border border-white/10 disabled:opacity-50"
+                  >
+                    {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
+                  </button>
 
-              <button
-                type="button"
-                onClick={continueStory}
-                disabled={continueLoading}
-                className="mt-4 w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg disabled:opacity-50"
-              >
-                {continueLoading ? "Continuing story..." : `Continue to Chapter ${chapters.length + 1}`}
-              </button>
-            </div>
-          </div>
+                  <button
+                    type="button"
+                    onClick={continueStory}
+                    disabled={continueLoading}
+                    className="mt-4 w-full bg-rose-500 hover:bg-rose-400 rounded-2xl py-4 font-bold text-lg disabled:opacity-50"
+                  >
+                    {continueLoading ? "Continuing story..." : `Continue to Chapter ${chapters.length + 1}`}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </section>
     </main>
   );
 }
 
-function getStoryTitle(form: Record<string, string>) {
+function getStoryTitle(form: StoryForm) {
   return form.title?.trim() || "Untitled Story";
 }
 
