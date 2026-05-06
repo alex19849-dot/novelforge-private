@@ -408,6 +408,14 @@ STYLE RULES:
 - No “electric touch”, “storm in his eyes”, “second heartbeat”, “his breath hitched”, unless rare and genuinely needed.
 - Use the selected locale consistently.
 - Honour the selected POV exactly.
+DASH RULE:
+Do not use em dashes.
+Do not use long dashes.
+Do not use spaced dashes as dramatic interruptions.
+Do not use "—" anywhere.
+Do not use "–" anywhere.
+Use commas, full stops, colons, semicolons, brackets, or separate sentences instead.
+Before final output, scan and replace every em dash or en dash.
 `;
 
   try {
@@ -616,6 +624,14 @@ Remove or rewrite:
 - random object descriptions
 - repeated environmental details
 
+DASH RULE:
+Do not use em dashes.
+Do not use long dashes.
+Do not use spaced dashes as dramatic interruptions.
+Do not use "—" anywhere.
+Do not use "–" anywhere.
+Use commas, full stops, colons, semicolons, brackets, or separate sentences instead.
+Before final output, scan and replace every em dash or en dash.
 FINAL OUTPUT:
 Return only the polished final Chapter ${nextChapterNumber}.
 `;
