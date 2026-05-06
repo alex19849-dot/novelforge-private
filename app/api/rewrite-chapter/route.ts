@@ -314,7 +314,7 @@ Before final output, scan and replace every em dash or en dash.
     });
 
     return Response.json({
-      result: response.output_text,
+      result: response.output_text.replace(/[—–]/g, ","),
     });
   } catch (error) {
     console.error(error);
