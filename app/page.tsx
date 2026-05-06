@@ -1,40 +1,112 @@
+// Full replacement for app/page.tsx
+
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+import { useMemo, useState } from "react";
 
-const SUBGENRES = ["Contemporary", "Small Town", "Sports Romance", "Dark Romance", "Workplace", "Celebrity", "Paranormal", "Billionaire", "Second Chance"];
-const RELATIONSHIP_TYPES = ["MM Romance", "MF Romance"];
-const ROMANCE_DYNAMICS = ["Equals / balanced", "Protective x guarded", "Golden retriever x black cat", "Ice king x chaos", "Sunshine x cynic", "Rival x rival", "Forbidden pull", "Caregiver x independent", "Dom energy x brat energy", "Quiet intensity x loud confidence", "Rich x working class", "Celebrity x normal person", "Boss x employee", "Teammates", "Best friend's sibling", "Exes", "Enemy captains", "Fake relationship pairing", "Forced roommates", "Custom"];
-const ATTRACTION_STYLE = ["Instant punch", "Reluctant noticing", "Slow awareness", "Denial", "Hate attraction", "Admiration first", "Friendship first", "Lust first", "Emotional first", "Custom"];
-const ATTRACTION_FOCUS = ["Face", "Smile", "Mouth", "Voice", "Scent", "Hands", "Body", "Intelligence", "Confidence", "Kindness", "Competence", "Vulnerability", "Humour", "Mystery"];
-const SEXUAL_STYLE = ["Teasing", "Filthy talk", "Dominant", "Playful", "Intense emotional", "Rough edge", "Worshipful", "Desperate", "Tender", "Possessive", "Experimental", "Jealous heat", "Forbidden heat", "Slow simmer heat", "Custom"];
-const SPICE_TIMING = ["Early", "Middle", "Late", "Very late payoff"];
+type Tab = "core" | "characters" | "spark";
 
-const EXTERNAL_CONFLICT = ["Career pressure", "Money problems", "Fame / public image", "Child custody", "Injury", "Family pressure", "Distance", "Scandal", "Grief", "Danger", "Team rivalry", "Workplace rules", "Custom"];
-const INTERNAL_CONFLICT = ["Trust issues", "Shame", "Fear of love", "Anger", "Low self-worth", "Commitment fear", "Guilt", "Past trauma", "Fear of vulnerability", "Control issues", "Custom"];
-const ROMANTIC_CONFLICT = ["Rivals", "Secret", "Wrong timing", "Forbidden attraction", "Misunderstanding", "Jealousy", "Loyalty conflict", "Fear of being seen", "Opposite lifestyles", "Power imbalance, adult and consensual", "Custom"];
+export default function Page() { const [tab, setTab] = useState<Tab>("core"); const [showAdvanced, setShowAdvanced] = useState(false); const [form, setForm] = useState({ genre: "MM", subgenre: "Sports Romance", burn: 75, heat: 90, length: "Novella", c1Name: "", c2Name: "", c1Secret: "", c2Secret: "", conflict: "", keepsApart: "", mustHave: "", avoid: "", voice: "Commercial Romance", pov: "Dual POV", });
 
-const CHARACTER_WOUNDS = ["Abandonment", "Betrayal", "Public humiliation", "Family rejection", "Past relationship damage", "Career failure", "Financial hardship", "Grief", "Body insecurity", "Emotional neglect", "Custom"];
-const LOVE_LANGUAGES = ["Acts of service", "Physical touch", "Words of affirmation", "Quality time", "Gifts", "Quiet loyalty", "Protective behaviour"];
-const ATTACHMENT_STYLES = ["Secure", "Avoidant", "Anxious", "Fearful avoidant", "Guarded but loyal", "Detached until attached"];
-const JEALOUSY_STYLES = ["Quiet withdrawal", "Sharp comments", "Possessive tension", "Pretends not to care", "Gets competitive", "Becomes protective", "Acts colder"];
-const FLIRTING_STYLES = ["Dry teasing", "Blunt honesty", "Cocky banter", "Awkward sincerity", "Subtle looks", "Dirty jokes", "Protective gestures", "Acts annoyed but helps"];
+const summary = useMemo(() => { return ${form.genre} • ${form.subgenre} • ${form.length} • Burn ${form.burn}% • Heat ${form.heat}%; }, [form]);
 
-const AUTHOR_FLAVOUR = ["Gritty hockey romance", "Witty romcom", "Queer heartfelt romance", "Dark obsessive romance", "Warm cosy romance", "Spicy commercial romance", "Lean emotional romance", "Sharp modern romance"];
-const ENDING_GLOW = ["Quiet domestic happiness", "Moving in", "Career win together", "Public declaration", "Found family ending", "Spicy epilogue", "Wedding hint", "Baby / family hint", "Sequel bait"];
-const MM_NUANCE = ["Masc x masc", "Masc x softer", "Switch dynamic", "One more emotionally closed", "Queer identity themes", "Coming out not central", "Coming out subplot", "Found queer community", "No homophobia plot"];
-const MF_NUANCE = ["Strong heroine", "Soft but not weak heroine", "Protective hero", "Morally grey hero", "Modern gender roles", "Traditional tension", "Heroine saves herself", "Hero falls first", "Heroine falls first"];
+const set = (key: string, value: string | number) => setForm((p) => ({ ...p, [key]: value }));
 
-const POV_OPTIONS = ["First person, single POV", "First person, dual POV", "Third person, single POV", "Third person, dual POV", "Alternating POV"];
-const LOCALE_OPTIONS = ["British English", "American English", "Canadian English", "Australian English", "Irish English", "Neutral International"];
+const TabBtn = ({ id, label }: { id: Tab; label: string }) => ( <button onClick={() => setTab(id)} className={rounded-full px-5 py-2 text-sm font-semibold transition ${tab === id ? "bg-cyan-400 text-black" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"}} > {label} </button> );
 
-const REGION_OPTIONS: Record<string, string[]> = {
-  "British English": ["Neutral British", "Northern UK", "Lancashire", "Yorkshire", "Midlands", "London / South East", "Scottish", "Welsh"],
-  "American English": ["Neutral American", "Midwest US", "East Coast US", "Southern US", "West Coast US", "New York", "California"],
-  "Canadian English": ["Neutral Canadian", "Urban Canadian", "Small town Canadian", "French Canadian influence"],
-  "Australian English": ["Neutral Australian", "Urban Australian", "Rural Australian"],
-  "Irish English": ["Neutral Irish", "Dublin", "Rural Irish"],
+const Input = ({ label, value, onChange }: any) => ( <label className="block space-y-2"> <span className="text-sm text-zinc-300">{label}</span> <input
+value={value}
+onChange={onChange}
+className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-white outline-none focus:border-cyan-400"
+/> </label> );
+
+return ( <main className="min-h-screen bg-zinc-950 text-white"> <div className="mx-auto max-w-7xl px-6 py-8"> <div className="mb-8 rounded-3xl border border-zinc-800 bg-zinc-900 p-6"> <h1 className="text-4xl font-bold">NovelForge</h1> <p className="mt-2 text-zinc-400">Build a proper romance story, not a bloated mess of random scenes and decorative nonsense.</p> </div>
+
+<div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <section className="rounded-3xl border border-zinc-800 bg-zinc-900 p-6">
+        <div className="mb-6 flex flex-wrap gap-3">
+          <TabBtn id="core" label="1. Story Core" />
+          <TabBtn id="characters" label="2. Characters" />
+          <TabBtn id="spark" label="3. Story Spark" />
+        </div>
+
+        {tab === "core" && (
+          <div className="grid gap-5 md:grid-cols-2">
+            <Input label="Genre" value={form.genre} onChange={(e: any) => set("genre", e.target.value)} />
+            <Input label="Subgenre" value={form.subgenre} onChange={(e: any) => set("subgenre", e.target.value)} />
+            <Input label="Length" value={form.length} onChange={(e: any) => set("length", e.target.value)} />
+            <Input label="Writing Style" value={form.voice} onChange={(e: any) => set("voice", e.target.value)} />
+            <label>
+              <span className="text-sm text-zinc-300">Burn</span>
+              <input type="range" min="0" max="100" value={form.burn} onChange={(e) => set("burn", Number(e.target.value))} className="w-full" />
+            </label>
+            <label>
+              <span className="text-sm text-zinc-300">Heat</span>
+              <input type="range" min="0" max="100" value={form.heat} onChange={(e) => set("heat", Number(e.target.value))} className="w-full" />
+            </label>
+          </div>
+        )}
+
+        {tab === "characters" && (
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="rounded-3xl bg-zinc-950 p-5">
+              <h3 className="mb-4 text-lg font-semibold">Character One</h3>
+              <div className="space-y-4">
+                <Input label="Name" value={form.c1Name} onChange={(e: any) => set("c1Name", e.target.value)} />
+                <Input label="Secret / Baggage" value={form.c1Secret} onChange={(e: any) => set("c1Secret", e.target.value)} />
+              </div>
+            </div>
+            <div className="rounded-3xl bg-zinc-950 p-5">
+              <h3 className="mb-4 text-lg font-semibold">Character Two</h3>
+              <div className="space-y-4">
+                <Input label="Name" value={form.c2Name} onChange={(e: any) => set("c2Name", e.target.value)} />
+                <Input label="Secret / Baggage" value={form.c2Secret} onChange={(e: any) => set("c2Secret", e.target.value)} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "spark" && (
+          <div className="space-y-5">
+            <Input label="Conflict" value={form.conflict} onChange={(e: any) => set("conflict", e.target.value)} />
+            <Input label="What Keeps Them Apart" value={form.keepsApart} onChange={(e: any) => set("keepsApart", e.target.value)} />
+            <Input label="Must Have Scenes" value={form.mustHave} onChange={(e: any) => set("mustHave", e.target.value)} />
+            <Input label="Must Avoid" value={form.avoid} onChange={(e: any) => set("avoid", e.target.value)} />
+          </div>
+        )}
+
+        <div className="mt-8 rounded-3xl border border-zinc-800 bg-zinc-950 p-4">
+          <button onClick={() => setShowAdvanced(!showAdvanced)} className="font-semibold text-cyan-400">
+            {showAdvanced ? "Hide" : "Show"} Advanced Options
+          </button>
+          {showAdvanced && (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <Input label="POV" value={form.pov} onChange={(e: any) => set("pov", e.target.value)} />
+              <Input label="Regional Voice" value="Modern" onChange={() => {}} />
+            </div>
+          )}
+        </div>
+
+        <button className="mt-8 w-full rounded-2xl bg-cyan-400 px-6 py-4 font-bold text-black transition hover:brightness-110">
+          Generate Story Bible ✨
+        </button>
+      </section>
+
+      <aside className="h-fit rounded-3xl border border-zinc-800 bg-zinc-900 p-6 lg:sticky lg:top-6">
+        <h3 className="text-xl font-semibold">Live Preview</h3>
+        <p className="mt-4 rounded-2xl bg-zinc-950 p-4 text-zinc-300">{summary}</p>
+        <div className="mt-4 space-y-3 text-sm text-zinc-400">
+          <p>Cleaner flow.</p>
+          <p>Less clutter.</p>
+          <p>Better story inputs.</p>
+          <p>No seven-step death march.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+); }  "Irish English": ["Neutral Irish", "Dublin", "Rural Irish"],
   "Neutral International": ["Neutral"],
 };
 
