@@ -3,254 +3,31 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
-const SUBGENRES = [
-  "Contemporary",
-  "Small Town",
-  "Sports Romance",
-  "Dark Romance",
-  "Workplace",
-  "Celebrity",
-  "Paranormal",
-  "Billionaire",
-  "Second Chance",
-];
-
+const SUBGENRES = ["Contemporary", "Small Town", "Sports Romance", "Dark Romance", "Workplace", "Celebrity", "Paranormal", "Billionaire", "Second Chance"];
 const RELATIONSHIP_TYPES = ["MM Romance", "MF Romance"];
-
-const ROMANCE_DYNAMICS = [
-  "Equals / balanced",
-  "Protective x guarded",
-  "Golden retriever x black cat",
-  "Ice king x chaos",
-  "Sunshine x cynic",
-  "Rival x rival",
-  "Forbidden pull",
-  "Caregiver x independent",
-  "Dom energy x brat energy",
-  "Quiet intensity x loud confidence",
-  "Rich x working class",
-  "Celebrity x normal person",
-  "Boss x employee",
-  "Teammates",
-  "Best friend's sibling",
-  "Exes",
-  "Enemy captains",
-  "Fake relationship pairing",
-  "Forced roommates",
-  "Custom",
-];
-
-const ATTRACTION_STYLE = [
-  "Instant punch",
-  "Reluctant noticing",
-  "Slow awareness",
-  "Denial",
-  "Hate attraction",
-  "Admiration first",
-  "Friendship first",
-  "Lust first",
-  "Emotional first",
-  "Custom",
-];
-
-const ATTRACTION_FOCUS = [
-  "Face",
-  "Smile",
-  "Mouth",
-  "Voice",
-  "Scent",
-  "Hands",
-  "Body",
-  "Intelligence",
-  "Confidence",
-  "Kindness",
-  "Competence",
-  "Vulnerability",
-  "Humour",
-  "Mystery",
-];
-
-const SEXUAL_STYLE = [
-  "Teasing",
-  "Filthy talk",
-  "Dominant",
-  "Playful",
-  "Intense emotional",
-  "Rough edge",
-  "Worshipful",
-  "Desperate",
-  "Tender",
-  "Possessive",
-  "Experimental",
-  "Jealous heat",
-  "Forbidden heat",
-  "Slow simmer heat",
-  "Custom",
-];
-
+const ROMANCE_DYNAMICS = ["Equals / balanced", "Protective x guarded", "Golden retriever x black cat", "Ice king x chaos", "Sunshine x cynic", "Rival x rival", "Forbidden pull", "Caregiver x independent", "Dom energy x brat energy", "Quiet intensity x loud confidence", "Rich x working class", "Celebrity x normal person", "Boss x employee", "Teammates", "Best friend's sibling", "Exes", "Enemy captains", "Fake relationship pairing", "Forced roommates", "Custom"];
+const ATTRACTION_STYLE = ["Instant punch", "Reluctant noticing", "Slow awareness", "Denial", "Hate attraction", "Admiration first", "Friendship first", "Lust first", "Emotional first", "Custom"];
+const ATTRACTION_FOCUS = ["Face", "Smile", "Mouth", "Voice", "Scent", "Hands", "Body", "Intelligence", "Confidence", "Kindness", "Competence", "Vulnerability", "Humour", "Mystery"];
+const SEXUAL_STYLE = ["Teasing", "Filthy talk", "Dominant", "Playful", "Intense emotional", "Rough edge", "Worshipful", "Desperate", "Tender", "Possessive", "Experimental", "Jealous heat", "Forbidden heat", "Slow simmer heat", "Custom"];
 const SPICE_TIMING = ["Early", "Middle", "Late", "Very late payoff"];
 
-const EXTERNAL_CONFLICT = [
-  "Career pressure",
-  "Money problems",
-  "Fame / public image",
-  "Child custody",
-  "Injury",
-  "Family pressure",
-  "Distance",
-  "Scandal",
-  "Grief",
-  "Danger",
-  "Team rivalry",
-  "Workplace rules",
-  "Custom",
-];
+const EXTERNAL_CONFLICT = ["Career pressure", "Money problems", "Fame / public image", "Child custody", "Injury", "Family pressure", "Distance", "Scandal", "Grief", "Danger", "Team rivalry", "Workplace rules", "Custom"];
+const INTERNAL_CONFLICT = ["Trust issues", "Shame", "Fear of love", "Anger", "Low self-worth", "Commitment fear", "Guilt", "Past trauma", "Fear of vulnerability", "Control issues", "Custom"];
+const ROMANTIC_CONFLICT = ["Rivals", "Secret", "Wrong timing", "Forbidden attraction", "Misunderstanding", "Jealousy", "Loyalty conflict", "Fear of being seen", "Opposite lifestyles", "Power imbalance, adult and consensual", "Custom"];
 
-const INTERNAL_CONFLICT = [
-  "Trust issues",
-  "Shame",
-  "Fear of love",
-  "Anger",
-  "Low self-worth",
-  "Commitment fear",
-  "Guilt",
-  "Past trauma",
-  "Fear of vulnerability",
-  "Control issues",
-  "Custom",
-];
+const CHARACTER_WOUNDS = ["Abandonment", "Betrayal", "Public humiliation", "Family rejection", "Past relationship damage", "Career failure", "Financial hardship", "Grief", "Body insecurity", "Emotional neglect", "Custom"];
+const LOVE_LANGUAGES = ["Acts of service", "Physical touch", "Words of affirmation", "Quality time", "Gifts", "Quiet loyalty", "Protective behaviour"];
+const ATTACHMENT_STYLES = ["Secure", "Avoidant", "Anxious", "Fearful avoidant", "Guarded but loyal", "Detached until attached"];
+const JEALOUSY_STYLES = ["Quiet withdrawal", "Sharp comments", "Possessive tension", "Pretends not to care", "Gets competitive", "Becomes protective", "Acts colder"];
+const FLIRTING_STYLES = ["Dry teasing", "Blunt honesty", "Cocky banter", "Awkward sincerity", "Subtle looks", "Dirty jokes", "Protective gestures", "Acts annoyed but helps"];
 
-const ROMANTIC_CONFLICT = [
-  "Rivals",
-  "Secret",
-  "Wrong timing",
-  "Forbidden attraction",
-  "Misunderstanding",
-  "Jealousy",
-  "Loyalty conflict",
-  "Fear of being seen",
-  "Opposite lifestyles",
-  "Power imbalance, adult and consensual",
-  "Custom",
-];
+const AUTHOR_FLAVOUR = ["Gritty hockey romance", "Witty romcom", "Queer heartfelt romance", "Dark obsessive romance", "Warm cosy romance", "Spicy commercial romance", "Lean emotional romance", "Sharp modern romance"];
+const ENDING_GLOW = ["Quiet domestic happiness", "Moving in", "Career win together", "Public declaration", "Found family ending", "Spicy epilogue", "Wedding hint", "Baby / family hint", "Sequel bait"];
+const MM_NUANCE = ["Masc x masc", "Masc x softer", "Switch dynamic", "One more emotionally closed", "Queer identity themes", "Coming out not central", "Coming out subplot", "Found queer community", "No homophobia plot"];
+const MF_NUANCE = ["Strong heroine", "Soft but not weak heroine", "Protective hero", "Morally grey hero", "Modern gender roles", "Traditional tension", "Heroine saves herself", "Hero falls first", "Heroine falls first"];
 
-const CHARACTER_WOUNDS = [
-  "Abandonment",
-  "Betrayal",
-  "Public humiliation",
-  "Family rejection",
-  "Past relationship damage",
-  "Career failure",
-  "Financial hardship",
-  "Grief",
-  "Body insecurity",
-  "Emotional neglect",
-  "Custom",
-];
-
-const LOVE_LANGUAGES = [
-  "Acts of service",
-  "Physical touch",
-  "Words of affirmation",
-  "Quality time",
-  "Gifts",
-  "Quiet loyalty",
-  "Protective behaviour",
-];
-
-const ATTACHMENT_STYLES = [
-  "Secure",
-  "Avoidant",
-  "Anxious",
-  "Fearful avoidant",
-  "Guarded but loyal",
-  "Detached until attached",
-];
-
-const JEALOUSY_STYLES = [
-  "Quiet withdrawal",
-  "Sharp comments",
-  "Possessive tension",
-  "Pretends not to care",
-  "Gets competitive",
-  "Becomes protective",
-  "Acts colder",
-];
-
-const FLIRTING_STYLES = [
-  "Dry teasing",
-  "Blunt honesty",
-  "Cocky banter",
-  "Awkward sincerity",
-  "Subtle looks",
-  "Dirty jokes",
-  "Protective gestures",
-  "Acts annoyed but helps",
-];
-
-const AUTHOR_FLAVOUR = [
-  "Gritty hockey romance",
-  "Witty romcom",
-  "Queer heartfelt romance",
-  "Dark obsessive romance",
-  "Warm cosy romance",
-  "Spicy commercial romance",
-  "Lean emotional romance",
-  "Sharp modern romance",
-];
-
-const ENDING_GLOW = [
-  "Quiet domestic happiness",
-  "Moving in",
-  "Career win together",
-  "Public declaration",
-  "Found family ending",
-  "Spicy epilogue",
-  "Wedding hint",
-  "Baby / family hint",
-  "Sequel bait",
-];
-
-const MM_NUANCE = [
-  "Masc x masc",
-  "Masc x softer",
-  "Switch dynamic",
-  "One more emotionally closed",
-  "Queer identity themes",
-  "Coming out not central",
-  "Coming out subplot",
-  "Found queer community",
-  "No homophobia plot",
-];
-
-const MF_NUANCE = [
-  "Strong heroine",
-  "Soft but not weak heroine",
-  "Protective hero",
-  "Morally grey hero",
-  "Modern gender roles",
-  "Traditional tension",
-  "Heroine saves herself",
-  "Hero falls first",
-  "Heroine falls first",
-];
-
-const POV_OPTIONS = [
-  "First person, single POV",
-  "First person, dual POV",
-  "Third person, single POV",
-  "Third person, dual POV",
-  "Alternating POV",
-];
-
-const LOCALE_OPTIONS = [
-  "British English",
-  "American English",
-  "Canadian English",
-  "Australian English",
-  "Irish English",
-  "Neutral International",
-];
+const POV_OPTIONS = ["First person, single POV", "First person, dual POV", "Third person, single POV", "Third person, dual POV", "Alternating POV"];
+const LOCALE_OPTIONS = ["British English", "American English", "Canadian English", "Australian English", "Irish English", "Neutral International"];
 
 const REGION_OPTIONS: Record<string, string[]> = {
   "British English": ["Neutral British", "Northern UK", "Lancashire", "Yorkshire", "Midlands", "London / South East", "Scottish", "Welsh"],
@@ -261,27 +38,8 @@ const REGION_OPTIONS: Record<string, string[]> = {
   "Neutral International": ["Neutral"],
 };
 
-const VOICE_STYLE_OPTIONS = [
-  "Commercial romance",
-  "Raw / gritty",
-  "Warm / cosy",
-  "Sharp / witty",
-  "Dark / intense",
-  "Emotional / deep",
-  "Fast / punchy",
-  "Literary but restrained",
-];
-
-const DIALOGUE_STYLE_OPTIONS = [
-  "Natural / grounded",
-  "Bantery",
-  "Dry humour",
-  "Flirty",
-  "Tense / clipped",
-  "Emotionally loaded",
-  "Blunt and realistic",
-];
-
+const VOICE_STYLE_OPTIONS = ["Commercial romance", "Raw / gritty", "Warm / cosy", "Sharp / witty", "Dark / intense", "Emotional / deep", "Fast / punchy", "Literary but restrained"];
+const DIALOGUE_STYLE_OPTIONS = ["Natural / grounded", "Bantery", "Dry humour", "Flirty", "Tense / clipped", "Emotionally loaded", "Blunt and realistic"];
 const PROSE_DENSITY_OPTIONS = ["Lean", "Balanced", "Rich but controlled"];
 const BURN_OPTIONS = ["Instant attraction", "Fast burn", "Medium burn", "Slow burn", "Agonising slow burn"];
 const CHAPTER_OPENER_OPTIONS = ["Quiet opener", "Immediate chemistry", "Tension heavy", "Plot heavy", "High conflict opener", "Character-first opener"];
@@ -293,28 +51,7 @@ const TOWN_OPTIONS = ["Seaside town", "Mountain town", "Rural farming town", "To
 const CELEBRITY_OPTIONS = ["Actor", "Musician", "Athlete", "Influencer", "Author", "Reality star", "Royal / aristocrat", "Custom"];
 const PARANORMAL_OPTIONS = ["Vampire", "Werewolf", "Witch", "Demon", "Fae", "Shifter", "Ghost", "Mixed supernatural world", "Custom"];
 
-const TROPE_OPTIONS = [
-  "Enemies to lovers",
-  "Friends to lovers",
-  "Forced proximity",
-  "Fake dating",
-  "Second chance",
-  "Grumpy / sunshine",
-  "Only one bed",
-  "Hurt / comfort",
-  "Forbidden attraction",
-  "Workplace romance",
-  "Small town romance",
-  "Sports romance",
-  "Celebrity romance",
-  "Secret relationship",
-  "Opposites attract",
-  "Slow burn",
-  "High angst",
-  "Protective lead",
-  "Found family",
-  "Jealousy",
-];
+const TROPE_OPTIONS = ["Enemies to lovers", "Friends to lovers", "Forced proximity", "Fake dating", "Second chance", "Grumpy / sunshine", "Only one bed", "Hurt / comfort", "Forbidden attraction", "Workplace romance", "Small town romance", "Sports romance", "Celebrity romance", "Secret relationship", "Opposites attract", "Slow burn", "High angst", "Protective lead", "Found family", "Jealousy"];
 
 const BASE_JOB_OPTIONS = ["Business owner", "Tradesperson", "Doctor / Nurse", "Teacher", "Artist", "Musician", "Writer", "Chef", "Bar owner", "Police / Firefighter", "Military", "Adult student", "Unemployed / rebuilding life", "Custom"];
 const SPORTS_JOBS = ["Ice hockey player", "Footballer", "Rugby player", "Coach", "Team doctor", "Physio", "Sports journalist", "Agent", "Club owner"];
@@ -359,7 +96,6 @@ const defaultForm: StoryForm = {
   subgenre: "Sports Romance",
   subgenreDetail: "Ice hockey",
   subgenreDetailCustom: "",
-
   romanceDynamic: "Rival x rival",
   romanceDynamicCustom: "",
   attractionStyle: "Hate attraction",
@@ -368,20 +104,16 @@ const defaultForm: StoryForm = {
   sexualStyle: "Teasing, Jealous heat, Rough edge",
   sexualStyleCustom: "",
   spiceTiming: "Middle",
-
   externalConflict: "Career pressure, Money problems",
   externalConflictCustom: "",
   internalConflict: "Trust issues, Fear of vulnerability",
   internalConflictCustom: "",
   romanticConflict: "Rivals, Jealousy",
   romanticConflictCustom: "",
-
   authorFlavour: "Gritty hockey romance",
   endingGlow: "Quiet domestic happiness",
-
   mmNuance: "Masc x masc, One more emotionally closed, No homophobia plot",
   mfNuance: "Strong heroine, Modern gender roles, Hero falls first",
-
   locale: "Canadian English",
   regionVoice: "Urban Canadian",
   voiceStyle: "Commercial romance",
@@ -398,7 +130,6 @@ const defaultForm: StoryForm = {
   pov: "First person, dual POV",
   ending: "Happy ending",
   length: "Novella",
-
   c1Name: "",
   c1Age: "",
   c1Appearance: "",
@@ -418,7 +149,6 @@ const defaultForm: StoryForm = {
   c1Jealousy: "Pretends not to care",
   c1Flirting: "Dry teasing",
   c1CustomNotes: "",
-
   c2Name: "",
   c2Age: "",
   c2Appearance: "",
@@ -438,7 +168,6 @@ const defaultForm: StoryForm = {
   c2Jealousy: "Possessive tension",
   c2Flirting: "Cocky banter",
   c2CustomNotes: "",
-
   setting: "Sports team, Ice rink",
   settingCustom: "",
   plot: "",
@@ -454,11 +183,9 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [authMessage, setAuthMessage] = useState("");
   const [loadingAuth, setLoadingAuth] = useState(true);
-
   const [step, setStep] = useState(1);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
-
   const [form, setForm] = useState<StoryForm>(defaultForm);
   const [chapters, setChapters] = useState<string[]>([]);
   const [activeChapterIndex, setActiveChapterIndex] = useState(0);
@@ -468,16 +195,7 @@ export default function Home() {
   const [saving, setSaving] = useState(false);
   const [customRewrite, setCustomRewrite] = useState("");
 
-  const steps = [
-    "Story Core",
-    "Romance Engine",
-    "Character 1",
-    "Character 2",
-    "Plot Architecture",
-    "Voice & Style",
-    "Review",
-  ];
-
+  const steps = ["Story Core", "Romance Engine", "Character 1", "Character 2", "Plot Architecture", "Voice & Style", "Review"];
   const jobOptions = getJobOptions(form.subgenre);
   const sceneOptions = getSceneOptions(form.subgenre);
   const regionOptions = REGION_OPTIONS[form.locale] || ["Neutral"];
@@ -630,7 +348,14 @@ export default function Home() {
     setStep(1);
   }
 
-  async function saveCurrentStory() {
+  async function saveCurrentStory(
+    override?: {
+      form?: StoryForm;
+      chapters?: string[];
+      activeChapterIndex?: number;
+      customRewrite?: string;
+    }
+  ) {
     if (!user) {
       setAuthMessage("Log in first so it can save to the cloud.");
       return null;
@@ -638,27 +363,43 @@ export default function Home() {
 
     setSaving(true);
 
+    const formToSave = override?.form || form;
+    const chaptersToSave = override?.chapters || chapters;
+    const activeChapterIndexToSave = override?.activeChapterIndex ?? activeChapterIndex;
+    const customRewriteToSave = override?.customRewrite ?? customRewrite;
+
     const payload = {
       user_id: user.id,
-      title: getStoryTitle(form),
-      form,
-      chapters,
-      active_chapter_index: activeChapterIndex,
-      custom_rewrite: customRewrite,
+      title: getStoryTitle(formToSave),
+      form: formToSave,
+      chapters: chaptersToSave,
+      active_chapter_index: activeChapterIndexToSave,
+      custom_rewrite: customRewriteToSave,
       updated_at: new Date().toISOString(),
     };
 
     if (activeStoryId) {
       const { error } = await supabase.from("stories").update(payload).eq("id", activeStoryId);
+
       setSaving(false);
-      if (error) return null;
+
+      if (error) {
+        console.error(error);
+        return null;
+      }
+
       await loadStories();
       return activeStoryId;
     }
 
     const { data, error } = await supabase.from("stories").insert(payload).select().single();
+
     setSaving(false);
-    if (error) return null;
+
+    if (error) {
+      console.error(error);
+      return null;
+    }
 
     setActiveStoryId(data.id);
     await loadStories();
@@ -701,11 +442,19 @@ export default function Home() {
     });
 
     const data = await res.json();
-    setChapters([data.result || "Something went wrong."]);
+    const chapter = data.result || "Something went wrong.";
+    const newChapters = [chapter];
+
+    setChapters(newChapters);
     setActiveChapterIndex(0);
     setLoading(false);
 
-    setTimeout(() => saveCurrentStory(), 500);
+    await saveCurrentStory({
+      form,
+      chapters: newChapters,
+      activeChapterIndex: 0,
+      customRewrite,
+    });
   }
 
   async function rewriteChapter() {
@@ -722,14 +471,18 @@ export default function Home() {
     const data = await res.json();
     const rewritten = data.result || "Rewrite failed.";
 
-    setChapters((prev) => {
-      const next = [...prev];
-      next[activeChapterIndex] = rewritten;
-      return next;
-    });
+    const newChapters = [...chapters];
+    newChapters[activeChapterIndex] = rewritten;
 
+    setChapters(newChapters);
     setRewriteLoading(false);
-    setTimeout(() => saveCurrentStory(), 500);
+
+    await saveCurrentStory({
+      form,
+      chapters: newChapters,
+      activeChapterIndex,
+      customRewrite,
+    });
   }
 
   async function continueStory() {
@@ -754,10 +507,19 @@ export default function Home() {
     const data = await res.json();
     const nextChapter = data.result || "Continue failed.";
 
-    setChapters((prev) => [...prev, nextChapter]);
-    setActiveChapterIndex(chapters.length);
+    const newChapters = [...chapters, nextChapter];
+    const newActiveIndex = newChapters.length - 1;
+
+    setChapters(newChapters);
+    setActiveChapterIndex(newActiveIndex);
     setContinueLoading(false);
-    setTimeout(() => saveCurrentStory(), 500);
+
+    await saveCurrentStory({
+      form,
+      chapters: newChapters,
+      activeChapterIndex: newActiveIndex,
+      customRewrite,
+    });
   }
 
   if (loadingAuth) {
@@ -819,7 +581,7 @@ export default function Home() {
                 </button>
               </div>
 
-              <button onClick={saveCurrentStory} className="mb-5 w-full rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700">
+              <button onClick={() => saveCurrentStory()} className="mb-5 w-full rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700">
                 {saving ? "Saving..." : "Save Story"}
               </button>
 
@@ -855,7 +617,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                <button onClick={saveCurrentStory} className="rounded-2xl border border-white/10 bg-zinc-800 px-5 py-3 font-semibold hover:bg-zinc-700">
+                <button onClick={() => saveCurrentStory()} className="rounded-2xl border border-white/10 bg-zinc-800 px-5 py-3 font-semibold hover:bg-zinc-700">
                   {saving ? "Saving..." : "Save"}
                 </button>
               </div>
@@ -895,10 +657,8 @@ export default function Home() {
                     <div className="grid gap-4 md:grid-cols-2">
                       <Select label="Romance Dynamic" field="romanceDynamic" value={form.romanceDynamic} updateField={updateField} options={ROMANCE_DYNAMICS} />
                       {form.romanceDynamic === "Custom" && <Input label="Custom Romance Dynamic" field="romanceDynamicCustom" form={form} updateField={updateField} />}
-
                       <Select label="Attraction Style" field="attractionStyle" value={form.attractionStyle} updateField={updateField} options={ATTRACTION_STYLE} />
                       {form.attractionStyle === "Custom" && <Input label="Custom Attraction Style" field="attractionStyleCustom" form={form} updateField={updateField} />}
-
                       <Select label="Spice Timing" field="spiceTiming" value={form.spiceTiming} updateField={updateField} options={SPICE_TIMING} />
                       <Select label="Burn Pacing" field="burnPacing" value={form.burnPacing} updateField={updateField} options={BURN_OPTIONS} />
                     </div>
@@ -906,36 +666,28 @@ export default function Home() {
                     <CheckboxGroup label="Attraction Focus" field="attractionFocus" selected={form.attractionFocus} options={ATTRACTION_FOCUS} updateField={updateField} />
                     <CheckboxGroup label="Sexual Style" field="sexualStyle" selected={form.sexualStyle} options={SEXUAL_STYLE} updateField={updateField} />
                     {hasCustom(form.sexualStyle) && <Input label="Custom Sexual Style" field="sexualStyleCustom" form={form} updateField={updateField} />}
-
                     {form.relationship === "MM Romance" && <CheckboxGroup label="MM Nuance" field="mmNuance" selected={form.mmNuance} options={MM_NUANCE} updateField={updateField} />}
                     {form.relationship === "MF Romance" && <CheckboxGroup label="MF Nuance" field="mfNuance" selected={form.mfNuance} options={MF_NUANCE} updateField={updateField} />}
                   </Card>
                 )}
 
                 {step === 3 && <CharacterSection title="Character 1" prefix="c1" form={form} updateField={updateField} jobOptions={jobOptions} />}
-
                 {step === 4 && <CharacterSection title="Character 2" prefix="c2" form={form} updateField={updateField} jobOptions={jobOptions} />}
 
                 {step === 5 && (
                   <Card title="Plot Architecture">
                     <CheckboxGroup label="Setting" field="setting" selected={form.setting} options={SETTING_OPTIONS} updateField={updateField} />
                     {hasCustom(form.setting) && <Input label="Custom Setting" field="settingCustom" form={form} updateField={updateField} />}
-
                     <CheckboxGroup label="External Conflict" field="externalConflict" selected={form.externalConflict} options={EXTERNAL_CONFLICT} updateField={updateField} />
                     {hasCustom(form.externalConflict) && <Input label="Custom External Conflict" field="externalConflictCustom" form={form} updateField={updateField} />}
-
                     <CheckboxGroup label="Internal Conflict" field="internalConflict" selected={form.internalConflict} options={INTERNAL_CONFLICT} updateField={updateField} />
                     {hasCustom(form.internalConflict) && <Input label="Custom Internal Conflict" field="internalConflictCustom" form={form} updateField={updateField} />}
-
                     <CheckboxGroup label="Romantic Conflict" field="romanticConflict" selected={form.romanticConflict} options={ROMANTIC_CONFLICT} updateField={updateField} />
                     {hasCustom(form.romanticConflict) && <Input label="Custom Romantic Conflict" field="romanticConflictCustom" form={form} updateField={updateField} />}
-
                     <CheckboxGroup label="Must-Have Scenes" field="mustHave" selected={form.mustHave} options={sceneOptions} updateField={updateField} />
                     {hasCustom(form.mustHave) && <Input label="Custom Must-Have Scene" field="mustHaveCustom" form={form} updateField={updateField} />}
-
                     <CheckboxGroup label="Must-Not-Have" field="mustNotHave" selected={form.mustNotHave} options={MUST_NOT_HAVE_OPTIONS} updateField={updateField} />
                     {hasCustom(form.mustNotHave) && <Input label="Custom Must-Not-Have" field="mustNotHaveCustom" form={form} updateField={updateField} />}
-
                     <TextArea label="Plot Notes" field="plot" form={form} updateField={updateField} placeholder="Add the core idea, twists, black moment, or exact scenes you want..." />
                   </Card>
                 )}
@@ -983,7 +735,6 @@ export default function Home() {
                   <button onClick={() => setStep((prev) => Math.max(1, prev - 1))} disabled={step === 1} className="w-full rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700 disabled:opacity-40">
                     Back
                   </button>
-
                   {step < steps.length && (
                     <button onClick={() => setStep((prev) => Math.min(steps.length, prev + 1))} className="w-full rounded-2xl bg-rose-500 py-3 font-bold hover:bg-rose-400">
                       Next
@@ -995,7 +746,6 @@ export default function Home() {
 
             <aside className="rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl backdrop-blur-xl lg:sticky lg:top-24">
               <h2 className="mb-4 text-xl font-bold">Story Controls</h2>
-
               <div className="grid gap-3 text-sm text-zinc-300">
                 <p><strong className="text-rose-200">Target length:</strong> {form.length}</p>
                 <p><strong className="text-rose-200">Heat:</strong> {form.heat}</p>
@@ -1132,7 +882,6 @@ function CharacterSection({ title, prefix, form, updateField, jobOptions }: any)
       <div className="grid gap-4 md:grid-cols-2">
         <Select label="Job / Role" field={jobField} value={form[jobField]} updateField={updateField} options={jobOptions} />
         {form[jobField] === "Custom" && <Input label="Custom Job / Role" field={customJobField} form={form} updateField={updateField} />}
-
         <Select label="Attachment Style" field={`${prefix}Attachment`} value={form[`${prefix}Attachment`]} updateField={updateField} options={ATTACHMENT_STYLES} />
         <Select label="Jealousy Style" field={`${prefix}Jealousy`} value={form[`${prefix}Jealousy`]} updateField={updateField} options={JEALOUSY_STYLES} />
         <Select label="Flirting Style" field={`${prefix}Flirting`} value={form[`${prefix}Flirting`]} updateField={updateField} options={FLIRTING_STYLES} />
@@ -1149,7 +898,6 @@ function CharacterSection({ title, prefix, form, updateField, jobOptions }: any)
       <CheckboxGroup label="Character Wound" field={woundField} selected={form[woundField]} options={CHARACTER_WOUNDS} updateField={updateField} />
       {hasCustom(form[woundField]) && <Input label="Custom Wound" field={customWoundField} form={form} updateField={updateField} />}
       <CheckboxGroup label="Love Language" field={`${prefix}LoveLanguage`} selected={form[`${prefix}LoveLanguage`]} options={LOVE_LANGUAGES} updateField={updateField} />
-
       <TextArea label="Extra Character Notes" field={`${prefix}CustomNotes`} form={form} updateField={updateField} placeholder="Anything specific you want included..." />
     </Card>
   );
@@ -1207,11 +955,9 @@ function CheckboxGroup({ label, field, selected, options, updateField }: any) {
   return (
     <div className="grid gap-3">
       <span className="text-sm text-zinc-300">{label}</span>
-
       <div className="flex flex-wrap gap-2">
         {options.map((option: string) => {
           const active = selectedArray.includes(option);
-
           return (
             <button
               type="button"
