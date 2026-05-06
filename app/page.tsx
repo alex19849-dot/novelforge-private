@@ -7,9 +7,10 @@ import { useMemo, useState } from "react";
 type Tab = "core" | "characters" | "spark";
 
 export default function Page() { const [tab, setTab] = useState<Tab>("core"); const [showAdvanced, setShowAdvanced] = useState(false); const [form, setForm] = useState({ genre: "MM", subgenre: "Sports Romance", burn: 75, heat: 90, length: "Novella", c1Name: "", c2Name: "", c1Secret: "", c2Secret: "", conflict: "", keepsApart: "", mustHave: "", avoid: "", voice: "Commercial Romance", pov: "Dual POV", });
-
-const summary = useMemo(() => { return ${form.genre} • ${form.subgenre} • ${form.length} • Burn ${form.burn}% • Heat ${form.heat}%; }, [form]);
-
+const summary = useMemo(
+  () => `${form.genre} • ${form.subgenre} • ${form.length} • ${form.heat}`,
+  [form]
+);
 const set = (key: string, value: string | number) => setForm((p) => ({ ...p, [key]: value }));
 
 const TabBtn = ({ id, label }: { id: Tab; label: string }) => ( <button onClick={() => setTab(id)} className={rounded-full px-5 py-2 text-sm font-semibold transition ${tab === id ? "bg-cyan-400 text-black" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"}} > {label} </button> );
