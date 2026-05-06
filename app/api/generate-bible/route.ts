@@ -4,6 +4,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+function cleanOutput(text: string) {
+  return text.replace(/[—–]/g, ",");
+}
+
 export async function POST(req: Request) {
   const body = await req.json();
 
@@ -16,11 +20,13 @@ Internally create:
 - full story bible
 - romance arc
 - heat escalation plan
+- physical escalation plan
 - trope plan
 - conflict plan
 - character wound plan
 - ending plan
 - continuity plan
+- side character motive plan
 
 Do not show any planning.
 
@@ -157,6 +163,36 @@ CHAPTER 1 PURPOSE:
 - Do not write a complete story arc.
 - Do not resolve the main conflict.
 
+CAUSE AND CONSEQUENCE RULE:
+Every scene must logically follow from the previous scene.
+
+Before writing each scene, internally answer:
+1. What just happened?
+2. How would each character realistically react?
+3. What emotional state are they carrying forward?
+4. What practical consequence follows?
+5. What scene naturally comes next?
+
+Do not jump abruptly between emotional states.
+
+Maintain emotional continuity:
+- anger carries
+- embarrassment carries
+- jealousy carries
+- attraction carries
+- hurt carries
+- suspicion carries
+- fear carries
+- guilt carries
+
+Avoid:
+- scene reset syndrome
+- random tonal jumps
+- random topic jumps
+- contradictory behaviour
+- conversations that ignore what was just said
+- characters reacting as if previous lines did not happen
+
 SCENE FLOW RULE:
 Every scene must move the story forward.
 
@@ -172,6 +208,24 @@ Do not describe objects just because they exist.
 Avoid repeated environmental details like pipes, radiators, coffee, walls, floors, windows, weather, smells, or light unless they matter in the scene.
 The relationship must grow through actions, choices, friction, mistakes, jealousy, restraint, consequences and dialogue.
 Do not rely only on internal thoughts or body awareness.
+
+DIALOGUE FLOW RULE:
+Dialogue must follow logically from the previous line.
+
+Each reply should feel like:
+- an answer
+- an evasion
+- a deflection
+- a challenge
+- a joke
+- a defensive reaction
+- a deliberate refusal to answer
+
+Do not make characters respond to a different conversation.
+Do not use banter to dodge every emotional beat.
+Do not make every line witty.
+Let silence, interruption, discomfort and avoidance happen naturally.
+If a line creates tension, the next line should acknowledge, dodge, escalate, or break that tension.
 
 RELATIONSHIP STATE TRACKER:
 Internally track the romance stage.
@@ -217,6 +271,35 @@ For enemies-to-lovers:
 - Attraction and sexual tension may rise before trust.
 - Vulnerability should stay low until earned.
 - Jealousy can appear before emotional honesty.
+
+PHYSICAL ESCALATION TRACKER:
+Track physical intimacy separately from emotional intimacy.
+
+Stage 0 = awareness only
+Stage 1 = charged proximity
+Stage 2 = accidental contact lingers
+Stage 3 = deliberate touch
+Stage 4 = first kiss
+Stage 5 = heated make-out
+Stage 6 = sexual touching
+Stage 7 = oral / mutual release / explicit play
+Stage 8 = penetrative sex / full consummation
+Stage 9 = comfortable sexual intimacy
+
+Chapter 1 Physical State:
+- If Heat Level is Fade to black or Mild, stay between Stage 0 and Stage 1.
+- If Heat Level is Spicy, stay between Stage 1 and Stage 2.
+- If Heat Level is Explicit adult, stay between Stage 1 and Stage 2 unless Burn Pacing is Instant attraction or Fast burn.
+- Do not include a kiss in Chapter 1 for enemies-to-lovers unless explicitly requested in Plot Notes.
+- Do not stack first kiss, heavy sexual play and emotional confession in Chapter 1.
+
+Rules:
+- Move no more than one physical stage per chapter.
+- Fast burn may occasionally move two physical stages only if strongly motivated by the scene.
+- Emotional trust does not automatically rise with physical escalation.
+- Physical intimacy may create awkwardness, shame, denial, jealousy, possessiveness, or confusion.
+- First sexual contact should change the relationship dynamic.
+- Do not stack first kiss + heavy sexual play + emotional confession in one scene unless it is the story climax.
 
 HEAT RULES:
 If Heat Level is Fade to black:
@@ -270,6 +353,36 @@ If selected style includes Tender:
 If selected style includes Filthy talk:
 - Use sparingly and naturally.
 - Do not force explicit dialogue into Chapter 1 unless the scene genuinely supports it.
+
+SIDE CHARACTER COHERENCE:
+Supporting characters must behave like real people.
+
+They must have:
+- consistent motives
+- understandable goals
+- believable reactions
+- scene continuity
+
+Children:
+- behave age appropriately
+- emotional states must transition logically
+- if crying, show believable recovery or passage of time before playful behaviour
+- avoid convenience child writing
+- do not use children only as plot levers
+
+Manipulative ex:
+- manipulation should feel believable and psychologically consistent
+- use guilt, history, access, timing, pressure, triangulation and emotional leverage
+- do not write cartoon villain dialogue
+- complexity is stronger than obvious villainy
+- the ex may be selfish, hurt, desperate, lonely, controlling, frightened, resentful, or still attached
+- make the ex's goal clear enough that readers understand the pressure even if they dislike the behaviour
+
+Friends / teammates:
+- distinct voices
+- realistic locker room rhythm
+- not exposition machines
+- do not make them explain the plot for the reader
 
 TROPE RULES:
 If Tropes includes "Enemies to lovers":
@@ -400,6 +513,15 @@ Examples:
 - You look like hell.
 - Stop grimacing.
 
+DASH RULE:
+Do not use em dashes.
+Do not use long dashes.
+Do not use spaced dashes as dramatic interruptions.
+Do not use "—" anywhere.
+Do not use "–" anywhere.
+Use commas, full stops, colons, semicolons, brackets, or separate sentences instead.
+Before final output, scan and replace every em dash or en dash.
+
 STYLE RULES:
 - Natural commercial romance prose.
 - Distinct character voices.
@@ -415,15 +537,6 @@ STYLE RULES:
 - No “electric touch”, “storm in his eyes”, “second heartbeat”, “his breath hitched”, unless rare and genuinely needed.
 - Use the selected locale consistently.
 - Honour the selected POV exactly.
-
-DASH RULE:
-Do not use em dashes.
-Do not use long dashes.
-Do not use spaced dashes as dramatic interruptions.
-Do not use "—" anywhere.
-Do not use "–" anywhere.
-Use commas, full stops, colons, semicolons, brackets, or separate sentences instead.
-Before final output, scan and replace every em dash or en dash.
 `;
 
   try {
@@ -435,7 +548,7 @@ Before final output, scan and replace every em dash or en dash.
       max_output_tokens: 8000,
     });
 
-    const draft = draftResponse.output_text;
+    const draft = cleanOutput(draftResponse.output_text);
 
     const editorPrompt = `
 You are NovelForge's strict human-style romance editor.
@@ -494,6 +607,21 @@ EDITOR TASKS:
 18. Make every scene move the story forward.
 19. Make the relationship progression clear and logical.
 20. Ensure the chapter fits the selected MM or MF nuance.
+21. Make side character motives believable and consistent.
+22. Fix cause and consequence issues.
+23. Fix child behaviour continuity if children appear.
+24. Fix manipulative ex behaviour so it feels human, not cartoonish.
+25. Keep physical escalation appropriate for Chapter 1.
+
+CAUSE AND CONSEQUENCE EDIT:
+Every scene must logically follow from the previous scene.
+Do not jump abruptly between emotional states.
+Maintain emotional continuity.
+If a character was angry, embarrassed, jealous, suspicious, scared, guilty, or aroused, that state should carry into the next relevant beat unless something clearly changes it.
+Fix scene reset syndrome.
+Fix random topic jumps.
+Fix conversations that ignore the previous line.
+Make every scene cause the next scene.
 
 STORY FLOW EDIT:
 Cut decorative description that does not affect character, tension, plot or mood.
@@ -504,6 +632,22 @@ If nothing changes in a scene, rewrite or cut it.
 Do not describe objects just because they exist.
 Avoid repeated environmental details like pipes, radiators, coffee, walls, floors, windows, weather, smells, or light unless they matter in the scene.
 
+DIALOGUE FLOW EDIT:
+Dialogue must follow logically.
+Each reply should answer, evade, deflect, challenge, joke, defend, or deliberately refuse to answer.
+Do not make characters respond to a different conversation.
+Do not use banter to dodge every emotional beat.
+If a line creates tension, the next line should acknowledge, dodge, escalate, or break that tension.
+
+SIDE CHARACTER EDIT:
+Supporting characters must have consistent motives and believable reactions.
+Children must behave age appropriately.
+If a child is upset, show believable recovery, comfort, distraction, or passage of time before playful behaviour.
+Do not use a child only as a convenient emotional lever.
+Manipulative exes should use believable pressure: guilt, history, access, timing, triangulation, emotional leverage and old wounds.
+Do not write the ex as a cartoon villain.
+Make the ex's goal understandable even if the behaviour is selfish or damaging.
+
 RELATIONSHIP STATE EDIT:
 - Preserve the correct relationship stage.
 - Chapter 1 should stay at Stage 1 or Stage 2.
@@ -513,6 +657,14 @@ RELATIONSHIP STATE EDIT:
 - If the chapter becomes too soft too early, add resistance, pride, awkwardness, irritation or denial.
 - Heat can rise faster than trust.
 - Attraction should not erase conflict.
+
+PHYSICAL ESCALATION EDIT:
+- Track physical intimacy separately from emotional intimacy.
+- Chapter 1 should not jump too far physically.
+- If enemies-to-lovers is selected, do not include a kiss in Chapter 1 unless explicitly requested in Plot Notes.
+- Do not stack first kiss, heavy sexual play and emotional confession in one scene.
+- Physical want should create tension, confusion, denial, pride or conflict.
+- Physical escalation must change the relationship dynamic.
 
 ENEMIES TO LOVERS EDIT:
 If "Enemies to lovers" is selected:
@@ -584,6 +736,12 @@ Do not overuse:
 
 Vary concern through character-specific language.
 
+DASH EDIT:
+Remove all em dashes and en dashes.
+Do not use "—" anywhere.
+Do not use "–" anywhere.
+Replace them with commas, full stops, colons, semicolons, brackets, or separate sentences.
+
 LENGTH EDIT:
 - If Book Length is Novella, final chapter should be 1,000 to 1,500 words.
 - If Book Length is Short Novel, final chapter should be 1,600 to 2,400 words.
@@ -605,21 +763,12 @@ Remove or rewrite:
 - random object descriptions
 - repeated environmental details
 
-DASH RULE:
-Do not use em dashes.
-Do not use long dashes.
-Do not use spaced dashes as dramatic interruptions.
-Do not use "—" anywhere.
-Do not use "–" anywhere.
-Use commas, full stops, colons, semicolons, brackets, or separate sentences instead.
-Before final output, scan and replace every em dash or en dash.
-
 FINAL OUTPUT:
 Return only the polished final Chapter 1.
 `;
 
     const finalResponse = await openai.responses.create({
-      model: "gpt-5",
+      model: "gpt-5.5",
       reasoning: { effort: "low" },
       text: { verbosity: "low" },
       input: editorPrompt,
@@ -627,7 +776,7 @@ Return only the polished final Chapter 1.
     });
 
     return Response.json({
-      result: finalResponse.output_text.replace(/[—–]/g, ","),
+      result: cleanOutput(finalResponse.output_text),
     });
   } catch (error) {
     console.error(error);
