@@ -287,7 +287,7 @@ ENDING RULE:
 
   try {
     const response = await openai.responses.create({
-      model: "gpt-5",
+      model: "gpt-5.5",
       reasoning: { effort: "low" },
       text: { verbosity: "low" },
       input: prompt,
