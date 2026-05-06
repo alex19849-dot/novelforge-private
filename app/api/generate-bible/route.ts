@@ -627,7 +627,7 @@ Return only the polished final Chapter 1.
     });
 
     return Response.json({
-      result: finalResponse.output_text,
+      result: finalResponse.output_text.replace(/[—–]/g, ","),
     });
   } catch (error) {
     console.error(error);
