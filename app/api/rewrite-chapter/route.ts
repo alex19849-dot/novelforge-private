@@ -79,6 +79,15 @@ STYLE EDIT:
 - Narration should sound modern, not formal, literary, robotic, or old-fashioned.
 - Description should be selective, purposeful, and tied to character, tension, mood, or plot.
 
+DASH RULE:
+Do not use em dashes.
+Do not use long dashes.
+Do not use spaced dashes as dramatic interruptions.
+Do not use "—" anywhere.
+Do not use "–" anywhere.
+Use commas, full stops, colons, semicolons, brackets, or separate sentences instead.
+Before final output, scan and replace every em dash or en dash.
+
 NATURAL SPEECH RULE:
 Write like real modern people.
 
@@ -283,6 +292,16 @@ ENDING RULE:
 - Never stop mid-thought, mid-dialogue, or mid-paragraph.
 - If the chapter is too long, end the scene earlier with a clean hook.
 - The ending should create a reason to continue, not just stop.
+
+DASH RULE:
+Do not use em dashes.
+Do not use long dashes.
+Do not use spaced dashes as dramatic interruptions.
+Do not use "—" anywhere.
+Do not use "–" anywhere.
+Use commas, full stops, colons, semicolons, brackets, or separate sentences instead.
+Before final output, scan and replace every em dash or en dash.
+
 `;
 
   try {
