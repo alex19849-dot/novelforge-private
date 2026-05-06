@@ -645,7 +645,7 @@ Return only the polished final Chapter ${nextChapterNumber}.
     });
 
     return Response.json({
-      result: finalResponse.output_text,
+     result: finalResponse.output_text.replace(/[—–]/g, ","),
     });
   } catch (error) {
     console.error(error);
