@@ -273,6 +273,7 @@ export default function Home() {
     const chaptersToSave = override?.chapters || chapters;
     const activeIndexToSave = override?.activeChapterIndex ?? activeChapterIndex;
     const rewriteToSave = override?.customRewrite ?? customRewrite;
+    const storyStateToSave = override?.storyState ?? storyState;
 
   const payload = {
   user_id: user.id,
