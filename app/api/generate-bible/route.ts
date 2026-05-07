@@ -8,228 +8,228 @@ function cleanOutput(text: string) {
   return text.replace(/[—–]/g, ",");
 }
 
+function getTargetChapters(length: string) {
+  if (length === "Novella") return 10;
+  if (length === "Short Novel") return 20;
+  if (length === "Long Novel") return 34;
+  return 10;
+}
+
+function getWordTarget(length: string) {
+  if (length === "Novella") return "900-1400";
+  if (length === "Short Novel") return "1600-2200";
+  if (length === "Long Novel") return "2400-3200";
+  return "900-1400";
+}
+
+function getMaxTokens(length: string) {
+  if (length === "Novella") return 2600;
+  if (length === "Short Novel") return 4200;
+  if (length === "Long Novel") return 6200;
+  return 2600;
+}
+
+function getRegionalTerms(locale: string) {
+  if (locale === "British English") {
+    return {
+      regionalLanguage: "British English",
+      locationTerms: ["car park", "flat", "phone", "trainers", "dressing room", "locker room", "rink"],
+      forbiddenTerms: ["SUV", "parking lot", "apartment", "cell phone", "sneakers", "mom"],
+    };
+  }
+
+  if (locale === "American English") {
+    return {
+      regionalLanguage: "American English",
+      locationTerms: ["parking lot", "apartment", "cell phone", "sneakers", "locker room", "rink"],
+      forbiddenTerms: ["car park", "flat", "trainers", "mum"],
+    };
+  }
+
+  if (locale === "Canadian English") {
+    return {
+      regionalLanguage: "Canadian English",
+      locationTerms: ["parking lot", "apartment", "phone", "locker room", "rink"],
+      forbiddenTerms: ["car park", "flat", "mum"],
+    };
+  }
+
+  return {
+    regionalLanguage: locale || "Neutral International",
+    locationTerms: ["phone", "home", "rink", "locker room"],
+    forbiddenTerms: [],
+  };
+}
+
 export async function POST(req: Request) {
   const body = await req.json();
 
-  const draftPrompt = `
-You are NovelForge, a private romance fiction engine.
+  const targetChapters = getTargetChapters(body.length);
+  const wordTarget = getWordTarget(body.length);
+  const maxTokens = getMaxTokens(body.length);
+  const regional = getRegionalTerms(body.locale);
 
-Write a DRAFT of Chapter 1.
+  const openingStoryState = {
+    chapter: 1,
+    targetChapters,
+    wordTarget,
+    relationshipStage: 1,
+    physicalStage: body.heat === "Explicit adult" ? 1 : 0,
+    trust: 5,
+    attraction: body.heat === "Explicit adult" ? 35 : 18,
+    irritation: body.tropes?.includes("Enemies to lovers") ? 78 : 45,
+    jealousy: 0,
+    vulnerability: 2,
+    sexualTension: body.heat === "Explicit adult" ? 40 : 15,
+    lastMajorBeat: "story opening and central romantic conflict introduced",
+    nextRequiredConsequence: "carry forward the tension, attraction, conflict and practical consequences from Chapter 1",
+    activeConflict: body.romanticConflict || body.tropes || "romantic conflict",
+    subConflict: body.externalConflict || "",
+    childStatus: body.tropes?.includes("Secret child") || body.plot?.toLowerCase().includes("child") ? "child exists only if established clearly and must behave age appropriately" : null,
+    exStatus: body.plot?.toLowerCase().includes("ex") ? "ex may create pressure only through believable, seeded behaviour" : null,
+    regionalLanguage: regional.regionalLanguage,
+    locationTerms: regional.locationTerms,
+    forbiddenTerms: regional.forbiddenTerms,
+    forbiddenDrift: [
+      "random illness",
+      "random custody threat",
+      "sudden family emergency",
+      "unseeded scandal",
+      "unseeded blackmail",
+      "random accident",
+      "American wording if story is British English",
+      "calling a locker room only 'the room'",
+      "repeating previous generated story beats",
+      "inventing major new subplots without setup",
+    ],
+    storyFingerprint: {
+      relationship: body.relationship,
+      subgenre: body.subgenre,
+      subgenreDetail: body.subgenreDetail,
+      trope: body.tropes,
+      heat: body.heat,
+      burn: body.burnPacing,
+      coreIdea: body.plot,
+      characterNotes: body.characterNotes,
+      mustAvoid: body.mustNotHave,
+    },
+    endingRunway: "far",
+  };
 
-Internally create:
-- full story bible
-- romance arc
-- heat escalation plan
-- physical escalation plan
-- trope plan
-- conflict plan
-- character wound plan
-- ending plan
-- continuity plan
-- side character motive plan
+  const prompt = `
+You are NovelForge, a private award-focused romance fiction engine.
 
-Do not show any planning.
+Write Chapter 1 only.
 
-Return only Chapter 1 prose.
+Return only polished Chapter 1 prose.
+Do not return notes.
+Do not return the story state.
+Do not return headings other than the chapter title and POV headings if required by the selected POV.
 
-SAFETY RULES:
-- All characters must be 18+.
-- Do not sexualise minors.
-- Do not include illegal sexual content.
-- Explicit adult content is allowed only between consenting adults.
-- Do not include incest.
-- Do not frame coercion, stalking, abuse, or manipulation as romantic.
-- Keep consent clear.
-- If the setup risks unsafe content, age up characters and make the relationship legal, adult and consensual.
-
-STORY CORE:
+STORY INPUTS:
 Title: ${body.title}
 Relationship Type: ${body.relationship}
 Subgenre: ${body.subgenre}
 Subgenre Detail: ${body.subgenreDetail}
 Book Length: ${body.length}
+Target Total Chapters: ${targetChapters}
+Chapter Word Target: ${wordTarget}
 POV: ${body.pov}
 Heat Level: ${body.heat}
-Ending Style: ${body.ending}
-Plot Intensity: ${body.intensity}
-Age Bracket: ${body.ageBracket}
-
-ROMANCE ENGINE:
-Romance Dynamic: ${body.romanceDynamic}
-Attraction Style: ${body.attractionStyle}
-Attraction Focus: ${body.attractionFocus}
-Sexual Style: ${body.sexualStyle}
-Spice Timing: ${body.spiceTiming}
 Burn Pacing: ${body.burnPacing}
-Tropes: ${body.tropes}
-
-MM / MF NUANCE:
-MM Nuance: ${body.mmNuance}
-MF Nuance: ${body.mfNuance}
-
-CHARACTER 1:
-Name: ${body.c1Name}
-Age: ${body.c1Age}
-Appearance: ${body.c1Appearance}
-Job / Role: ${body.c1Job}
-Personality: ${body.c1Personality}
-Speech Quirks: ${body.c1Speech}
-Flaws: ${body.c1Flaws}
-Biggest Desire: ${body.c1Desire}
-Biggest Fear: ${body.c1Fear}
-Secret: ${body.c1Secret}
-Wound: ${body.c1Wound}
-Love Language: ${body.c1LoveLanguage}
-Attachment Style: ${body.c1Attachment}
-Jealousy Style: ${body.c1Jealousy}
-Flirting Style: ${body.c1Flirting}
-Extra Notes: ${body.c1CustomNotes}
-
-CHARACTER 2:
-Name: ${body.c2Name}
-Age: ${body.c2Age}
-Appearance: ${body.c2Appearance}
-Job / Role: ${body.c2Job}
-Personality: ${body.c2Personality}
-Speech Quirks: ${body.c2Speech}
-Flaws: ${body.c2Flaws}
-Biggest Desire: ${body.c2Desire}
-Biggest Fear: ${body.c2Fear}
-Secret: ${body.c2Secret}
-Wound: ${body.c2Wound}
-Love Language: ${body.c2LoveLanguage}
-Attachment Style: ${body.c2Attachment}
-Jealousy Style: ${body.c2Jealousy}
-Flirting Style: ${body.c2Flirting}
-Extra Notes: ${body.c2CustomNotes}
-
-PLOT ARCHITECTURE:
-Setting: ${body.setting}
-External Conflict: ${body.externalConflict}
-Internal Conflict: ${body.internalConflict}
-Romantic Conflict: ${body.romanticConflict}
-Must-Have Scenes: ${body.mustHave}
+Main Trope: ${body.tropes}
+Ending Style: ${body.ending}
+Story Idea: ${body.plot}
+Character Notes: ${body.characterNotes}
+Must-Have: ${body.mustHave}
 Must-Not-Have: ${body.mustNotHave}
-Plot Notes: ${body.plot}
 
-VOICE AND STYLE:
-Locale: ${body.locale}
-Regional Voice: ${body.regionVoice}
-Author Flavour: ${body.authorFlavour}
-Writing Style: ${body.voiceStyle}
-Dialogue Style: ${body.dialogueStyle}
-Prose Density: ${body.proseDensity}
-Chapter Opener: ${body.chapterOpener}
-Ending Glow: ${body.endingGlow}
-Real-World Grounding: ${body.grounding}
-Avoid Style: ${body.avoidStyle}
+HIDDEN OPENING STORY STATE:
+${JSON.stringify(openingStoryState, null, 2)}
 
-TARGET STORY LENGTH ENGINE:
-Internally plan the complete story length.
+REGIONAL LANGUAGE LOCK:
+Use ${regional.regionalLanguage}.
+Preferred terms: ${regional.locationTerms.join(", ")}.
+Avoid these terms unless a character specifically would use them: ${regional.forbiddenTerms.join(", ")}.
+If the setting is British English, prefer car, car park, flat, phone, trainers, mum, dressing room or locker room.
+If the setting is American English, prefer parking lot, apartment, cell phone, sneakers, mom, locker room.
+If the setting is Canadian English, use natural Canadian wording and hockey vocabulary.
 
-If Book Length is Novella:
-- Target 8 to 12 chapters total.
-- Chapter 1 should be 1,000 to 1,500 words.
-- The romance and main conflict must start quickly.
-- By Chapter 3, chemistry should be obvious.
-- By the middle chapters, romantic and plot stakes should escalate.
-- The ending should begin forming by the final 2 to 3 chapters.
+HARD LENGTH RULE:
+For Novella:
+- Absolute target is 900 to 1400 words.
+- Do not exceed 1500 words.
+- If approaching the limit, end the chapter cleanly with a hook or emotional turn.
+- Do not add another scene just to round things off.
 
-If Book Length is Short Novel:
-- Target 16 to 24 chapters total.
-- Chapter 1 should be 1,600 to 2,400 words.
-- Allow more subplot development.
-- Do not rush the final emotional payoff.
+For Short Novel:
+- Target 1600 to 2200 words.
+- Do not exceed 2400 words.
 
-If Book Length is Long Novel:
-- Target 28 to 40 chapters total.
-- Chapter 1 should be 2,400 to 3,500 words.
-- Allow deeper subplot layers and slower emotional development.
+For Long Novel:
+- Target 2400 to 3200 words.
+- Do not exceed 3500 words.
 
-For Chapter 1:
-- Do not stop mid-sentence.
-- End with a clean hook, reveal, conflict beat, sexual tension beat, or emotional turn.
-- Do not write multiple chapters disguised as one chapter.
+If forced to choose between length and extra detail, choose shorter and cleaner.
+
+UNIQUENESS RULE:
+This story must feel specific to the user's Story Idea and Character Notes.
+Do not default to generic previous romance openings.
+Do not reuse stock beats unless the user requested them.
+Do not write a recycled version of another rival hockey / secret child / manipulative ex story unless those details are clearly in the current Story Idea.
+Prioritise the user's unique premise over trope autopilot.
 
 CHAPTER 1 PURPOSE:
-- Introduce the world clearly.
-- Establish both main characters.
-- Establish the central friction.
-- Establish the relationship dynamic.
-- Establish the attraction style.
-- Establish romantic and sexual tension without resolving it.
-- Establish at least one external, internal, or romantic conflict.
+- Open with a strong hook.
+- Establish both main leads clearly.
+- Establish genre, setting and central conflict quickly.
+- Establish the main relationship dynamic.
+- Establish attraction if heat is Spicy or Explicit adult.
+- Establish friction, resistance or complication.
 - Do not reveal every secret.
-- Do not write a complete story arc.
-- Do not resolve the main conflict.
+- Do not solve the emotional conflict.
+- Do not create couple-like comfort too soon.
+- End with a clean hook, reveal, conflict beat, sexual tension beat, or emotional turn.
 
-CAUSE AND CONSEQUENCE RULE:
-Every scene must logically follow from the previous scene.
-
-Before writing each scene, internally answer:
+CAUSE AND CONSEQUENCE:
+Every scene must follow logically from the previous beat.
+Before writing each scene, silently check:
 1. What just happened?
-2. How would each character realistically react?
-3. What emotional state are they carrying forward?
+2. What would each character realistically do next?
+3. What emotional state carries forward?
 4. What practical consequence follows?
-5. What scene naturally comes next?
+5. Why is this scene necessary?
 
-Do not jump abruptly between emotional states.
+No random tonal jumps.
+No sudden illness.
+No unseeded emergencies.
+No convenient custody drama.
+No random scandal.
+No scene drift.
 
-Maintain emotional continuity:
-- anger carries
-- embarrassment carries
-- jealousy carries
-- attraction carries
-- hurt carries
-- suspicion carries
-- fear carries
-- guilt carries
+SIDE CHARACTER COHERENCE:
+Children:
+- behave age appropriately
+- do not teleport emotionally
+- if upset, show comfort, distraction, exhaustion, or passage of time before playful behaviour
+- never use a child only as a lever
 
-Avoid:
-- scene reset syndrome
-- random tonal jumps
-- random topic jumps
-- contradictory behaviour
-- conversations that ignore what was just said
-- characters reacting as if previous lines did not happen
+Exes:
+- must have believable motives
+- can use guilt, history, timing, access, concern, or emotional pressure
+- do not write cartoon villains
+- do not create random threats unless seeded
 
-SCENE FLOW RULE:
-Every scene must move the story forward.
+Friends / teammates:
+- should sound distinct
+- should not explain the plot for the reader
 
-Each scene needs:
-- a clear purpose
-- a conflict beat
-- a relationship beat
-- a plot beat
-- a reason to keep reading
+LOCATION NAMING:
+If in a locker room or dressing room, call it locker room, dressing room, changing room, players' room, or another clear regional term.
+Do not repeatedly call it "the room".
 
-Do not add random setting description unless it affects mood, character, tension, or plot.
-Do not describe objects just because they exist.
-Avoid repeated environmental details like pipes, radiators, coffee, walls, floors, windows, weather, smells, or light unless they matter in the scene.
-The relationship must grow through actions, choices, friction, mistakes, jealousy, restraint, consequences and dialogue.
-Do not rely only on internal thoughts or body awareness.
-
-DIALOGUE FLOW RULE:
-Dialogue must follow logically from the previous line.
-
-Each reply should feel like:
-- an answer
-- an evasion
-- a deflection
-- a challenge
-- a joke
-- a defensive reaction
-- a deliberate refusal to answer
-
-Do not make characters respond to a different conversation.
-Do not use banter to dodge every emotional beat.
-Do not make every line witty.
-Let silence, interruption, discomfort and avoidance happen naturally.
-If a line creates tension, the next line should acknowledge, dodge, escalate, or break that tension.
-
-RELATIONSHIP STATE TRACKER:
-Internally track the romance stage.
-
+RELATIONSHIP STATE:
+Start at Stage 1 or Stage 2 only.
 Stage 1 = hostility
 Stage 2 = reluctant awareness
 Stage 3 = begrudging respect
@@ -239,42 +239,13 @@ Stage 6 = first surrender
 Stage 7 = intimacy
 Stage 8 = commitment
 
-Chapter 1 Relationship State:
-- Start at Stage 1 or Stage 2.
-- Trust should be low.
-- Irritation, tension or uncertainty should be high.
-- Attraction should be present if Heat Level is Spicy or Explicit adult.
-- Sexual tension should be noticeable if Heat Level is Explicit adult.
-- Do not allow emotional comfort, caretaking softness, confession, romantic safety, or couple-like intimacy yet.
+Chapter 1 may move no more than one stage.
+Trust must stay low.
+Attraction may be obvious.
+Irritation, pride, denial or resistance should stay alive.
+Do not allow emotional safety too early.
 
-Rules:
-- Move the relationship forward by no more than one stage per chapter.
-- Do not jump from hostility to emotional caretaking.
-- Do not jump from rivalry to couple-like comfort.
-- Do not let physical heat automatically create emotional trust.
-- Heat can rise faster than trust.
-- Conflict and attraction can coexist.
-- If enemies-to-lovers is selected, keep irritation, pride and resistance alive even when attraction rises.
-
-Hidden sliders:
-- Trust
-- Attraction
-- Irritation
-- Jealousy
-- Vulnerability
-- Sexual tension
-- Physical escalation
-
-For enemies-to-lovers:
-- Trust should rise slowly.
-- Irritation should stay high early.
-- Attraction and sexual tension may rise before trust.
-- Vulnerability should stay low until earned.
-- Jealousy can appear before emotional honesty.
-
-PHYSICAL ESCALATION TRACKER:
-Track physical intimacy separately from emotional intimacy.
-
+PHYSICAL ESCALATION:
 Stage 0 = awareness only
 Stage 1 = charged proximity
 Stage 2 = accidental contact lingers
@@ -286,497 +257,75 @@ Stage 7 = oral / mutual release / explicit play
 Stage 8 = penetrative sex / full consummation
 Stage 9 = comfortable sexual intimacy
 
-Chapter 1 Physical State:
-- If Heat Level is Fade to black or Mild, stay between Stage 0 and Stage 1.
-- If Heat Level is Spicy, stay between Stage 1 and Stage 2.
-- If Heat Level is Explicit adult, stay between Stage 1 and Stage 2 unless Burn Pacing is Instant attraction or Fast burn.
-- Do not include a kiss in Chapter 1 for enemies-to-lovers unless explicitly requested in Plot Notes.
-- Do not stack first kiss, heavy sexual play and emotional confession in Chapter 1.
+For Chapter 1:
+- Fade to black or Mild: Stage 0 to 1.
+- Spicy: Stage 1 to 2.
+- Explicit adult: Stage 1 to 2.
+- If Fast burn + Explicit adult: Stage 2 is allowed, but no full sexual scene in Chapter 1 unless the user explicitly requested it.
+- Do not stack first kiss, sexual touching and emotional confession in Chapter 1.
 
-Rules:
-- Move no more than one physical stage per chapter.
-- Fast burn may occasionally move two physical stages only if strongly motivated by the scene.
-- Emotional trust does not automatically rise with physical escalation.
-- Physical intimacy may create awkwardness, shame, denial, jealousy, possessiveness, or confusion.
-- First sexual contact should change the relationship dynamic.
-- Do not stack first kiss + heavy sexual play + emotional confession in one scene unless it is the story climax.
+SPICE PACING LOCK:
+If Heat Level is Explicit adult and Burn Pacing is Fast burn:
+- Chapter 1 must include obvious sexual tension.
+- The attraction should feel intrusive, physical and inconvenient.
+- Do not delay all heat into vague internal thoughts.
+- Do not turn heat into emotional softness.
+- Conflict and lust must coexist.
 
-HEAT RULES:
-If Heat Level is Fade to black:
-- Build attraction and romance normally.
-- Keep intimate scenes closed door.
-
-If Heat Level is Mild:
-- Include clear attraction, body awareness, lingering looks, charged touch and flirt tension.
-- Kissing and sensual moments may happen naturally.
-- Keep intimate scenes light and non-graphic.
+If Heat Level is Explicit adult and Burn Pacing is Medium burn:
+- Chapter 1 must include noticeable sexual tension.
+- Do not make the chapter feel cold.
 
 If Heat Level is Spicy:
-- Attraction should feel physical and distracting early.
-- Include body awareness, charged proximity, jealous reactions, intrusive attraction thoughts and flirt tension.
-- Sexual tension should feel present, not absent.
-- Characters should notice selected attraction focus naturally: ${body.attractionFocus}.
+- Include physical awareness, charged proximity and flirt tension.
 
-If Heat Level is Explicit adult:
-- Sexual tension must exist early.
-- Attraction should feel physical, intrusive, distracting and difficult to ignore.
-- Characters should have unwanted attraction thoughts they resist.
-- Proximity should sometimes feel charged.
-- Jealousy, possessiveness and body awareness should show up early.
-- Dialogue may carry flirt tension, dirty humour or sharp chemistry.
-- For Medium burn:
-  Chapter 1 = noticeable attraction and sexual tension.
-  Chapter 2 = stronger tension.
-  Chapter 3 = obvious charged chemistry or near moments.
-  Chapter 4+ = escalating physical payoff.
-- Do not make them emotionally soft too quickly.
-- Keep conflict high while heat rises.
-- Attraction should annoy, unsettle or inconvenience them.
-- Heat can rise faster than trust.
+DIALOGUE:
+Dialogue must respond logically to the previous line.
+Each reply should answer, dodge, challenge, deflect, joke, refuse or escalate.
+No random replies to a different conversation.
+No endless "You good?" / "Fine." loops.
+No over-polished banter every line.
 
-SEXUAL STYLE RULE:
-Use the selected sexual style as flavour, not as a random checklist.
-Selected sexual style: ${body.sexualStyle}
-
-If selected style includes Teasing:
-- Use verbal sparring, baiting, restraint and charged humour.
-
-If selected style includes Jealous heat:
-- Let jealousy show through reaction, tension, silence, sharp comments or possessive awareness.
-
-If selected style includes Rough edge:
-- Make tension physical and sharp, but always consensual and adult.
-
-If selected style includes Tender:
-- Save tenderness until the relationship stage earns it.
-
-If selected style includes Filthy talk:
-- Use sparingly and naturally.
-- Do not force explicit dialogue into Chapter 1 unless the scene genuinely supports it.
-
-SIDE CHARACTER COHERENCE:
-Supporting characters must behave like real people.
-
-They must have:
-- consistent motives
-- understandable goals
-- believable reactions
-- scene continuity
-
-Children:
-- behave age appropriately
-- emotional states must transition logically
-- if crying, show believable recovery or passage of time before playful behaviour
-- avoid convenience child writing
-- do not use children only as plot levers
-
-Manipulative ex:
-- manipulation should feel believable and psychologically consistent
-- use guilt, history, access, timing, pressure, triangulation and emotional leverage
-- do not write cartoon villain dialogue
-- complexity is stronger than obvious villainy
-- the ex may be selfish, hurt, desperate, lonely, controlling, frightened, resentful, or still attached
-- make the ex's goal clear enough that readers understand the pressure even if they dislike the behaviour
-
-Friends / teammates:
-- distinct voices
-- realistic locker room rhythm
-- not exposition machines
-- do not make them explain the plot for the reader
-
-TROPE RULES:
-If Tropes includes "Enemies to lovers":
-- Chapter 1 must feel like genuine friction.
-- They should clash through pride, distrust, rivalry, resentment, competition, or opposing choices.
-- Attraction can exist, but it should annoy, confuse or unsettle them.
-- Do not make them emotionally safe with each other too early.
-- Do not make them immediately domestic, gentle, or openly supportive.
-- Do not include a kiss in Chapter 1.
-- Do not include intimate touching beyond accidental or conflict-driven contact.
-- End with unresolved tension, not romantic comfort.
-
-If Tropes includes "Friends to lovers":
-- Establish familiarity, inside jokes, comfort and buried longing.
-- Do not make them feel like strangers.
-
-If Tropes includes "Second chance":
-- Establish shared history and old hurt.
-- Do not resolve the wound in Chapter 1.
-
-If Tropes includes "Forced proximity":
-- Make the forced situation clear.
-- Proximity must create inconvenience, tension, temptation or conflict.
-
-If Tropes includes "Slow burn" or Burn Pacing is Slow burn or Agonising slow burn:
-- Keep physical escalation restrained.
-- Focus on tension, denial, irritation, longing and charged moments.
-- Do not rush kissing, sex, or emotional confession.
-
-CHARACTER DEPTH RULE:
-Characters must behave from their wounds, fears, desires, attachment style, jealousy style, flirting style and love language.
-Do not dump backstory.
-Reveal wounds through behaviour, avoidance, reactions, choices and conflict.
-Make their connection grow through earned moments, not sudden emotional speeches.
-
-MM / MF CALIBRATION:
-If Relationship Type is MM Romance:
-- Honour the selected MM nuance.
-- Do not make either character a stereotype.
-- Masculinity, softness, vulnerability, dominance and tenderness should be character-led.
-- Queer identity themes should only be central if selected.
-- If "No homophobia plot" is selected, do not create a homophobia subplot.
-
-If Relationship Type is MF Romance:
-- Honour the selected MF nuance.
-- Do not make the heroine weak unless specifically requested.
-- Protective behaviour must not erase the heroine's agency.
-- Modern or traditional gender dynamics should follow the selected nuance.
-
-NATURAL SPEECH RULE:
-Write like real modern people.
-
-Use natural contractions:
-- I'm
-- I've
-- I'd
-- I'll
-- you're
-- you've
-- you'll
-- we're
-- we've
-- he's
-- she's
-- it's
-- that's
-- there's
-- don't
-- doesn't
-- didn't
-- can't
-- couldn't
-- won't
-- wouldn't
-- isn't
-- aren't
-- wasn't
-- weren't
-
-Avoid stiff constructions unless a character is intentionally formal.
-
-Avoid:
-- I do not
-- I am not
-- It is
-- He is
-- She is
-- They are
-- That is
-- There is
-- I cannot
-- I will not
-
-Prefer:
-- I don't
-- I'm not
-- it's
-- he's
-- she's
-- they're
-- that's
-- there's
-- I can't
-- I won't
-
-Narration should sound modern, not formal, literary, robotic, or old-fashioned.
-
-PHRASE REPETITION RULE:
-Avoid repeating emotional check-in lines.
-
-Do not overuse:
-- You good?
-- You okay?
-- Are you okay?
-- Fine.
-- Nothing.
-- Good.
-
-If concern is shown, vary the wording.
-
-Examples:
-- You look wrecked.
-- That shoulder's ugly.
-- You look tired.
-- You limping?
-- You're quiet tonight.
-- What's eating you?
-- You look like hell.
-- Stop grimacing.
-
-DASH RULE:
-Do not use em dashes.
-Do not use long dashes.
-Do not use spaced dashes as dramatic interruptions.
-Do not use "—" anywhere.
-Do not use "–" anywhere.
-Use commas, full stops, colons, semicolons, brackets, or separate sentences instead.
-Before final output, scan and replace every em dash or en dash.
-
-STYLE RULES:
+STYLE:
 - Natural commercial romance prose.
+- Human, readable, emotionally grounded.
 - Distinct character voices.
-- Natural dialogue with subtext.
 - No em dashes.
+- No en dashes.
+- No long dash interruptions.
 - No therapy-speak.
 - No fake profound lines.
-- No impossible physical actions.
-- No purple prose.
-- No over-described rooms.
 - No random object descriptions.
+- No over-described rooms.
+- No purple prose.
 - No repeated symbolic closing lines.
-- No “electric touch”, “storm in his eyes”, “second heartbeat”, “his breath hitched”, unless rare and genuinely needed.
-- Use the selected locale consistently.
-- Honour the selected POV exactly.
+- No stiff formal narration like "I do not" unless intentional.
+- Use natural contractions.
 `;
 
   try {
-    const draftResponse = await openai.responses.create({
+    const response = await openai.responses.create({
       model: "gpt-5.5",
       reasoning: { effort: "low" },
       text: { verbosity: "low" },
-      input: draftPrompt,
-      max_output_tokens: 8000,
+      input: prompt,
+      max_output_tokens: maxTokens,
     });
 
-    const draft = cleanOutput(draftResponse.output_text);
+    const chapter = cleanOutput(response.output_text || "");
 
-    const editorPrompt = `
-You are NovelForge's strict human-style romance editor.
-
-Rewrite and clean this draft Chapter 1 into the FINAL version.
-
-Return only final Chapter 1 prose. No notes.
-
-USER STORY SETTINGS:
-Relationship Type: ${body.relationship}
-Subgenre: ${body.subgenre}
-Subgenre Detail: ${body.subgenreDetail}
-Tropes: ${body.tropes}
-Romance Dynamic: ${body.romanceDynamic}
-Attraction Style: ${body.attractionStyle}
-Attraction Focus: ${body.attractionFocus}
-Heat Level: ${body.heat}
-Sexual Style: ${body.sexualStyle}
-Spice Timing: ${body.spiceTiming}
-Burn Pacing: ${body.burnPacing}
-Book Length: ${body.length}
-POV: ${body.pov}
-Locale: ${body.locale}
-Regional Voice: ${body.regionVoice}
-Author Flavour: ${body.authorFlavour}
-Writing Style: ${body.voiceStyle}
-Dialogue Style: ${body.dialogueStyle}
-Prose Density: ${body.proseDensity}
-Chapter Opener: ${body.chapterOpener}
-Must-Not-Have: ${body.mustNotHave}
-Avoid Style: ${body.avoidStyle}
-MM Nuance: ${body.mmNuance}
-MF Nuance: ${body.mfNuance}
-
-DRAFT CHAPTER:
-${draft}
-
-EDITOR TASKS:
-1. Fix logic issues.
-2. Fix dialogue that does not logically answer the previous line.
-3. Fix impossible or weird physical actions.
-4. Remove pretty-but-meaningless lines.
-5. Tighten bloated paragraphs.
-6. Remove repeated phrases and repeated emotional beats.
-7. Strengthen the selected trope.
-8. Make the opening hook stronger.
-9. Keep the chapter ending complete and clean.
-10. Do not stop mid-sentence.
-11. Do not add notes, headings, bullet points, or commentary.
-12. Make heat level actually match the selected heat setting.
-13. If Spicy or Explicit adult is selected, increase sexual tension naturally.
-14. For Medium burn, make chemistry escalate steadily, not slowly stall.
-15. Add charged looks, body awareness, jealousy, flirt tension, proximity and resisted attraction where appropriate.
-16. Keep conflict and heat rising together.
-17. Cut random setting description.
-18. Make every scene move the story forward.
-19. Make the relationship progression clear and logical.
-20. Ensure the chapter fits the selected MM or MF nuance.
-21. Make side character motives believable and consistent.
-22. Fix cause and consequence issues.
-23. Fix child behaviour continuity if children appear.
-24. Fix manipulative ex behaviour so it feels human, not cartoonish.
-25. Keep physical escalation appropriate for Chapter 1.
-
-CAUSE AND CONSEQUENCE EDIT:
-Every scene must logically follow from the previous scene.
-Do not jump abruptly between emotional states.
-Maintain emotional continuity.
-If a character was angry, embarrassed, jealous, suspicious, scared, guilty, or aroused, that state should carry into the next relevant beat unless something clearly changes it.
-Fix scene reset syndrome.
-Fix random topic jumps.
-Fix conversations that ignore the previous line.
-Make every scene cause the next scene.
-
-STORY FLOW EDIT:
-Cut decorative description that does not affect character, tension, plot or mood.
-Make every paragraph earn its place.
-Make the relationship progression clear and logical.
-Ensure each scene changes something.
-If nothing changes in a scene, rewrite or cut it.
-Do not describe objects just because they exist.
-Avoid repeated environmental details like pipes, radiators, coffee, walls, floors, windows, weather, smells, or light unless they matter in the scene.
-
-DIALOGUE FLOW EDIT:
-Dialogue must follow logically.
-Each reply should answer, evade, deflect, challenge, joke, defend, or deliberately refuse to answer.
-Do not make characters respond to a different conversation.
-Do not use banter to dodge every emotional beat.
-If a line creates tension, the next line should acknowledge, dodge, escalate, or break that tension.
-
-SIDE CHARACTER EDIT:
-Supporting characters must have consistent motives and believable reactions.
-Children must behave age appropriately.
-If a child is upset, show believable recovery, comfort, distraction, or passage of time before playful behaviour.
-Do not use a child only as a convenient emotional lever.
-Manipulative exes should use believable pressure: guilt, history, access, timing, triangulation, emotional leverage and old wounds.
-Do not write the ex as a cartoon villain.
-Make the ex's goal understandable even if the behaviour is selfish or damaging.
-
-RELATIONSHIP STATE EDIT:
-- Preserve the correct relationship stage.
-- Chapter 1 should stay at Stage 1 or Stage 2.
-- Do not move the romance forward by more than one stage.
-- Do not let heat create sudden emotional trust.
-- Do not turn rivalry into comfort too early.
-- If the chapter becomes too soft too early, add resistance, pride, awkwardness, irritation or denial.
-- Heat can rise faster than trust.
-- Attraction should not erase conflict.
-
-PHYSICAL ESCALATION EDIT:
-- Track physical intimacy separately from emotional intimacy.
-- Chapter 1 should not jump too far physically.
-- If enemies-to-lovers is selected, do not include a kiss in Chapter 1 unless explicitly requested in Plot Notes.
-- Do not stack first kiss, heavy sexual play and emotional confession in one scene.
-- Physical want should create tension, confusion, denial, pride or conflict.
-- Physical escalation must change the relationship dynamic.
-
-ENEMIES TO LOVERS EDIT:
-If "Enemies to lovers" is selected:
-- Increase friction.
-- Make softness feel reluctant, unwanted or resisted.
-- Add conflict through behaviour, competition, pride, suspicion, resentment or emotional defence.
-- Remove anything that makes them feel too couple-like too early.
-- Attraction should feel inconvenient, irritating or unwanted.
-- Do not include a kiss in Chapter 1.
-- Do not make them emotionally cosy in Chapter 1.
-
-HEAT EDIT:
-If Heat Level is Spicy:
-- Ensure attraction feels physical and noticeable.
-- Add body awareness, charged proximity, jealous reactions, intrusive attraction thoughts and flirt tension where appropriate.
-- Use the selected attraction focus naturally: ${body.attractionFocus}.
-
-If Heat Level is Explicit adult:
-- Ensure sexual tension exists early.
-- Make attraction feel physical, intrusive, distracting and resisted.
-- Add charged proximity, body awareness, jealousy, dirty humour, sharp chemistry or unwanted attraction where appropriate.
-- For Medium burn, Chapter 1 must contain noticeable attraction and sexual tension.
-- Do not make the scene emotionally soft just to make it hot.
-- Keep all attraction consensual and adult.
-
-SEXUAL STYLE EDIT:
-Use selected sexual style naturally: ${body.sexualStyle}
-Do not force the sexual style into every scene.
-Do not make Chapter 1 feel like instant intimacy unless the selected burn pacing supports it.
-If tenderness appears too early, convert it into tension, restraint, irritation or resisted awareness.
-
-NATURAL SPEECH EDIT:
-Rewrite stiff formal phrasing into natural modern phrasing.
-Use contractions naturally.
-Avoid:
-- I do not
-- I am not
-- It is
-- He is
-- She is
-- They are
-- That is
-- There is
-- I cannot
-- I will not
-
-Prefer:
-- I don't
-- I'm not
-- it's
-- he's
-- she's
-- they're
-- that's
-- there's
-- I can't
-- I won't
-
-PHRASE REPETITION EDIT:
-Avoid repeated check-in lines.
-
-Do not overuse:
-- You good?
-- You okay?
-- Are you okay?
-- Fine.
-- Nothing.
-- Good.
-
-Vary concern through character-specific language.
-
-DASH EDIT:
-Remove all em dashes and en dashes.
-Do not use "—" anywhere.
-Do not use "–" anywhere.
-Replace them with commas, full stops, colons, semicolons, brackets, or separate sentences.
-
-LENGTH EDIT:
-- If Book Length is Novella, final chapter should be 1,000 to 1,500 words.
-- If Book Length is Short Novel, final chapter should be 1,600 to 2,400 words.
-- If Book Length is Long Novel, final chapter should be 2,400 to 3,500 words.
-- If too long, cut repetition, random description and over-explaining.
-- If near the limit, end cleanly rather than adding another scene.
-
-ANTI-AI EDIT:
-Remove or rewrite:
-- fake profound sentences
-- therapy-speak
-- melodramatic inner monologue
-- body-part clichés
-- impossible actions
-- repeated “I don’t know” style closings
-- lines that sound poetic but mean nothing
-- over-polished banter
-- long decorative descriptions
-- random object descriptions
-- repeated environmental details
-
-FINAL OUTPUT:
-Return only the polished final Chapter 1.
-`;
-
-    const finalResponse = await openai.responses.create({
-      model: "gpt-5.5",
-      reasoning: { effort: "low" },
-      text: { verbosity: "low" },
-      input: editorPrompt,
-      max_output_tokens: 8000,
-    });
+    const storyState = {
+      ...openingStoryState,
+      chapter: 1,
+      lastMajorBeat: "Chapter 1 introduced the leads, central conflict, attraction, and opening consequence.",
+      nextRequiredConsequence:
+        "Chapter 2 must directly follow the emotional and practical fallout from Chapter 1. Do not reset the characters.",
+      endingRunway: "far",
+    };
 
     return Response.json({
-      result: cleanOutput(finalResponse.output_text),
+      result: chapter,
+      storyState,
     });
   } catch (error) {
     console.error(error);
@@ -784,7 +333,8 @@ Return only the polished final Chapter 1.
     return Response.json(
       {
         result:
-          "Something went wrong while generating the chapter. The app has thrown its toys out of the pram.",
+          "Something went wrong while generating Chapter 1. The app has thrown its toys out of the pram.",
+        storyState: openingStoryState,
       },
       { status: 500 }
     );
