@@ -381,11 +381,12 @@ setStoryState(newStoryState);
     const response = await fetch("/api/continue-story", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        form: preparedForm,
-        previousChapter,
-        nextChapterNumber: chapters.length + 1,
-      }),
+   body: JSON.stringify({
+  form: preparedForm,
+  previousChapter,
+  nextChapterNumber: chapters.length + 1,
+  storyState,
+}),
     });
 
     const data = await response.json();
