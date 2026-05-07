@@ -315,6 +315,8 @@ export default function Home() {
     setChapters(story.chapters || []);
     setActiveChapterIndex(story.active_chapter_index || 0);
     setCustomRewrite(story.custom_rewrite || "");
+    setStoryState(story.story_state || {});
+    setStoryState(story.story_state || {});
     setShowLibrary(false);
     setCopyMessage("");
     window.scrollTo({ top: 0, behavior: "smooth" });
