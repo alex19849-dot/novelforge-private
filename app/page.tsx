@@ -359,11 +359,12 @@ setStoryState(newStoryState);
     setLoading(false);
 
     await saveCurrentStory({
-      form: preparedForm,
-      chapters: newChapters,
-      activeChapterIndex: 0,
-      customRewrite,
-    });
+  form: preparedForm,
+  chapters: newChapters,
+  activeChapterIndex,
+  customRewrite,
+  storyState,
+});
   }
 
   async function continueStory() {
