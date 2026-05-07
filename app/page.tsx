@@ -348,10 +348,12 @@ export default function Home() {
       body: JSON.stringify(preparedForm),
     });
 
-    const data = await response.json();
-    const chapter = data.result || "Something went wrong.";
-    const newChapters = [chapter];
+  const data = await response.json();
+const chapter = data.result || "Something went wrong.";
+const newStoryState = data.storyState || {};
+const newChapters = [chapter];
 
+setStoryState(newStoryState);
     setChapters(newChapters);
     setActiveChapterIndex(0);
     setLoading(false);
