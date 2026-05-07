@@ -425,12 +425,17 @@ setStoryState(newStoryState);
     setChapters(newChapters);
     setRewriteLoading(false);
 
-    await saveCurrentStory({
-      form: preparedForm,
-      chapters: newChapters,
-      activeChapterIndex,
-      customRewrite,
-    });
+   const newStoryState = data.storyState || storyState;
+
+setStoryState(newStoryState);
+
+await saveCurrentStory({
+  form: preparedForm,
+  chapters: newChapters,
+  activeChapterIndex: newIndex,
+  customRewrite,
+  storyState: newStoryState,
+});
   }
 
   async function copyChapter(chapter: string, index: number) {
