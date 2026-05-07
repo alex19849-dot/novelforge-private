@@ -255,11 +255,12 @@ export default function Home() {
 
   async function saveCurrentStory(
     override?: {
-      form?: StoryForm;
-      chapters?: string[];
-      activeChapterIndex?: number;
-      customRewrite?: string;
-    }
+  form?: StoryForm;
+  chapters?: string[];
+  activeChapterIndex?: number;
+  customRewrite?: string;
+  storyState?: any;
+}
   ) {
     if (!user) {
       setAuthMessage("Log in first so it can save to the cloud.");
