@@ -132,6 +132,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [authMessage, setAuthMessage] = useState("");
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const [storyState, setStoryState] = useState<any>({});
 
   const [form, setForm] = useState<StoryForm>({ ...defaultForm });
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
