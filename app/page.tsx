@@ -435,7 +435,7 @@ setStoryState(newStoryState);
 await saveCurrentStory({
   form: preparedForm,
   chapters: newChapters,
-  activeChapterIndex: newIndex,
+  activeChapterIndex: 0,
   customRewrite,
   storyState: newStoryState,
 });
