@@ -271,15 +271,16 @@ export default function Home() {
     const activeIndexToSave = override?.activeChapterIndex ?? activeChapterIndex;
     const rewriteToSave = override?.customRewrite ?? customRewrite;
 
-    const payload = {
-      user_id: user.id,
-      title: getStoryTitle(formToSave),
-      form: formToSave,
-      chapters: chaptersToSave,
-      active_chapter_index: activeIndexToSave,
-      custom_rewrite: rewriteToSave,
-      updated_at: new Date().toISOString(),
-    };
+  const payload = {
+  user_id: user.id,
+  title: getStoryTitle(formToSave),
+  form: formToSave,
+  chapters: chaptersToSave,
+  active_chapter_index: activeIndexToSave,
+  custom_rewrite: rewriteToSave,
+  story_state: storyState || {},
+  updated_at: new Date().toISOString(),
+};
 
     if (activeStoryId) {
       const { error } = await supabase.from("stories").update(payload).eq("id", activeStoryId);
