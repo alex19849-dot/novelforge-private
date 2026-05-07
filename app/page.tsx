@@ -13,6 +13,7 @@ type SavedStory = {
   chapters: string[];
   active_chapter_index: number;
   custom_rewrite: string;
+  story_state?: any;
 };
 
 const defaultForm: StoryForm = {
