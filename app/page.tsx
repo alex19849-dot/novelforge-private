@@ -412,14 +412,15 @@ setStoryState(newStoryState);
     setRewriteLoading(true);
 
     const response = await fetch("/api/rewrite-chapter", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chapter: activeChapter,
-        instruction: customRewrite,
-      }),
-    });
-
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    chapter: activeChapter,
+    instruction: customRewrite,
+    form: preparedForm,
+    storyState,
+  }),
+});
     const data = await response.json();
     const rewritten = data.result || "Rewrite failed.";
     const newChapters = [...chapters];
