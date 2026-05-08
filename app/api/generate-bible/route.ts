@@ -23,10 +23,10 @@ function getWordTarget(length: string) {
 }
 
 function getMaxTokens(length: string) {
-  if (length === "Novella") return 2600;
-  if (length === "Short Novel") return 4200;
-  if (length === "Long Novel") return 6200;
-  return 2600;
+ if (length === "Novella") return 4200;
+if (length === "Short Novel") return 6200;
+if (length === "Long Novel") return 9000;
+return 4200;
 }
 
 function getRegionalTerms(locale: string) {
