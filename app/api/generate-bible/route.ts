@@ -279,6 +279,79 @@ If Heat Level is Explicit adult and Burn Pacing is Medium burn:
 If Heat Level is Spicy:
 - Include physical awareness, charged proximity and flirt tension.
 
+ATTRACTION VARIETY RULE:
+
+Do not repeatedly focus on mouths, lips, or staring at mouths as the default attraction beat.
+
+Rotate attraction cues naturally.
+
+Physical attraction may focus on:
+- throat movement while swallowing
+- neck
+- jaw tension
+- hands, fingers, knuckles, veins, wrists
+- forearms
+- shoulders
+- chest
+- waist
+- hips
+- thighs
+- back
+- height difference
+- scent
+- warmth
+- body heat
+- breath on skin
+- voice dropping lower
+- rough voice
+- laugh
+- smirk
+- bruises
+- tattoos
+- freckles
+- scars
+- sweat
+- wet hair
+- flushed skin
+- visible tension in muscles
+- proximity
+- accidental touch lingering
+- jealousy reaction
+- possessive instinct
+- noticing someone else looking at them
+- noticing competence
+- noticing tenderness
+- noticing exhaustion
+- noticing protective behaviour
+- noticing vulnerability
+
+Attraction should also rotate between:
+- physical noticing
+- emotional noticing
+- admiration
+- jealousy
+- protectiveness
+- curiosity
+- resentment mixed with desire
+- shame
+- confusion
+- possessiveness
+- frustration
+- fascination
+
+Do not repeat the same attraction beat within close succession.
+Vary sensory focus.
+Vary emotional reaction.
+Keep attraction surprising and character specific.
+
+Avoid repetitive patterns like:
+- eyes dropped to mouth
+- stared at lips
+- watched his mouth
+- looked at his lips
+
+Use sparingly, not repeatedly.
+
 DIALOGUE:
 Dialogue must respond logically to the previous line.
 Each reply should answer, dodge, challenge, deflect, joke, refuse or escalate.
