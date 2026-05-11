@@ -166,7 +166,64 @@ export default function Home() {
 
   const preparedForm = useMemo(() => {
     const next = { ...defaultForm, ...form };
+if (next.storyLocation === "New York, USA") {
+  next.locale = "American English";
+  next.regionVoice = "New York";
+  next.setting = "New York";
+}
 
+if (next.storyLocation === "California, USA") {
+  next.locale = "American English";
+  next.regionVoice = "California";
+  next.setting = "California";
+}
+
+if (next.storyLocation === "Southern USA") {
+  next.locale = "American English";
+  next.regionVoice = "Southern USA";
+  next.setting = "Southern USA";
+}
+
+if (next.storyLocation === "Midwest USA") {
+  next.locale = "American English";
+  next.regionVoice = "Midwest USA";
+  next.setting = "Midwest USA";
+}
+
+if (next.storyLocation === "London, UK") {
+  next.locale = "British English";
+  next.regionVoice = "London / South East";
+  next.setting = "London";
+}
+
+if (next.storyLocation === "Northern England, UK") {
+  next.locale = "British English";
+  next.regionVoice = "Northern UK";
+  next.setting = "Northern England";
+}
+
+if (next.storyLocation === "Scotland, UK") {
+  next.locale = "British English";
+  next.regionVoice = "Scotland";
+  next.setting = "Scotland";
+}
+
+if (next.storyLocation === "Canada") {
+  next.locale = "Canadian English";
+  next.regionVoice = "Neutral Canadian";
+  next.setting = "Canada";
+}
+
+if (next.storyLocation === "Australia") {
+  next.locale = "Australian English";
+  next.regionVoice = "Australian";
+  next.setting = "Australia";
+}
+
+if (next.storyLocation === "Neutral International") {
+  next.locale = "Neutral International";
+  next.regionVoice = "Neutral";
+}
     const characterNotes = form.characterNotes || "";
     next.c1CustomNotes = `${next.c1CustomNotes || ""}\n\nGeneral character notes:\n${characterNotes}`.trim();
     next.c2CustomNotes = `${next.c2CustomNotes || ""}\n\nGeneral character notes:\n${characterNotes}`.trim();
