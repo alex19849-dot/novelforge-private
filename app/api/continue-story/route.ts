@@ -218,7 +218,33 @@ If Novella:
 - Chapters 9 to 10: resolution and emotional payoff.
 Do not keep delaying payoff.
 Do not keep adding new subplots.
+EROTIC ENGINE V2:
+Use the saved erotic state and nextRequiredEroticBeat.
 
+Current erotic progression stage:
+${updatedStoryState.eroticProgressionStage}
+
+Next required erotic beat:
+${updatedStoryState.nextRequiredEroticBeat}
+
+Intimacy aftermath:
+${updatedStoryState.intimacyAftermath}
+
+Rules:
+- Erotic scenes must feel character-specific, not generic.
+- Do not repeat the same touch beats over and over.
+- Avoid looping ribs, waist, sides, hip, breath, almost-kiss, stop.
+- Physical escalation should involve varied, natural contact when appropriate: hair, jaw, throat, nape, chest, lower back, arse, thighs, hands, mouth, skin, clothing, pressure, taste, heat, restraint.
+- Use desire through action, dialogue, physical response and emotional consequence.
+- Do not write clinical mechanics.
+- Do not write porn without story.
+- Do not make intimacy emotionally cosy before the relationship earns it.
+- If the scene is explicit, it must still reveal character, conflict, power shift, trust, fear, need, shame, confidence, vulnerability, or possession.
+- If someone says stop, wait, not yet, too much, or no, respect it immediately.
+- Consent must be clear.
+- All sexual content must involve adults only.
+- Keep child scenes, family scenes and sexual scenes clearly separated in time, space and tone.
+- If a child has appeared recently in the chapter, do not transition immediately into explicit sexual content without a clear scene break, time shift, privacy and tonal reset.
 SPICE PACING LOCK:
 If Heat Level is Explicit adult and Burn Pacing is Fast burn:
 - By Chapter 3, there must be deliberate charged physical escalation or a deliberate almost-kiss.
