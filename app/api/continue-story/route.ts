@@ -119,8 +119,11 @@ shouldWriteEpilogue:
   nextChapterNumber >= (incomingState.targetChapters || 10) &&
   incomingState.epilogueWritten !== true,
 
-epilogueWritten: incomingState.epilogueWritten || false,
-
+epilogueWritten:
+  nextChapterNumber >= (incomingState.targetChapters || 10) &&
+  incomingState.epilogueWritten !== true
+    ? true
+    : incomingState.epilogueWritten || false,
 lastMajorBeat:
       incomingState.nextRequiredConsequence ||
       "carry forward the previous chapter consequence",
