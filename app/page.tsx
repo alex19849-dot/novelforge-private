@@ -128,7 +128,18 @@ const tropeOptions = [
   "High angst",
   "Found family",
 ];
-
+const storyLocationOptions = [
+  "New York, USA",
+  "California, USA",
+  "Southern USA",
+  "Midwest USA",
+  "London, UK",
+  "Northern England, UK",
+  "Scotland, UK",
+  "Canada",
+  "Australia",
+  "Neutral International",
+];
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [email, setEmail] = useState("");
