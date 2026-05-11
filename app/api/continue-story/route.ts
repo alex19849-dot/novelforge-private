@@ -416,7 +416,25 @@ Avoid repetitive check-ins:
 - Fine.
 - Nothing.
 - Good.
+ENDING AND EPILOGUE ENGINE:
+Current ending phase:
+${updatedStoryState.endingPhase}
 
+Should write epilogue:
+${updatedStoryState.shouldWriteEpilogue}
+
+Epilogue already written:
+${updatedStoryState.epilogueWritten}
+
+Rules:
+- Do not write an epilogue until the main romantic conflict, external conflict and emotional arc are resolved.
+- If shouldWriteEpilogue is true and epilogueWritten is false, write an epilogue instead of another normal chapter.
+- The epilogue should show earned payoff, not new drama.
+- Epilogue may show relationship security, family integration, career stability, domestic intimacy, future promise, emotional safety, or a final spicy afterglow if it fits the heat level.
+- Do not introduce a new villain, new breakup, new illness, new custody threat, new scandal or major new conflict in the epilogue.
+- If the story is not resolved yet, do not write the epilogue. Instead write the chapter that resolves the remaining conflict.
+- For novella, begin steering strongly toward resolution once endingPhase is resolution-runway.
+- For novella, do not keep extending the middle with repeated jealousy, repeated almost moments, repeated ex pressure, or repeated emotional avoidance.
 STYLE:
 - Natural commercial romance prose.
 - Human, readable, emotionally grounded.
