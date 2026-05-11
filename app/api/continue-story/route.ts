@@ -83,7 +83,45 @@ export async function POST(req: Request) {
     jealousy: Math.min((incomingState.jealousy || 0) + 6, 100),
     vulnerability: Math.min((incomingState.vulnerability || 2) + 5, 100),
     sexualTension: Math.min((incomingState.sexualTension || 35) + 12, 100),
-    lastMajorBeat:
+
+eroticProgressionStage: targetPhysicalStage,
+sexualMilestones: incomingState.sexualMilestones || [],
+usedTouchBeats: incomingState.usedTouchBeats || [],
+
+nextRequiredEroticBeat:
+  form.heat === "Fade to black"
+    ? "Build romantic intimacy, longing, affection and meaningful kisses without graphic sexual detail."
+    : form.heat === "Mild"
+    ? "Build sensual tension through kissing, closeness, touch and emotional intimacy without heavy explicit detail."
+    : form.heat === "Spicy"
+    ? "Escalate with stronger kissing, roaming hands, body awareness, jealousy and sensual payoff while keeping the detail spicy but not fully explicit."
+    : form.heat === "Explicit adult" && form.burnPacing === "Fast burn"
+    ? "Escalate clearly beyond kissing if the story has reached the right stage. Use character-specific desire, bolder touching, ass grabbing, tasting, grinding, dirty talk, restraint, and consequence. Do not loop endless ribs, waist, sides and almost moments."
+    : form.heat === "Explicit adult" && form.burnPacing === "Medium burn"
+    ? "Escalate steadily through deeper kissing, roaming hands, bolder physical contact and emotional fallout. Do not let the story feel cold."
+    : form.heat === "Explicit adult"
+    ? "Build intense erotic tension with clear physical progression, restraint, hunger and emotional consequence."
+    : "Build attraction naturally.",
+
+intimacyAftermath:
+  targetPhysicalStage >= 5
+    ? "Physical intimacy must affect behaviour afterwards through awkwardness, possessiveness, tenderness, panic, jealousy, confidence, guilt, or emotional fallout."
+    : incomingState.intimacyAftermath || "",
+
+endingPhase:
+  nextChapterNumber >= (incomingState.targetChapters || 10) - 1
+    ? "epilogue-ready"
+    : nextChapterNumber >= (incomingState.targetChapters || 10) - 3
+    ? "resolution-runway"
+    : "middle-build",
+
+shouldWriteEpilogue:
+  nextChapterNumber >= (incomingState.targetChapters || 10) &&
+  incomingState.epilogueWritten !== true,
+
+epilogueWritten: incomingState.epilogueWritten || false,
+
+lastMajorBeat:
       incomingState.nextRequiredConsequence ||
       "carry forward the previous chapter consequence",
     nextRequiredConsequence:
