@@ -19,6 +19,7 @@ type SavedStory = {
 const defaultForm: StoryForm = {
   title: "",
   relationship: "MM Romance",
+  storyLocation: "New York, USA",
   subgenre: "Sports Romance",
   subgenreDetail: "Ice hockey",
   length: "Novella",
