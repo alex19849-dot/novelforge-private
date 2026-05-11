@@ -80,7 +80,55 @@ export async function POST(req: Request) {
     irritation: body.tropes?.includes("Enemies to lovers") ? 78 : 45,
     jealousy: 0,
     vulnerability: 2,
-    sexualTension: body.heat === "Explicit adult" ? 40 : 15,
+   sexualTension:
+  body.heat === "Explicit adult"
+    ? 40
+    : body.heat === "Spicy"
+    ? 30
+    : body.heat === "Mild"
+    ? 18
+    : 8,
+
+eroticProgressionStage: 1,
+sexualMilestones: [],
+usedTouchBeats: [],
+
+nextRequiredEroticBeat:
+  body.heat === "Fade to black"
+    ? "Focus on emotional intimacy, romantic tension, yearning, affection and meaningful kisses without graphic sexual detail."
+
+    : body.heat === "Mild"
+    ? "Build attraction steadily through touching, kissing, longing, emotional closeness and sensual tension without heavy explicit detail."
+
+    : body.heat === "Spicy" &&
+      body.burnPacing === "Slow burn"
+    ? "Build strong unresolved sexual tension, loaded touches, possessiveness, jealousy and escalating kissing before explicit intimacy."
+
+    : body.heat === "Spicy" &&
+      body.burnPacing === "Fast burn"
+    ? "Escalate physical intimacy early through heated kissing, roaming hands, body worship, desperation and strong chemistry without stalling repeatedly."
+
+    : body.heat === "Explicit adult" &&
+      body.burnPacing === "Slow burn"
+    ? "Delay full sexual payoff while heavily escalating tension, obsession, physical awareness, possessiveness and emotionally loaded intimacy."
+
+    : body.heat === "Explicit adult" &&
+      body.burnPacing === "Medium burn"
+    ? "Escalate physical intimacy steadily with clear progression, stronger touching, heated make-outs and emotional consequences."
+
+    : body.heat === "Explicit adult" &&
+      body.burnPacing === "Fast burn"
+    ? "Escalate physical intimacy confidently. Do not stall with endless almost-kisses. Progress naturally from touching to heated intimacy with emotional and relational consequences."
+
+    : "Build romance and attraction naturally.",
+
+intimacyAftermath: "",
+endingPhase: "opening",
+shouldWriteEpilogue: false,
+epilogueWritten: false,
+
+lastMajorBeat:
+  "story opening and central romantic conflict introduced",
     lastMajorBeat: "story opening and central romantic conflict introduced",
     nextRequiredConsequence: "carry forward the tension, attraction, conflict and practical consequences from Chapter 1",
     activeConflict: body.romanticConflict || body.tropes || "romantic conflict",
