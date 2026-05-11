@@ -614,7 +614,13 @@ await saveCurrentStory({
               <div className="grid gap-5">
                 <Card title="Create Story">
                   <Input label="Story Title" field="title" form={form} updateField={updateField} />
-
+<Select
+  label="Story Location / Dialect"
+  field="storyLocation"
+  value={form.storyLocation}
+  options={storyLocationOptions}
+  updateField={updateField}
+/>
                   <div className="grid gap-4 md:grid-cols-2">
                     <Select label="Romance Type" field="relationship" value={form.relationship} options={relationshipOptions} updateField={updateField} />
                     <Select label="Story Length" field="length" value={form.length} options={lengthOptions} updateField={updateField} />
