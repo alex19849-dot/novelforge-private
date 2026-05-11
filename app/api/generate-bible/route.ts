@@ -129,7 +129,6 @@ epilogueWritten: false,
 
 lastMajorBeat:
   "story opening and central romantic conflict introduced",
-    lastMajorBeat: "story opening and central romantic conflict introduced",
     nextRequiredConsequence: "carry forward the tension, attraction, conflict and practical consequences from Chapter 1",
     activeConflict: body.romanticConflict || body.tropes || "romantic conflict",
     subConflict: body.externalConflict || "",
