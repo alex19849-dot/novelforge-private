@@ -164,6 +164,13 @@ ${JSON.stringify(incomingState, null, 2)}
 TARGET UPDATED STATE FOR THIS CHAPTER:
 ${JSON.stringify(updatedStoryState, null, 2)}
 
+STORY STATE IS AUTHORITATIVE:
+The saved story state is the truth for continuity, pacing, heat, relationship progression, unresolved conflict and ending direction.
+Do not treat it as optional.
+Do not reset pacing.
+Do not regress intimacy.
+Do not forget established attraction, injuries, secrets, emotional consequences, jealousy, vulnerability, sexual milestones or relationship fallout.
+
 PREVIOUS CHAPTERS:
 ${previousChapter}
 
