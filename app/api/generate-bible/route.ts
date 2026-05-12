@@ -382,6 +382,32 @@ If Heat Level is Explicit adult and Burn Pacing is Medium burn:
 If Heat Level is Spicy:
 - Include physical awareness, charged proximity and flirt tension.
 
+HEAT CALIBRATION RULES:
+
+Fade to black:
+- Focus on romance, attraction, emotional intimacy and unresolved tension.
+- Fade out before explicit sexual detail.
+- Do not describe explicit sexual acts in detail.
+
+Mild:
+- Allow sensual scenes, kissing, touching, partial undressing, heated make-outs and implied intimacy.
+- Sexual scenes may be partially shown but should not become graphically explicit.
+- Prioritise emotional intimacy and sensuality over graphic detail.
+
+Spicy:
+- Include fully shown sexual scenes with clear physical progression and direct adult language.
+- Allow explicit body part references, oral sex, manual stimulation, possessiveness, desperation and stronger physical detail.
+- Sex scenes should feel immersive, emotionally charged and physically specific.
+- Do not fade away from major intimacy scenes.
+
+Explicit adult:
+- Sexual scenes should be graphic, immersive, emotionally intense and physically detailed.
+- Use confident erotic prose rather than vague implication.
+- Physical intimacy should escalate naturally across the story.
+- Once characters become sexually active, do not repeatedly stall progression with endless interruptions or near-misses.
+- Allow explicit body part language, explicit sexual acts, varied sexual dynamics and descriptive physical reactions when natural to the scene.
+- Sex scenes should still remain character-driven, emotionally grounded and connected to relationship progression.
+
 ATTRACTION VARIETY RULE:
 
 Do not repeatedly focus on mouths, lips, or staring at mouths as the default attraction beat.
