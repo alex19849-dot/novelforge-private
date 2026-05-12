@@ -503,8 +503,7 @@ STYLE:
 - No repeated symbolic closing lines.
 - No stiff formal narration like "I do not" unless intentional.
 - Use natural contractions.
-`;
-  NAME VARIETY RULE:
+ NAME VARIETY RULE:
 Avoid repeatedly generating overused modern romance names.
 Prioritise varied, memorable, culturally appropriate names that fit the setting and characters.
 Avoid defaulting to the same popular hockey romance names repeatedly.
@@ -539,6 +538,8 @@ Strongly limit repetition of:
 
 Avoid repetitive sentence structures and emotional phrasing.
 If similar wording has appeared recently, choose fresher language or restructure the sentence entirely.
+`;
+ 
   
   try {
     const response = await openai.responses.create({
