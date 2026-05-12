@@ -8,6 +8,38 @@ function cleanOutput(text: string) {
   return text.replace(/[—–]/g, ",");
 }
 
+function getStoryVoicePack() {
+  const packs = [
+    {
+      name: "Sharp Commercial",
+      style:
+        "Fast-moving commercial romance voice with sharp banter, punchy dialogue, sexual tension and emotional momentum.",
+    },
+    {
+      name: "Emotional Contemporary",
+      style:
+        "Emotionally immersive romance voice with deeper introspection, slower emotional beats and stronger vulnerability.",
+    },
+    {
+      name: "Dark Intense",
+      style:
+        "Moodier romance voice with heavier tension, darker emotional atmosphere, sharper conflict and less humour.",
+    },
+    {
+      name: "Playful Sexy",
+      style:
+        "Flirty, sexy, playful romance voice with stronger chemistry, teasing dialogue and lighter emotional rhythm.",
+    },
+    {
+      name: "Lyrical Intimate",
+      style:
+        "More intimate and atmospheric prose with emotional detail, sensory immersion and softer pacing.",
+    },
+  ];
+
+  return packs[Math.floor(Math.random() * packs.length)];
+}
+
 function getMaxTokens(length: string) {
 if (length === "Novella") return 4200;
 if (length === "Short Novel") return 6200;
@@ -22,6 +54,7 @@ export async function POST(req: Request) {
   const instruction = body.instruction || "";
   const form = body.form || {};
   const storyState = body.storyState || {};
+  const voicePack = getStoryVoicePack();
 
   const maxTokens = getMaxTokens(form.length);
 
@@ -41,6 +74,12 @@ ${instruction}
 
 CURRENT STORY STATE:
 ${JSON.stringify(storyState, null, 2)}
+
+STORY STATE IS AUTHORITATIVE:
+The saved story state controls continuity, pacing, relationship progression, intimacy escalation and unresolved emotional consequences.
+Do not reset attraction, emotional tension, jealousy, conflict, sexual progression or vulnerability during rewrites.
+Do not accidentally soften explicit scenes into vague fade-to-black scenes during rewrites.
+Preserve established chemistry, tone and escalation level unless the rewrite instruction explicitly requests changes.
 
 STORY SETTINGS:
 Title: ${form.title}
@@ -209,6 +248,32 @@ If Heat Level is Explicit adult and Burn Pacing is Medium burn:
 - By Chapter 5 or 6, the first kiss should happen unless the story strongly earns delay.
 - By Chapter 7, sexual escalation should be obvious.
 
+HEAT CALIBRATION RULES:
+
+Fade to black:
+- Focus on romance, attraction, emotional intimacy and unresolved tension.
+- Fade out before explicit sexual detail.
+- Do not describe explicit sexual acts in detail.
+
+Mild:
+- Allow sensual scenes, kissing, touching, partial undressing, heated make-outs and implied intimacy.
+- Sexual scenes may be partially shown but should not become graphically explicit.
+- Prioritise emotional intimacy and sensuality over graphic detail.
+
+Spicy:
+- Include fully shown sexual scenes with clear physical progression and direct adult language.
+- Allow explicit body part references, oral sex, manual stimulation, possessiveness, desperation and stronger physical detail.
+- Sex scenes should feel immersive, emotionally charged and physically specific.
+- Do not fade away from major intimacy scenes.
+
+Explicit adult:
+- Sexual scenes should be graphic, immersive, emotionally intense and physically detailed.
+- Use confident erotic prose rather than vague implication.
+- Physical intimacy should escalate naturally across the story.
+- Once characters become sexually active, do not repeatedly stall progression with endless interruptions or near-misses.
+- Allow explicit body part language, explicit sexual acts, varied sexual dynamics and descriptive physical reactions when natural to the scene.
+- Sex scenes should still remain character-driven, emotionally grounded and connected to relationship progression.
+
 STYLE REWRITE:
 - Natural commercial romance prose.
 - Human, readable, emotionally grounded.
@@ -227,6 +292,42 @@ STYLE REWRITE:
 - Remove repeated symbolic closings.
 - Tighten waffle.
 - Keep the story moving.
+
+VOICE PACK:
+${voicePack.name}
+
+VOICE DIRECTION:
+${voicePack.style}
+
+Preserve the story's current voice if it is already working, but do not flatten every rewrite into the same bantery NovelForge rhythm.
+Each rewritten chapter must keep its own narrative identity.
+Avoid making all stories sound like the same pair of sarcastic hockey gremlins wearing different wigs.
+
+WORD REPETITION RULE:
+Avoid repeatedly using the same emotional filler words, adverbs or descriptive phrasing across scenes.
+
+Strongly limit repetition of:
+- emotionally
+- softly
+- quietly
+- gently
+- carefully
+- warmly
+- breathlessly
+- tension
+- heat
+- ache
+- pulse
+- shiver
+- silently
+
+Avoid repetitive sentence structures and emotional phrasing.
+If similar wording has appeared recently, choose fresher wording or restructure the sentence entirely.
+
+NAME VARIETY RULE:
+Do not introduce new side-character names that repeat overused romance-name patterns unless already established in the chapter.
+If the rewrite needs a new name, make it varied, memorable and fitting for the setting.
+
 ATTRACTION VARIETY RULE:
 
 Do not repeatedly focus on mouths, lips, or staring at mouths as the default attraction beat.
