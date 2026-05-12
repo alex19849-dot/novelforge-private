@@ -162,7 +162,37 @@ lastMajorBeat:
     },
     endingRunway: "far",
   };
+function getStoryVoicePack() {
+  const packs = [
+    {
+      name: "Sharp Commercial",
+      style:
+        "Fast-moving commercial romance voice with sharp banter, punchy dialogue, sexual tension and emotional momentum.",
+    },
+    {
+      name: "Emotional Contemporary",
+      style:
+        "Emotionally immersive romance voice with deeper introspection, slower emotional beats and stronger vulnerability.",
+    },
+    {
+      name: "Dark Intense",
+      style:
+        "Moodier romance voice with heavier tension, darker emotional atmosphere, sharper conflict and less humour.",
+    },
+    {
+      name: "Playful Sexy",
+      style:
+        "Flirty, sexy, playful romance voice with stronger chemistry, teasing dialogue and lighter emotional rhythm.",
+    },
+    {
+      name: "Lyrical Intimate",
+      style:
+        "More intimate and atmospheric prose with emotional detail, sensory immersion and softer pacing.",
+    },
+  ];
 
+  return packs[Math.floor(Math.random() * packs.length)];
+}
   const prompt = `
 You are NovelForge, a private award-focused romance fiction engine.
 
