@@ -37,7 +37,6 @@ function getRegionalTerms(locale: string) {
       forbiddenTerms: ["SUV", "parking lot", "apartment", "cell phone", "sneakers", "mom"],
     };
   }
-
   if (locale === "American English") {
     return {
       regionalLanguage: "American English",
@@ -68,6 +67,7 @@ export async function POST(req: Request) {
   const wordTarget = getWordTarget(body.length);
   const maxTokens = getMaxTokens(body.length);
   const regional = getRegionalTerms(body.locale);
+  const voicePack = getStoryVoicePack();
 
   const openingStoryState = {
     chapter: 1,
@@ -193,6 +193,16 @@ function getStoryVoicePack() {
 
   return packs[Math.floor(Math.random() * packs.length)];
 }
+  const bannedNames = [
+  "Asher",
+  "Mason",
+  "Rafe",
+  "Rafael",
+  "Eli",
+  "Luca",
+  "Nate",
+  "Noah",
+];
   const prompt = `
 You are NovelForge, a private award-focused romance fiction engine.
 
@@ -267,6 +277,22 @@ CHAPTER 1 PURPOSE:
 - Do not solve the emotional conflict.
 - Do not create couple-like comfort too soon.
 - End with a clean hook, reveal, conflict beat, sexual tension beat, or emotional turn.
+
+ENDING STRUCTURE RULE:
+Stories must naturally progress toward a final chapter and epilogue.
+Do not continue endlessly once the emotional and romantic arcs are complete.
+
+Final chapters should:
+- resolve the central emotional conflict
+- resolve the romantic arc
+- deliver payoff and consequence
+- reduce introduction of major new conflicts
+
+Epilogues should:
+- feel softer and emotionally rewarding
+- show relationship stability, future promise, healing, domestic intimacy, success or emotional closure
+- clearly feel like an ending
+- be labelled "Epilogue" automatically
 
 CAUSE AND CONSEQUENCE:
 Every scene must follow logically from the previous beat.
@@ -452,7 +478,42 @@ STYLE:
 - No stiff formal narration like "I do not" unless intentional.
 - Use natural contractions.
 `;
+  NAME VARIETY RULE:
+Avoid repeatedly generating overused modern romance names.
+Prioritise varied, memorable, culturally appropriate names that fit the setting and characters.
+Avoid defaulting to the same popular hockey romance names repeatedly.
+Recently overused names:
+${bannedNames.join(", ")}
+VOICE PACK:
+${voicePack.name}
 
+VOICE DIRECTION:
+${voicePack.style}
+
+Each story must develop its own narrative identity.
+Do not default to the same dialogue cadence, humour rhythm, banter style, sentence structure or emotional pacing as previous stories.
+Some stories should feel sharper, softer, darker, funnier, moodier, more introspective, more erotic or more emotionally vulnerable depending on the premise.
+ WORD REPETITION RULE:
+Avoid repeatedly using the same emotional filler words, adverbs or descriptive phrasing across scenes.
+
+Strongly limit repetition of:
+- emotionally
+- softly
+- quietly
+- gently
+- carefully
+- warmly
+- breathlessly
+- tension
+- heat
+- ache
+- pulse
+- shiver
+- silently
+
+Avoid repetitive sentence structures and emotional phrasing.
+If similar wording has appeared recently, choose fresher language or restructure the sentence entirely.
+  
   try {
     const response = await openai.responses.create({
       model: "gpt-5.5",
