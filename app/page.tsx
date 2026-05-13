@@ -155,6 +155,9 @@ export default function Home() {
   const [activeChapterIndex, setActiveChapterIndex] = useState(0);
   const [customRewrite, setCustomRewrite] = useState("");
 
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [continueLoading, setContinueLoading] = useState(false);
   const [rewriteLoading, setRewriteLoading] = useState(false);
