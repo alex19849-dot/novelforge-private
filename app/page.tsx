@@ -745,7 +745,7 @@ await saveCurrentStory({
 }}
   >
     {chapters.map((chapter, index) => (
-      <div key={index} className="w-full flex-shrink-0 p-6">
+     <div key={index} className="min-w-full flex-shrink-0 p-6">
        {!chapter.trim().startsWith("Chapter") && !chapter.trim().startsWith("Epilogue") && (
   <h2 className="mb-6 text-3xl font-bold text-rose-200">
     {storyState?.shouldWriteEpilogue && index === chapters.length - 1
