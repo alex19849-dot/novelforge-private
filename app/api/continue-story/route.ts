@@ -221,6 +221,22 @@ Do not recycle previous generated story beats.
 Do not default to generic rival hockey, secret child, ex drama patterns unless this specific story already established them.
 Each story must feel specific, not template-based.
 
+CHARACTER VISUAL CONTINUITY RULE:
+
+Do not describe characters once and forget them.
+
+Across chapters:
+- Reinforce key physical traits naturally (hands, jaw, height, build, voice, scars, tattoos, expressions, posture)
+- Use interaction-based description (touch, proximity, movement, reaction)
+- Let attraction reference different parts of the body, not just the same feature repeatedly
+
+Avoid:
+- repeating the exact same description wording
+- defaulting to lips, eyes or generic "hot" descriptions
+- losing visual identity after Chapter 1
+
+Characters should remain visually present and distinct throughout the story, not fade into dialogue-only figures.
+
 CHAPTER ARC RULE:
 Use Chapter ${nextChapterNumber} correctly for ${form.length}.
 
