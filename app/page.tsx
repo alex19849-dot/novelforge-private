@@ -703,13 +703,29 @@ await saveCurrentStory({
                 ))}
               </div>
 
-              <button onClick={() => copyChapter(activeChapter, activeChapterIndex)} className="small-button">
-                Copy Chapter
-              </button>
-            </div>
+            <div className="flex flex-wrap gap-2">
+  <button
+    onClick={() => document.getElementById("chapter-reader")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+    className="small-button"
+  >
+    Chapter Start
+  </button>
+
+  <button
+    onClick={() => document.getElementById("chapter-end")?.scrollIntoView({ behavior: "smooth", block: "end" })}
+    className="small-button"
+  >
+    Chapter End
+  </button>
+
+  <button onClick={() => copyChapter(activeChapter, activeChapterIndex)} className="small-button">
+    Copy Chapter
+  </button>
+</div>
 
             {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
 <div
+  id="chapter-reader"
   className="relative overflow-hidden cursor-copy rounded-3xl border border-white/10 bg-zinc-950/60"
   onClick={() => copyChapter(activeChapter, activeChapterIndex)}
   onTouchStart={handleTouchStart}
@@ -734,6 +750,7 @@ await saveCurrentStory({
 
         <div className="whitespace-pre-wrap leading-8 text-zinc-100">
           {chapter}
+          <div id="chapter-end" />
         </div>
       </div>
     ))}
