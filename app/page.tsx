@@ -538,13 +538,17 @@ await saveCurrentStory({
 });
   }
 
-  async function copyChapter(chapter: string, index: number) {
-    const plainText = `Chapter ${index + 1}\n\n${chapter}`.replace(/\r?\n/g, "\n");
-
-    await navigator.clipboard.writeText(plainText);
+ async function copyChapter(chapter: string, index: number) {
+  try {
+    await navigator.clipboard.writeText(chapter);
     setCopyMessage(`Chapter ${index + 1} copied as plain text.`);
     setTimeout(() => setCopyMessage(""), 2500);
+  } catch (error) {
+    console.error(error);
+    setCopyMessage("Could not copy chapter.");
+    setTimeout(() => setCopyMessage(""), 2500);
   }
+}
 
   if (loadingAuth) {
     return (
