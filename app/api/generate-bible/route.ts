@@ -278,6 +278,19 @@ CHAPTER 1 PURPOSE:
 - Do not create couple-like comfort too soon.
 - End with a clean hook, reveal, conflict beat, sexual tension beat, or emotional turn.
 
+CHARACTER VISUAL IMMERSION RULE:
+
+When introducing main characters:
+- Give a clear, specific visual impression within their first appearance
+- Combine physical traits with movement, posture, clothing, and presence
+- Avoid vague descriptions like "attractive" or "good looking"
+- Use concrete, memorable details (height, build, hair texture, skin tone, scars, tattoos, expressions, voice, mannerisms)
+- Show how they carry themselves, not just how they look
+- Anchor attraction to specific physical details, not generic statements
+
+Do not dump full description in one block.
+Layer details naturally through action, dialogue and interaction.
+
 ENDING STRUCTURE RULE:
 Stories must naturally progress toward a final chapter and epilogue.
 Do not continue endlessly once the emotional and romantic arcs are complete.
