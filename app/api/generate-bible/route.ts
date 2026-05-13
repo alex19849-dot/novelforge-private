@@ -213,6 +213,19 @@ Do not return notes.
 Do not return the story state.
 Do not return headings other than the chapter title and POV headings if required by the selected POV.
 
+CHAPTER TITLE RULE:
+
+- Do not duplicate the chapter label
+- If POV format is used, format like:
+  Chapter 1
+  NOAH
+
+- Do NOT write:
+  Chapter 1 Chapter 1 NOAH
+  or any repeated numbering
+
+- Only include the chapter number once
+
 STORY INPUTS:
 Title: ${body.title}
 Relationship Type: ${body.relationship}
