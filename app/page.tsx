@@ -747,11 +747,13 @@ await saveCurrentStory({
   >
     {chapters.map((chapter, index) => (
       <div key={index} className="w-full flex-shrink-0 p-6">
-        <h2 className="mb-6 text-3xl font-bold text-rose-200">
-          {storyState?.shouldWriteEpilogue && index === chapters.length - 1
-            ? "Epilogue"
-            : `Chapter ${index + 1}`}
-        </h2>
+       {!chapter.trim().startsWith("Chapter") && !chapter.trim().startsWith("Epilogue") && (
+  <h2 className="mb-6 text-3xl font-bold text-rose-200">
+    {storyState?.shouldWriteEpilogue && index === chapters.length - 1
+      ? "Epilogue"
+      : `Chapter ${index + 1}`}
+  </h2>
+)}
 
         <div className="whitespace-pre-wrap leading-8 text-zinc-100">
           {chapter}
