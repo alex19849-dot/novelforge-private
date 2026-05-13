@@ -740,10 +740,9 @@ await saveCurrentStory({
 >
   <div
     className="flex transition-transform duration-300 ease-out"
-    style={{
-      transform: `translateX(-${activeChapterIndex * 100}%)`,
-      width: `${chapters.length * 100}%`,
-    }}
+   style={{
+  transform: `translateX(-${activeChapterIndex * 100}%)`,
+}}
   >
     {chapters.map((chapter, index) => (
       <div key={index} className="w-full flex-shrink-0 p-6">
