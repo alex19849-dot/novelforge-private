@@ -726,6 +726,7 @@ await saveCurrentStory({
     Copy Chapter
   </button>
 </div>
+</div>
 
             {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
 <div
