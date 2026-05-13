@@ -153,6 +153,29 @@ export default function Home() {
 
   const [chapters, setChapters] = useState<string[]>([]);
   const [activeChapterIndex, setActiveChapterIndex] = useState(0);
+  function handleTouchStart(e: React.TouchEvent) {
+  setTouchEndX(null);
+  setTouchStartX(e.targetTouches[0].clientX);
+}
+
+function handleTouchMove(e: React.TouchEvent) {
+  setTouchEndX(e.targetTouches[0].clientX);
+}
+
+function handleTouchEnd() {
+  if (touchStartX === null || touchEndX === null) return;
+
+  const distance = touchStartX - touchEndX;
+  const minSwipeDistance = 50;
+
+  if (distance > minSwipeDistance && activeChapterIndex < chapters.length - 1) {
+    setActiveChapterIndex(activeChapterIndex + 1);
+  }
+
+  if (distance < -minSwipeDistance && activeChapterIndex > 0) {
+    setActiveChapterIndex(activeChapterIndex - 1);
+  }
+}
   const [customRewrite, setCustomRewrite] = useState("");
 
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
