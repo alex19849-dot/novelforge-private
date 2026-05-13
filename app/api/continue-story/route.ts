@@ -145,6 +145,21 @@ No outline.
 No commentary.
 No JSON.
 
+CHAPTER TITLE RULE:
+
+- Do not duplicate the chapter label
+- If POV format is used, format like:
+  Chapter ${nextChapterNumber}
+  NOAH
+
+- Do NOT write:
+  Chapter ${nextChapterNumber} Chapter ${nextChapterNumber} NOAH
+  or any repeated numbering
+
+- Only include the chapter number once
+- If writing the epilogue, title it exactly:
+  Epilogue
+
 STORY INPUTS:
 Title: ${form.title}
 Relationship Type: ${form.relationship}
