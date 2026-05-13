@@ -578,7 +578,7 @@ await saveCurrentStory({
         )}
 
         {user && (
-          <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        <div className="w-full max-w-4xl mx-auto">
             <section className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur-xl">
               <div className="mb-6">
                 <h2 className="text-4xl font-black">{getStoryTitle(form)}</h2>
