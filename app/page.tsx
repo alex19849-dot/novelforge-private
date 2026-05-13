@@ -709,10 +709,12 @@ await saveCurrentStory({
             </div>
 
             {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
-
-         <div
+<div
   className="relative overflow-hidden cursor-copy rounded-3xl border border-white/10 bg-zinc-950/60"
   onClick={() => copyChapter(activeChapter, activeChapterIndex)}
+  onTouchStart={handleTouchStart}
+  onTouchMove={handleTouchMove}
+  onTouchEnd={handleTouchEnd}
   title="Click chapter text to copy as plain text"
 >
   <div
