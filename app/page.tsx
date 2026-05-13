@@ -709,7 +709,11 @@ await saveCurrentStory({
                 </button>
 
                 <button onClick={continueStory} disabled={continueLoading} className="rounded-2xl bg-rose-500 py-3 font-bold hover:bg-rose-400 disabled:opacity-50">
-                  {continueLoading ? "Continuing..." : `Continue to Chapter ${chapters.length + 1}`}
+                  {continueLoading
+  ? "Continuing..."
+  : storyState?.shouldWriteEpilogue
+  ? "Write Epilogue"
+  : `Continue to Chapter ${chapters.length + 1}`}
                 </button>
               </div>
             </div>
