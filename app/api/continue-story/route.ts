@@ -109,31 +109,34 @@ intimacyAftermath:
     : incomingState.intimacyAftermath || "",
 
 endingPhase:
-  nextChapterNumber >= (incomingState.targetChapters || 10) - 1
-    ? "epilogue-ready"
-    : nextChapterNumber >= (incomingState.targetChapters || 10) - 3
+  nextChapterNumber >= (incomingState.targetChapters || 10)
+    ? "epilogue"
+    : nextChapterNumber >= (incomingState.targetChapters || 10) - 2
     ? "resolution-runway"
     : "middle-build",
 
 shouldWriteEpilogue:
-  nextChapterNumber >= (incomingState.targetChapters || 10) &&
+  nextChapterNumber >= (incomingState.targetChapters || 10) - 1 &&
   incomingState.epilogueWritten !== true,
 
 epilogueWritten:
-  nextChapterNumber >= (incomingState.targetChapters || 10) &&
-  incomingState.epilogueWritten !== true
+  nextChapterNumber >= (incomingState.targetChapters || 10)
     ? true
     : incomingState.epilogueWritten || false,
-lastMajorBeat:
-      incomingState.nextRequiredConsequence ||
-      "carry forward the previous chapter consequence",
-    nextRequiredConsequence:
-      "The next chapter must directly echo the emotional, physical and practical fallout from this chapter. Do not reset.",
-  };
 
   const prompt = `
 You are NovelForge, an award-focused romance continuation engine.
 
+EPILOGUE MODE:
+If shouldWriteEpilogue is true and epilogueWritten is false:
+- Write an Epilogue instead of a numbered chapter
+- Title it exactly: Epilogue
+- Do not label it as Chapter ${nextChapterNumber}
+- Shift tone to emotional payoff, softness, stability and resolution
+- Show relationship after conflict is resolved
+- Do not introduce new major problems
+
+Otherwise:
 Write Chapter ${nextChapterNumber} only.
 
 Return only polished chapter prose.
