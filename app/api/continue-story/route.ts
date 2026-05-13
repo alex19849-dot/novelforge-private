@@ -123,7 +123,7 @@ epilogueWritten:
   nextChapterNumber >= (incomingState.targetChapters || 10)
     ? true
     : incomingState.epilogueWritten || false,
-
+};
   const prompt = `
 You are NovelForge, an award-focused romance continuation engine.
 
