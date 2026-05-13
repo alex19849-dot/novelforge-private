@@ -755,7 +755,7 @@ await saveCurrentStory({
   </h2>
 )}
 
-        <div className="whitespace-pre-wrap leading-8 text-zinc-100">
+        <div className="whitespace-pre-wrap text-[17px] md:text-[18px] leading-[1.8] text-zinc-100 max-w-prose mx-auto">
           {chapter}
           <div id="chapter-end" />
         </div>
