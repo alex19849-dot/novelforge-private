@@ -684,14 +684,33 @@ await saveCurrentStory({
 
             {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
 
-            <article
-              onClick={() => copyChapter(activeChapter, activeChapterIndex)}
-              title="Click chapter text to copy as plain text"
-              className="cursor-copy rounded-3xl border border-white/10 bg-zinc-950/60 p-6 leading-8 text-zinc-100 whitespace-pre-wrap"
-            >
-              <h2 className="mb-6 text-3xl font-bold text-rose-200">Chapter {activeChapterIndex + 1}</h2>
-              {activeChapter}
-            </article>
+         <div
+  className="relative overflow-hidden cursor-copy rounded-3xl border border-white/10 bg-zinc-950/60"
+  onClick={() => copyChapter(activeChapter, activeChapterIndex)}
+  title="Click chapter text to copy as plain text"
+>
+  <div
+    className="flex transition-transform duration-300 ease-out"
+    style={{
+      transform: `translateX(-${activeChapterIndex * 100}%)`,
+      width: `${chapters.length * 100}%`,
+    }}
+  >
+    {chapters.map((chapter, index) => (
+      <div key={index} className="w-full flex-shrink-0 p-6">
+        <h2 className="mb-6 text-3xl font-bold text-rose-200">
+          {storyState?.shouldWriteEpilogue && index === chapters.length - 1
+            ? "Epilogue"
+            : `Chapter ${index + 1}`}
+        </h2>
+
+        <div className="whitespace-pre-wrap leading-8 text-zinc-100">
+          {chapter}
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
 
             <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
               <h3 className="mb-4 text-2xl font-bold text-rose-200">Rewrite Chapter</h3>
