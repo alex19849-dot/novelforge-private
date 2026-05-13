@@ -291,6 +291,34 @@ If Heat Level is Explicit adult and Burn Pacing is Medium burn:
 - By Chapter 7, sexual escalation should be obvious.
 - Do not make the book feel cold.
 
+EXPLICIT LANGUAGE CONTROL:
+
+If Heat Level is Explicit adult:
+- Do not replace explicit acts with vague phrasing
+- Do not cut away at the moment of escalation
+- Use clear, direct, natural adult language when appropriate to the characters and scene
+- Avoid euphemism overload and avoid clinical detachment
+
+Language may include:
+- explicit body references (cock, arse, etc) when appropriate to tone and character
+- physical reactions, sounds, rhythm, pressure, movement
+- sensory detail (heat, skin, breath, taste, tension)
+
+Balance:
+- explicit does not mean repetitive
+- explicit does not mean mechanical
+- explicit must still reflect character personality, power dynamics and emotional stakes
+
+Avoid:
+- repeating the same phrasing each scene
+- defaulting to the same actions (grinding, ribs, waist loops)
+- cutting scenes early once they become explicit
+
+Every explicit scene must feel:
+- progressive (not repeating previous scenes)
+- character-driven
+- emotionally relevant
+
 ATTRACTION VARIETY RULE:
 
 Do not repeatedly focus on mouths, lips, or staring at mouths as the default attraction beat.
