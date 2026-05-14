@@ -770,9 +770,9 @@ await saveCurrentStory({
    style={{
   transform: `translateX(-${activeChapterIndex * 100}%)`,
 }}
-  >
+  <div>
    {chapters.map((chapter, index) => (
-  <div
+  
     key={index}
     className="min-w-full flex-shrink-0 flex items-center justify-center"
   >
