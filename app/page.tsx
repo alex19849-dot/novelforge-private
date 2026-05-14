@@ -610,7 +610,7 @@ await saveCurrentStory({
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-5 py-8">
+      <section className="mx-auto max-w-7xl px-0 py-8 sm:px-5">
         {!user && (
           <div className="mx-auto mt-16 max-w-xl rounded-3xl border border-white/10 bg-white/10 p-8 shadow-2xl backdrop-blur-xl">
             <h2 className="text-3xl font-bold mb-3">Log in</h2>
