@@ -420,7 +420,11 @@ Each chapter must move further physically than the previous one.
 
 Failure to escalate is incorrect output.
 HEAT CALIBRATION RULES:
-
+- Explicit adult means the story must show sexual intimacy on page once the physical stage reaches 6 or higher.
+- Do not fade to black during major intimacy scenes.
+- Do not rely on vague phrases like "they lost themselves", "things went further", or "the rest was heat".
+- Use direct adult language naturally when the scene calls for it.
+- Physical intimacy must progress beyond kissing and grinding in a fast-burn novella.
 Fade to black:
 - Focus on romance, attraction, emotional intimacy and unresolved tension.
 - Fade out before explicit sexual detail.
