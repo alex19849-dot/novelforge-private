@@ -719,7 +719,10 @@ await saveCurrentStory({
                 {chapters.map((_, index) => (
                   <button
                     key={index}
-                    onClick={() => setActiveChapterIndex(index)}
+                   onClick={() => {
+  setActiveChapterIndex(index);
+  setPageIndex(0);
+}}
                     className={`rounded-full border px-4 py-2 text-sm ${
                       activeChapterIndex === index
                         ? "border-rose-400 bg-rose-500 text-white"
