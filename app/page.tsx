@@ -153,6 +153,7 @@ export default function Home() {
 
   const [chapters, setChapters] = useState<string[]>([]);
   const [activeChapterIndex, setActiveChapterIndex] = useState(0);
+  const [pageIndex, setPageIndex] = useState(0);
   function handleTouchStart(e: React.TouchEvent) {
   setTouchEndX(null);
   setTouchStartX(e.targetTouches[0].clientX);
