@@ -284,7 +284,22 @@ If Novella:
 - Chapters 9 to 10: resolution and emotional payoff.
 Do not keep delaying payoff.
 Do not keep adding new subplots.
+
+
 EROTIC ENGINE V2:
+
+EXPLICIT DELIVERY RULE:
+
+If Heat Level is Explicit adult and the required physical stage is 6 or higher:
+- The chapter must include explicit on-page sexual progression
+- Do not fade to black
+- Do not stop at kissing, grinding, or vague implication
+- Use direct adult language when natural to the characters and scene
+- The scene must move beyond previous intimacy beats
+- The scene must still reveal character, conflict, trust, power, fear, want, or emotional consequence
+
+Failure to deliver explicit on-page progression is incorrect output.
+
 Use the saved erotic state and nextRequiredEroticBeat.
 
 Current erotic progression stage:
@@ -311,6 +326,7 @@ Rules:
 - All sexual content must involve adults only.
 - Keep child scenes, family scenes and sexual scenes clearly separated in time, space and tone.
 - If a child has appeared recently in the chapter, do not transition immediately into explicit sexual content without a clear scene break, time shift, privacy and tonal reset.
+
 SPICE PACING LOCK:
 If Heat Level is Explicit adult and Burn Pacing is Fast burn:
 - By Chapter 3, there must be deliberate charged physical escalation or a deliberate almost-kiss.
@@ -429,24 +445,30 @@ Avoid repetitive patterns like:
 
 Use sparingly, not repeatedly.
 
-PHYSICAL STAGE TARGET:
-Current target physical stage for this chapter: ${targetPhysicalStage}.
+PHYSICAL STAGE ENFORCEMENT (CRITICAL):
+
+Current required physical stage for this chapter: ${targetPhysicalStage}
+
+You MUST reach this stage within this chapter.
+
+Do not delay escalation.
+Do not repeat earlier interaction patterns.
+Do not replace action with internal thoughts.
 
 Stage meanings:
-0 = awareness only
-1 = charged proximity
-2 = accidental contact lingers
-3 = deliberate touch
-4 = first kiss
-5 = heated make-out
-6 = sexual touching
-7 = oral / mutual release / explicit play
-8 = penetrative sex / full consummation
-9 = comfortable sexual intimacy
 
-This chapter must respect the target physical stage.
-If the story is behind target, catch up naturally.
-If the story is ahead, show consequence, fallout, awkwardness, denial or emotional complication.
+Stage 5 = heated make-out (hands roaming, bodies reacting clearly)
+Stage 6 = sexual touching (clear arousal, explicit contact, not vague)
+Stage 7 = oral / mutual release / explicit sexual interaction shown on page
+Stage 8 = penetrative sex shown on page, not implied
+
+If the target stage is 6 or higher:
+- The scene MUST be explicit
+- No fade to black
+- No stopping early
+- No cutting away
+
+If this stage is not reached, the output is incorrect.
 
 RELATIONSHIP STAGE TARGET:
 Current target relationship stage for this chapter: ${targetRelationshipStage}.
