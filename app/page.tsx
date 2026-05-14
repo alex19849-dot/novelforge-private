@@ -796,8 +796,8 @@ await saveCurrentStory({
     →
   </button>
 </div>
-  <div className="min-h-[72vh] md:min-h-[78vh] px-5 py-8 sm:px-8 md:px-12">
-    <div className="mx-auto w-full max-w-[720px]">
+  <div className="min-h-[72vh] md:min-h-[78vh] px-3 sm:px-8 md:px-12 py-8">
+    <div className="w-full max-w-[720px] mx-auto px-2 sm:px-0">
       <div className="whitespace-pre-wrap break-words text-left text-[16px] leading-[1.75] text-zinc-100 sm:text-[17px] md:text-[18px]">
         {pages[pageIndex] || ""}
       </div>
