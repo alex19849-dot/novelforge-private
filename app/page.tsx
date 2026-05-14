@@ -190,7 +190,20 @@ const [touchEndX, setTouchEndX] = useState<number | null>(null);
   const [copyMessage, setCopyMessage] = useState("");
 
   const activeChapter = chapters[activeChapterIndex] || "";
+function splitIntoPages(text: string) {
+  const words = text.split(" ");
+  const wordsPerPage = 180;
 
+  const pages = [];
+  for (let i = 0; i < words.length; i += wordsPerPage) {
+    pages.push(words.slice(i, i + wordsPerPage).join(" "));
+  }
+
+  return pages;
+}
+
+const pages = splitIntoPages(activeChapter);
+  
   const preparedForm = useMemo(() => {
     const next = { ...defaultForm, ...form };
 if (next.storyLocation === "New York, USA") {
