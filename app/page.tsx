@@ -769,7 +769,7 @@ await saveCurrentStory({
           <div className="whitespace-pre-wrap text-[16px] sm:text-[17px] md:text-[18px] leading-[1.7] text-zinc-100 text-left break-words">
             {pages[pageIndex]}
           </div>
-
+          </div>
           <p className="mt-6 text-center text-xs text-zinc-500">
             Page {pageIndex + 1} of {pages.length}
           </p>
