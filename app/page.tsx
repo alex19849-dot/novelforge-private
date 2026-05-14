@@ -765,32 +765,33 @@ await saveCurrentStory({
   onTouchEnd={handleTouchEnd}
   title="Click chapter text to copy as plain text"
 >
-  <div
-    className="flex transition-transform duration-300 ease-out"
-   style={{
-  transform: `translateX(-${activeChapterIndex * 100}%)`,
-}}
-  <div>
-   {chapters.map((chapter, index) => (
-  
-    key={index}
-    className="min-w-full flex-shrink-0 flex items-center justify-center"
-  >
-    <div className="h-[calc(100vh-140px)] flex items-center justify-center w-full">
-      <div className="w-full max-w-[680px] px-6">
-        <div className="whitespace-pre-wrap text-[16px] sm:text-[17px] md:text-[18px] leading-[1.7] text-zinc-100 text-left break-words">
-          {pages[pageIndex]}
+ <div
+  className="flex transition-transform duration-300 ease-out"
+  style={{
+    transform: `translateX(-${activeChapterIndex * 100}%)`,
+  }}
+>
+  {chapters.map((chapter, index) => (
+    <div
+      key={index}
+      className="min-w-full flex-shrink-0 flex items-center justify-center"
+    >
+      <div className="h-[calc(100vh-140px)] flex items-center justify-center w-full">
+        <div className="w-full max-w-[680px] px-6">
+          <div className="whitespace-pre-wrap text-[16px] sm:text-[17px] md:text-[18px] leading-[1.7] text-zinc-100 text-left break-words">
+            {pages[pageIndex]}
+          </div>
+
+          <p className="mt-6 text-center text-xs text-zinc-500">
+            Page {pageIndex + 1} of {pages.length}
+          </p>
+
+          <div id="chapter-end" />
         </div>
-
-        <p className="mt-6 text-center text-xs text-zinc-500">
-          Page {pageIndex + 1} of {pages.length}
-        </p>
-
-        <div id="chapter-end" />
       </div>
     </div>
-  </div>
-))}
+  ))}
+</div>
             <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
               <h3 className="mb-4 text-2xl font-bold text-rose-200">Rewrite Chapter</h3>
 
