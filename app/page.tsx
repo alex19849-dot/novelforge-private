@@ -758,29 +758,27 @@ await saveCurrentStory({
       <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>
     )}
 
-    <div
-      id="chapter-reader"
-      className="relative overflow-hidden cursor-copy rounded-3xl border border-white/10 bg-zinc-950/60"
-      onClick={() => copyChapter(activeChapter, activeChapterIndex)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      title="Click chapter text to copy as plain text"
-    >
-      <div className="h-[calc(100vh-140px)] flex items-center justify-center w-full">
-        <div className="w-full max-w-[680px] px-6">
-          <div className="whitespace-pre-wrap text-[16px] sm:text-[17px] md:text-[18px] leading-[1.7] text-zinc-100 text-left break-words">
-            {pages[pageIndex] || ""}
-          </div>
-
-          <p className="mt-6 text-center text-xs text-zinc-500">
-            Page {pageIndex + 1} of {pages.length}
-          </p>
-
-          <div id="chapter-end" />
-        </div>
+   <div
+  id="chapter-reader"
+  className="rounded-3xl border border-white/10 bg-zinc-950/70"
+  onTouchStart={handleTouchStart}
+  onTouchMove={handleTouchMove}
+  onTouchEnd={handleTouchEnd}
+>
+  <div className="min-h-[72vh] md:min-h-[78vh] px-5 py-8 sm:px-8 md:px-12">
+    <div className="mx-auto w-full max-w-[720px]">
+      <div className="whitespace-pre-wrap break-words text-left text-[16px] leading-[1.75] text-zinc-100 sm:text-[17px] md:text-[18px]">
+        {pages[pageIndex] || ""}
       </div>
+
+      <p className="mt-8 text-center text-xs text-zinc-500">
+        Page {pageIndex + 1} of {pages.length}
+      </p>
+
+      <div id="chapter-end" />
     </div>
+  </div>
+</div>
 
     <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
       <h3 className="mb-4 text-2xl font-bold text-rose-200">
