@@ -700,95 +700,124 @@ await saveCurrentStory({
           </div>
         )}
 
-        {user && chapters.length > 0 && (
-          <section className="mx-auto mt-8 max-w-5xl rounded-3xl border border-white/10 bg-black/30 p-6 shadow-2xl">
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex flex-wrap gap-2">
-              <select
-  value={activeChapterIndex}
-  onChange={(e) => {
-    setActiveChapterIndex(Number(e.target.value));
-    setPageIndex(0);
-  }}
-  className="rounded-xl bg-zinc-900 px-4 py-2 text-sm text-white"
->
-  {chapters.map((_, index) => (
-    <option key={index} value={index}>
-      Chapter {index + 1}
-    </option>
-  ))}
-</select>
-            <div className="flex flex-wrap gap-2">
-  <button
-    onClick={() => document.getElementById("chapter-reader")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-    className="small-button"
-  >
-    Chapter Start
-  </button>
-
-  <button
-    onClick={() => document.getElementById("chapter-end")?.scrollIntoView({ behavior: "smooth", block: "end" })}
-    className="small-button"
-  >
-    Chapter End
-  </button>
-
-  <button onClick={() => copyChapter(activeChapter, activeChapterIndex)} className="small-button">
-    Copy Chapter
-  </button>
-</div>
-
-
-            {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
-<div
-  id="chapter-reader"
-  className="relative overflow-hidden cursor-copy rounded-3xl border border-white/10 bg-zinc-950/60"
-  onClick={() => copyChapter(activeChapter, activeChapterIndex)}
-  onTouchStart={handleTouchStart}
-  onTouchMove={handleTouchMove}
-  onTouchEnd={handleTouchEnd}
-  title="Click chapter text to copy as plain text"
->
-  <div className="h-[calc(100vh-140px)] flex items-center justify-center w-full">
-    <div className="w-full max-w-[680px] px-6">
-      <div className="whitespace-pre-wrap text-[16px] sm:text-[17px] md:text-[18px] leading-[1.7] text-zinc-100 text-left break-words">
-        {pages[pageIndex] || ""}
+       {user && chapters.length > 0 && (
+  <section className="mx-auto mt-8 max-w-5xl rounded-3xl border border-white/10 bg-black/30 p-6 shadow-2xl">
+    <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={activeChapterIndex}
+          onChange={(e) => {
+            setActiveChapterIndex(Number(e.target.value));
+            setPageIndex(0);
+          }}
+          className="rounded-xl bg-zinc-900 px-4 py-2 text-sm text-white"
+        >
+          {chapters.map((_, index) => (
+            <option key={index} value={index}>
+              Chapter {index + 1}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <p className="mt-6 text-center text-xs text-zinc-500">
-        Page {pageIndex + 1} of {pages.length}
-      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() =>
+            document.getElementById("chapter-reader")?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            })
+          }
+          className="small-button"
+        >
+          Chapter Start
+        </button>
 
-      <div id="chapter-end" />
+        <button
+          onClick={() =>
+            document.getElementById("chapter-end")?.scrollIntoView({
+              behavior: "smooth",
+              block: "end",
+            })
+          }
+          className="small-button"
+        >
+          Chapter End
+        </button>
+
+        <button
+          onClick={() => copyChapter(activeChapter, activeChapterIndex)}
+          className="small-button"
+        >
+          Copy Chapter
+        </button>
+      </div>
     </div>
-  </div>
-</div>
-            <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-              <h3 className="mb-4 text-2xl font-bold text-rose-200">Rewrite Chapter</h3>
 
-              <textarea
-                value={customRewrite}
-                onChange={(event) => setCustomRewrite(event.target.value)}
-                placeholder="Example: tighten this, fix flow, make the ex drama more grounded, add more heat, make the dialogue more natural..."
-                className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
-              />
+    {copyMessage && (
+      <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>
+    )}
 
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <button onClick={rewriteChapter} disabled={rewriteLoading || !customRewrite.trim()} className="rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700 disabled:opacity-50">
-                  {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
-                </button>
+    <div
+      id="chapter-reader"
+      className="relative overflow-hidden cursor-copy rounded-3xl border border-white/10 bg-zinc-950/60"
+      onClick={() => copyChapter(activeChapter, activeChapterIndex)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      title="Click chapter text to copy as plain text"
+    >
+      <div className="h-[calc(100vh-140px)] flex items-center justify-center w-full">
+        <div className="w-full max-w-[680px] px-6">
+          <div className="whitespace-pre-wrap text-[16px] sm:text-[17px] md:text-[18px] leading-[1.7] text-zinc-100 text-left break-words">
+            {pages[pageIndex] || ""}
+          </div>
 
-                <button onClick={continueStory} disabled={continueLoading} className="rounded-2xl bg-rose-500 py-3 font-bold hover:bg-rose-400 disabled:opacity-50">
-                  {continueLoading
-  ? "Continuing..."
-  : storyState?.shouldWriteEpilogue
-  ? "Write Epilogue"
-  : `Continue to Chapter ${chapters.length + 1}`}
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
+          <p className="mt-6 text-center text-xs text-zinc-500">
+            Page {pageIndex + 1} of {pages.length}
+          </p>
+
+          <div id="chapter-end" />
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
+      <h3 className="mb-4 text-2xl font-bold text-rose-200">
+        Rewrite Chapter
+      </h3>
+
+      <textarea
+        value={customRewrite}
+        onChange={(event) => setCustomRewrite(event.target.value)}
+        placeholder="Example: tighten this, fix flow, make the ex drama more grounded, add more heat, make the dialogue more natural..."
+        className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
+      />
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <button
+          onClick={rewriteChapter}
+          disabled={rewriteLoading || !customRewrite.trim()}
+          className="rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700 disabled:opacity-50"
+        >
+          {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
+        </button>
+
+        <button
+          onClick={continueStory}
+          disabled={continueLoading}
+          className="rounded-2xl bg-rose-500 py-3 font-bold hover:bg-rose-400 disabled:opacity-50"
+        >
+          {continueLoading
+            ? "Continuing..."
+            : storyState?.shouldWriteEpilogue
+            ? "Write Epilogue"
+            : `Continue to Chapter ${chapters.length + 1}`}
+        </button>
+      </div>
+    </div>
+  </section>
+)}
       </section>
 
       <style jsx>{`
