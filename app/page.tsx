@@ -584,7 +584,7 @@ await saveCurrentStory({
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-stone-950 to-rose-950 text-white">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-zinc-950/90 backdrop-blur-xl">
+     <header className="border-b border-white/10 bg-zinc-950/90 backdrop-blur-xl">
         <div className="mx-auto max-w-7xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black tracking-tight">NovelForge</h1>
