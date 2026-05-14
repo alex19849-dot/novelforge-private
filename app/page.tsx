@@ -717,18 +717,6 @@ await saveCurrentStory({
       Chapter {index + 1}
     </option>
   ))}
-</select>
-
-                    className={`rounded-full border px-4 py-2 text-sm ${
-                      activeChapterIndex === index
-                        ? "border-rose-400 bg-rose-500 text-white"
-                        : "border-white/10 bg-zinc-950/70 text-zinc-300 hover:border-rose-400"
-                    }`}
-                  >
-                    Chapter {index + 1}
-                  </button>
-                ))}
-              </div>
 
             <div className="flex flex-wrap gap-2">
   <button
