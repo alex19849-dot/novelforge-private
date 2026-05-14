@@ -760,7 +760,7 @@ await saveCurrentStory({
 
    <div
   id="chapter-reader"
-  className="rounded-3xl border border-white/10 bg-zinc-950/70"
+ className="relative rounded-3xl border border-white/10 bg-zinc-950/70"
   onTouchStart={handleTouchStart}
   onTouchMove={handleTouchMove}
   onTouchEnd={handleTouchEnd}
