@@ -19,27 +19,49 @@ function nextPhysicalStage(current: number, form: any, chapter: number) {
   const heat = form.heat || "";
   const burn = form.burnPacing || "";
 
-  if (heat !== "Explicit adult") return Math.min(current + 1, 4);
+  if (heat === "Fade to black") return Math.min(current + 1, 3);
 
-  if (burn === "Fast burn") {
-    if (chapter >= 6) return Math.max(current, 6);
-    if (chapter >= 5) return Math.max(current, 5);
-    if (chapter >= 4) return Math.max(current, 4);
-    if (chapter >= 3) return Math.max(current, 3);
-    return Math.max(current, 2);
+  if (heat === "Mild") {
+    if (chapter <= 2) return 1;
+    if (chapter <= 4) return 2;
+    return 3;
   }
 
-  if (burn === "Medium burn") {
-    if (chapter >= 7) return Math.max(current, 6);
-    if (chapter >= 6) return Math.max(current, 5);
-    if (chapter >= 5) return Math.max(current, 4);
-    if (chapter >= 4) return Math.max(current, 3);
-    return Math.max(current, 2);
+  if (heat === "Spicy") {
+    if (chapter <= 2) return 2;
+    if (chapter === 3) return 3;
+    if (chapter === 4) return 4;
+    if (chapter === 5) return 5;
+    return 6;
+  }
+
+  if (heat === "Explicit adult" && burn === "Fast burn") {
+    if (chapter <= 2) return 2;
+    if (chapter === 3) return 4;
+    if (chapter === 4) return 5;
+    if (chapter === 5) return 6;
+    return 7;
+  }
+
+  if (heat === "Explicit adult" && burn === "Medium burn") {
+    if (chapter <= 2) return 2;
+    if (chapter === 3) return 3;
+    if (chapter === 4) return 4;
+    if (chapter === 5) return 5;
+    if (chapter === 6) return 6;
+    return 7;
+  }
+
+  if (heat === "Explicit adult") {
+    if (chapter <= 3) return 2;
+    if (chapter === 4) return 3;
+    if (chapter === 5) return 4;
+    if (chapter === 6) return 5;
+    return 6;
   }
 
   return Math.min(current + 1, 4);
 }
-
 function nextRelationshipStage(current: number, chapter: number) {
   if (chapter <= 2) return Math.min(current + 1, 2);
   if (chapter <= 4) return Math.min(current + 1, 4);
