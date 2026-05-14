@@ -769,7 +769,7 @@ await saveCurrentStory({
 )}
 
         <div className="whitespace-pre-wrap w-full max-w-[680px] mx-auto text-[16px] sm:text-[17px] md:text-[18px] leading-[1.7] text-zinc-100 text-left break-words">
-          {chapter}
+          {pages[pageIndex]}
           <div id="chapter-end" />
         </div>
       </div>
