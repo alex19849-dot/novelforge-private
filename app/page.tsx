@@ -704,13 +704,21 @@ await saveCurrentStory({
           <section className="mx-auto mt-8 max-w-5xl rounded-3xl border border-white/10 bg-black/30 p-6 shadow-2xl">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap gap-2">
-                {chapters.map((_, index) => (
-                  <button
-                    key={index}
-                   onClick={() => {
-  setActiveChapterIndex(index);
-  setPageIndex(0);
-}}
+              <select
+  value={activeChapterIndex}
+  onChange={(e) => {
+    setActiveChapterIndex(Number(e.target.value));
+    setPageIndex(0);
+  }}
+  className="rounded-xl bg-zinc-900 px-4 py-2 text-sm text-white"
+>
+  {chapters.map((_, index) => (
+    <option key={index} value={index}>
+      Chapter {index + 1}
+    </option>
+  ))}
+</select>
+
                     className={`rounded-full border px-4 py-2 text-sm ${
                       activeChapterIndex === index
                         ? "border-rose-400 bg-rose-500 text-white"
