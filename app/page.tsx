@@ -172,18 +172,22 @@ function handleTouchEnd() {
   if (distance > minSwipeDistance) {
     if (pageIndex < pages.length - 1) {
       setPageIndex(pageIndex + 1);
+      document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
     } else if (activeChapterIndex < chapters.length - 1) {
       setActiveChapterIndex(activeChapterIndex + 1);
       setPageIndex(0);
+      document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
     }
   }
 
   if (distance < -minSwipeDistance) {
     if (pageIndex > 0) {
       setPageIndex(pageIndex - 1);
+      document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
     } else if (activeChapterIndex > 0) {
       setActiveChapterIndex(activeChapterIndex - 1);
       setPageIndex(0);
+      document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
     }
   }
 }
