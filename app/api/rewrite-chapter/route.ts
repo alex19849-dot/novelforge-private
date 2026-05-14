@@ -68,7 +68,17 @@ No notes.
 No bullet points.
 No commentary.
 No JSON.
+CRITICAL REWRITE RULE:
 
+The rewritten chapter MUST respect the current story stage and heat level.
+
+If Heat Level is Explicit adult:
+- Do not soften or reduce physical intimacy
+- Do not fade to black if the scene is already explicit
+- If the chapter is behind the required physical stage, escalate it appropriately
+- Do not revert to earlier stages (e.g. turning explicit scenes back into kissing or tension)
+
+If the rewrite does not match the required physical escalation, it is incorrect.
 USER REWRITE INSTRUCTION:
 ${instruction}
 
