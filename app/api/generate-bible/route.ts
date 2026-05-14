@@ -404,19 +404,21 @@ For Chapter 1:
 Do not stack kiss + full escalation in Chapter 1, but do not keep it passive.
 SPICE PACING LOCK:
 If Heat Level is Explicit adult and Burn Pacing is Fast burn:
-- Chapter 1 must include obvious sexual tension.
-- The attraction should feel intrusive, physical and inconvenient.
-- Do not delay all heat into vague internal thoughts.
-- Do not turn heat into emotional softness.
-- Conflict and lust must coexist.
 
-If Heat Level is Explicit adult and Burn Pacing is Medium burn:
-- Chapter 1 must include noticeable sexual tension.
-- Do not make the chapter feel cold.
+- Chapter 1 must include clear physical awareness and at least one deliberate or lingering contact
+- Chapter 2 must escalate physical interaction beyond the previous chapter (more deliberate touch, tension that is acted on, not just thought about)
+- Chapter 3 MUST include a kiss or clearly interrupted kiss
+- Chapter 4 MUST include a kiss if it has not already happened
 
-If Heat Level is Spicy:
-- Include physical awareness, charged proximity and flirt tension.
+Do not delay escalation with repeated tension, staring, or internal thoughts.
 
+Do not repeat:
+- almost-kiss loops
+- touch → stop → repeat cycles
+
+Each chapter must move further physically than the previous one.
+
+Failure to escalate is incorrect output.
 HEAT CALIBRATION RULES:
 
 Fade to black:
