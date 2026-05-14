@@ -169,12 +169,22 @@ function handleTouchEnd() {
   const distance = touchStartX - touchEndX;
   const minSwipeDistance = 50;
 
-  if (distance > minSwipeDistance && activeChapterIndex < chapters.length - 1) {
-    setActiveChapterIndex(activeChapterIndex + 1);
+  if (distance > minSwipeDistance) {
+    if (pageIndex < pages.length - 1) {
+      setPageIndex(pageIndex + 1);
+    } else if (activeChapterIndex < chapters.length - 1) {
+      setActiveChapterIndex(activeChapterIndex + 1);
+      setPageIndex(0);
+    }
   }
 
-  if (distance < -minSwipeDistance && activeChapterIndex > 0) {
-    setActiveChapterIndex(activeChapterIndex - 1);
+  if (distance < -minSwipeDistance) {
+    if (pageIndex > 0) {
+      setPageIndex(pageIndex - 1);
+    } else if (activeChapterIndex > 0) {
+      setActiveChapterIndex(activeChapterIndex - 1);
+      setPageIndex(0);
+    }
   }
 }
   const [customRewrite, setCustomRewrite] = useState("");
