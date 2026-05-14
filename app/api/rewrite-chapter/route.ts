@@ -245,6 +245,18 @@ Do not make explicit content emotionally cosy unless the relationship has earned
 Keep consent clear.
 All characters must be 18+.
 
+PHYSICAL STAGE ENFORCEMENT:
+
+If Heat Level is Explicit adult and the saved physical stage is 6 or higher:
+- The rewritten chapter must preserve or increase explicit physical progression
+- Do not reduce explicit scenes into vague sensuality
+- Do not replace on-page intimacy with implication
+- Do not cut away from major intimacy unless the user specifically requests fade to black
+
+If the chapter is behind the saved physical stage:
+- Correct it during the rewrite
+- Escalate naturally but clearly
+
 SPICE PACING LOCK:
 If Heat Level is Explicit adult and Burn Pacing is Fast burn:
 - By Chapter 3, there should be deliberate charged physical escalation or a deliberate almost-kiss.
