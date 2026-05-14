@@ -701,7 +701,7 @@ await saveCurrentStory({
         )}
 
        {user && chapters.length > 0 && (
-  <section className="mx-auto mt-8 max-w-5xl rounded-3xl border border-white/10 bg-black/30 p-6 shadow-2xl">
+  <section className="mt-8 w-full max-w-none md:max-w-5xl mx-auto rounded-3xl border border-white/10 bg-black/30 p-3 sm:p-6 shadow-2xl">
     <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
       <div className="flex flex-wrap gap-2">
         <select
