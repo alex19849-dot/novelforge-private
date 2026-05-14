@@ -631,7 +631,7 @@ await saveCurrentStory({
           </div>
         )}
 
-        {user && (
+        {user && chapters.length === 0 && (
         <div className="w-full max-w-4xl mx-auto">
             <section className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur-xl">
               <div className="mb-6">
