@@ -138,8 +138,7 @@ endingPhase:
     : "middle-build",
 
 shouldWriteEpilogue:
-  nextChapterNumber >= (incomingState.targetChapters || 10) - 1 &&
-  incomingState.epilogueWritten !== true,
+  nextChapterNumber === (incomingState.targetChapters || 10) + 1,
 
 epilogueWritten:
   nextChapterNumber >= (incomingState.targetChapters || 10)
