@@ -765,6 +765,37 @@ await saveCurrentStory({
   onTouchMove={handleTouchMove}
   onTouchEnd={handleTouchEnd}
 >
+     <div className="absolute inset-y-0 left-0 flex items-center">
+  <button
+    onClick={() => {
+      if (pageIndex > 0) {
+        setPageIndex(pageIndex - 1);
+      } else if (activeChapterIndex > 0) {
+        setActiveChapterIndex(activeChapterIndex - 1);
+        setPageIndex(0);
+      }
+    }}
+    className="ml-2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20"
+  >
+    ←
+  </button>
+</div>
+
+<div className="absolute inset-y-0 right-0 flex items-center">
+  <button
+    onClick={() => {
+      if (pageIndex < pages.length - 1) {
+        setPageIndex(pageIndex + 1);
+      } else if (activeChapterIndex < chapters.length - 1) {
+        setActiveChapterIndex(activeChapterIndex + 1);
+        setPageIndex(0);
+      }
+    }}
+    className="mr-2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20"
+  >
+    →
+  </button>
+</div>
   <div className="min-h-[72vh] md:min-h-[78vh] px-5 py-8 sm:px-8 md:px-12">
     <div className="mx-auto w-full max-w-[720px]">
       <div className="whitespace-pre-wrap break-words text-left text-[16px] leading-[1.75] text-zinc-100 sm:text-[17px] md:text-[18px]">
