@@ -717,7 +717,7 @@ await saveCurrentStory({
       Chapter {index + 1}
     </option>
   ))}
-
+</select>
             <div className="flex flex-wrap gap-2">
   <button
     onClick={() => document.getElementById("chapter-reader")?.scrollIntoView({ behavior: "smooth", block: "start" })}
