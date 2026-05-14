@@ -696,19 +696,7 @@ await saveCurrentStory({
               </div>
             </section>
 
-            <aside className="h-fit rounded-3xl border border-white/10 bg-white/10 p-5 shadow-2xl backdrop-blur-xl lg:sticky lg:top-24">
-              <h2 className="mb-4 text-xl font-bold">Live Preview</h2>
-
-              <div className="rounded-2xl border border-white/10 bg-zinc-950/50 p-4 text-sm text-zinc-200">
-                {preview}
-              </div>
-
-              <div className="mt-5 grid gap-3 text-sm">
-                <PreviewRow label="Main trope" value={preparedForm.tropes} />
-                <PreviewRow label="Subgenre detail" value={preparedForm.subgenreDetail} />
-                <PreviewRow label="Chapters" value={`${chapters.length}`} />
-              </div>
-            </aside>
+           
           </div>
         )}
 
