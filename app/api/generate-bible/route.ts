@@ -387,12 +387,21 @@ Stage 8 = penetrative sex / full consummation
 Stage 9 = comfortable sexual intimacy
 
 For Chapter 1:
-- Fade to black or Mild: Stage 0 to 1.
-- Spicy: Stage 1 to 2.
-- Explicit adult: Stage 1 to 2.
-- If Fast burn + Explicit adult: Stage 2 is allowed, but no full sexual scene in Chapter 1 unless the user explicitly requested it.
-- Do not stack first kiss, sexual touching and emotional confession in Chapter 1.
 
+- Fade to black or Mild: Stage 0 to 1
+- Spicy: Stage 1 to 2
+
+- Explicit adult:
+  - Stage 2 MUST be reached (charged proximity and lingering contact)
+  - Attraction must feel physical, intrusive and noticeable
+  - Do not keep attraction purely internal
+
+- Explicit adult + Fast burn:
+  - Stage 3 is allowed (deliberate touch)
+  - Do not stall with only looks or thoughts
+  - Include at least one clear physical interaction (touch, grab, contact, or deliberate proximity)
+
+Do not stack kiss + full escalation in Chapter 1, but do not keep it passive.
 SPICE PACING LOCK:
 If Heat Level is Explicit adult and Burn Pacing is Fast burn:
 - Chapter 1 must include obvious sexual tension.
