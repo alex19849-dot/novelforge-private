@@ -564,6 +564,112 @@ STYLE:
 - No purple prose.
 - No stiff formal narration like "I do not" unless intentional.
 - Use natural contractions.
+
+GLOBAL LENGTH CONTROL:
+
+Target total story length:
+
+- Novella: 20,000 to 40,000 words MAX (including epilogue)
+- Short Novel: 40,000 to 70,000 words MAX
+- Long Novel: 70,000 to 110,000 words MAX
+
+The story MUST remain within this total range.
+
+If the story is approaching the upper limit:
+- Begin accelerating resolution
+- Reduce filler scenes
+- Increase plot progression and payoff
+
+Do not continue adding new chapters once the story has reached its intended length.
+
+ESCALATION LOOP PREVENTION:
+
+Do not repeat the same escalation pattern.
+
+The following loop is forbidden:
+- tension → physical contact → partial release → reset → repeat
+
+If a similar interaction has already occurred:
+- the next interaction MUST escalate beyond it
+- the emotional or power dynamic MUST change
+
+If escalation does not change, the output is incorrect.
+
+SCENE VARIETY ENFORCEMENT:
+
+Each explicit or intimate scene must be structurally different.
+
+You MUST vary:
+- physical positioning
+- pacing (slow, rushed, aggressive, controlled)
+- emotional tone (anger, need, jealousy, vulnerability, control)
+- location and context
+- who initiates and who leads
+
+Do not repeat:
+- identical body positioning
+- identical scene rhythm
+- identical initiation pattern
+
+If two scenes feel similar in structure, the output is incorrect.
+
+SCENE PROGRESSION STRUCTURE:
+
+Each major intimate interaction must follow a progression:
+
+1. First release → messy, impulsive, uncontrolled
+2. Second → more controlled, testing boundaries
+3. Third → clear power shift between characters
+4. Fourth → confrontation mixed with intimacy (emotion + conflict)
+5. Fifth → full loss of control, emotional and physical consequences
+
+Do not repeat the same type of scene twice.
+
+Each stage must feel different in:
+- control
+- tone
+- intention
+
+CONSEQUENCE RULE:
+
+Every intimate scene must change something:
+
+- relationship dynamic
+- emotional state
+- power balance
+- trust or conflict level
+
+If a scene ends and nothing changes, it is incorrect.
+
+Do not return to neutral after intimacy.
+
+INTENSITY REQUIREMENT:
+
+Do not default to safe, repetitive or softened interactions.
+
+Avoid:
+- vague descriptions
+- repeated soft escalation
+- emotional neutrality
+
+Scenes must feel:
+- specific to the characters
+- varied in tone
+- driven by tension and consequence
+
+Do not reduce intensity once escalation has begun.
+
+PROGRESSION LOCK:
+
+Once the story reaches a higher level of intimacy:
+- it must not revert to earlier stages
+
+Do not return to:
+- only tension
+- only minor contact
+- early-stage interactions
+
+Progression must move forward or deepen, never reset.
 `;
 
   try {
