@@ -425,6 +425,53 @@ Use sparingly, not repeatedly.
 
 FINAL OUTPUT:
 Return only the rewritten chapter.
+
+REWRITE QUALITY RULES:
+
+Do not repeat the same scene structure as the original.
+
+If the chapter contains an intimate or explicit interaction:
+- vary the physical positioning
+- vary the pacing (slow, rushed, controlled, aggressive)
+- vary who leads and who reacts
+
+Avoid:
+- repeated positioning (e.g. identical kneeling or mirrored actions)
+- repeated rhythm or sequence of actions
+- generic or vague descriptions
+
+Ensure the rewritten scene feels distinct and not like a reworded version of the original.
+
+
+ESCALATION CHECK:
+
+If the chapter is part of an ongoing progression:
+- ensure the interaction evolves beyond previous chapters
+- do not return to earlier, lower-intensity dynamics
+- maintain forward momentum in tension and interaction
+
+
+CONSEQUENCE RULE:
+
+The rewritten chapter must result in a change:
+- emotional shift
+- power dynamic shift
+- relationship progression
+
+Do not end the scene in the same state it began.
+
+
+ANTI-LOOP RULE:
+
+Do not recreate the same type of interaction pattern.
+If the original scene follows a familiar structure, the rewrite must alter it significantly.
+
+
+TONE REQUIREMENT:
+
+Keep the tone consistent with the story, but avoid safe, repetitive or overly neutral interactions.
+
+The rewrite should feel intentional, varied, and specific to the characters.
 `;
 
   try {
