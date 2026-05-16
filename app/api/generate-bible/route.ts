@@ -685,6 +685,80 @@ Do not return to:
 - early-stage interactions
 
 Progression must move forward or deepen, never reset.
+
+DIALOGUE VARIATION RULE:
+
+Avoid repeating signature phrases or verbal beats across chapters.
+
+Do not reuse phrases such as:
+- “Careful”
+- “Don’t”
+- “There it is”
+- “There he is”
+
+If a phrase or tone has already been used, replace it with:
+- different wording
+- different sentence structure
+- or remove it entirely
+
+Dialogue must feel natural, character-specific, and varied. Repetition signals weak writing and must be avoided.
+
+CONTINUITY RULE:
+
+All scenes must logically follow previous events.
+
+Before writing a scene, check:
+- character location
+- recent interactions
+- established actions
+
+Do not introduce actions that contradict earlier events.
+
+If a detail has already been established (e.g. a character already met earlier), do not create a new reason that conflicts with it.
+
+Scenes must feel grounded, not patched together.
+
+CHARACTER VOICE DIFFERENTIATION:
+
+Each main character must have a distinct voice.
+
+- Declan: controlled, precise, minimal, deliberate, rarely wastes words
+- Evan: reactive, more emotional, sharper tone, more natural phrasing
+
+Do not write both characters with the same rhythm, tone, or vocabulary.
+
+Dialogue and internal narration must reflect personality differences.
+
+If both characters sound similar, the output is incorrect.
+
+INTIMACY REALISM RULE:
+
+Do not rely on repeated explicit verbal consent phrases.
+
+Instead:
+- show mutual intent through body language
+- show awareness through reaction and response
+- use tension, hesitation, and choice
+
+Avoid repetitive lines such as:
+- “tell me you want this”
+- “is this okay”
+- “say it”
+
+Consent should be clear through context and character behaviour, not constant verbal repetition.
+
+Interactions must feel natural, not scripted or overly formal.
+
+ANTI-PATTERN RULE:
+
+Do not reuse:
+- identical sentence rhythm
+- repeated scene framing
+- repeated escalation beats
+
+Each scene must feel newly constructed, not generated from a template.
+
+If the structure feels familiar, change it.
 `;
  
   
