@@ -472,6 +472,64 @@ TONE REQUIREMENT:
 Keep the tone consistent with the story, but avoid safe, repetitive or overly neutral interactions.
 
 The rewrite should feel intentional, varied, and specific to the characters.
+
+REWRITE IMPROVEMENT RULES:
+
+Improve the chapter without repeating the same structure or wording.
+
+Avoid reusing common phrases such as:
+- “Careful”
+- “Don’t”
+- “There it is”
+- “There he is”
+
+Replace repetitive dialogue with more natural, varied phrasing.
+
+
+CONTINUITY CHECK:
+
+Ensure all actions and events make logical sense based on earlier scenes.
+
+Do not introduce explanations or actions that contradict previous events.
+
+If something feels forced or unrealistic, correct it.
+
+
+CHARACTER VOICE:
+
+Maintain clear differences in character voice:
+
+- Declan: controlled, precise, minimal
+- Evan: more reactive, emotional, natural
+
+Do not let both characters sound the same.
+
+
+INTIMACY REALISM:
+
+Avoid repetitive verbal confirmation during intimate moments.
+
+Show mutual intent through:
+- body language
+- reactions
+- pacing
+
+Do not rely on repeated “say it”, “tell me”, or similar phrases.
+
+
+ANTI-REPETITION:
+
+Do not recreate the same type of scene or interaction.
+
+If the original scene feels familiar or repeated, adjust:
+- pacing
+- tone
+- interaction style
+
+
+GOAL:
+
+The rewritten chapter must feel cleaner, more natural, and more varied, without changing the overall story direction.
 `;
 
   try {
