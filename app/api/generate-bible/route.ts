@@ -759,6 +759,53 @@ Do not reuse:
 Each scene must feel newly constructed, not generated from a template.
 
 If the structure feels familiar, change it.
+
+INTIMACY PROGRESSION & VARIETY (MANDATORY):
+
+This is a FAST BURN, EXPLICIT adult romance.
+
+By early-to-mid story, the relationship must progress beyond:
+- kissing
+- hand stimulation
+- oral-only interactions
+
+These may occur, but must NOT be the dominant or repeated pattern.
+
+The story MUST include a range of distinct intimate scenes across the narrative, including:
+- slower, emotionally grounded intimacy
+- urgent, impulsive encounters
+- more intense, dominant/controlled dynamics
+- varied physical interaction styles
+
+Each scene must differ in:
+- pacing (slow, rushed, controlled, aggressive)
+- tone (tender, tense, confrontational, possessive)
+- initiation (who leads and how)
+- emotional context
+
+Do NOT repeat the same type of scene (e.g. repeated oral-focused scenes).
+
+ESCALATION REQUIREMENT:
+
+Once the relationship has escalated:
+- it must not return to earlier, lower-intensity patterns
+- intimacy must continue to deepen or shift, not reset
+
+If multiple scenes occur without meaningful progression or variation, the output is incorrect.
+
+
+DETAIL & SPECIFICITY:
+
+Avoid vague or generic descriptions.
+
+Scenes must include:
+- specific physical actions
+- clear positioning and interaction
+- sensory detail (touch, movement, reaction)
+
+Do not summarize or fade out.
+Do not rely on generic phrasing.
+
 `;
  
   
