@@ -530,6 +530,53 @@ If the original scene feels familiar or repeated, adjust:
 GOAL:
 
 The rewritten chapter must feel cleaner, more natural, and more varied, without changing the overall story direction.
+
+INTIMACY FIX (LITE):
+
+Improve the chapter by breaking repetitive intimacy patterns.
+
+Avoid repeating:
+- kissing → hand stimulation → oral-only sequences
+
+If the chapter includes intimacy:
+- vary the type of interaction
+- vary pacing (slow, urgent, controlled)
+- vary tone (tender, tense, confrontational)
+
+Do not reuse the same structure as earlier scenes.
+
+
+ESCALATION CHECK:
+
+Ensure the interaction progresses beyond earlier scenes.
+
+Do not return to lower-intensity patterns once the relationship has escalated.
+
+
+DETAIL IMPROVEMENT:
+
+Avoid vague or generic phrasing.
+
+Use clear, specific actions and reactions.
+Do not summarize or fade out key moments.
+
+
+REALISM:
+
+Do not rely on repeated verbal confirmation.
+
+Show intent through:
+- body language
+- reactions
+- pacing
+
+Keep it natural and grounded.
+
+
+GOAL:
+
+The rewritten scene must feel different, more specific, and properly progressed, without changing the overall story direction.
+
 `;
 
   try {
