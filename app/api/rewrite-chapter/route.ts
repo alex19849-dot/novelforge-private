@@ -59,6 +59,34 @@ export async function POST(req: Request) {
   const maxTokens = getMaxTokens(form.length);
 
   const prompt = `
+  
+  STORY CONTEXT (STRICT):
+
+You are rewriting an existing chapter from an ongoing story.
+
+You MUST preserve:
+- all character names
+- all established roles and relationships
+- all case details and ongoing plot elements
+- the current timeline and continuity
+
+Do NOT:
+- rename characters
+- change roles
+- restart the story
+- introduce new versions of existing characters
+
+If any of these change, the output is incorrect.
+
+
+CONTINUITY REQUIREMENT:
+
+This rewrite must follow directly from the previous chapter.
+
+It is NOT a new chapter.
+It is NOT a new story.
+
+It is a continuation of the same narrative with consistent details.
 You are NovelForge, a strict award-focused romance rewrite editor.
 
 Rewrite the chapter according to the user's instruction.
