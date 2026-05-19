@@ -320,6 +320,28 @@ Epilogues should:
 - clearly feel like an ending
 - be labelled "Epilogue" automatically
 
+FINAL STRUCTURE LOCK:
+
+When the story approaches its final chapters:
+
+- Do NOT restart the story
+- Do NOT generate new "Chapter 1"
+- Do NOT repeat epilogues
+- Do NOT introduce new major plotlines
+
+Final structure must be:
+
+- Final Chapter → resolves main conflict and relationship
+- Epilogue → optional, softer, future-facing closure
+
+Only ONE epilogue is allowed.
+
+Once the epilogue is written:
+- the story must end
+- no further chapters should be generated
+
+If the story is complete, stop.
+
 CAUSE AND CONSEQUENCE:
 Every scene must follow logically from the previous beat.
 Before writing each scene, silently check:
@@ -374,6 +396,31 @@ Attraction may be obvious.
 Irritation, pride, denial or resistance should stay alive.
 Do not allow emotional safety too early.
 
+EMOTIONAL INTIMACY REQUIREMENT:
+
+The story must include meaningful non-sexual intimacy between the main characters.
+
+This includes:
+- conversations where they learn about each other
+- personal questions that are avoided, deflected or partially answered
+- moments of vulnerability (small, not dramatic)
+- quiet scenes (car rides, late night talks, post-case decompression, shared space)
+- noticing habits, routines, reactions
+
+Do NOT rely only on:
+- tension
+- arguments
+- sexual interaction
+
+Characters must:
+- become curious about each other
+- notice details beyond physical attraction
+- learn things they didn’t expect
+
+These moments must feel natural, not forced or overly emotional.
+
+If the relationship progresses without emotional familiarity, the output is incorrect.
+
 PHYSICAL ESCALATION:
 Stage 0 = awareness only
 Stage 1 = charged proximity
@@ -402,6 +449,7 @@ For Chapter 1:
   - Include at least one clear physical interaction (touch, grab, contact, or deliberate proximity)
 
 Do not stack kiss + full escalation in Chapter 1, but do not keep it passive.
+
 SPICE PACING LOCK:
 If Heat Level is Explicit adult and Burn Pacing is Fast burn:
 
@@ -419,6 +467,7 @@ Do not repeat:
 Each chapter must move further physically than the previous one.
 
 Failure to escalate is incorrect output.
+
 HEAT CALIBRATION RULES:
 - Explicit adult means the story must show sexual intimacy on page once the physical stage reaches 6 or higher.
 - Do not fade to black during major intimacy scenes.
@@ -529,6 +578,34 @@ No random replies to a different conversation.
 No endless "You good?" / "Fine." loops.
 No over-polished banter every line.
 
+DIALOGUE REALISM RULE:
+
+Dialogue must sound like real people speaking, not written lines.
+
+Avoid:
+- overly structured responses
+- perfectly phrased comebacks every line
+- constant sharp banter
+- characters always having the “right” reply
+
+Include:
+- interruptions
+- unfinished thoughts
+- short replies
+- overlapping intention (what they say vs what they mean)
+- moments where characters don’t respond directly
+
+Characters should:
+- deflect
+- avoid questions
+- change subject
+- say the wrong thing
+- hesitate
+
+Not every line needs impact.
+
+Silence, avoidance and awkwardness are valid and important.
+
 STYLE:
 - Natural commercial romance prose.
 - Human, readable, emotionally grounded.
@@ -559,6 +636,7 @@ ${voicePack.style}
 Each story must develop its own narrative identity.
 Do not default to the same dialogue cadence, humour rhythm, banter style, sentence structure or emotional pacing as previous stories.
 Some stories should feel sharper, softer, darker, funnier, moodier, more introspective, more erotic or more emotionally vulnerable depending on the premise.
+
  WORD REPETITION RULE:
 Avoid repeatedly using the same emotional filler words, adverbs or descriptive phrasing across scenes.
 
@@ -749,6 +827,32 @@ Consent should be clear through context and character behaviour, not constant ve
 
 Interactions must feel natural, not scripted or overly formal.
 
+INTIMACY DEPTH RULE:
+
+Intimate scenes must feel varied, specific and character-driven.
+
+Avoid:
+- repeating the same sequence of actions
+- defaulting to the same type of interaction
+- vague or generic phrasing
+
+Each scene must:
+- feel physically distinct
+- reflect the current emotional dynamic
+- include clear escalation in intensity or control
+
+Include variation in:
+- pacing (slow, controlled, urgent, rough, hesitant)
+- tone (tender, possessive, frustrated, curious, dominant, reactive)
+- focus (who is in control, who is reacting)
+
+Intimacy must feel:
+- intentional
+- reactive to previous scenes
+- emotionally and physically connected
+
+If scenes feel similar to previous ones, they must be changed.
+
 ANTI-PATTERN RULE:
 
 Do not reuse:
@@ -762,7 +866,7 @@ If the structure feels familiar, change it.
 
 INTIMACY PROGRESSION & VARIETY (MANDATORY):
 
-This is a FAST BURN, EXPLICIT adult romance.
+If this is a FAST BURN, EXPLICIT adult romance.
 
 By early-to-mid story, the relationship must progress beyond:
 - kissing
