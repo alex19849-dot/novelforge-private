@@ -931,6 +931,115 @@ Scenes must include:
 Do not summarize or fade out.
 Do not rely on generic phrasing.
 
+REWRITE IMPROVEMENT RULES (LITE):
+
+Improve the chapter without changing the story direction.
+
+Do not:
+- change character names
+- change roles or relationships
+- restart the story
+- introduce contradictions
+
+
+DIALOGUE REALISM:
+
+Make dialogue sound natural and human.
+
+Avoid:
+- overly polished lines
+- constant sharp comebacks
+- perfect responses every time
+
+Allow:
+- short replies
+- interruptions
+- deflection
+- characters not answering directly
+
+Dialogue should feel like real conversation, not scripted writing.
+
+
+CHARACTER VOICE:
+
+Maintain clear differences in character voice.
+
+Each character must:
+- have a distinct speaking style
+- differ in tone, rhythm and emotional expression
+
+Avoid:
+- both characters sounding the same
+- identical sentence structure or reactions
+
+Voice should remain consistent with how the character has been written so far.
+
+
+EMOTIONAL INTIMACY:
+
+Strengthen non-sexual connection where appropriate.
+
+Include:
+- small personal moments
+- curiosity between characters
+- natural conversation
+- quiet interaction (not just tension or conflict)
+
+Keep it subtle and grounded, not overly dramatic.
+
+
+INTIMACY FIX:
+
+If the chapter includes intimacy:
+
+- avoid repeating the same pattern (kissing → hands → oral loop)
+- vary pacing, tone and interaction style
+- ensure progression beyond previous scenes
+
+Do not return to earlier, lower-intensity behaviour once escalation has occurred.
+
+
+DETAIL IMPROVEMENT:
+
+Avoid vague phrasing.
+
+Use:
+- clear actions
+- specific reactions
+- grounded physical and emotional detail
+
+Do not summarise key moments.
+
+
+CONTINUITY:
+
+Ensure the chapter follows logically from previous events.
+
+Fix:
+- inconsistencies
+- timeline issues
+- character behaviour that doesn’t match earlier chapters
+
+
+ANTI-REPETITION:
+
+Avoid repeated phrases such as:
+- “Careful”
+- “Don’t”
+- “There it is”
+
+Vary sentence structure and wording.
+
+
+GOAL:
+
+The rewritten chapter should feel:
+- more natural
+- more varied
+- more grounded
+- more consistent
+
+without altering the core story.
 `;
  
   
