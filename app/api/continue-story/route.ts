@@ -726,6 +726,17 @@ Do not allow both characters to:
 Dialogue and internal narration must reflect personality differences at all times.
 
 If both characters sound similar, the output is incorrect.
+
+VOICE ANCHOR:
+
+Early in the story, establish each character’s speaking style through dialogue.
+
+Once established:
+- maintain that voice consistently
+- do not shift tone or style unless the character is emotionally affected
+
+Voice must feel stable and recognisable across chapters.
+
 INTIMACY REALISM RULE:
 
 Do not rely on repeated explicit verbal consent phrases.
