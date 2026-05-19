@@ -705,17 +705,27 @@ Scenes must feel grounded, not patched together.
 
 CHARACTER VOICE DIFFERENTIATION:
 
-Each main character must have a distinct voice.
+Each main character must have a clearly distinct voice.
 
-- Declan: controlled, precise, minimal, deliberate, rarely wastes words
-- Evan: reactive, more emotional, sharper tone, more natural phrasing
+For every story:
+- define how each character speaks, thinks and reacts
+- ensure their tone, rhythm and vocabulary differ
 
-Do not write both characters with the same rhythm, tone, or vocabulary.
+Characters should differ in:
+- sentence length (short vs longer phrasing)
+- emotional expression (controlled vs reactive)
+- directness (blunt vs evasive)
+- humour style (dry, sarcastic, playful, none)
+- confidence level (dominant, uncertain, defensive, quiet)
 
-Dialogue and internal narration must reflect personality differences.
+Do not allow both characters to:
+- speak with the same rhythm
+- use the same phrasing patterns
+- respond in the same emotional way
+
+Dialogue and internal narration must reflect personality differences at all times.
 
 If both characters sound similar, the output is incorrect.
-
 INTIMACY REALISM RULE:
 
 Do not rely on repeated explicit verbal consent phrases.
@@ -790,6 +800,107 @@ Scenes must include:
 
 Do not summarize or fade out.
 Do not rely on generic phrasing.
+
+DIALOGUE REALISM RULE:
+
+Dialogue must sound like real people speaking, not written lines.
+
+Avoid:
+- overly structured responses
+- perfectly phrased comebacks every line
+- constant sharp banter
+- characters always having the “right” reply
+
+Include:
+- interruptions
+- unfinished thoughts
+- short replies
+- overlapping intention (what they say vs what they mean)
+- moments where characters don’t respond directly
+
+Characters should:
+- deflect
+- avoid questions
+- change subject
+- say the wrong thing
+- hesitate
+
+Not every line needs impact.
+
+Silence, avoidance and awkwardness are valid and important.
+
+EMOTIONAL INTIMACY REQUIREMENT:
+
+The story must include meaningful non-sexual intimacy between the main characters.
+
+This includes:
+- conversations where they learn about each other
+- personal questions that are avoided, deflected or partially answered
+- moments of vulnerability (small, not dramatic)
+- quiet scenes (car rides, late night talks, post-case decompression, shared space)
+- noticing habits, routines, reactions
+
+Do NOT rely only on:
+- tension
+- arguments
+- sexual interaction
+
+Characters must:
+- become curious about each other
+- notice details beyond physical attraction
+- learn things they didn’t expect
+
+These moments must feel natural, not forced or overly emotional.
+
+If the relationship progresses without emotional familiarity, the output is incorrect.
+
+INTIMACY DEPTH RULE:
+
+Intimate scenes must feel varied, specific and character-driven.
+
+Avoid:
+- repeating the same sequence of actions
+- defaulting to the same type of interaction
+- vague or generic phrasing
+
+Each scene must:
+- feel physically distinct
+- reflect the current emotional dynamic
+- include clear escalation in intensity or control
+
+Include variation in:
+- pacing (slow, controlled, urgent, rough, hesitant)
+- tone (tender, possessive, frustrated, curious, dominant, reactive)
+- focus (who is in control, who is reacting)
+
+Intimacy must feel:
+- intentional
+- reactive to previous scenes
+- emotionally and physically connected
+
+If scenes feel similar to previous ones, they must be changed.
+
+FINAL STRUCTURE LOCK:
+
+When the story approaches its final chapters:
+
+- Do NOT restart the story
+- Do NOT generate new "Chapter 1"
+- Do NOT repeat epilogues
+- Do NOT introduce new major plotlines
+
+Final structure must be:
+
+- Final Chapter → resolves main conflict and relationship
+- Epilogue → optional, softer, future-facing closure
+
+Only ONE epilogue is allowed.
+
+Once the epilogue is written:
+- the story must end
+- no further chapters should be generated
+
+If the story is complete, stop.
 
 `;
 
