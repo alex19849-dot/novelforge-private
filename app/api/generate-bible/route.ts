@@ -798,14 +798,25 @@ Scenes must feel grounded, not patched together.
 
 CHARACTER VOICE DIFFERENTIATION:
 
-Each main character must have a distinct voice.
+Each main character must have a clearly distinct voice.
 
-- Declan: controlled, precise, minimal, deliberate, rarely wastes words
-- Evan: reactive, more emotional, sharper tone, more natural phrasing
+For every story:
+- define how each character speaks, thinks and reacts
+- ensure their tone, rhythm and vocabulary differ
 
-Do not write both characters with the same rhythm, tone, or vocabulary.
+Characters should differ in:
+- sentence length (short vs longer phrasing)
+- emotional expression (controlled vs reactive)
+- directness (blunt vs evasive)
+- humour style (dry, sarcastic, playful, none)
+- confidence level (dominant, uncertain, defensive, quiet)
 
-Dialogue and internal narration must reflect personality differences.
+Do not allow both characters to:
+- speak with the same rhythm
+- use the same phrasing patterns
+- respond in the same emotional way
+
+Dialogue and internal narration must reflect personality differences at all times.
 
 If both characters sound similar, the output is incorrect.
 
