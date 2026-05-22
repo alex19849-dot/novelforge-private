@@ -468,6 +468,24 @@ Each chapter must move further physically than the previous one.
 
 Failure to escalate is incorrect output.
 
+ESCALATION TIMING ENFORCEMENT:
+
+Escalation must occur within a realistic timeframe based on burn pacing and book length.
+
+For Short Novel + Medium Burn:
+- clear physical escalation must occur by 30–40% of the story
+- penetrative or full sexual intimacy must occur before 65% of the story
+
+For Fast Burn:
+- penetrative or full intimacy must occur no later than 50% of the story
+
+If the story progresses beyond these points without escalation:
+- correct immediately
+- do not delay further
+- do not continue lower-level interaction
+
+Delaying escalation beyond this point is incorrect output.
+
 HEAT CALIBRATION RULES:
 - Explicit adult means the story must show sexual intimacy on page once the physical stage reaches 6 or higher.
 - Do not fade to black during major intimacy scenes.
@@ -658,6 +676,22 @@ Strongly limit repetition of:
 Avoid repetitive sentence structures and emotional phrasing.
 If similar wording has appeared recently, choose fresher language or restructure the sentence entirely.
 
+PATTERN DETECTION RULE:
+
+Before writing a sentence, check for recent phrasing patterns.
+
+If similar wording, rhythm or phrasing has appeared in the last few paragraphs:
+- restructure the sentence
+- change wording completely
+- vary sentence length and flow
+
+Do not reuse:
+- identical emotional phrasing
+- repeated sentence openings
+- repeated rhythm patterns
+
+If writing feels familiar or repeated, rewrite it.
+
 GLOBAL LENGTH CONTROL:
 
 Target total story length:
@@ -820,6 +854,24 @@ Dialogue and internal narration must reflect personality differences at all time
 
 If both characters sound similar, the output is incorrect.
 
+STORY-LEVEL VOICE IDENTITY:
+
+Each story must establish a distinct narrative voice early.
+
+This includes:
+- sentence rhythm (short, sharp vs longer, smoother)
+- tone (gritty, emotional, sarcastic, restrained, intense)
+- dialogue style (minimal, reactive, playful, blunt)
+
+Do not reuse:
+- the same narration style
+- the same dialogue cadence
+- the same emotional pacing from previous stories
+
+Each book should feel like it was written in a slightly different voice.
+
+If the tone feels similar to a previous story, adjust it.
+
 VOICE ANCHOR:
 
 Early in the story, establish each character’s speaking style through dialogue.
@@ -873,6 +925,21 @@ Intimacy must feel:
 - emotionally and physically connected
 
 If scenes feel similar to previous ones, they must be changed.
+
+INTIMACY TYPE ROTATION:
+
+Do not repeat the same type of sexual interaction across multiple scenes.
+
+Scenes must rotate between:
+- slower, exploratory intimacy
+- urgent or impulsive encounters
+- dominant or controlled dynamics
+- emotionally driven or vulnerable scenes
+
+If a previous scene focused on one type (e.g. oral-focused or passive interaction):
+- the next must shift type
+
+Repeated focus on the same act or structure is incorrect.
 
 ANTI-PATTERN RULE:
 
