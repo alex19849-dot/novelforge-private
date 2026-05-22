@@ -554,6 +554,15 @@ If the original scene feels familiar or repeated, adjust:
 - tone
 - interaction style
 
+PATTERN CORRECTION:
+
+If repeated phrasing or sentence rhythm is detected:
+
+- rewrite those sections with new wording
+- vary sentence structure and pacing
+- remove familiar or reused expressions
+
+Writing should not feel patterned or recycled.
 
 GOAL:
 
@@ -573,6 +582,25 @@ If the chapter includes intimacy:
 
 Do not reuse the same structure as earlier scenes.
 
+ESCALATION CORRECTION:
+
+If the chapter is too late in the story for its current level of intimacy:
+
+- increase progression appropriately
+- avoid continuing lower-level interaction
+- move the scene forward in intensity where it makes sense
+
+Do not delay escalation if it should have already occurred.
+
+SCENE VARIATION CHECK:
+
+If the scene feels similar to previous intimate scenes:
+
+- adjust tone, pacing or dynamic
+- change interaction style
+- ensure the scene feels distinct
+
+Do not repeat the same structure or focus.
 
 ESCALATION CHECK:
 
