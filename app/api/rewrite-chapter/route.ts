@@ -173,6 +173,14 @@ If British English, avoid SUV, parking lot, apartment, cell phone, sneakers, mom
 Use car, car park, flat, phone, trainers, mum, dressing room or locker room.
 Use regional wording naturally.
 
+WORLD BUILDING FIX:
+
+If description is:
+- too vague → add small, grounded detail
+- too heavy → reduce and simplify
+
+Ensure the setting feels real without slowing the scene.
+
 LOCATION NAMING RULE:
 If a scene is in a locker room or dressing room, call it locker room, dressing room, changing room, players' room, or a clear regional equivalent.
 Do not repeatedly call it "the room".
