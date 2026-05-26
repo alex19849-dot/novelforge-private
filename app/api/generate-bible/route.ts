@@ -1085,6 +1085,60 @@ Consent should be clear through context and character behaviour, not constant ve
 
 Interactions must feel natural, not scripted or overly formal.
 
+CONSENT LANGUAGE BAN:
+
+Do not include any reference to consent, permission, or checking behaviour during intimate scenes.
+
+This includes:
+
+- direct phrases:
+  “are you sure”
+  “tell me to stop”
+  “is this okay”
+  “you can stop me”
+
+- indirect phrasing:
+  “not asking for permission”
+  “not in a clinical way”
+  “not waiting for permission”
+  “making sure I wanted it”
+
+- internal narration about consent:
+  any thoughts analysing permission, safety, or approval
+
+Do not:
+- explain consent
+- reference consent
+- imply consent through commentary
+
+If such phrasing appears, remove or rewrite it.
+
+Scenes must proceed through:
+- mutual action
+- escalation
+- physical and emotional response
+
+No discussion or analysis of consent is allowed.
+
+INTIMACY LANGUAGE RESTRICTION:
+
+Do not use reflective or analytical phrasing during intimate scenes.
+
+Avoid lines that:
+- explain what the moment is doing
+- describe how something feels in a detached or observational way
+- justify or clarify behaviour
+
+Banned structures include:
+- “not in a way that…”
+- “in a way that felt…”
+- “like he was checking…”
+- “as if asking…”
+
+Keep writing immediate, physical and in-the-moment.
+
+No commentary. No explanation.
+
 INTIMACY DEPTH RULE:
 
 Intimate scenes must feel varied, specific and character-driven.
