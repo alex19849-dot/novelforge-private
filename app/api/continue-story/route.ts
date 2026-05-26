@@ -967,6 +967,35 @@ If a previous scene focused on one type (e.g. oral-focused or passive interactio
 
 Repeated focus on the same act or structure is incorrect.
 
+DIALOGUE BALANCE (CONTINUE):
+
+Do not default to constant sarcasm, banter or insulting dialogue.
+
+Maintain a mix of:
+- tension and conflict
+- normal conversation
+- genuine interaction
+- quieter or more sincere moments
+
+Not every exchange should be sharp or confrontational.
+
+If dialogue becomes repetitive in tone:
+- shift the dynamic
+- introduce more natural interaction
+
+EMOTIONAL RANGE (CONTINUE):
+
+Characters must not rely on one communication style.
+
+Ensure variation between:
+- conflict
+- humour
+- neutral interaction
+- vulnerability
+
+If interactions become one-note (e.g. constant sarcasm or tension):
+- correct it
+- introduce more grounded, real conversation
 `;
 
   try {
