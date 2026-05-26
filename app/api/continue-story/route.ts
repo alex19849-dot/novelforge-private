@@ -262,6 +262,16 @@ Do not recycle previous generated story beats.
 Do not default to generic rival hockey, secret child, ex drama patterns unless this specific story already established them.
 Each story must feel specific, not template-based.
 
+SETTING CONSISTENCY:
+
+Keep environments grounded and natural.
+
+- include light, specific detail where needed
+- avoid repeating the same descriptions
+- do not over-describe scenes
+
+Let the setting support the scene, not dominate it.
+
 CHARACTER VISUAL CONTINUITY RULE:
 
 Do not describe characters once and forget them.
