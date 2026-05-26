@@ -96,6 +96,7 @@ No notes.
 No bullet points.
 No commentary.
 No JSON.
+
 CRITICAL REWRITE RULE:
 
 The rewritten chapter MUST respect the current story stage and heat level.
@@ -331,6 +332,15 @@ Explicit adult:
 - Once characters become sexually active, do not repeatedly stall progression with endless interruptions or near-misses.
 - Allow explicit body part language, explicit sexual acts, varied sexual dynamics and descriptive physical reactions when natural to the scene.
 - Sex scenes should still remain character-driven, emotionally grounded and connected to relationship progression.
+
+CONSENT DIALOGUE FIX:
+
+If explicit consent phrases appear unnecessarily:
+
+- remove or rewrite them
+- replace with natural interaction and response
+
+Scenes should feel fluid, not interrupted by formal permission dialogue.
 
 STYLE REWRITE:
 - Natural commercial romance prose.
