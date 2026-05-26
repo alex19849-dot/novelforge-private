@@ -858,6 +858,50 @@ If a section feels slow or repetitive:
 If a key moment feels rushed:
 - expand it slightly to allow impact
 
+SCENE PURPOSE RULE:
+
+Every scene must have a clear purpose.
+
+Each scene must:
+- move the relationship forward
+- increase tension or stakes
+- reveal something new (emotion, character, dynamic)
+
+If a scene does not change anything:
+- remove or rewrite it
+
+Do not include filler scenes.
+
+EMOTIONAL PAYOFF RULE:
+
+Key moments must have emotional impact.
+
+After important events (arguments, intimacy, reveals, exposure):
+
+- do not move on too quickly
+- include brief internal reaction or consequence
+- show how it affects the characters
+
+Avoid:
+- jumping straight to the next scene
+- skipping emotional processing entirely
+
+The reader must feel the moment, not just see it happen.
+
+AFTERMATH RULE:
+
+After major scenes, include a short aftermath.
+
+This can be:
+- internal thoughts
+- change in behaviour
+- shift in dynamic
+- tension increase
+
+Do not immediately reset the tone.
+
+Moments should leave a mark before the story moves on.
+
 CONSEQUENCE RULE:
 
 Every intimate scene must change something:
