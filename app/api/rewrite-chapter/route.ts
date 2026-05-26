@@ -451,6 +451,16 @@ Avoid repetitive patterns like:
 
 Use sparingly, not repeatedly.
 
+EMOTIONAL BALANCE FIX:
+
+If character interaction lacks variation:
+
+- introduce a mix of tension, neutrality and softer moments
+- include small, genuine interaction where appropriate
+- allow brief vulnerability or normal conversation
+
+Do not keep interaction at one emotional level (e.g. constant conflict or sarcasm).
+
 FINAL OUTPUT:
 Return only the rewritten chapter.
 
@@ -525,13 +535,53 @@ If something feels forced or unrealistic, correct it.
 
 CHARACTER VOICE:
 
-Maintain clear differences in character voice:
+Maintain clear differences in character voice.
 
-- Declan: controlled, precise, minimal
-- Evan: more reactive, emotional, natural
+Each character must:
+- have a distinct speaking style
+- differ in tone, rhythm and emotional expression
 
-Do not let both characters sound the same.
+Avoid:
+- both characters sounding the same
+- identical sentence structure or reactions
 
+Voice should remain consistent with how the character has been written so far.
+
+Do not impose a new voice or change established character tone.
+
+VOICE PRESERVATION:
+
+Do not overwrite or redefine character voice.
+
+Only refine:
+- clarity
+- realism
+- flow
+
+Keep:
+- original personality
+- established tone
+- unique speech patterns
+
+If voice is changed too much, the output is incorrect.
+
+DIALOGUE TONE CORRECTION:
+
+If dialogue is overly sarcastic, confrontational or dominated by banter:
+
+- reduce constant snark
+- vary tone across the scene
+- introduce more natural, grounded conversation
+
+Not every line should be:
+- sharp
+- sarcastic
+- reactive
+
+Add moments where characters:
+- speak plainly
+- ask real questions
+- respond without deflection
 
 INTIMACY REALISM:
 
