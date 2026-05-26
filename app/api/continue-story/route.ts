@@ -484,6 +484,17 @@ If the target stage is 6 or higher:
 
 If this stage is not reached, the output is incorrect.
 
+CONSENT FLOW CONTROL:
+
+Do not introduce repeated or unnecessary verbal consent dialogue.
+
+Maintain natural progression through:
+- mutual action
+- physical response
+- escalating interaction
+
+Avoid interrupting scenes with explicit permission requests unless context demands it.
+
 RELATIONSHIP STAGE TARGET:
 Current target relationship stage for this chapter: ${targetRelationshipStage}.
 
