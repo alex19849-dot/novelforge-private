@@ -642,6 +642,46 @@ If dialogue becomes repetitive in tone (e.g. constant snark or banter):
 
 Dialogue must feel human and varied, not one-note.
 
+DIRTY TALK QUALITY RULE:
+
+Dirty talk must feel natural, character-driven and varied.
+
+Avoid:
+- clinical or explicit terminology (e.g. “penetration”)
+- repetitive phrases or wording
+- overly literal descriptions of actions
+
+Instead:
+- use tone, implication and reaction
+- reflect character personality (dominant, restrained, reactive, etc.)
+- vary between:
+  - possessive
+  - teasing
+  - controlled
+  - impulsive
+
+Dialogue should feel like something a real person would say in the moment.
+
+If wording feels awkward, technical or unnatural:
+- rewrite it
+- simplify it
+- make it more fluid
+
+DIRTY TALK VARIATION:
+
+Do not repeat the same type of dirty talk across scenes.
+
+Ensure variation in:
+- tone
+- phrasing
+- intensity
+
+Avoid:
+- using the same phrases across scenes
+- defaulting to the same structure of dialogue
+
+Each scene should feel distinct in how characters speak.
+
 EMOTIONAL RANGE IN INTERACTION:
 
 Characters must not rely on a single communication style.
