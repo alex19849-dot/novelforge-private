@@ -293,7 +293,6 @@ If the user asks for more spice, increase heat in line with the saved physical s
 If the chapter is behind the expected spice pacing, add charged escalation naturally.
 Do not replace spice with vague staring.
 Do not make explicit content emotionally cosy unless the relationship has earned it.
-Keep consent clear.
 All characters must be 18+.
 
 PHYSICAL STAGE ENFORCEMENT:
@@ -355,6 +354,18 @@ If explicit consent phrases appear unnecessarily:
 - replace with natural interaction and response
 
 Scenes should feel fluid, not interrupted by formal permission dialogue.
+
+CONSENT REMOVAL:
+
+Remove any reference to:
+- consent
+- permission
+- checking behaviour
+- reflective phrasing about the interaction
+
+Rewrite the scene so it flows naturally without these elements.
+
+Do not replace with indirect or softened versions.
 
 STYLE REWRITE:
 - Natural commercial romance prose.
