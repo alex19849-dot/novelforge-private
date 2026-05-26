@@ -596,6 +596,50 @@ No random replies to a different conversation.
 No endless "You good?" / "Fine." loops.
 No over-polished banter every line.
 
+DIALOGUE VARIETY AND BALANCE:
+
+Do not default to constant sarcasm, banter or insulting dialogue.
+
+Balance dialogue between:
+- tension and conflict
+- normal conversation
+- genuine interaction
+- quieter, more sincere moments
+
+Not every exchange should be:
+- sarcastic
+- confrontational
+- sharp or cutting
+
+Characters must:
+- occasionally speak plainly
+- ask real questions
+- respond without deflection
+- show curiosity about each other
+
+If dialogue becomes repetitive in tone (e.g. constant snark or banter):
+- shift the dynamic
+- soften the interaction
+- introduce variation
+
+Dialogue must feel human and varied, not one-note.
+
+EMOTIONAL RANGE IN INTERACTION:
+
+Characters must not rely on a single communication style.
+
+Across the story, include:
+- tension and friction
+- humour and lightness
+- quiet or neutral interaction
+- moments of vulnerability
+
+If characters only communicate through conflict or sarcasm:
+- correct immediately
+- introduce more grounded and real conversation
+
+Emotional variation is required for believable connection.
+
 DIALOGUE REALISM RULE:
 
 Dialogue must sound like real people speaking, not written lines.
