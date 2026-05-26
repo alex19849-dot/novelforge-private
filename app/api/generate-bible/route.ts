@@ -838,6 +838,26 @@ Each stage must feel different in:
 - tone
 - intention
 
+PACING CONTROL:
+
+The story must maintain forward momentum without dragging or rushing.
+
+Avoid:
+- multiple low-impact scenes in a row
+- repeating the same emotional or physical beat
+- rushing through important turning points
+
+Ensure:
+- each chapter changes something (emotion, tension, relationship, stakes)
+- important moments are given space to land
+- progression feels steady, not uneven
+
+If a section feels slow or repetitive:
+- move the story forward
+
+If a key moment feels rushed:
+- expand it slightly to allow impact
+
 CONSEQUENCE RULE:
 
 Every intimate scene must change something:
