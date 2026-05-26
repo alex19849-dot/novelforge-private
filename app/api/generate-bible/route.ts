@@ -686,6 +686,24 @@ Not every line needs impact.
 
 Silence, avoidance and awkwardness are valid and important.
 
+CONSENT NATURALITY RULE:
+
+Do not rely on explicit verbal consent phrases during intimate scenes.
+
+Avoid dialogue such as:
+- “are you sure?”
+- “tell me to stop”
+- “is this okay?”
+
+These should not appear unless the scene specifically requires it.
+
+Consent should be shown through:
+- body language
+- mutual escalation
+- character response and participation
+
+Interaction should feel natural and fluid, not formal or scripted.
+
 STYLE:
 - Natural commercial romance prose.
 - Human, readable, emotionally grounded.
