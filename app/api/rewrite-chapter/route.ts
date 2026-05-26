@@ -701,6 +701,24 @@ GOAL:
 
 The rewritten scene must feel different, more specific, and properly progressed, without changing the overall story direction.
 
+PACING FIX:
+
+If a scene feels slow or repetitive:
+- tighten it
+- remove unnecessary parts
+
+If a moment feels rushed:
+- expand slightly to improve impact
+
+EMOTIONAL IMPACT FIX:
+
+If key moments lack impact:
+
+- add brief internal reaction
+- show emotional consequence
+- allow the moment to land
+
+Do not skip emotional response.
 `;
 
   try {
