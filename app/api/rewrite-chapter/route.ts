@@ -225,6 +225,20 @@ Avoid repetitive check-ins:
 - Nothing.
 - Good.
 
+DIRTY TALK FIX:
+
+If dialogue sounds:
+- clinical
+- repetitive
+- unnatural
+
+Rewrite it to feel:
+- more fluid
+- more natural
+- less literal
+
+Avoid explicit terminology that breaks immersion.
+
 SIDE CHARACTER COHERENCE:
 Children:
 - must behave age appropriately
