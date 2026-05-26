@@ -279,6 +279,24 @@ Do not reuse stock beats unless the user requested them.
 Do not write a recycled version of another rival hockey / secret child / manipulative ex story unless those details are clearly in the current Story Idea.
 Prioritise the user's unique premise over trope autopilot.
 
+REALISTIC WORLD BUILDING:
+
+Settings must feel natural and grounded without over-description.
+
+Do:
+- include small, specific details (sounds, movement, background activity)
+- show environment through character interaction
+- vary locations so scenes don’t feel repetitive
+
+Avoid:
+- long descriptive paragraphs
+- listing details without purpose
+- repeating the same setting descriptions
+
+The environment should feel lived-in, not explained.
+
+If description does not add atmosphere or context, remove it.
+
 CHAPTER 1 PURPOSE:
 - Open with a strong hook.
 - Establish both main leads clearly.
@@ -683,6 +701,7 @@ STYLE:
 - No repeated symbolic closing lines.
 - No stiff formal narration like "I do not" unless intentional.
 - Use natural contractions.
+
  NAME VARIETY RULE:
 Avoid repeatedly generating overused modern romance names.
 Prioritise varied, memorable, culturally appropriate names that fit the setting and characters.
