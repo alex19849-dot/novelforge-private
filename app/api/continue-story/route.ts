@@ -524,6 +524,17 @@ Do not let emotional trust outrun the stage.
 Heat may rise faster than trust.
 If enemies-to-lovers, keep pride, resistance, irritation and conflict alive.
 
+CONSENT ENFORCEMENT:
+
+Do not include or reintroduce any consent-related dialogue or phrasing.
+
+Do not reference:
+- permission
+- checking behaviour
+- hesitation framed as consent
+
+If it appears, remove it and continue the scene naturally.
+
 CAUSE AND CONSEQUENCE:
 Every scene must logically follow the previous scene.
 Before writing each scene, silently check:
