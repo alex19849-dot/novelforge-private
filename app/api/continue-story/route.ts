@@ -1017,6 +1017,19 @@ Ensure variation between:
 If interactions become one-note (e.g. constant sarcasm or tension):
 - correct it
 - introduce more grounded, real conversation
+
+PACING & PAYOFF (CONTINUE):
+
+Maintain steady progression.
+
+- each scene must move something forward
+- avoid repeating the same type of scene
+
+After key moments:
+- allow brief emotional reaction
+- do not move on too quickly
+
+Ensure scenes have impact, not just action.
 `;
 
   try {
