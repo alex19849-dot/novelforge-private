@@ -758,11 +758,11 @@ await saveCurrentStory({
       </div>
     </div>
 
-    {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
+  {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
 
 <div
   id="chapter-reader"
-  className="relative bg-[#f4ecd8] text-black"
+  className="relative h-[calc(100vh-96px)] overflow-hidden bg-[#f4ecd8] text-black"
   onClick={() => copyChapter(activeChapter, activeChapterIndex)}
   onTouchStart={handleTouchStart}
   onTouchMove={handleTouchMove}
@@ -801,13 +801,13 @@ await saveCurrentStory({
     →
   </button>
 
-  <div className="flex min-h-[calc(100vh-120px)] items-center justify-center px-4 py-8 md:px-20">
-    <div className="w-full max-w-[780px]">
-      <div className="whitespace-pre-wrap break-words text-left text-[17px] leading-[1.75] text-black sm:text-[18px] md:text-[19px]">
+  <div className="flex h-full items-start justify-center px-5 py-8 md:px-24">
+    <div className="flex h-full w-full max-w-[820px] flex-col overflow-hidden">
+      <div className="h-[calc(100%-36px)] overflow-hidden whitespace-pre-wrap break-words text-left text-[16px] leading-[1.65] text-black sm:text-[17px] md:text-[18px]">
         {pages[pageIndex] || ""}
       </div>
 
-      <p className="mt-8 text-center text-xs text-black/50">
+      <p className="mt-4 text-center text-xs text-black/50">
         Page {pageIndex + 1} of {pages.length}
       </p>
 
@@ -850,7 +850,7 @@ await saveCurrentStory({
     </button>
   </div>
 </div>
-  </section>
+</section>
 )}
  </section>
       <style jsx>{`
