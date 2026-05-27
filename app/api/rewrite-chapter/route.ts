@@ -504,8 +504,6 @@ If character interaction lacks variation:
 
 Do not keep interaction at one emotional level (e.g. constant conflict or sarcasm).
 
-FINAL OUTPUT:
-Return only the rewritten chapter.
 
 REWRITE QUALITY RULES:
 
@@ -592,6 +590,14 @@ Voice should remain consistent with how the character has been written so far.
 
 Do not impose a new voice or change established character tone.
 
+NO PREVIOUS BOOK VOICE BLEED:
+
+Do not rewrite the chapter in the style of earlier stories.
+
+Preserve the current characters’ established voices.
+
+Do not turn them into a silent dominant character and a sarcastic reactive character unless that is already specific to this story.
+
 VOICE PRESERVATION:
 
 Do not overwrite or redefine character voice.
@@ -626,6 +632,19 @@ Add moments where characters:
 - ask real questions
 - respond without deflection
 
+BANTER LOOP FIX:
+
+If dialogue is mostly sarcasm, insults or quick comebacks, reduce it.
+
+Add more natural variation:
+- direct replies
+- real questions
+- pauses
+- emotional honesty
+- unfinished thoughts
+
+The scene should not read like every line is trying to be clever.
+
 INTIMACY REALISM:
 
 Avoid repetitive verbal confirmation during intimate moments.
@@ -647,6 +666,19 @@ If the original scene feels familiar or repeated, adjust:
 - tone
 - interaction style
 
+GENERIC PHRASE FIX:
+
+Remove or rewrite familiar romance phrases such as:
+- his eyes darkened
+- my pulse kicked
+- his mouth curved without humour
+- heat flashed
+- something shifted
+- his jaw tightened
+- he went still
+
+Replace with fresher, character-specific reactions.
+
 PATTERN CORRECTION:
 
 If repeated phrasing or sentence rhythm is detected:
@@ -657,9 +689,6 @@ If repeated phrasing or sentence rhythm is detected:
 
 Writing should not feel patterned or recycled.
 
-GOAL:
-
-The rewritten chapter must feel cleaner, more natural, and more varied, without changing the overall story direction.
 
 INTIMACY FIX (LITE):
 
@@ -674,6 +703,26 @@ If the chapter includes intimacy:
 - vary tone (tender, tense, confrontational)
 
 Do not reuse the same structure as earlier scenes.
+
+INTIMACY VARIATION FIX:
+
+If the chapter repeats a previous intimacy structure, change it.
+
+Avoid repeating:
+- argument turning physical
+- pinning against a surface
+- control-based dirty talk
+- hand/oral-only progression
+- the same dominant/reactive rhythm
+
+Shift the scene through:
+- pacing
+- tone
+- location
+- who initiates
+- emotional consequence
+
+The rewritten intimacy must feel distinct from earlier scenes.
 
 ESCALATION CORRECTION:
 
@@ -721,6 +770,8 @@ Show intent through:
 
 Keep it natural and grounded.
 
+FINAL OUTPUT:
+Return only the rewritten chapter.
 
 GOAL:
 
@@ -744,6 +795,14 @@ If key moments lack impact:
 - allow the moment to land
 
 Do not skip emotional response.
+
+FINAL OUTPUT:
+Return only the rewritten chapter.
+
+GOAL:
+
+The rewritten scene must feel different, more specific, and properly progressed, without changing the overall story direction.
+
 `;
 
   try {
