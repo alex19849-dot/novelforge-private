@@ -769,7 +769,7 @@ await saveCurrentStory({
   onTouchMove={handleTouchMove}
   onTouchEnd={handleTouchEnd}
 >
-     <div className="absolute inset-y-0 left-0 flex items-center">
+   <div className="absolute inset-y-0 left-0 hidden md:flex items-center">
   <button
     onClick={() => {
       if (pageIndex > 0) {
@@ -779,13 +779,12 @@ await saveCurrentStory({
         setPageIndex(0);
       }
     }}
-    className="ml-2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20"
+    className="ml-4 rounded-full bg-black/20 backdrop-blur-sm p-3 text-black hover:bg-black/30 transition"
   >
     ←
   </button>
 </div>
-
-<div className="absolute inset-y-0 right-0 flex items-center">
+     <div className="absolute inset-y-0 right-0 hidden md:flex items-center">
   <button
     onClick={() => {
       if (pageIndex < pages.length - 1) {
@@ -795,7 +794,7 @@ await saveCurrentStory({
         setPageIndex(0);
       }
     }}
-    className="mr-2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20"
+    className="mr-4 rounded-full bg-black/20 backdrop-blur-sm p-3 text-black hover:bg-black/30 transition"
   >
     →
   </button>
