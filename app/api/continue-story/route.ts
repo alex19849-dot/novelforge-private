@@ -514,6 +514,34 @@ Characters may:
 
 Do not make emotionally intense characters consistently self-aware, emotionally fluent, or psychologically balanced during crisis.
 
+TRAUMA AFTERMATH REALISM:
+
+Major emotional events, violence, rescues, revelations, and reunions should have lasting psychological impact.
+
+Do not resolve trauma immediately through:
+- romance
+- sex
+- comforting dialogue
+- emotional clarity
+- instant trust
+- quick recovery
+
+Characters may become:
+- emotionally overwhelmed
+- unstable
+- numb
+- dissociated
+- reactive
+- irrational
+- exhausted
+- silent
+- frightened
+- unpredictable
+
+Rescued or traumatized adults or children should behave like real adults or children under stress, not emotionally perfect symbols or plot devices.
+
+Allow emotional consequences to persist across multiple chapters.
+
 EROTIC ENGINE V2:
 
 EXPLICIT DELIVERY RULE:
