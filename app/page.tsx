@@ -170,7 +170,7 @@ function handleTouchEnd() {
   const minSwipeDistance = 50;
 
   if (distance > minSwipeDistance) {
-    if (pageIndex < pages.length - 1) {
+    if (pageIndex < totalPages - 1) {
       setPageIndex(pageIndex + 1);
       document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
     } else if (activeChapterIndex < chapters.length - 1) {
