@@ -769,7 +769,7 @@ await saveCurrentStory({
   onTouchMove={handleTouchMove}
   onTouchEnd={handleTouchEnd}
 >
-   className="absolute inset-y-0 left-0 flex items-center max-sm:hidden"
+   <div className="absolute inset-y-0 left-0 flex items-center max-sm:hidden"
   <button
     onClick={() => {
       if (pageIndex > 0) {
@@ -784,7 +784,7 @@ await saveCurrentStory({
     ←
   </button>
 </div>
-     className="absolute inset-y-0 right-0 flex items-center max-sm:hidden"
+    <div className="absolute inset-y-0 right-0 flex items-center max-sm:hidden"
   <button
     onClick={() => {
       if (pageIndex < pages.length - 1) {
