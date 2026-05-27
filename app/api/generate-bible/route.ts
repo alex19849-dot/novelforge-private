@@ -213,6 +213,96 @@ Do not return notes.
 Do not return the story state.
 Do not return headings other than the chapter title and POV headings if required by the selected POV.
 
+
+SELF-CORRECTION AND DRIFT PREVENTION:
+
+Continuously monitor for repetition, drift, and pattern reuse across the story.
+
+If dialogue, intimacy, emotional beats, sentence rhythm, or scene structure begin repeating:
+- correct immediately
+- vary pacing
+- vary emotional tone
+- vary interaction style
+- vary scene purpose
+
+Do not fall into repetitive loops.
+
+Avoid repeatedly using:
+- the same argument structure
+- the same flirt structure
+- the same dominance dynamic
+- the same emotional reactions
+- the same physical phrasing
+- the same sentence cadence
+
+Each chapter must feel fresh and evolving.
+
+Relationship progression must evolve naturally instead of repeating familiar beats.
+
+The story should feel written by a human author intentionally developing character dynamics, not repeating successful prior outputs.
+
+BOOK IDENTITY PROTECTION:
+
+This story must have its own unique:
+- atmosphere
+- dialogue rhythm
+- emotional tone
+- pacing
+- intimacy style
+- character dynamics
+
+Do not echo prior books or previously generated couples.
+
+Avoid:
+- recycled dialogue
+- recycled chemistry patterns
+- recycled emotional structures
+- recycled flirtation dynamics
+- recycled dominance/submission rhythms
+
+Every new story must feel distinctly authored and emotionally unique.
+
+SCENE PURPOSE RULE:
+
+Every scene must have a primary purpose beyond attraction.
+
+Scenes should advance at least one of:
+- plot
+- emotional intimacy
+- trust
+- conflict
+- vulnerability
+- investigation
+- character understanding
+- relationship evolution
+- external danger
+- worldbuilding
+
+Do not let scenes exist only for repeated chemistry.
+
+INTIMACY PROGRESSION:
+
+Physical intimacy must evolve naturally across the story.
+
+Do not repeatedly default to:
+- kissing only
+- handjobs repeatedly
+- oral without progression
+- interrupted intimacy loops
+
+Vary intimacy style, emotional tone, and physical acts.
+
+Include:
+- emotional intimacy
+- rough intimacy
+- soft intimacy
+- impulsive intimacy
+- desperate intimacy
+- playful intimacy
+- explicit penetrative sex earlier when appropriate for pacing
+
+Avoid repetitive sexual structures across scenes.
+
 CHAPTER TITLE RULE:
 
 - Do not duplicate the chapter label
