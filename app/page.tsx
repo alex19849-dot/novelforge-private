@@ -845,6 +845,7 @@ await saveCurrentStory({
             : `Continue to Chapter ${chapters.length + 1}`}
         </button>
       </div>
+      </div>
   </section>
 )}
 
