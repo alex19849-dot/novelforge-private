@@ -767,14 +767,7 @@ await saveCurrentStory({
         Copy
       </button>
 
-      <button
-  onClick={rewriteChapter}
-  disabled={rewriteLoading || !customRewrite.trim()}
-  className="rounded-xl border border-black/10 bg-[#efe3c8] px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
->
-  {rewriteLoading ? "Rewriting..." : "Rewrite"}
-</button>
-
+  
 <button
   onClick={continueStory}
   disabled={continueLoading}
