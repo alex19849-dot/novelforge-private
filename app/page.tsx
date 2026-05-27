@@ -515,11 +515,13 @@ setStoryState(newStoryState);
 });
   }
 
-  async function continueStory() {
-    if (!activeChapter) return;
+ async function continueStory() {
+  if (!activeChapter) return;
 
-    setContinueLoading(true);
+  setContinueLoading(true);
+  setCopyMessage("");
 
+  try {
     const previousChapter = chapters
       .map((chapter, index) => `Chapter ${index + 1}\n${chapter}`)
       .join("\n\n");
@@ -527,22 +529,30 @@ setStoryState(newStoryState);
     const response = await fetch("/api/continue-story", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-   body: JSON.stringify({
-  form: preparedForm,
-  previousChapter,
-  nextChapterNumber: chapters.length + 1,
-  storyState,
-}),
+      body: JSON.stringify({
+        form: preparedForm,
+        previousChapter,
+        nextChapterNumber: chapters.length + 1,
+        storyState,
+      }),
     });
 
+    if (!response.ok) {
+      throw new Error(`API failed: ${response.status}`);
+    }
+
     const data = await response.json();
-    const nextChapter = data.result || "Continue failed.";
+
+    if (!data.result) {
+      throw new Error("No chapter returned.");
+    }
+
+    const nextChapter = data.result;
     const newChapters = [...chapters, nextChapter];
     const newIndex = newChapters.length - 1;
 
     setChapters(newChapters);
     setActiveChapterIndex(newIndex);
-    setContinueLoading(false);
 
     await saveCurrentStory({
       form: preparedForm,
@@ -550,7 +560,39 @@ setStoryState(newStoryState);
       activeChapterIndex: newIndex,
       customRewrite,
     });
+  } catch (error) {
+    console.error("Continue story error:", error);
+    setCopyMessage(
+      error instanceof Error ? error.message : "Continue failed."
+    );
+  } finally {
+    setContinueLoading(false);
   }
+}
+  if (!response.ok) {
+  throw new Error(`API failed: ${response.status}`);
+}
+
+const data = await response.json();
+
+if (!data.result) {
+  throw new Error("No chapter returned.");
+}
+
+const nextChapter = data.result;
+
+const newChapters = [...chapters, nextChapter];
+const newIndex = newChapters.length - 1;
+
+setChapters(newChapters);
+setActiveChapterIndex(newIndex);
+
+await saveCurrentStory({
+  form: preparedForm,
+  chapters: newChapters,
+  activeChapterIndex: newIndex,
+  customRewrite,
+});
 
   async function rewriteChapter() {
     if (!activeChapter || !customRewrite.trim()) return;
