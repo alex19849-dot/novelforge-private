@@ -818,10 +818,10 @@ await saveCurrentStory({
 >
   <div
     className="h-full whitespace-pre-wrap text-left text-[16px] leading-[1.65] text-black sm:text-[17px] md:text-[18px]"
-    style={{
-      columnWidth: "820px",
-      columnGap: "80px",
-    }}
+   style={{
+  columnWidth: `${readerRef.current?.clientWidth || 820}px`,
+  columnGap: "0px",
+}}
   >
     {activeChapter}
   </div>
