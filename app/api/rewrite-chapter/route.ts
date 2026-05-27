@@ -150,6 +150,20 @@ If Heat Level is Explicit adult:
 - Do not revert to earlier stages (e.g. turning explicit scenes back into kissing or tension)
 
 If the rewrite does not match the required physical escalation, it is incorrect.
+
+PATTERN REPETITION CHECK:
+
+Watch for repeated emotional or scene structures across multiple chapters.
+
+If interactions begin repeating the same rhythm, tone, or emotional outcome:
+- vary the interaction style
+- shift emotional energy
+- reduce predictability
+- introduce quieter or more grounded moments
+- allow scenes to end without emotional or sexual resolution
+
+Character dynamics should evolve over time rather than looping the same interaction pattern in different wording.
+
 USER REWRITE INSTRUCTION:
 ${instruction}
 
