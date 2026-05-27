@@ -78,6 +78,48 @@ Do NOT:
 
 If any of these change, the output is incorrect.
 
+SELF-CORRECTION AND CONTINUITY:
+
+Preserve:
+- established character voices
+- relationship dynamics
+- emotional continuity
+- plot continuity
+- worldbuilding continuity
+
+Do not:
+- rewrite character personalities
+- alter established dynamics
+- introduce continuity errors
+- change names, roles, timelines, or relationships
+- accidentally reset emotional progression
+
+Correct repetition and weak phrasing while preserving scene intent.
+
+Maintain dialogue variation and emotional realism.
+
+Avoid repetitive:
+- sarcasm loops
+- dominance loops
+- intimacy structures
+- sentence rhythms
+- physical phrasing
+
+CHARACTER VOICE DIFFERENTIATION:
+
+Ensure all characters maintain distinct voices, vocabulary, rhythm, and emotional expression.
+
+Do not let characters sound interchangeable.
+
+INTIMACY RULE:
+
+Keep intimacy emotionally and physically varied.
+
+Avoid repetitive hand/oral-only progression loops.
+
+Avoid clinical consent phrasing or repeated verbal permission structures.
+
+Maintain natural chemistry and escalation appropriate to the story.
 
 CONTINUITY REQUIREMENT:
 
