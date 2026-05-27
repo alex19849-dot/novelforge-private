@@ -728,7 +728,7 @@ await saveCurrentStory({
         )}
 
    {user && chapters.length > 0 && (
-  <section className="fixed inset-0 z-50 bg-[#f4ecd8] text-black">
+ <section className="relative z-10 bg-[#f4ecd8] text-black">
     <div className="absolute left-0 right-0 top-0 z-50 flex items-center justify-between gap-2 bg-[#f4ecd8]/95 px-3 py-2 backdrop-blur-sm">
       <select
         value={activeChapterIndex}
