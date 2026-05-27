@@ -205,10 +205,15 @@ const [touchEndX, setTouchEndX] = useState<number | null>(null);
 
   const activeChapter = chapters[activeChapterIndex] || "";
 function splitIntoPages(text: string) {
+  const isMobile =
+    typeof window !== "undefined" && window.innerWidth < 768;
+
   const words = text.split(" ");
-  const wordsPerPage = 500;
+
+  const wordsPerPage = isMobile ? 170 : 320;
 
   const pages = [];
+
   for (let i = 0; i < words.length; i += wordsPerPage) {
     pages.push(words.slice(i, i + wordsPerPage).join(" "));
   }
@@ -788,8 +793,8 @@ await saveCurrentStory({
   </button>
 
   <div className="flex h-full items-start justify-center px-5 py-8 md:px-24">
-    <div className="flex w-full max-w-[820px] flex-col">
-     <div className="whitespace-pre-wrap break-words text-left text-[16px] leading-[1.65] text-black sm:text-[17px] md:text-[18px]">
+    <div className="flex h-full w-full max-w-[820px] flex-col overflow-hidden">
+    <div className="h-[calc(100%-36px)] overflow-hidden whitespace-pre-wrap break-words text-left text-[16px] leading-[1.65] text-black sm:text-[17px] md:text-[18px]">
         {pages[pageIndex] || ""}
       </div>
 
