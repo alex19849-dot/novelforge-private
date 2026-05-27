@@ -515,7 +515,7 @@ setStoryState(newStoryState);
 });
   }
 
- async function continueStory() {
+async function continueStory() {
   if (!activeChapter) return;
 
   setContinueLoading(true);
@@ -536,6 +536,37 @@ setStoryState(newStoryState);
         storyState,
       }),
     });
+
+    if (!response.ok) {
+      throw new Error(`API failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.result) {
+      throw new Error("No chapter returned.");
+    }
+
+    const nextChapter = data.result;
+    const newChapters = [...chapters, nextChapter];
+    const newIndex = newChapters.length - 1;
+
+    setChapters(newChapters);
+    setActiveChapterIndex(newIndex);
+
+    await saveCurrentStory({
+      form: preparedForm,
+      chapters: newChapters,
+      activeChapterIndex: newIndex,
+      customRewrite,
+    });
+  } catch (error) {
+    console.error("Continue story error:", error);
+    setCopyMessage(error instanceof Error ? error.message : "Continue failed.");
+  } finally {
+    setContinueLoading(false);
+  }
+}
 
     if (!response.ok) {
       throw new Error(`API failed: ${response.status}`);
