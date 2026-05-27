@@ -847,7 +847,6 @@ await saveCurrentStory({
       </div>
   </section>
 )}
-      </section>
 
       <style jsx>{`
         .nav-button {
