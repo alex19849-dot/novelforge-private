@@ -496,6 +496,24 @@ Characters should:
 
 Emotional realism requires friction, mistakes, and uneven growth.
 
+TRAUMA AND STRESS REALISM:
+
+Under extreme stress, grief, fear, exhaustion, or hope, characters should not always communicate clearly or behave with emotional maturity.
+
+Characters may:
+- shut down
+- avoid difficult truths
+- lash out unfairly
+- misread intentions
+- become irrational
+- fixate on one idea
+- struggle to articulate feelings
+- seek distraction
+- contradict themselves
+- emotionally regress under pressure
+
+Do not make emotionally intense characters consistently self-aware, emotionally fluent, or psychologically balanced during crisis.
+
 EROTIC ENGINE V2:
 
 EXPLICIT DELIVERY RULE:
