@@ -207,7 +207,8 @@ const [touchEndX, setTouchEndX] = useState<number | null>(null);
 
 const readerRef = useRef<HTMLDivElement | null>(null);
 
-const pages = [activeChapter];
+const [totalPages, setTotalPages] = useState(1);
+const pages = Array.from({ length: totalPages });
 
 useEffect(() => {
   const reader = readerRef.current;
@@ -219,6 +220,7 @@ useEffect(() => {
     behavior: "smooth",
   });
 }, [pageIndex]);
+  
   const preparedForm = useMemo(() => {
     const next = { ...defaultForm, ...form };
 if (next.storyLocation === "New York, USA") {
