@@ -464,6 +464,21 @@ If Novella:
 Do not keep delaying payoff.
 Do not keep adding new subplots.
 
+ESCALATION CONTROL:
+
+Do not escalate emotional intimacy, sexual intimacy, trust, vulnerability, and relationship dependency too quickly at the same time.
+
+Allow different parts of the relationship to progress unevenly.
+
+Characters may:
+- trust physically before emotionally
+- rely on each other before admitting affection
+- desire each other before understanding each other
+- protect each other while still resisting intimacy
+
+Avoid making every major interaction deepen all areas of the relationship simultaneously.
+
+Preserve anticipation, uncertainty, and emotional tension across the full story.
 
 EROTIC ENGINE V2:
 
