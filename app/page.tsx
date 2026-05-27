@@ -792,9 +792,20 @@ await saveCurrentStory({
 
   <div className="flex h-full items-start justify-center px-5 py-8 md:px-24">
     <div className="flex h-full w-full max-w-[820px] flex-col overflow-hidden">
-    <div className="h-[calc(100%-36px)] overflow-hidden whitespace-pre-wrap break-words text-left text-[16px] leading-[1.65] text-black sm:text-[17px] md:text-[18px]">
-        {activeChapter}
-      </div>
+   <div
+  ref={readerRef}
+  className="h-[calc(100%-36px)] overflow-hidden"
+>
+  <div
+    className="h-full whitespace-pre-wrap text-left text-[16px] leading-[1.65] text-black sm:text-[17px] md:text-[18px]"
+    style={{
+      columnWidth: "820px",
+      columnGap: "80px",
+    }}
+  >
+    {activeChapter}
+  </div>
+</div>
 
       <p className="mt-4 text-center text-xs text-black/50">
         Page {pageIndex + 1} of {pages.length}
