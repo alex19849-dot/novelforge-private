@@ -208,7 +208,6 @@ const [touchEndX, setTouchEndX] = useState<number | null>(null);
 const readerRef = useRef<HTMLDivElement | null>(null);
 
 const [totalPages, setTotalPages] = useState(1);
-const pages = Array.from({ length: totalPages });
 
 useEffect(() => {
   const reader = readerRef.current;
@@ -221,6 +220,27 @@ useEffect(() => {
   });
 }, [pageIndex]);
   
+  useEffect(() => {
+  const reader = readerRef.current;
+
+  if (!reader) return;
+
+  const updatePages = () => {
+    const total = Math.ceil(
+      reader.scrollWidth / reader.clientWidth
+    );
+
+    setTotalPages(total || 1);
+  };
+
+  updatePages();
+
+  window.addEventListener("resize", updatePages);
+
+  return () => {
+    window.removeEventListener("resize", updatePages);
+  };
+}, [activeChapter]);
   const preparedForm = useMemo(() => {
     const next = { ...defaultForm, ...form };
 if (next.storyLocation === "New York, USA") {
@@ -808,7 +828,7 @@ await saveCurrentStory({
 </div>
 
       <p className="mt-4 text-center text-xs text-black/50">
-        Page {pageIndex + 1} of {pages.length}
+        Page {pageIndex + 1} of {totalPages}
       </p>
 
       <div id="chapter-end" />
