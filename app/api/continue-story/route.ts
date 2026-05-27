@@ -1053,6 +1053,49 @@ After key moments:
 - do not move on too quickly
 
 Ensure scenes have impact, not just action.
+
+ONGOING INTIMACY VARIATION:
+
+Do not repeat the previous intimate scene structure.
+
+If the last scene involved dominance, pinning, hand stimulation, oral focus, or argument-to-sex escalation, the next intimate scene must shift tone, pacing and setup.
+
+Every intimate scene must feel newly built, not repeated with different wording.
+
+DIALOGUE DRIFT CONTROL:
+
+Do not let dialogue drift into constant sarcasm or banter.
+
+Balance:
+- teasing
+- directness
+- real questions
+- short plain answers
+- silence
+- emotional honesty
+
+If the scene becomes a string of comebacks, rewrite the interaction to feel more natural.
+
+VOICE PRESERVATION:
+
+Maintain the unique voice of the current story and current characters.
+
+Do not drift into the tone, rhythm or dialogue style of previous books.
+
+Do not reuse familiar character dynamics from earlier stories.
+
+PHRASE FRESHNESS CHECK:
+
+Before outputting, remove or rewrite familiar repeated phrases such as:
+- his eyes darkened
+- my pulse kicked
+- his mouth curved without humour
+- heat flashed
+- something shifted
+- his jaw tightened
+- he went still
+
+Use specific reactions that fit the current character and moment.
 `;
 
   try {
