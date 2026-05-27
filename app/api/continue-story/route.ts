@@ -542,6 +542,19 @@ Rescued or traumatized adults or children should behave like real adults or chil
 
 Allow emotional consequences to persist across multiple chapters.
 
+POST-RESOLUTION COMPLICATION:
+
+Major victories, reunions, rescues, confessions, or emotional breakthroughs should create new emotional, relational, and psychological complications rather than fully stabilizing the story.
+
+After major turning points:
+- tension should evolve, not disappear
+- relationships may become more complicated
+- emotional consequences should deepen
+- characters may react unpredictably
+- success may create new fears, conflicts, or dependencies
+
+Avoid treating emotional payoff as permanent emotional resolution.
+
 EROTIC ENGINE V2:
 
 EXPLICIT DELIVERY RULE:
