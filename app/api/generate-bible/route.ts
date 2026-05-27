@@ -297,6 +297,20 @@ The environment should feel lived-in, not explained.
 
 If description does not add atmosphere or context, remove it.
 
+SETTING THROUGH ACTION:
+
+Show setting through movement, conflict, work, danger and character interaction.
+
+Avoid pausing the scene for description.
+
+The world should feel specific through:
+- what characters notice
+- what they avoid
+- who watches them
+- what the location forces them to do
+
+Do not over-describe rooms, streets, bars or offices.
+
 CHAPTER 1 PURPOSE:
 - Open with a strong hook.
 - Establish both main leads clearly.
@@ -983,6 +997,37 @@ Do not return to:
 
 Progression must move forward or deepen, never reset.
 
+INTIMACY SCENE ROTATION LOCK:
+
+Do not repeat the same intimacy structure across consecutive scenes.
+
+If the previous intimate scene involved:
+- argument leading to physical contact
+- pinning against a wall, desk, glass or door
+- dominant control language
+- hand stimulation or oral-only progression
+
+The next intimate scene must use a different structure.
+
+Rotate intimacy scenes between:
+- messy and impulsive
+- slower and emotionally exposed
+- playful or teasing
+- urgent and secretive
+- tender after violence
+- filthy but character-specific
+- conflicted but not repetitive
+
+Do not use the same physical setup twice in a row.
+
+Each intimate scene must feel different in:
+- location
+- pacing
+- emotional tone
+- who initiates
+- who loses control
+- what changes afterward
+
 DIALOGUE VARIATION RULE:
 
 Avoid repeating signature phrases or verbal beats across chapters.
@@ -999,6 +1044,27 @@ If a phrase or tone has already been used, replace it with:
 - or remove it entirely
 
 Dialogue must feel natural, character-specific, and varied. Repetition signals weak writing and must be avoided.
+
+DIALOGUE LOOP CONTROL:
+
+Avoid repetitive banter loops where characters trade short sarcastic replies without emotional or plot movement.
+
+Do not overuse:
+- quick contradiction replies
+- “fast answer / accurate answer” style exchanges
+- constant sarcasm as chemistry
+- every line being a comeback
+
+Dialogue must include variation:
+- direct answers
+- silence
+- unfinished thoughts
+- genuine questions
+- plain speech
+- emotional honesty
+- topic changes
+
+If dialogue becomes only banter, correct it immediately.
 
 CONTINUITY RULE:
 
@@ -1038,6 +1104,20 @@ Do not allow both characters to:
 Dialogue and internal narration must reflect personality differences at all times.
 
 If both characters sound similar, the output is incorrect.
+
+CHARACTER VOICE FRESHNESS:
+
+Do not default to the same dominant-controlled man and reactive-sarcastic partner dynamic from previous stories.
+
+For each new story, build character voice from the current character notes only.
+
+Characters must have:
+- their own humour style
+- their own emotional habits
+- their own way of showing desire
+- their own way of handling fear, jealousy and vulnerability
+
+Do not reuse voice patterns from earlier books.
 
 STORY-LEVEL VOICE IDENTITY:
 
@@ -1336,7 +1416,20 @@ Avoid repeated phrases such as:
 
 Vary sentence structure and wording.
 
+GENERIC PHRASE BAN:
 
+Avoid overusing generic romance beats such as:
+- his eyes darkened
+- my pulse kicked
+- his mouth curved without humour
+- heat flashed
+- something shifted
+- his jaw tightened
+- he went still
+
+Use fresher, more specific physical or emotional reactions instead.
+
+If a phrase feels familiar from previous chapters or previous books, rewrite it.
 GOAL:
 
 The rewritten chapter should feel:
