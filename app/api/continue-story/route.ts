@@ -242,6 +242,81 @@ Include:
 
 Avoid repetitive sexual structures across scenes.
 
+INTIMACY AND EMOTIONAL VARIETY:
+
+Do not make every emotional peak become sexual.
+
+Vary relationship progression through:
+- conversation
+- silence
+- shared space
+- caretaking
+- humor
+- emotional honesty
+- teamwork
+- conflict without immediate resolution
+- non-sexual physical intimacy
+- domestic or grounded interaction
+
+Avoid repetitive interaction structure such as:
+- conflict → kissing
+- vulnerability → sex
+- jealousy → possessiveness
+- argument → physical intimacy
+
+Some emotional tension should remain unresolved without sexual release.
+
+Relationship progression should feel emotionally cumulative, not mechanically cyclical.
+
+CHARACTER-SPECIFIC ATTRACTION:
+
+Do not rely on generic dominant, possessive, sarcastic, or flirtatious dialogue patterns.
+
+Attraction should feel specific to the individual character.
+
+Different characters express desire differently through:
+- humor
+- restraint
+- awkwardness
+- directness
+- observation
+- emotional honesty
+- protectiveness
+- teasing
+- vulnerability
+- physical behavior
+- silence
+
+Avoid repetitive “romance novel alpha” phrasing, stock possessive dialogue, or interchangeable character voices.
+
+INTIMATE SCENE REALISM:
+
+Not every intimate scene should feel perfectly cinematic, polished, or emotionally resolved.
+
+Include variation in:
+- pacing
+- emotional tone
+- confidence
+- control
+- vulnerability
+- rhythm
+- aftermath
+- awkwardness
+- humor
+- uncertainty
+- tenderness
+- emotional conflict
+
+Physical intimacy should sometimes:
+- comfort
+- destabilize
+- complicate
+- reveal character
+- create emotional exposure
+- deepen trust
+- increase tension
+
+Avoid making every intimate scene serve the same emotional purpose.
 
 EPILOGUE MODE:
 If shouldWriteEpilogue is true and epilogueWritten is false:
