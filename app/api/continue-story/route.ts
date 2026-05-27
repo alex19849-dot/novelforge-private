@@ -480,6 +480,22 @@ Avoid making every major interaction deepen all areas of the relationship simult
 
 Preserve anticipation, uncertainty, and emotional tension across the full story.
 
+CHARACTER IMPERFECTION:
+
+Do not allow emotionally important characters to become unrealistically emotionally competent, endlessly patient, or consistently correct.
+
+Characters should:
+- misunderstand each other sometimes
+- make flawed decisions
+- react emotionally under pressure
+- fail to communicate fully
+- carry blind spots shaped by their past
+- unintentionally hurt each other
+- misjudge situations
+- struggle with vulnerability
+
+Emotional realism requires friction, mistakes, and uneven growth.
+
 EROTIC ENGINE V2:
 
 EXPLICIT DELIVERY RULE:
