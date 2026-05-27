@@ -758,20 +758,21 @@ await saveCurrentStory({
       </div>
     </div>
 
-    {copyMessage && (
-      <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>
-    )}
+    {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
 
-   <div
+<div
   id="chapter-reader"
- className="relative rounded-3xl border border-white/10 bg-zinc-950/70"
+  className="relative bg-[#f4ecd8] text-black"
+  onClick={() => copyChapter(activeChapter, activeChapterIndex)}
   onTouchStart={handleTouchStart}
   onTouchMove={handleTouchMove}
   onTouchEnd={handleTouchEnd}
+  title="Click chapter text to copy as plain text"
 >
- <div className="relative min-h-[72vh] md:min-h-[78vh] bg-[#f4ecd8] text-black">
   <button
-    onClick={() => {
+    onClick={(event) => {
+      event.stopPropagation();
+
       if (pageIndex > 0) {
         setPageIndex(pageIndex - 1);
       } else if (activeChapterIndex > 0) {
@@ -785,7 +786,9 @@ await saveCurrentStory({
   </button>
 
   <button
-    onClick={() => {
+    onClick={(event) => {
+      event.stopPropagation();
+
       if (pageIndex < pages.length - 1) {
         setPageIndex(pageIndex + 1);
       } else if (activeChapterIndex < chapters.length - 1) {
@@ -798,8 +801,8 @@ await saveCurrentStory({
     →
   </button>
 
-  <div className="flex min-h-[72vh] md:min-h-[78vh] items-center justify-center px-4 py-8 md:px-16">
-    <div className="w-full max-w-[760px]">
+  <div className="flex min-h-[calc(100vh-120px)] items-center justify-center px-4 py-8 md:px-20">
+    <div className="w-full max-w-[780px]">
       <div className="whitespace-pre-wrap break-words text-left text-[17px] leading-[1.75] text-black sm:text-[18px] md:text-[19px]">
         {pages[pageIndex] || ""}
       </div>
@@ -812,40 +815,41 @@ await saveCurrentStory({
     </div>
   </div>
 </div>
-    <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-      <h3 className="mb-4 text-2xl font-bold text-rose-200">
-        Rewrite Chapter
-      </h3>
 
-      <textarea
-        value={customRewrite}
-        onChange={(event) => setCustomRewrite(event.target.value)}
-        placeholder="Example: tighten this, fix flow, make the ex drama more grounded, add more heat, make the dialogue more natural..."
-        className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
-      />
+<div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
+  <h3 className="mb-4 text-2xl font-bold text-rose-200">
+    Rewrite Chapter
+  </h3>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <button
-          onClick={rewriteChapter}
-          disabled={rewriteLoading || !customRewrite.trim()}
-          className="rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700 disabled:opacity-50"
-        >
-          {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
-        </button>
+  <textarea
+    value={customRewrite}
+    onChange={(event) => setCustomRewrite(event.target.value)}
+    placeholder="Example: tighten this, fix flow, make the ex drama more grounded, add more heat, make the dialogue more natural..."
+    className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
+  />
 
-        <button
-          onClick={continueStory}
-          disabled={continueLoading}
-          className="rounded-2xl bg-rose-500 py-3 font-bold hover:bg-rose-400 disabled:opacity-50"
-        >
-          {continueLoading
-            ? "Continuing..."
-            : storyState?.shouldWriteEpilogue
-            ? "Write Epilogue"
-            : `Continue to Chapter ${chapters.length + 1}`}
-        </button>
-      </div>
-      </div>
+  <div className="mt-4 grid gap-3 md:grid-cols-2">
+    <button
+      onClick={rewriteChapter}
+      disabled={rewriteLoading || !customRewrite.trim()}
+      className="rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700 disabled:opacity-50"
+    >
+      {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
+    </button>
+
+    <button
+      onClick={continueStory}
+      disabled={continueLoading}
+      className="rounded-2xl bg-rose-500 py-3 font-bold hover:bg-rose-400 disabled:opacity-50"
+    >
+      {continueLoading
+        ? "Continuing..."
+        : storyState?.shouldWriteEpilogue
+        ? "Write Epilogue"
+        : `Continue to Chapter ${chapters.length + 1}`}
+    </button>
+  </div>
+</div>
   </section>
 )}
 
