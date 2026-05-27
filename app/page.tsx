@@ -769,7 +769,7 @@ await saveCurrentStory({
   onTouchMove={handleTouchMove}
   onTouchEnd={handleTouchEnd}
 >
-   <div className="absolute inset-y-0 left-0 z-50 flex items-center">
+ <div className="relative min-h-[72vh] md:min-h-[78vh] bg-[#f4ecd8] text-black">
   <button
     onClick={() => {
       if (pageIndex > 0) {
@@ -779,13 +779,11 @@ await saveCurrentStory({
         setPageIndex(0);
       }
     }}
-    className="ml-4 rounded-full bg-black/20 backdrop-blur-sm p-3 text-black hover:bg-black/30 transition"
+    className="absolute left-4 top-1/2 z-50 hidden -translate-y-1/2 rounded-full bg-black/20 px-4 py-3 text-2xl text-black hover:bg-black/30 md:block"
   >
     ←
   </button>
-</div>
 
-<div className="absolute inset-y-0 right-0 z-50 flex items-center">
   <button
     onClick={() => {
       if (pageIndex < pages.length - 1) {
@@ -795,19 +793,18 @@ await saveCurrentStory({
         setPageIndex(0);
       }
     }}
-    className="mr-4 rounded-full bg-black/20 backdrop-blur-sm p-3 text-black hover:bg-black/30 transition"
+    className="absolute right-4 top-1/2 z-50 hidden -translate-y-1/2 rounded-full bg-black/20 px-4 py-3 text-2xl text-black hover:bg-black/30 md:block"
   >
     →
   </button>
-</div>
 
-<div className="min-h-[72vh] md:min-h-[78vh] px-3 sm:px-8 md:px-12 py-8">
-    <div className="w-full max-w-[720px] mx-auto px-2 sm:px-0">
-      <div className="whitespace-pre-wrap break-words text-left text-[16px] leading-[1.75] text-zinc-100 sm:text-[17px] md:text-[18px]">
+  <div className="flex min-h-[72vh] md:min-h-[78vh] items-center justify-center px-4 py-8 md:px-16">
+    <div className="w-full max-w-[760px]">
+      <div className="whitespace-pre-wrap break-words text-left text-[17px] leading-[1.75] text-black sm:text-[18px] md:text-[19px]">
         {pages[pageIndex] || ""}
       </div>
 
-      <p className="mt-8 text-center text-xs text-zinc-500">
+      <p className="mt-8 text-center text-xs text-black/50">
         Page {pageIndex + 1} of {pages.length}
       </p>
 
@@ -815,7 +812,6 @@ await saveCurrentStory({
     </div>
   </div>
 </div>
-
     <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
       <h3 className="mb-4 text-2xl font-bold text-rose-200">
         Rewrite Chapter
