@@ -704,65 +704,51 @@ await saveCurrentStory({
           </div>
         )}
 
-       {user && chapters.length > 0 && (
-  <section className="mt-8 w-full max-w-none md:max-w-5xl mx-auto rounded-3xl border border-white/10 bg-black/30 p-3 sm:p-6 shadow-2xl">
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-      <div className="flex flex-wrap gap-2">
-        <select
-          value={activeChapterIndex}
-          onChange={(e) => {
-            setActiveChapterIndex(Number(e.target.value));
-            setPageIndex(0);
-          }}
-          className="rounded-xl bg-zinc-900 px-4 py-2 text-sm text-white"
-        >
-          {chapters.map((_, index) => (
-            <option key={index} value={index}>
-              Chapter {index + 1}
-            </option>
-          ))}
-        </select>
-      </div>
+   {user && chapters.length > 0 && (
+  <section className="fixed inset-0 z-50 bg-[#f4ecd8] text-black">
+    <div className="absolute left-0 right-0 top-0 z-50 flex items-center justify-between gap-2 bg-[#f4ecd8]/95 px-3 py-2 backdrop-blur-sm">
+      <select
+        value={activeChapterIndex}
+        onChange={(e) => {
+          const value = e.target.value;
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() =>
-            document.getElementById("chapter-reader")?.scrollIntoView({
-              behavior: "smooth",
-              block: "start",
-            })
+          if (value === "home") {
+            createNewStory();
+            return;
           }
-          className="small-button"
-        >
-          Chapter Start
-        </button>
 
-        <button
-          onClick={() =>
-            document.getElementById("chapter-end")?.scrollIntoView({
-              behavior: "smooth",
-              block: "end",
-            })
+          if (value === "library") {
+            setShowLibrary(true);
+            return;
           }
-          className="small-button"
-        >
-          Chapter End
-        </button>
 
-        <button
-          onClick={() => copyChapter(activeChapter, activeChapterIndex)}
-          className="small-button"
-        >
-          Copy Chapter
-        </button>
-      </div>
+          setActiveChapterIndex(Number(value));
+          setPageIndex(0);
+        }}
+        className="min-w-0 flex-1 rounded-xl border border-black/10 bg-[#efe3c8] px-3 py-2 text-sm text-black"
+      >
+        <option value="home">Home / New Story</option>
+        <option value="library">Story Library</option>
+
+        {chapters.map((_, index) => (
+          <option key={index} value={index}>
+            Chapter {index + 1}
+          </option>
+        ))}
+      </select>
+
+      <button
+        onClick={() => copyChapter(activeChapter, activeChapterIndex)}
+        className="rounded-xl border border-black/10 bg-[#efe3c8] px-3 py-2 text-sm font-semibold text-black"
+      >
+        Copy
+      </button>
     </div>
-
   {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
 
 <div
   id="chapter-reader"
-  className="relative h-[calc(100vh-96px)] overflow-hidden bg-[#f4ecd8] text-black"
+  className="relative h-screen overflow-hidden bg-[#f4ecd8] pt-14 text-black"
   onClick={() => copyChapter(activeChapter, activeChapterIndex)}
   onTouchStart={handleTouchStart}
   onTouchMove={handleTouchMove}
