@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 type StoryForm = Record<string, string>;
@@ -204,20 +204,21 @@ const [touchEndX, setTouchEndX] = useState<number | null>(null);
   const [copyMessage, setCopyMessage] = useState("");
 
   const activeChapter = chapters[activeChapterIndex] || "";
-function splitIntoPages(text: string) {
-  const words = text.split(" ");
-  const wordsPerPage = 120;
 
-  const pages = [];
-  for (let i = 0; i < words.length; i += wordsPerPage) {
-    pages.push(words.slice(i, i + wordsPerPage).join(" "));
-  }
+const readerRef = useRef<HTMLDivElement | null>(null);
 
-  return pages;
-}
+const pages = [activeChapter];
 
-const pages = splitIntoPages(activeChapter);
-  
+useEffect(() => {
+  const reader = readerRef.current;
+
+  if (!reader) return;
+
+  reader.scrollTo({
+    left: pageIndex * reader.clientWidth,
+    behavior: "smooth",
+  });
+}, [pageIndex]);
   const preparedForm = useMemo(() => {
     const next = { ...defaultForm, ...form };
 if (next.storyLocation === "New York, USA") {
