@@ -798,7 +798,7 @@ await saveCurrentStory({
     onClick={(event) => {
       event.stopPropagation();
 
-      if (pageIndex < pages.length - 1) {
+     if (pageIndex < totalPages - 1) {
         setPageIndex(pageIndex + 1);
       } else if (activeChapterIndex < chapters.length - 1) {
         setActiveChapterIndex(activeChapterIndex + 1);
