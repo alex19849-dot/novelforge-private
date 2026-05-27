@@ -748,7 +748,7 @@ await saveCurrentStory({
 
 <div
   id="chapter-reader"
-  className="relative h-screen overflow-hidden bg-[#f4ecd8] pt-14 text-black"
+ className="relative h-screen overflow-y-auto bg-[#f4ecd8] pt-14 text-black"
   onClick={() => copyChapter(activeChapter, activeChapterIndex)}
   onTouchStart={handleTouchStart}
   onTouchMove={handleTouchMove}
