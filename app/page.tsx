@@ -205,15 +205,10 @@ const [touchEndX, setTouchEndX] = useState<number | null>(null);
 
   const activeChapter = chapters[activeChapterIndex] || "";
 function splitIntoPages(text: string) {
-  const isMobile =
-    typeof window !== "undefined" && window.innerWidth < 768;
-
   const words = text.split(" ");
-
-  const wordsPerPage = isMobile ? 170 : 320;
+  const wordsPerPage = 120;
 
   const pages = [];
-
   for (let i = 0; i < words.length; i += wordsPerPage) {
     pages.push(words.slice(i, i + wordsPerPage).join(" "));
   }
