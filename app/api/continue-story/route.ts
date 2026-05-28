@@ -413,6 +413,28 @@ Do not reset character dynamics backward into:
 
 Maintain emotional continuity from recent chapters.
 
+RELATIONSHIP MEMORY:
+
+The central romantic relationship has an evolving history and must not reset between chapters.
+
+Track and preserve:
+- current relationship phase
+- trust level
+- emotional distance or closeness
+- physical intimacy stage
+- unresolved conflicts
+- recent vulnerability
+- current power balance
+- emotional wounds
+- shared secrets
+- fears, doubts, and dependencies
+
+Do not write the characters as strangers again once they have progressed beyond that stage.
+
+Do not reset attraction, trust, conflict, or intimacy back to early-story dynamics.
+
+The relationship must evolve cumulatively across chapters.
+
 PREVIOUS CHAPTERS:
 ${previousChapter}
 
