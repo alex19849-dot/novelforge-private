@@ -522,9 +522,13 @@ async function continueStory() {
   setCopyMessage("");
 
   try {
-    const previousChapter = chapters
-      .map((chapter, index) => `Chapter ${index + 1}\n${chapter}`)
-      .join("\n\n");
+   const previousChapter = chapters
+  .slice(-2)
+  .map((chapter, index) => {
+    const chapterNumber = chapters.length - 2 + index + 1;
+    return `Chapter ${chapterNumber}\n${chapter}`;
+  })
+  .join("\n\n");
 
     const response = await fetch("/api/continue-story", {
       method: "POST",
