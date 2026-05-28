@@ -380,6 +380,27 @@ Do not reset pacing.
 Do not regress intimacy.
 Do not forget established attraction, injuries, secrets, emotional consequences, jealousy, vulnerability, sexual milestones or relationship fallout.
 
+CURRENT STORY STATE:
+
+CURRENT RELATIONSHIP PHASE:
+The main characters are no longer in early attraction or mystery phase.
+They already know each other deeply and have shared emotional and physical intimacy.
+
+CURRENT EMOTIONAL STATE:
+- The relationship contains accumulated emotional history.
+- Trust exists but remains imperfect.
+- Trauma, conflict, exhaustion, and unresolved emotional tension are active.
+- Characters should behave with continuity from recent chapters.
+
+CONTINUITY RULE:
+Do not reset character dynamics backward into:
+- introductory chemistry
+- stranger-like curiosity
+- emotionally distant flirtation
+- repeated first-attraction behavior
+
+Maintain emotional continuity from recent chapters.
+
 PREVIOUS CHAPTERS:
 ${previousChapter}
 
