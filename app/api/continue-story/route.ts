@@ -327,6 +327,18 @@ If shouldWriteEpilogue is true and epilogueWritten is false:
 - Show relationship after conflict is resolved
 - Do not introduce new major problems
 
+CHAPTER HEADING RULE:
+
+The chapter must begin exactly like this:
+
+Chapter ${nextChapterNumber}
+
+Then use the correct POV heading if the story uses POV headings.
+
+Never omit the chapter number.
+Never restart the story.
+Never write an opening that feels like Chapter 1.
+
 Otherwise:
 Write Chapter ${nextChapterNumber} only.
 
