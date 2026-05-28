@@ -575,42 +575,60 @@ async function continueStory() {
   }
 }
 
-  async function rewriteChapter() {
-    if (!activeChapter || !customRewrite.trim()) return;
+ async function rewriteChapter() {
+  if (!activeChapter || !customRewrite.trim()) return;
 
-    setRewriteLoading(true);
+  setRewriteLoading(true);
+  setCopyMessage("");
 
+  try {
     const response = await fetch("/api/rewrite-chapter", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    chapter: activeChapter,
-    instruction: customRewrite,
-    form: preparedForm,
-    storyState,
-  }),
-});
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chapter: activeChapter,
+        instruction: customRewrite,
+        form: preparedForm,
+        storyState,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Rewrite API failed: ${response.status}`);
+    }
+
     const data = await response.json();
-    const rewritten = data.result || "Rewrite failed.";
+
+    if (!data.result) {
+      throw new Error("No rewritten chapter returned.");
+    }
+
+    const rewritten = data.result;
     const newChapters = [...chapters];
 
     newChapters[activeChapterIndex] = rewritten;
 
+    const newStoryState = data.storyState || storyState;
+
     setChapters(newChapters);
+    setStoryState(newStoryState);
+
+    await saveCurrentStory({
+      form: preparedForm,
+      chapters: newChapters,
+      activeChapterIndex,
+      customRewrite,
+      storyState: newStoryState,
+    });
+  } catch (error) {
+    console.error("Rewrite chapter error:", error);
+    setCopyMessage(
+      error instanceof Error ? error.message : "Rewrite failed."
+    );
+  } finally {
     setRewriteLoading(false);
-
-   const newStoryState = data.storyState || storyState;
-
-setStoryState(newStoryState);
-
-await saveCurrentStory({
-  form: preparedForm,
-  chapters: newChapters,
-  activeChapterIndex: 0,
-  customRewrite,
-  storyState: newStoryState,
-});
   }
+}
 
  async function copyChapter(chapter: string, index: number) {
   try {
