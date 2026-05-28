@@ -413,6 +413,21 @@ Do not reset character dynamics backward into:
 
 Maintain emotional continuity from recent chapters.
 
+CURRENT STORY PHASE:
+
+The story must continue from the current progression point.
+
+Do not restart:
+- emotional arcs
+- attraction dynamics
+- trust development
+- relationship familiarity
+- conflict progression
+- trauma progression
+- intimacy progression
+
+Characters must behave like people carrying accumulated history from previous chapters.
+
 RELATIONSHIP MEMORY:
 
 The central romantic relationship has an evolving history and must not reset between chapters.
