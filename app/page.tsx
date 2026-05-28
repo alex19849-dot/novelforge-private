@@ -523,7 +523,7 @@ async function continueStory() {
 
   try {
    const previousChapter = chapters
-  .slice(-2)
+  .slice(-3)
   .map((chapter, index) => {
     const chapterNumber = chapters.length - 2 + index + 1;
     return `Chapter ${chapterNumber}\n${chapter}`;
