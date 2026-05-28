@@ -600,30 +600,6 @@ async function continueStory() {
     setContinueLoading(false);
   }
 }
-  if (!response.ok) {
-  throw new Error(`API failed: ${response.status}`);
-}
-
-const data = await response.json();
-
-if (!data.result) {
-  throw new Error("No chapter returned.");
-}
-
-const nextChapter = data.result;
-
-const newChapters = [...chapters, nextChapter];
-const newIndex = newChapters.length - 1;
-
-setChapters(newChapters);
-setActiveChapterIndex(newIndex);
-
-await saveCurrentStory({
-  form: preparedForm,
-  chapters: newChapters,
-  activeChapterIndex: newIndex,
-  customRewrite,
-});
 
   async function rewriteChapter() {
     if (!activeChapter || !customRewrite.trim()) return;
