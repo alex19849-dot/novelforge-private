@@ -192,6 +192,24 @@ Must-Have: ${form.mustHave}
 Must-Not-Have: ${form.mustNotHave}
 Locale: ${form.locale}
 
+CURRENT STORY CONTINUITY:
+
+This is a later-stage relationship, not an introductory attraction phase.
+
+Characters already:
+- know each other deeply
+- carry emotional history
+- have unresolved tension and trauma
+- understand each other’s habits, vulnerabilities, and emotional patterns
+
+Do not rewrite scenes as if the characters are:
+- strangers
+- newly intrigued
+- emotionally distant
+- restarting attraction dynamics
+
+Preserve continuity with the current relationship stage and emotional progression.
+
 ORIGINAL CHAPTER:
 ${chapter}
 
