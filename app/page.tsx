@@ -546,7 +546,7 @@ async function continueStory() {
     }
 
     const data = await response.json();
-
+console.log("CONTINUE DATA:", data);
     if (!data.result) {
       throw new Error("No chapter returned.");
     }
