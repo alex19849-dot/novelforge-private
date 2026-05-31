@@ -539,6 +539,7 @@ async function continueStory() {
         previousChapter,
         nextChapterNumber: chapters.length + 1,
         storyState,
+        chapterGuidance,
       }),
     });
 
