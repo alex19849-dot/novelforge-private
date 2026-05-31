@@ -576,7 +576,7 @@ console.log("CONTINUE DATA:", data);
 }
 
  async function rewriteChapter() {
-  if (!activeChapter || !customRewrite.trim()) return;
+  if (!activeChapter || !chapterGuidance.trim()) return;
 
   setRewriteLoading(true);
   setCopyMessage("");
@@ -587,7 +587,7 @@ console.log("CONTINUE DATA:", data);
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chapter: activeChapter,
-        instruction: customRewrite,
+        instruction: chapterGuidance,
         form: preparedForm,
         storyState,
       }),
