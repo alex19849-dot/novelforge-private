@@ -897,7 +897,7 @@ console.log("CONTINUE DATA:", data);
   </h3>
 
   <textarea
-    value={customRewrite}
+    value={chapterGuidance}
     onChange={(event) => setCustomRewrite(event.target.value)}
     placeholder="Example: tighten this, fix flow, make the ex drama more grounded, add more heat, make the dialogue more natural..."
     className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
