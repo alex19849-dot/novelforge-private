@@ -418,7 +418,7 @@ if (next.storyLocation === "Neutral International") {
     const formToSave = override?.form || preparedForm;
     const chaptersToSave = override?.chapters || chapters;
     const activeIndexToSave = override?.activeChapterIndex ?? activeChapterIndex;
-    const rewriteToSave = override?.customRewrite ?? customRewrite;
+    const guidanceToSave = override?.chapterGuidance ?? chapterGuidance;
     const storyStateToSave = override?.storyState ?? storyState;
 
   const payload = {
