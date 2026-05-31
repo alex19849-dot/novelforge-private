@@ -191,7 +191,7 @@ function handleTouchEnd() {
     }
   }
 }
-  const [customRewrite, setCustomRewrite] = useState("");
+  const [chapterGuidance, setChapterGuidance] = useState("");
 
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
 const [touchEndX, setTouchEndX] = useState<number | null>(null);
