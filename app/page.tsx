@@ -618,7 +618,7 @@ console.log("CONTINUE DATA:", data);
       form: preparedForm,
       chapters: newChapters,
       activeChapterIndex,
-      customRewrite,
+      chapterGuidance,
       storyState: newStoryState,
     });
   } catch (error) {
