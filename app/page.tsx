@@ -395,7 +395,7 @@ if (next.storyLocation === "Neutral International") {
     setForm({ ...defaultForm });
     setChapters([]);
     setActiveChapterIndex(0);
-    setCustomRewrite("");
+    setChapterGuidance("");
     setCopyMessage("");
   }
 
@@ -404,7 +404,7 @@ if (next.storyLocation === "Neutral International") {
   form?: StoryForm;
   chapters?: string[];
   activeChapterIndex?: number;
-  customRewrite?: string;
+  chapterGuidance?: string;
   storyState?: any;
 }
   ) {
