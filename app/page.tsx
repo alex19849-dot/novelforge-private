@@ -510,7 +510,7 @@ setStoryState(newStoryState);
   form: preparedForm,
   chapters: newChapters,
   activeChapterIndex,
-  customRewrite,
+  chapterGuidance,
   storyState,
 });
   }
@@ -562,7 +562,7 @@ console.log("CONTINUE DATA:", data);
       form: preparedForm,
       chapters: newChapters,
       activeChapterIndex: newIndex,
-      customRewrite,
+      chapterGuidance,
     });
 
   } catch (error) {
