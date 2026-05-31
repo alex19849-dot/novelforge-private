@@ -427,7 +427,7 @@ if (next.storyLocation === "Neutral International") {
   form: formToSave,
   chapters: chaptersToSave,
   active_chapter_index: activeIndexToSave,
-  custom_rewrite: rewriteToSave,
+  chapterGuidance: guidanceToSave,
  story_state: storyStateToSave || {},
   updated_at: new Date().toISOString(),
 };
