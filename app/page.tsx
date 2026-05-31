@@ -463,7 +463,7 @@ if (next.storyLocation === "Neutral International") {
     setForm({ ...defaultForm, ...story.form });
     setChapters(story.chapters || []);
     setActiveChapterIndex(story.active_chapter_index || 0);
-    setCustomRewrite(story.custom_rewrite || "");
+   setChapterGuidance(story.chapter_guidance || story.custom_rewrite || "");
     setStoryState(story.story_state || {});
     setStoryState(story.story_state || {});
     setShowLibrary(false);
