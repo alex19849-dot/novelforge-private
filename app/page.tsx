@@ -907,7 +907,7 @@ console.log("CONTINUE DATA:", data);
   <div className="mt-4 grid gap-3 md:grid-cols-2">
     <button
       onClick={rewriteChapter}
-      disabled={rewriteLoading || !customRewrite.trim()}
+     disabled={rewriteLoading || !chapterGuidance.trim()}
       className="rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700 disabled:opacity-50"
     >
       {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
