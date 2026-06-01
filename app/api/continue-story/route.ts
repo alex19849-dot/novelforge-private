@@ -77,7 +77,7 @@ export async function POST(req: Request) {
   const previousChapter = body.previousChapter || "";
   const nextChapterNumber = body.nextChapterNumber || 2;
   const incomingState = body.storyState || {};
-
+  const chapterGuidance = body.chapterGuidance || "";
   const maxTokens = getMaxTokens(form.length);
 
   const targetPhysicalStage = nextPhysicalStage(
