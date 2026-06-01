@@ -146,6 +146,12 @@ epilogueWritten:
     : incomingState.epilogueWritten || false,
 };
   const prompt = `
+CHAPTER GUIDANCE:
+${chapterGuidance || "None provided."}
+
+Follow the chapter guidance unless it contradicts established continuity, the story bible, or the current story state.
+
+  
   Maintain the established narrative voice, tone and character dynamics from earlier chapters.
 
 Do not shift into a different writing style, tone or dialogue rhythm.
