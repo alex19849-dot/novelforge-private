@@ -224,21 +224,30 @@ Do not reset emotional states.
 Every rewrite must preserve the chapter's role in the larger story.
 
 HARD LENGTH RULE:
+
 For Novella:
-- Target 900 to 1400 words.
-- Absolute maximum 1500 words.
-- If too long, cut repetition, filler, random description and over-explaining.
-- Do not add extra scenes unless the user specifically asks.
+
+* Preserve approximately the same length as the original chapter.
+* Do not significantly shorten the chapter unless the user explicitly requests it.
+* Retain all major scenes, dialogue, emotional beats, character development and plot progression.
+* Target 3000 to 6000 words when rewriting complete chapters.
+* If shortening is requested, remove repetition and filler before removing story content.
 
 For Short Novel:
-- Target 1600 to 2200 words.
-- Absolute maximum 2400 words.
+
+* Preserve approximately the same length as the original chapter.
+* Target 4000 to 7000 words when rewriting complete chapters.
 
 For Long Novel:
-- Target 2400 to 3200 words.
-- Absolute maximum 3500 words.
 
-If forced to choose, choose shorter, cleaner and sharper.
+* Preserve approximately the same length as the original chapter.
+* Target 5000 to 9000 words when rewriting complete chapters.
+
+If forced to choose:
+
+* Preserve story content over brevity.
+* Preserve emotional beats over compression.
+* Preserve chapter completeness over word-count reduction.
 
 REGIONAL LANGUAGE LOCK:
 Use: ${storyState.regionalLanguage || form.locale || "British English"}.
@@ -869,6 +878,24 @@ If key moments lack impact:
 - allow the moment to land
 
 Do not skip emotional response.
+
+FORMAT PRESERVATION RULE:
+
+Preserve the original chapter structure exactly.
+
+If the original chapter begins with:
+
+Chapter Number
+
+POV Header
+
+the rewrite must preserve both.
+
+Do not remove chapter numbers.
+Do not remove POV headers.
+Do not begin directly with prose.
+Do not change chapter numbering.
+
 
 FINAL OUTPUT:
 Return only the rewritten chapter.
