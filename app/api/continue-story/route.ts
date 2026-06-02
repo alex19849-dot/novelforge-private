@@ -1477,7 +1477,7 @@ Use specific reactions that fit the current character and moment.
     
 console.log("RESPONSE STATUS:", response.status);
 console.log("OUTPUT LENGTH:", response.output_text?.length);
-console.log(JSON.stringify(response, null, 2));
+
     
     const chapter = cleanOutput(response.output_text || "");
 
