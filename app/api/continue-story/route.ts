@@ -206,7 +206,6 @@ ROMANCE PACING:
 - Include emotional intimacy as well as romantic or physical tension.
 - If intimacy occurs, it must change the relationship dynamic afterwards.
 - Keep all romantic and sexual content adult-only.
-- Consent must be clear through mutual action and reaction.
 
 STYLE:
 - Natural commercial romance prose.
