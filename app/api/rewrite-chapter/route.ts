@@ -186,9 +186,6 @@ Return only the rewritten chapter.
       max_output_tokens: maxTokens,
     });
 
-    console.log("REWRITE RESPONSE STATUS:", response.status);
-    console.log("REWRITE OUTPUT LENGTH:", response.output_text?.length);
-
     if (response.status === "incomplete") {
       return Response.json(
         {
