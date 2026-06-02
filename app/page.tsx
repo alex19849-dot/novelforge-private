@@ -236,7 +236,6 @@ export default function Home() {
       chapters: chaptersToSave,
       active_chapter_index: activeIndexToSave,
       custom_rewrite: guidanceToSave,
-      chapter_guidance: guidanceToSave,
       story_state: storyStateToSave || {},
       updated_at: new Date().toISOString(),
     };
