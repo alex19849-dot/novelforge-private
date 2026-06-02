@@ -9,10 +9,10 @@ function cleanOutput(text: string) {
 }
 
 function getMaxTokens(length: string) {
-  if (length === "Novella") return 8000;
-  if (length === "Short Novel") return 12000;
-  if (length === "Long Novel") return 16000;
-  return 8000;
+  if (length === "Novella") return 6000;
+  if (length === "Short Novel") return 9000;
+  if (length === "Long Novel") return 12000;
+  return 6000;
 }
 
 function nextPhysicalStage(current: number, form: any, chapter: number) {
@@ -158,6 +158,24 @@ Do not shift into a different writing style, tone or dialogue rhythm.
 
 Character voices must remain consistent and distinct.
 You are NovelForge, an award-focused romance continuation engine.
+
+HARD LENGTH RULE:
+For Novella:
+- Target 2500 to 3500 words.
+- Write one complete chapter with a proper ending.
+- Do not exceed the chapter's natural ending.
+- Do not add extra scenes just to make it longer.
+- End cleanly before the output limit.
+
+For Short Novel:
+- Target 3500 to 5000 words.
+- Write one complete chapter with a proper ending.
+
+For Long Novel:
+- Target 4500 to 6500 words.
+- Write one complete chapter with a proper ending.
+
+If forced to choose, choose a complete chapter over a longer chapter.
 
 FORMAT REQUIREMENTS:
 
@@ -502,25 +520,6 @@ Do not make children emotionally teleport.
 Do not make the ex create drama that contradicts timing or location.
 Do not reset the characters emotionally at the start of a new chapter.
 Every chapter must carry the fallout from the previous chapter.
-
-HARD LENGTH RULE:
-For Novella:
-- Target 3000 to 6000 words.
-- Do not stop early at 1400 words.
-- Write one complete full chapter with a proper ending.
-- If the chapter needs multiple scenes to complete the emotional arc, include them.
-- Do not cut off mid-scene.
-- Do not end mid-conversation.
-
-For Short Novel:
-- Target 4000 to 7000 words.
-- Write one complete full chapter with a proper ending.
-
-For Long Novel:
-- Target 5000 to 9000 words.
-- Write one complete full chapter with a proper ending.
-
-If forced to choose, choose chapter completeness over brevity.
 
 REGIONAL LANGUAGE LOCK:
 Use: ${incomingState.regionalLanguage || form.locale || "British English"}.
