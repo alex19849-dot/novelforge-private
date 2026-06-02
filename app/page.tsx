@@ -12,313 +12,80 @@ type SavedStory = {
   form: StoryForm;
   chapters: string[];
   active_chapter_index: number;
-  custom_rewrite: string;
+  custom_rewrite?: string;
   story_state?: any;
   chapter_guidance?: string;
 };
 
 const defaultForm: StoryForm = {
   title: "",
+  plot: "",
+  characterNotes: "",
+  mustNotHave: "",
+
   relationship: "MM Romance",
-  storyLocation: "New York, USA",
-  subgenre: "Sports Romance",
-  subgenreDetail: "Ice hockey",
+  storyLocation: "London, UK",
+  subgenre: "Workplace",
+  subgenreDetail: "Office romance",
   length: "Novella",
   heat: "Explicit adult",
   burnPacing: "Fast burn",
   pov: "First person, dual POV",
   ending: "Happy ending",
-  
-  tropes: "Enemies to lovers",
-  plot: "",
+  tropes: "Gay for you, workplace romance, forced proximity, boss x assistant",
   mustHave: "",
-  mustNotHave: "Random object descriptions, Over-described rooms, Cheating",
-  characterNotes: "",
 
-  romanceDynamic: "Rival x rival",
-  attractionStyle: "Hate attraction",
-  attractionFocus: "Mouth, Voice, Body, Competence",
-  sexualStyle: "Teasing, Jealous heat, Rough edge",
-  spiceTiming: "Middle",
-
-  mmNuance: "Masc x masc, One more emotionally closed, No homophobia plot",
-  mfNuance: "Strong heroine, Modern gender roles, Hero falls first",
-  ffNuance: "Emotionally layered, strong agency, no stereotypes",
-
-  c1Name: "",
-  c1Age: "",
-  c1Appearance: "",
-  c1Job: "",
-  c1Personality: "",
-  c1Speech: "",
-  c1Flaws: "",
-  c1Desire: "",
-  c1Fear: "",
-  c1Secret: "",
-  c1Wound: "",
-  c1LoveLanguage: "",
-  c1Attachment: "Guarded but loyal",
-  c1Jealousy: "Pretends not to care",
-  c1Flirting: "Dry teasing",
-  c1CustomNotes: "",
-
-  c2Name: "",
-  c2Age: "",
-  c2Appearance: "",
-  c2Job: "",
-  c2Personality: "",
-  c2Speech: "",
-  c2Flaws: "",
-  c2Desire: "",
-  c2Fear: "",
-  c2Secret: "",
-  c2Wound: "",
-  c2LoveLanguage: "",
-  c2Attachment: "Detached until attached",
-  c2Jealousy: "Possessive tension",
-  c2Flirting: "Cocky banter",
-  c2CustomNotes: "",
-
-  setting: "",
-  externalConflict: "Career pressure",
-  internalConflict: "Trust issues",
-  romanticConflict: "Rivals",
   locale: "British English",
-  regionVoice: "Neutral British",
+  regionVoice: "London / South East",
+  setting: "London",
   authorFlavour: "Spicy commercial romance",
   voiceStyle: "Commercial romance",
   dialogueStyle: "Natural / grounded",
   proseDensity: "Lean",
-  chapterOpener: "Tension heavy",
-  endingGlow: "Quiet domestic happiness",
-  grounding: "Mundane everyday detail, Physical exhaustion, Realistic awkwardness, Messy emotions",
-  avoidStyle: "Purple prose, Therapy-speak, Long dashes, Random setting description",
-  intensity: "Dramatic",
-  ageBracket: "22 to 30",
+  chapterOpener: "Character-driven",
+  avoidStyle: "Purple prose, therapy-speak, long dashes, over-described rooms",
 };
 
-const relationshipOptions = ["MF Romance", "MM Romance", "FF Romance"];
-const lengthOptions = ["Novella", "Short Novel", "Long Novel"];
-const subgenreOptions = [
-  "Contemporary",
-  "Sports Romance",
-  "Small Town",
-  "Workplace",
-  "Dark Romance",
-  "Celebrity",
-  "Paranormal",
-  "Fantasy Romance",
-  "Historical",
-  "Second Chance",
-];
-const heatOptions = ["Fade to black", "Mild", "Spicy", "Explicit adult"];
-const burnOptions = ["Instant attraction", "Fast burn", "Medium burn", "Slow burn", "Agonising slow burn"];
-const tropeOptions = [
-  "Enemies to lovers",
-  "Friends to lovers",
-  "Forced proximity",
-  "Fake dating",
-  "Second chance",
-  "Grumpy / sunshine",
-  "Only one bed",
-  "Secret child",
-  "Forbidden attraction",
-  "Celebrity romance",
-  "Workplace romance",
-  "Small town romance",
-  "High angst",
-  "Found family",
-];
-const storyLocationOptions = [
-  "New York, USA",
-  "California, USA",
-  "Southern USA",
-  "Midwest USA",
-  "London, UK",
-  "Northern England, UK",
-  "Scotland, UK",
-  "Canada",
-  "Australia",
-  "Neutral International",
-];
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [email, setEmail] = useState("");
   const [authMessage, setAuthMessage] = useState("");
   const [loadingAuth, setLoadingAuth] = useState(true);
-  const [storyState, setStoryState] = useState<any>({});
 
   const [form, setForm] = useState<StoryForm>({ ...defaultForm });
+  const [storyState, setStoryState] = useState<any>({});
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
 
   const [chapters, setChapters] = useState<string[]>([]);
   const [activeChapterIndex, setActiveChapterIndex] = useState(0);
   const [pageIndex, setPageIndex] = useState(0);
-  function handleTouchStart(e: React.TouchEvent) {
-  setTouchEndX(null);
-  setTouchStartX(e.targetTouches[0].clientX);
-}
+  const [totalPages, setTotalPages] = useState(1);
 
-function handleTouchMove(e: React.TouchEvent) {
-  setTouchEndX(e.targetTouches[0].clientX);
-}
-
-function handleTouchEnd() {
-  if (touchStartX === null || touchEndX === null) return;
-
-  const distance = touchStartX - touchEndX;
-  const minSwipeDistance = 50;
-
-  if (distance > minSwipeDistance) {
-    if (pageIndex < totalPages - 1) {
-      setPageIndex(pageIndex + 1);
-      document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
-    } else if (activeChapterIndex < chapters.length - 1) {
-      setActiveChapterIndex(activeChapterIndex + 1);
-      setPageIndex(0);
-      document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
-    }
-  }
-
-  if (distance < -minSwipeDistance) {
-    if (pageIndex > 0) {
-      setPageIndex(pageIndex - 1);
-      document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
-    } else if (activeChapterIndex > 0) {
-      setActiveChapterIndex(activeChapterIndex - 1);
-      setPageIndex(0);
-      document.getElementById("chapter-reader")?.scrollIntoView({ block: "start" });
-    }
-  }
-}
   const [chapterGuidance, setChapterGuidance] = useState("");
-
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-const [touchEndX, setTouchEndX] = useState<number | null>(null);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [copyMessage, setCopyMessage] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [continueLoading, setContinueLoading] = useState(false);
   const [rewriteLoading, setRewriteLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [showLibrary, setShowLibrary] = useState(false);
-  const [copyMessage, setCopyMessage] = useState("");
 
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
+  const readerRef = useRef<HTMLDivElement | null>(null);
   const activeChapter = chapters[activeChapterIndex] || "";
 
-const readerRef = useRef<HTMLDivElement | null>(null);
-
-const [totalPages, setTotalPages] = useState(1);
-
-useEffect(() => {
-  const reader = readerRef.current;
-
-  if (!reader) return;
-
-  reader.scrollTo({
-    left: pageIndex * reader.clientWidth,
-    behavior: "smooth",
-  });
-}, [pageIndex]);
-  
-  useEffect(() => {
-  const reader = readerRef.current;
-
-  if (!reader) return;
-
-  const updatePages = () => {
-    const total = Math.ceil(
-      reader.scrollWidth / reader.clientWidth
-    );
-
-    setTotalPages(total || 1);
-  };
-
-  updatePages();
-
-  window.addEventListener("resize", updatePages);
-
-  return () => {
-    window.removeEventListener("resize", updatePages);
-  };
-}, [activeChapter]);
   const preparedForm = useMemo(() => {
-    const next = { ...defaultForm, ...form };
-if (next.storyLocation === "New York, USA") {
-  next.locale = "American English";
-  next.regionVoice = "New York";
-  next.setting = "New York";
-}
-
-if (next.storyLocation === "California, USA") {
-  next.locale = "American English";
-  next.regionVoice = "California";
-  next.setting = "California";
-}
-
-if (next.storyLocation === "Southern USA") {
-  next.locale = "American English";
-  next.regionVoice = "Southern USA";
-  next.setting = "Southern USA";
-}
-
-if (next.storyLocation === "Midwest USA") {
-  next.locale = "American English";
-  next.regionVoice = "Midwest USA";
-  next.setting = "Midwest USA";
-}
-
-if (next.storyLocation === "London, UK") {
-  next.locale = "British English";
-  next.regionVoice = "London / South East";
-  next.setting = "London";
-}
-
-if (next.storyLocation === "Northern England, UK") {
-  next.locale = "British English";
-  next.regionVoice = "Northern UK";
-  next.setting = "Northern England";
-}
-
-if (next.storyLocation === "Scotland, UK") {
-  next.locale = "British English";
-  next.regionVoice = "Scotland";
-  next.setting = "Scotland";
-}
-
-if (next.storyLocation === "Canada") {
-  next.locale = "Canadian English";
-  next.regionVoice = "Neutral Canadian";
-  next.setting = "Canada";
-}
-
-if (next.storyLocation === "Australia") {
-  next.locale = "Australian English";
-  next.regionVoice = "Australian";
-  next.setting = "Australia";
-}
-
-if (next.storyLocation === "Neutral International") {
-  next.locale = "Neutral International";
-  next.regionVoice = "Neutral";
-}
-    const characterNotes = form.characterNotes || "";
-    next.c1CustomNotes = `${next.c1CustomNotes || ""}\n\nGeneral character notes:\n${characterNotes}`.trim();
-    next.c2CustomNotes = `${next.c2CustomNotes || ""}\n\nGeneral character notes:\n${characterNotes}`.trim();
-
-    if (next.relationship === "FF Romance") {
-      next.mmNuance = "";
-      next.mfNuance = "";
-    }
-
-    if (next.subgenre === "Sports Romance" && !next.subgenreDetail) {
-      next.subgenreDetail = "Ice hockey";
-    }
-
-    return next;
+    return {
+      ...defaultForm,
+      ...form,
+      locale: "British English",
+      regionVoice: "London / South East",
+      setting: "London",
+    };
   }, [form]);
-
-  const preview = `${preparedForm.relationship} • ${preparedForm.subgenre} • ${preparedForm.length} • ${preparedForm.burnPacing} • ${preparedForm.heat}`;
 
   useEffect(() => {
     async function initAuth() {
@@ -347,12 +114,61 @@ if (next.storyLocation === "Neutral International") {
     }
   }, [user]);
 
+  useEffect(() => {
+    setPageIndex(0);
+  }, [activeChapterIndex]);
+
+  useEffect(() => {
+    const reader = readerRef.current;
+    if (!reader) return;
+
+    reader.scrollTo({
+      left: pageIndex * reader.clientWidth,
+      behavior: "smooth",
+    });
+  }, [pageIndex]);
+
+  useEffect(() => {
+    const reader = readerRef.current;
+    if (!reader) return;
+
+    const updatePages = () => {
+      const total = Math.ceil(reader.scrollWidth / reader.clientWidth);
+      setTotalPages(total || 1);
+    };
+
+    setTimeout(updatePages, 80);
+    window.addEventListener("resize", updatePages);
+
+    return () => {
+      window.removeEventListener("resize", updatePages);
+    };
+  }, [activeChapter]);
+
   function updateField(field: string, value: string) {
     setForm((previous) => ({ ...previous, [field]: value }));
   }
 
   function getStoryTitle(formData: StoryForm) {
-    return formData.title?.trim() || "Untitled Story";
+    const directTitle = formData.title?.trim();
+    if (directTitle) return directTitle;
+
+    const firstLine = formData.plot?.split("\n")[0]?.trim();
+    if (firstLine) return firstLine.slice(0, 80);
+
+    return "Untitled Story";
+  }
+
+  function createNewStory() {
+    setActiveStoryId(null);
+    setForm({ ...defaultForm });
+    setStoryState({});
+    setChapters([]);
+    setActiveChapterIndex(0);
+    setPageIndex(0);
+    setChapterGuidance("");
+    setCopyMessage("");
+    setShowLibrary(false);
   }
 
   async function signIn() {
@@ -391,23 +207,14 @@ if (next.storyLocation === "Neutral International") {
     setSavedStories((data || []) as SavedStory[]);
   }
 
-  function createNewStory() {
-    setActiveStoryId(null);
-    setForm({ ...defaultForm });
-    setChapters([]);
-    setActiveChapterIndex(0);
-    setChapterGuidance("");
-    setCopyMessage("");
-  }
-
   async function saveCurrentStory(
     override?: {
-  form?: StoryForm;
-  chapters?: string[];
-  activeChapterIndex?: number;
-  chapterGuidance?: string;
-  storyState?: any;
-}
+      form?: StoryForm;
+      chapters?: string[];
+      activeChapterIndex?: number;
+      chapterGuidance?: string;
+      storyState?: any;
+    }
   ) {
     if (!user) {
       setAuthMessage("Log in first so it can save to the cloud.");
@@ -422,19 +229,24 @@ if (next.storyLocation === "Neutral International") {
     const guidanceToSave = override?.chapterGuidance ?? chapterGuidance;
     const storyStateToSave = override?.storyState ?? storyState;
 
-  const payload = {
-  user_id: user.id,
-  title: getStoryTitle(formToSave),
-  form: formToSave,
-  chapters: chaptersToSave,
-  active_chapter_index: activeIndexToSave,
-  custom_rewrite: guidanceToSave,
- story_state: storyStateToSave || {},
-  updated_at: new Date().toISOString(),
-};
+    const payload = {
+      user_id: user.id,
+      title: getStoryTitle(formToSave),
+      form: formToSave,
+      chapters: chaptersToSave,
+      active_chapter_index: activeIndexToSave,
+      custom_rewrite: guidanceToSave,
+      chapter_guidance: guidanceToSave,
+      story_state: storyStateToSave || {},
+      updated_at: new Date().toISOString(),
+    };
 
     if (activeStoryId) {
-      const { error } = await supabase.from("stories").update(payload).eq("id", activeStoryId);
+      const { error } = await supabase
+        .from("stories")
+        .update(payload)
+        .eq("id", activeStoryId);
+
       setSaving(false);
 
       if (error) {
@@ -446,7 +258,12 @@ if (next.storyLocation === "Neutral International") {
       return activeStoryId;
     }
 
-    const { data, error } = await supabase.from("stories").insert(payload).select().single();
+    const { data, error } = await supabase
+      .from("stories")
+      .insert(payload)
+      .select()
+      .single();
+
     setSaving(false);
 
     if (error) {
@@ -464,11 +281,11 @@ if (next.storyLocation === "Neutral International") {
     setForm({ ...defaultForm, ...story.form });
     setChapters(story.chapters || []);
     setActiveChapterIndex(story.active_chapter_index || 0);
-   setChapterGuidance(story.chapter_guidance || story.custom_rewrite || "");
     setStoryState(story.story_state || {});
-    setStoryState(story.story_state || {});
+    setChapterGuidance(story.chapter_guidance || story.custom_rewrite || "");
     setShowLibrary(false);
     setCopyMessage("");
+    setPageIndex(0);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -488,508 +305,535 @@ if (next.storyLocation === "Neutral International") {
     }
 
     setLoading(true);
+    setCopyMessage("");
     setChapters([]);
     setActiveChapterIndex(0);
+    setPageIndex(0);
 
-    const response = await fetch("/api/generate-bible", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(preparedForm),
-    });
+    try {
+      const response = await fetch("/api/generate-bible", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(preparedForm),
+      });
 
-  const data = await response.json();
-const chapter = data.result || "Something went wrong.";
-const newStoryState = data.storyState || {};
-const newChapters = [chapter];
+      if (!response.ok) {
+        throw new Error(`Generate failed: ${response.status}`);
+      }
 
-setStoryState(newStoryState);
-    setChapters(newChapters);
-    setActiveChapterIndex(0);
-    setLoading(false);
+      const data = await response.json();
+      const chapter = data.result || "Something went wrong.";
+      const newStoryState = data.storyState || {};
+      const newChapters = [chapter];
 
-    await saveCurrentStory({
-  form: preparedForm,
-  chapters: newChapters,
-  activeChapterIndex,
-  chapterGuidance,
-  storyState,
-});
-  }
+      setStoryState(newStoryState);
+      setChapters(newChapters);
+      setActiveChapterIndex(0);
 
-async function continueStory() {
-  if (!activeChapter) return;
-
-  setContinueLoading(true);
-  setCopyMessage("");
-
-  try {
-  const previousChapter = chapters
-  .slice(-3)
-  .join("\n\n");
-
-    const response = await fetch("/api/continue-story", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      await saveCurrentStory({
         form: preparedForm,
-        previousChapter,
-        nextChapterNumber: chapters.length + 1,
-        storyState,
+        chapters: newChapters,
+        activeChapterIndex: 0,
         chapterGuidance,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`API failed: ${response.status}`);
+        storyState: newStoryState,
+      });
+    } catch (error) {
+      console.error("Generate story error:", error);
+      setCopyMessage(error instanceof Error ? error.message : "Generate failed.");
+    } finally {
+      setLoading(false);
     }
-
-    const data = await response.json();
-console.log("CONTINUE DATA:", data);
-    if (!data.result) {
-      throw new Error("No chapter returned.");
-    }
-
-    const nextChapter = data.result;
-const newStoryState = data.storyState || storyState;
-const newChapters = [...chapters, nextChapter];
-const newIndex = newChapters.length - 1;
-
-    setChapters(newChapters);
-setActiveChapterIndex(newIndex);
-setStoryState(newStoryState);
-    
-   await saveCurrentStory({
-  form: preparedForm,
-  chapters: newChapters,
-  activeChapterIndex: newIndex,
-  chapterGuidance,
-  storyState: newStoryState,
-});
-
-  } catch (error) {
-    console.error("Continue story error:", error);
-    setCopyMessage(
-      error instanceof Error ? error.message : "Continue failed."
-    );
-  } finally {
-    setContinueLoading(false);
   }
-}
 
- async function rewriteChapter() {
-  if (!activeChapter || !chapterGuidance.trim()) return;
+  async function continueStory() {
+    if (!activeChapter) return;
 
-  setRewriteLoading(true);
-  setCopyMessage("");
+    setContinueLoading(true);
+    setCopyMessage("");
 
-  try {
-    const response = await fetch("/api/rewrite-chapter", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chapter: activeChapter,
-        instruction: chapterGuidance,
+    try {
+      const previousChapter = chapters.slice(-3).join("\n\n");
+
+      const response = await fetch("/api/continue-story", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          form: preparedForm,
+          previousChapter,
+          nextChapterNumber: chapters.length + 1,
+          storyState,
+          chapterGuidance,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Continue failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.result) {
+        throw new Error("No chapter returned.");
+      }
+
+      const nextChapter = data.result;
+      const newStoryState = data.storyState || storyState;
+      const newChapters = [...chapters, nextChapter];
+      const newIndex = newChapters.length - 1;
+
+      setChapters(newChapters);
+      setActiveChapterIndex(newIndex);
+      setStoryState(newStoryState);
+      setPageIndex(0);
+
+      await saveCurrentStory({
         form: preparedForm,
-        storyState,
-      }),
-    });
+        chapters: newChapters,
+        activeChapterIndex: newIndex,
+        chapterGuidance,
+        storyState: newStoryState,
+      });
+    } catch (error) {
+      console.error("Continue story error:", error);
+      setCopyMessage(error instanceof Error ? error.message : "Continue failed.");
+    } finally {
+      setContinueLoading(false);
+    }
+  }
 
-    if (!response.ok) {
-      throw new Error(`Rewrite API failed: ${response.status}`);
+  async function rewriteChapter() {
+    if (!activeChapter || !chapterGuidance.trim()) return;
+
+    setRewriteLoading(true);
+    setCopyMessage("");
+
+    try {
+      const response = await fetch("/api/rewrite-chapter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chapter: activeChapter,
+          instruction: chapterGuidance,
+          form: preparedForm,
+          storyState,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Rewrite failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!data.result) {
+        throw new Error("No rewritten chapter returned.");
+      }
+
+      const rewritten = data.result;
+      const newStoryState = data.storyState || storyState;
+      const newChapters = [...chapters];
+
+      newChapters[activeChapterIndex] = rewritten;
+
+      setChapters(newChapters);
+      setStoryState(newStoryState);
+
+      await saveCurrentStory({
+        form: preparedForm,
+        chapters: newChapters,
+        activeChapterIndex,
+        chapterGuidance,
+        storyState: newStoryState,
+      });
+    } catch (error) {
+      console.error("Rewrite chapter error:", error);
+      setCopyMessage(error instanceof Error ? error.message : "Rewrite failed.");
+    } finally {
+      setRewriteLoading(false);
+    }
+  }
+
+  async function copyChapter() {
+    if (!activeChapter) return;
+
+    try {
+      await navigator.clipboard.writeText(activeChapter);
+      setCopyMessage(`Chapter ${activeChapterIndex + 1} copied.`);
+      setTimeout(() => setCopyMessage(""), 2500);
+    } catch (error) {
+      console.error(error);
+      setCopyMessage("Could not copy chapter.");
+      setTimeout(() => setCopyMessage(""), 2500);
+    }
+  }
+
+  function previousPage() {
+    if (pageIndex > 0) {
+      setPageIndex(pageIndex - 1);
+      return;
     }
 
-    const data = await response.json();
+    if (activeChapterIndex > 0) {
+      setActiveChapterIndex(activeChapterIndex - 1);
+      setPageIndex(0);
+    }
+  }
 
-    if (!data.result) {
-      throw new Error("No rewritten chapter returned.");
+  function nextPage() {
+    if (pageIndex < totalPages - 1) {
+      setPageIndex(pageIndex + 1);
+      return;
     }
 
-    const rewritten = data.result;
-    const newChapters = [...chapters];
-
-    newChapters[activeChapterIndex] = rewritten;
-
-    const newStoryState = data.storyState || storyState;
-
-    setChapters(newChapters);
-    setStoryState(newStoryState);
-
-    await saveCurrentStory({
-      form: preparedForm,
-      chapters: newChapters,
-      activeChapterIndex,
-      chapterGuidance,
-      storyState: newStoryState,
-    });
-  } catch (error) {
-    console.error("Rewrite chapter error:", error);
-    setCopyMessage(
-      error instanceof Error ? error.message : "Rewrite failed."
-    );
-  } finally {
-    setRewriteLoading(false);
+    if (activeChapterIndex < chapters.length - 1) {
+      setActiveChapterIndex(activeChapterIndex + 1);
+      setPageIndex(0);
+    }
   }
-}
 
- async function copyChapter(chapter: string, index: number) {
-  try {
-    await navigator.clipboard.writeText(chapter);
-    setCopyMessage(`Chapter ${index + 1} copied as plain text.`);
-    setTimeout(() => setCopyMessage(""), 2500);
-  } catch (error) {
-    console.error(error);
-    setCopyMessage("Could not copy chapter.");
-    setTimeout(() => setCopyMessage(""), 2500);
+  function handleTouchStart(e: React.TouchEvent) {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
   }
-}
+
+  function handleTouchMove(e: React.TouchEvent) {
+    setTouchEndX(e.targetTouches[0].clientX);
+  }
+
+  function handleTouchEnd() {
+    if (touchStartX === null || touchEndX === null) return;
+
+    const distance = touchStartX - touchEndX;
+    const minSwipeDistance = 50;
+
+    if (distance > minSwipeDistance) nextPage();
+    if (distance < -minSwipeDistance) previousPage();
+  }
 
   if (loadingAuth) {
     return (
-      <main className="min-h-screen bg-zinc-950 text-white grid place-items-center">
-        <p className="text-zinc-300">Loading NovelForge...</p>
+      <main className="grid min-h-screen place-items-center bg-[#f4ecd8] text-[#111111]">
+        <p>Loading NovelForge...</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-zinc-950 via-stone-950 to-rose-950 text-white">
-     <header className="border-b border-white/10 bg-zinc-950/90 backdrop-blur-xl">
-        <div className="mx-auto max-w-7xl px-5 py-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">NovelForge</h1>
-            <p className="text-xs text-rose-300 uppercase tracking-[0.25em]">
-              Award-focused romance builder
-            </p>
-          </div>
+    <main className="min-h-screen bg-[#f4ecd8] text-[#111111]">
+      <header className="sticky top-0 z-50 border-b border-[#d6c5a3] bg-[#efe3c8]/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <h1 className="text-2xl font-black tracking-tight">NovelForge</h1>
 
           <nav className="flex flex-wrap items-center gap-2">
-            {user && (
+            {user ? (
               <>
-                <button onClick={createNewStory} className="nav-button">New Story</button>
-                <button onClick={() => setShowLibrary((prev) => !prev)} className="nav-button">
+                <button onClick={createNewStory} className="top-button">
+                  New Story
+                </button>
+                <button onClick={() => setShowLibrary((prev) => !prev)} className="top-button">
                   Story Library
                 </button>
-                <button onClick={() => saveCurrentStory()} className="nav-button">
-                  {saving ? "Saving..." : "Save"}
+                <button onClick={() => saveCurrentStory()} className="top-button">
+                  {saving ? "Saving..." : "Save Story"}
                 </button>
-                <button onClick={signOut} className="nav-button">Log Out</button>
+                <button onClick={signOut} className="top-button">
+                  Log Out
+                </button>
               </>
+            ) : (
+              <span className="text-sm font-semibold">Log in to save stories</span>
             )}
           </nav>
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-0 py-8 sm:px-5">
-        {!user && (
-          <div className="mx-auto mt-16 max-w-xl rounded-3xl border border-white/10 bg-white/10 p-8 shadow-2xl backdrop-blur-xl">
-            <h2 className="text-3xl font-bold mb-3">Log in</h2>
-            <p className="text-zinc-300 mb-6">Save stories and continue them across devices.</p>
+      {!user && (
+        <section className="mx-auto grid min-h-[calc(100vh-72px)] max-w-xl place-items-center px-4">
+          <div className="w-full rounded-3xl border border-[#d6c5a3] bg-[#efe3c8] p-6 shadow-xl">
+            <h2 className="mb-2 text-3xl font-black">Log in</h2>
+            <p className="mb-5 text-sm text-black/70">
+              Enter your email and NovelForge will send a login link.
+            </p>
 
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               placeholder="you@email.com"
-              className="mb-4 w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
+              className="mb-4 w-full rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] px-4 py-3 outline-none"
             />
 
-            <button onClick={signIn} className="w-full rounded-2xl bg-rose-500 py-4 font-bold hover:bg-rose-400">
+            <button onClick={signIn} className="primary-button w-full">
               Send Login Link
             </button>
 
-            {authMessage && <p className="mt-4 text-sm text-rose-200">{authMessage}</p>}
+            {authMessage && <p className="mt-4 text-sm font-semibold">{authMessage}</p>}
           </div>
-        )}
+        </section>
+      )}
 
-        {user && chapters.length === 0 && (
-        <div className="w-full max-w-4xl mx-auto">
-            <section className="rounded-3xl border border-white/10 bg-white/10 p-6 shadow-2xl backdrop-blur-xl">
-              <div className="mb-6">
-                <h2 className="text-4xl font-black">{getStoryTitle(form)}</h2>
-                <p className="mt-2 text-zinc-300">
-                  Choose the essentials. NovelForge handles the pacing, depth, continuity and messy little human feelings in the background.
-                </p>
-              </div>
+      {user && showLibrary && (
+        <section className="mx-auto max-w-4xl px-4 py-6">
+          <div className="rounded-3xl border border-[#d6c5a3] bg-[#efe3c8] p-5 shadow-xl">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-2xl font-black">Story Library</h2>
+              <button onClick={() => setShowLibrary(false)} className="secondary-button">
+                Close
+              </button>
+            </div>
 
-              {showLibrary && (
-                <div className="mb-6 rounded-3xl border border-white/10 bg-black/25 p-5">
-                  <h3 className="mb-4 text-xl font-bold text-rose-200">Story Library</h3>
-
-                  <div className="grid gap-3">
-                    {savedStories.length === 0 && <p className="text-sm text-zinc-400">No saved stories yet.</p>}
-
-                    {savedStories.map((story) => (
-                      <div key={story.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-zinc-950/50 p-4">
-                        <div>
-                          <p className="font-bold text-rose-100">{story.title}</p>
-                          <p className="text-xs text-zinc-400">{(story.chapters || []).length} chapter{(story.chapters || []).length === 1 ? "" : "s"}</p>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button onClick={() => loadStory(story)} className="small-button">Load</button>
-                          <button onClick={() => deleteStory(story.id)} className="small-button">Delete</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            <div className="grid gap-3">
+              {savedStories.length === 0 && (
+                <p className="text-sm text-black/60">No saved stories yet.</p>
               )}
 
-              <div className="grid gap-5">
-                <Card title="Create Story">
-                  <Input label="Story Title" field="title" form={form} updateField={updateField} />
-<Select
-  label="Story Location / Dialect"
-  field="storyLocation"
-  value={form.storyLocation}
-  options={storyLocationOptions}
-  updateField={updateField}
-/>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Select label="Romance Type" field="relationship" value={form.relationship} options={relationshipOptions} updateField={updateField} />
-                    <Select label="Story Length" field="length" value={form.length} options={lengthOptions} updateField={updateField} />
-                    <Select label="Subgenre" field="subgenre" value={form.subgenre} options={subgenreOptions} updateField={updateField} />
-                    <Input label="Subgenre Detail (optional)" field="subgenreDetail" form={form} updateField={updateField} />
-                    <Select label="Heat Level" field="heat" value={form.heat} options={heatOptions} updateField={updateField} />
-                    <Select label="Burn Pacing" field="burnPacing" value={form.burnPacing} options={burnOptions} updateField={updateField} />
-                    <Select label="Main Trope" field="tropes" value={form.tropes} options={tropeOptions} updateField={updateField} />
+              {savedStories.map((story) => (
+                <div
+                  key={story.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] p-4"
+                >
+                  <div>
+                    <p className="font-bold">{story.title}</p>
+                    <p className="text-xs text-black/60">
+                      {(story.chapters || []).length} chapter
+                      {(story.chapters || []).length === 1 ? "" : "s"}
+                    </p>
                   </div>
 
-                  <TextArea label="Story Idea" field="plot" form={form} updateField={updateField} placeholder="Example: rival hockey players forced onto the same line, one has a secret child and a manipulative ex..." />
-                  <TextArea label="Character Notes (optional)" field="characterNotes" form={form} updateField={updateField} placeholder="Names, ages, appearance, personalities, secrets, dynamics, anything you already know..." />
-                  <TextArea label="Must Avoid" field="mustNotHave" form={form} updateField={updateField} placeholder="Anything you do not want included..." />
-                </Card>
+                  <div className="flex gap-2">
+                    <button onClick={() => loadStory(story)} className="secondary-button">
+                      Load
+                    </button>
+                    <button onClick={() => deleteStory(story.id)} className="secondary-button">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
-                <button onClick={generateStory} className="rounded-2xl bg-rose-500 py-4 text-lg font-bold shadow-2xl hover:bg-rose-400">
-                  {loading ? "Generating Chapter 1..." : "Generate Chapter 1"}
+      {user && chapters.length === 0 && (
+        <section className="mx-auto max-w-4xl px-4 py-8">
+          <div className="rounded-3xl border border-[#d6c5a3] bg-[#efe3c8] p-5 shadow-xl">
+            <div className="mb-6">
+              <h2 className="text-3xl font-black">New Story</h2>
+              <p className="mt-2 text-sm text-black/70">
+                Three boxes. No cockpit full of buttons. Humanity learns.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              <TextArea
+                label="Story Idea"
+                field="plot"
+                form={form}
+                updateField={updateField}
+                placeholder="Paste the full story idea here."
+                tall
+              />
+
+              <TextArea
+                label="Characters"
+                field="characterNotes"
+                form={form}
+                updateField={updateField}
+                placeholder="Paste character details, side characters, family, appearances, ages, dynamics, secrets and anything important."
+                tall
+              />
+
+              <TextArea
+                label="Must Avoid"
+                field="mustNotHave"
+                form={form}
+                updateField={updateField}
+                placeholder="Paste anything the story must avoid."
+              />
+
+              <button onClick={generateStory} disabled={loading} className="primary-button">
+                {loading ? "Generating..." : "Generate Story"}
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {user && chapters.length > 0 && (
+        <section className="min-h-screen bg-[#f4ecd8] text-[#111111]">
+          <div className="sticky top-[57px] z-40 border-b border-[#d6c5a3] bg-[#efe3c8]/95 px-3 py-2 backdrop-blur">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
+              <select
+                value={activeChapterIndex}
+                onChange={(event) => {
+                  setActiveChapterIndex(Number(event.target.value));
+                  setPageIndex(0);
+                }}
+                className="min-w-[160px] flex-1 rounded-xl border border-[#d6c5a3] bg-[#f9f2df] px-3 py-2 text-sm font-semibold outline-none"
+              >
+                {chapters.map((_, index) => (
+                  <option key={index} value={index}>
+                    Chapter {index + 1}
+                  </option>
+                ))}
+              </select>
+
+              <button onClick={createNewStory} className="reader-button">
+                Home
+              </button>
+              <button onClick={() => setShowLibrary((prev) => !prev)} className="reader-button">
+                Library
+              </button>
+              <button onClick={() => saveCurrentStory()} className="reader-button">
+                Save
+              </button>
+              <button onClick={copyChapter} className="reader-button">
+                Copy
+              </button>
+            </div>
+          </div>
+
+          {copyMessage && (
+            <p className="mx-auto max-w-4xl px-4 pt-3 text-sm font-semibold text-[#7a5c3e]">
+              {copyMessage}
+            </p>
+          )}
+
+          <div
+            id="chapter-reader"
+            className="relative h-[calc(100vh-115px)] overflow-hidden bg-[#f4ecd8]"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            <button
+              onClick={previousPage}
+              className="absolute left-4 top-1/2 z-30 hidden -translate-y-1/2 rounded-full bg-[#d6c5a3]/70 px-4 py-3 text-2xl font-black hover:bg-[#d6c5a3] md:block"
+            >
+              ←
+            </button>
+
+            <button
+              onClick={nextPage}
+              className="absolute right-4 top-1/2 z-30 hidden -translate-y-1/2 rounded-full bg-[#d6c5a3]/70 px-4 py-3 text-2xl font-black hover:bg-[#d6c5a3] md:block"
+            >
+              →
+            </button>
+
+            <div className="flex h-full items-start justify-center px-5 py-7 md:px-24">
+              <div className="flex h-full w-full max-w-[820px] flex-col overflow-hidden">
+                <div ref={readerRef} className="h-[calc(100%-34px)] overflow-hidden">
+                  <div
+                    className="h-full whitespace-pre-wrap text-left text-[16px] leading-[1.7] text-[#111111] sm:text-[17px] md:text-[18px]"
+                    style={{
+                      columnWidth: `${readerRef.current?.clientWidth || 820}px`,
+                      columnGap: "0px",
+                    }}
+                  >
+                    {activeChapter}
+                  </div>
+                </div>
+
+                <p className="mt-3 text-center text-xs text-black/50">
+                  Page {pageIndex + 1} of {totalPages}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mx-auto max-w-4xl px-4 py-6">
+            <div className="rounded-3xl border border-[#d6c5a3] bg-[#efe3c8] p-5 shadow-xl">
+              <label className="grid gap-2">
+                <span className="text-sm font-bold">Chapter Guidance</span>
+                <textarea
+                  value={chapterGuidance}
+                  onChange={(event) => setChapterGuidance(event.target.value)}
+                  placeholder="Add guidance for the next chapter or instructions for rewriting the current chapter."
+                  className="min-h-[130px] w-full rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] px-4 py-3 text-black outline-none"
+                />
+              </label>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={rewriteChapter}
+                  disabled={rewriteLoading || !chapterGuidance.trim()}
+                  className="secondary-action-button"
+                >
+                  {rewriteLoading ? "Rewriting..." : "Rewrite Current Chapter"}
+                </button>
+
+                <button
+                  onClick={continueStory}
+                  disabled={continueLoading}
+                  className="primary-button"
+                >
+                  {continueLoading
+                    ? "Generating..."
+                    : storyState?.shouldWriteEpilogue
+                    ? "Write Epilogue"
+                    : `Generate Chapter ${chapters.length + 1}`}
                 </button>
               </div>
-            </section>
-
-           
+            </div>
           </div>
-        )}
+        </section>
+      )}
 
-   {user && chapters.length > 0 && (
- <section className="relative z-10 bg-[#f4ecd8] text-black">
-    <div className="absolute left-0 right-0 top-0 z-50 flex items-center justify-between gap-2 bg-[#f4ecd8]/95 px-3 py-2 backdrop-blur-sm">
-      <select
-        value={activeChapterIndex}
-        onChange={(e) => {
-          const value = e.target.value;
-
-          if (value === "home") {
-            createNewStory();
-            return;
-          }
-
-          if (value === "library") {
-            setShowLibrary(true);
-            return;
-          }
-
-          setActiveChapterIndex(Number(value));
-          setPageIndex(0);
-        }}
-        className="min-w-0 flex-1 rounded-xl border border-black/10 bg-[#efe3c8] px-3 py-2 text-sm text-black"
-      >
-        <option value="home">Home / New Story</option>
-        <option value="library">Story Library</option>
-
-        {chapters.map((_, index) => (
-          <option key={index} value={index}>
-            Chapter {index + 1}
-          </option>
-        ))}
-      </select>
-
-      <button
-        onClick={() => copyChapter(activeChapter, activeChapterIndex)}
-        className="rounded-xl border border-black/10 bg-[#efe3c8] px-3 py-2 text-sm font-semibold text-black"
-      >
-        Copy
-      </button>
-
-  
-<button
-  onClick={continueStory}
-  disabled={continueLoading}
-  className="rounded-xl border border-black/10 bg-[#efe3c8] px-3 py-2 text-sm font-semibold text-black disabled:opacity-50"
->
-  {continueLoading
-    ? "Continuing..."
-    : storyState?.shouldWriteEpilogue
-    ? "Epilogue"
-    : "Continue"}
-</button>
-    </div>
-   
-  {copyMessage && <p className="mb-4 text-sm text-rose-200">{copyMessage}</p>}
-
-<div
-  id="chapter-reader"
- className="relative h-screen overflow-y-auto bg-[#f4ecd8] pt-14 text-black"
-  onClick={() => copyChapter(activeChapter, activeChapterIndex)}
-  onTouchStart={handleTouchStart}
-  onTouchMove={handleTouchMove}
-  onTouchEnd={handleTouchEnd}
-  title="Click chapter text to copy as plain text"
->
-  <button
-    onClick={(event) => {
-      event.stopPropagation();
-
-      if (pageIndex > 0) {
-        setPageIndex(pageIndex - 1);
-      } else if (activeChapterIndex > 0) {
-        setActiveChapterIndex(activeChapterIndex - 1);
-        setPageIndex(0);
-      }
-    }}
-    className="absolute left-4 top-1/2 z-50 hidden -translate-y-1/2 rounded-full bg-black/20 px-4 py-3 text-2xl text-black hover:bg-black/30 md:block"
-  >
-    ←
-  </button>
-
-  <button
-    onClick={(event) => {
-      event.stopPropagation();
-
-     if (pageIndex < totalPages - 1) {
-        setPageIndex(pageIndex + 1);
-      } else if (activeChapterIndex < chapters.length - 1) {
-        setActiveChapterIndex(activeChapterIndex + 1);
-        setPageIndex(0);
-      }
-    }}
-    className="absolute right-4 top-1/2 z-50 hidden -translate-y-1/2 rounded-full bg-black/20 px-4 py-3 text-2xl text-black hover:bg-black/30 md:block"
-  >
-    →
-  </button>
-
-  <div className="flex h-full items-start justify-center px-5 py-8 md:px-24">
-    <div className="flex h-full w-full max-w-[820px] flex-col overflow-hidden">
-   <div
-  ref={readerRef}
-  className="h-[calc(100%-36px)] overflow-hidden"
->
-  <div
-    className="h-full whitespace-pre-wrap text-left text-[16px] leading-[1.65] text-black sm:text-[17px] md:text-[18px]"
-   style={{
-  columnWidth: `${readerRef.current?.clientWidth || 820}px`,
-  columnGap: "0px",
-}}
-  >
-    {activeChapter}
-  </div>
-</div>
-
-      <p className="mt-4 text-center text-xs text-black/50">
-        Page {pageIndex + 1} of {totalPages}
-      </p>
-
-      <div id="chapter-end" />
-    </div>
-  </div>
-</div>
-
-<div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5">
-  <h3 className="mb-4 text-2xl font-bold text-rose-200">
-    Rewrite Chapter
-  </h3>
-
-  <textarea
-    value={chapterGuidance}
-    onChange={(event) => setChapterGuidance(event.target.value)}
-    placeholder="Example: tighten this, fix flow, make the ex drama more grounded, add more heat, make the dialogue more natural..."
-    className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
-  />
-
-  <div className="mt-4 grid gap-3 md:grid-cols-2">
-    <button
-      onClick={rewriteChapter}
-     disabled={rewriteLoading || !chapterGuidance.trim()}
-      className="rounded-2xl border border-white/10 bg-zinc-800 py-3 font-semibold hover:bg-zinc-700 disabled:opacity-50"
-    >
-      {rewriteLoading ? "Rewriting..." : "Rewrite This Chapter"}
-    </button>
-
-    <button
-      onClick={continueStory}
-      disabled={continueLoading}
-      className="rounded-2xl bg-rose-500 py-3 font-bold hover:bg-rose-400 disabled:opacity-50"
-    >
-      {continueLoading
-        ? "Continuing..."
-        : storyState?.shouldWriteEpilogue
-        ? "Write Epilogue"
-        : `Continue to Chapter ${chapters.length + 1}`}
-    </button>
-  </div>
-</div>
-</section>
-)}
- </section>
       <style jsx>{`
-        .nav-button {
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          background: rgba(255, 255, 255, 0.05);
+        .top-button,
+        .reader-button,
+        .secondary-button {
+          border: 1px solid #d6c5a3;
+          background: #f9f2df;
+          color: #111111;
           border-radius: 999px;
-          padding: 0.6rem 1rem;
+          padding: 0.55rem 0.9rem;
           font-size: 0.875rem;
+          font-weight: 700;
+        }
+
+        .top-button:hover,
+        .reader-button:hover,
+        .secondary-button:hover {
+          background: #efe3c8;
+        }
+
+        .primary-button {
+          border-radius: 1rem;
+          background: #7a5c3e;
           color: white;
+          padding: 0.9rem 1.1rem;
+          font-weight: 900;
+          text-align: center;
         }
 
-        .nav-button:hover {
-          background: rgba(255, 255, 255, 0.12);
+        .primary-button:hover {
+          background: #8d6e4a;
         }
 
-        .small-button {
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          background: rgba(39, 39, 42, 0.9);
-          border-radius: 999px;
-          padding: 0.55rem 0.95rem;
-          font-size: 0.875rem;
-          font-weight: 600;
-          color: white;
+        .primary-button:disabled {
+          opacity: 0.55;
         }
 
-        .small-button:hover {
-          background: rgba(63, 63, 70, 1);
+        .secondary-action-button {
+          border-radius: 1rem;
+          border: 1px solid #d6c5a3;
+          background: #f9f2df;
+          color: #111111;
+          padding: 0.9rem 1.1rem;
+          font-weight: 900;
+          text-align: center;
+        }
+
+        .secondary-action-button:hover {
+          background: #f4ecd8;
+        }
+
+        .secondary-action-button:disabled {
+          opacity: 0.55;
         }
       `}</style>
     </main>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-black/20 p-6">
-      <h3 className="mb-5 text-2xl font-bold text-rose-200">{title}</h3>
-      <div className="grid gap-4">{children}</div>
-    </div>
-  );
-}
-
-function Input({
-  label,
-  field,
-  form,
-  updateField,
-}: {
-  label: string;
-  field: string;
-  form: StoryForm;
-  updateField: (field: string, value: string) => void;
-}) {
-  return (
-    <label className="grid gap-2">
-      <span className="text-sm text-zinc-300">{label}</span>
-      <input
-        value={form[field] || ""}
-        onChange={(event) => updateField(field, event.target.value)}
-        className="w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
-      />
-    </label>
   );
 }
 
@@ -999,60 +843,26 @@ function TextArea({
   form,
   updateField,
   placeholder = "",
+  tall = false,
 }: {
   label: string;
   field: string;
   form: StoryForm;
   updateField: (field: string, value: string) => void;
   placeholder?: string;
+  tall?: boolean;
 }) {
   return (
     <label className="grid gap-2">
-      <span className="text-sm text-zinc-300">{label}</span>
+      <span className="text-sm font-bold">{label}</span>
       <textarea
         value={form[field] || ""}
         onChange={(event) => updateField(field, event.target.value)}
         placeholder={placeholder}
-        className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
+        className={`w-full rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] px-4 py-3 text-black outline-none ${
+          tall ? "min-h-[220px]" : "min-h-[120px]"
+        }`}
       />
     </label>
-  );
-}
-
-function Select({
-  label,
-  field,
-  value,
-  options,
-  updateField,
-}: {
-  label: string;
-  field: string;
-  value: string;
-  options: string[];
-  updateField: (field: string, value: string) => void;
-}) {
-  return (
-    <label className="grid gap-2">
-      <span className="text-sm text-zinc-300">{label}</span>
-      <select
-        value={value || ""}
-        onChange={(event) => updateField(field, event.target.value)}
-        className="w-full rounded-2xl border border-white/10 bg-zinc-950/70 px-5 py-4 outline-none"
-      >
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function PreviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-white/10 bg-zinc-950/50 p-4">
-      <p className="text-xs uppercase tracking-[0.18em] text-rose-300">{label}</p>
-      <p className="mt-2 text-zinc-100">{value || "Not set"}</p>
-    </div>
   );
 }
