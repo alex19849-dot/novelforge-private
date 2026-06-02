@@ -146,6 +146,7 @@ epilogueWritten:
     : incomingState.epilogueWritten || false,
 };
   const prompt = `
+  
 CHAPTER GUIDANCE:
 ${chapterGuidance || "None provided."}
 
@@ -1473,7 +1474,11 @@ Use specific reactions that fit the current character and moment.
       input: prompt,
       max_output_tokens: maxTokens,
     });
-
+    
+console.log("RESPONSE STATUS:", response.status);
+console.log("OUTPUT LENGTH:", response.output_text?.length);
+console.log(JSON.stringify(response, null, 2));
+    
     const chapter = cleanOutput(response.output_text || "");
 
     return Response.json({
