@@ -1536,7 +1536,7 @@ without altering the core story.
     const response = await openai.responses.create({
       model: "gpt-5.5",
       reasoning: { effort: "low" },
-      text: { verbosity: "low" },
+     text: { verbosity: "high" },
       input: prompt,
       max_output_tokens: maxTokens,
     });
