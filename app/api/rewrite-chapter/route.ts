@@ -41,12 +41,11 @@ function getStoryVoicePack() {
 }
 
 function getMaxTokens(length: string) {
-if (length === "Novella") return 4200;
-if (length === "Short Novel") return 6200;
-if (length === "Long Novel") return 9000;
-return 4200;
+  if (length === "Novella") return 6000;
+  if (length === "Short Novel") return 9000;
+  if (length === "Long Novel") return 12000;
+  return 6000;
 }
-
 export async function POST(req: Request) {
   const body = await req.json();
 
@@ -224,31 +223,22 @@ Do not reset emotional states.
 Every rewrite must preserve the chapter's role in the larger story.
 
 HARD LENGTH RULE:
-
 For Novella:
-
-* Preserve approximately the same length as the original chapter.
-* Do not significantly shorten the chapter unless the user explicitly requests it.
-* Retain all major scenes, dialogue, emotional beats, character development and plot progression.
-* Target 3000 to 6000 words when rewriting complete chapters.
-* If shortening is requested, remove repetition and filler before removing story content.
+- Target 2500 to 3500 words.
+- Write one complete chapter with a proper ending.
+- Do not exceed the chapter's natural ending.
+- Do not add extra scenes just to make it longer.
+- End cleanly before the output limit.
 
 For Short Novel:
-
-* Preserve approximately the same length as the original chapter.
-* Target 4000 to 7000 words when rewriting complete chapters.
+- Target 3500 to 5000 words.
+- Write one complete chapter with a proper ending.
 
 For Long Novel:
+- Target 4500 to 6500 words.
+- Write one complete chapter with a proper ending.
 
-* Preserve approximately the same length as the original chapter.
-* Target 5000 to 9000 words when rewriting complete chapters.
-
-If forced to choose:
-
-* Preserve story content over brevity.
-* Preserve emotional beats over compression.
-* Preserve chapter completeness over word-count reduction.
-
+If forced to choose, choose a complete chapter over a longer chapter.
 REGIONAL LANGUAGE LOCK:
 Use: ${storyState.regionalLanguage || form.locale || "British English"}.
 Preferred terms: ${(storyState.locationTerms || []).join(", ")}.
