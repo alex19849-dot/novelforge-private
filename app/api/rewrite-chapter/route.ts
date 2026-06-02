@@ -123,7 +123,6 @@ ROMANCE AND INTIMACY:
 - If the original chapter includes intimacy, do not remove it unless the user asks.
 - If the original chapter is explicit, do not fade it to black unless the user asks.
 - Keep romantic and sexual content adult-only.
-- Keep consent clear through mutual action and reaction.
 - Avoid repetitive verbal consent phrasing unless the scene genuinely needs it.
 - If intimacy occurs, it must affect the emotional dynamic afterwards.
 - Do not repeat the same intimacy structure if the rewrite is meant to improve flow or freshness.
