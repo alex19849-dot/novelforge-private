@@ -883,7 +883,7 @@ The rewritten scene must feel different, more specific, and properly progressed,
     const response = await openai.responses.create({
       model: "gpt-5.5",
       reasoning: { effort: "low" },
-      text: { verbosity: "low" },
+      text: { verbosity: "high" },
       input: prompt,
       max_output_tokens: maxTokens,
     });
