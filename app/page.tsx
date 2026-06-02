@@ -370,13 +370,17 @@ export default function Home() {
         throw new Error(`Continue failed: ${response.status}`);
       }
 
-      const data = await response.json();
+   const data = await response.json();
 
-      if (!data.result) {
-        throw new Error("No chapter returned.");
-      }
+if (data.incomplete) {
+  throw new Error(data.result || "Chapter generation was incomplete.");
+}
 
-      const nextChapter = data.result;
+if (!data.result) {
+  throw new Error("No chapter returned.");
+}
+
+const nextChapter = data.result;
       const newStoryState = data.storyState || storyState;
       const newChapters = [...chapters, nextChapter];
       const newIndex = newChapters.length - 1;
