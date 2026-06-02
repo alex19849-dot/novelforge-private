@@ -23,10 +23,10 @@ function getWordTarget(length: string) {
 }
 
 function getMaxTokens(length: string) {
-  if (length === "Novella") return 8000;
-  if (length === "Short Novel") return 12000;
-  if (length === "Long Novel") return 16000;
-  return 8000;
+  if (length === "Novella") return 6000;
+  if (length === "Short Novel") return 9000;
+  if (length === "Long Novel") return 12000;
+  return 6000;
 }
 
 function getRegionalTerms(locale: string) {
@@ -346,21 +346,23 @@ If the setting is American English, prefer parking lot, apartment, cell phone, s
 If the setting is Canadian English, use natural Canadian wording and hockey vocabulary.
 
 HARD LENGTH RULE:
+
 For Novella:
-- Absolute target is 900 to 1400 words.
-- Do not exceed 1500 words.
-- If approaching the limit, end the chapter cleanly with a hook or emotional turn.
-- Do not add another scene just to round things off.
+- Target 2500 to 3500 words.
+- Write one complete chapter with a proper ending.
+- Do not exceed the chapter's natural ending.
+- Do not add extra scenes just to make it longer.
+- End cleanly before the output limit.
 
 For Short Novel:
-- Target 1600 to 2200 words.
-- Do not exceed 2400 words.
+- Target 3500 to 5000 words.
+- Write one complete chapter with a proper ending.
 
 For Long Novel:
-- Target 2400 to 3200 words.
-- Do not exceed 3500 words.
+- Target 4500 to 6500 words.
+- Write one complete chapter with a proper ending.
 
-If forced to choose between length and extra detail, choose shorter and cleaner.
+If forced to choose, choose a complete chapter over a longer chapter.
 
 UNIQUENESS RULE:
 This story must feel specific to the user's Story Idea and Character Notes.
