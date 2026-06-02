@@ -252,8 +252,6 @@ LENGTH:
       max_output_tokens: maxTokens,
     });
 
-    console.log("RESPONSE STATUS:", response.status);
-    console.log("OUTPUT LENGTH:", response.output_text?.length);
 
     if (response.status === "incomplete") {
       return Response.json(
