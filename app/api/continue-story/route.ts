@@ -253,43 +253,48 @@ LENGTH:
     });
 
 
-    if (response.status === "incomplete") {
-      return Response.json(
-        {
-          result:
-            "Chapter generation stopped before finishing. The chapter was not saved. The route correctly blocked an incomplete chapter instead of saving a cut-off mess.",
-          storyState: incomingState,
-        },
-        { status: 500 }
-      );
-    }
+   if (response.status === "incomplete") {
+  return Response.json(
+    {
+      result:
+        "Chapter generation stopped before finishing. Nothing has been saved. Try shorter guidance or reduce the chapter length.",
+      storyState: incomingState,
+      incomplete: true,
+    },
+    { status: 200 }
+  );
+}
 
-    const chapter = cleanOutput(response.output_text || "");
+const chapter = cleanOutput(response.output_text || "");
 
-    if (!chapter.trim()) {
-      return Response.json(
-        {
-          result: "No chapter text was returned.",
-          storyState: incomingState,
-        },
-        { status: 500 }
-      );
-    }
+if (!chapter.trim()) {
+  return Response.json(
+    {
+      result: "No chapter text was returned.",
+      storyState: incomingState,
+      incomplete: true,
+    },
+    { status: 200 }
+  );
+}
 
-    return Response.json({
-      result: chapter,
-      storyState: updatedStoryState,
-    });
-  } catch (error) {
-    console.error(error);
+return Response.json({
+  result: chapter,
+  storyState: updatedStoryState,
+});
+} catch (error) {
+console.error("CONTINUE STORY ERROR:", error);
 
-    return Response.json(
-      {
-        result:
-          "Something went wrong while continuing the story. The app is sulking in a corner.",
-        storyState: incomingState,
-      },
-      { status: 500 }
-    );
-  }
+return Response.json(
+  {
+    result:
+      error instanceof Error
+        ? `Continue error: ${error.message}`
+        : "Unknown continue error.",
+    storyState: incomingState,
+    incomplete: true,
+  },
+  { status: 200 }
+);
+}
 }
