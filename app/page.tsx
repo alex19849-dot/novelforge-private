@@ -523,12 +523,8 @@ async function continueStory() {
   setCopyMessage("");
 
   try {
-   const previousChapter = chapters
+  const previousChapter = chapters
   .slice(-3)
-  .map((chapter, index) => {
-    const chapterNumber = chapters.length - 2 + index + 1;
-    return `Chapter ${chapterNumber}\n${chapter}`;
-  })
   .join("\n\n");
 
     const response = await fetch("/api/continue-story", {
@@ -554,18 +550,21 @@ console.log("CONTINUE DATA:", data);
     }
 
     const nextChapter = data.result;
-    const newChapters = [...chapters, nextChapter];
-    const newIndex = newChapters.length - 1;
+const newStoryState = data.storyState || storyState;
+const newChapters = [...chapters, nextChapter];
+const newIndex = newChapters.length - 1;
 
     setChapters(newChapters);
-    setActiveChapterIndex(newIndex);
-
-    await saveCurrentStory({
-      form: preparedForm,
-      chapters: newChapters,
-      activeChapterIndex: newIndex,
-      chapterGuidance,
-    });
+setActiveChapterIndex(newIndex);
+setStoryState(newStoryState);
+    
+   await saveCurrentStory({
+  form: preparedForm,
+  chapters: newChapters,
+  activeChapterIndex: newIndex,
+  chapterGuidance,
+  storyState: newStoryState,
+});
 
   } catch (error) {
     console.error("Continue story error:", error);
