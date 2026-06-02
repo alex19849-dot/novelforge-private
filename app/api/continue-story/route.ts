@@ -1448,7 +1448,7 @@ Use specific reactions that fit the current character and moment.
     const response = await openai.responses.create({
       model: "gpt-5.5",
       reasoning: { effort: "low" },
-      text: { verbosity: "low" },
+      text: { verbosity: "high" },
       input: prompt,
       max_output_tokens: maxTokens,
     });
