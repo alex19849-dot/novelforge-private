@@ -14,9 +14,9 @@ function getMaxTokens(length: string) {
  return 6500;
 }
 function getWordTarget(length: string) {
-  if (length === "Short Novel") return "2000 to 3000 words";
-  if (length === "Long Novel") return "2500 to 3500 words";
-  return "1500 to 2500 words";
+ if (length === "Short Novel") return "1500 to 2200 words";
+ if (length === "Long Novel") return "1800 to 2500 words";
+ return "1200 to 1800 words";
 }
 
 function nextRelationshipStage(current: number, chapter: number) {
