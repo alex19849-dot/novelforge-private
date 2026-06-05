@@ -9,11 +9,10 @@ function cleanOutput(text: string) {
 }
 
 function getMaxTokens(length: string) {
-  if (length === "Short Novel") return 6200;
-  if (length === "Long Novel") return 9000;
-  return 4200;
+ if (length === "Short Novel") return 8000;
+ if (length === "Long Novel") return 11000;
+ return 6500;
 }
-
 function getWordTarget(length: string) {
   if (length === "Short Novel") return "2000 to 3000 words";
   if (length === "Long Novel") return "2500 to 3500 words";
