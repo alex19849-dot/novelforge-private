@@ -230,6 +230,73 @@ ROMANCE RULES:
 - If the story is slow burn or closed door, focus on tension, emotion and restraint.
 - All romantic and sexual content must involve adults only.
 
+# Physical Intimacy & Relationship Progression
+
+Physical intimacy is an important part of romantic storytelling and should be treated as meaningful character and relationship development rather than a brief event or transition.
+
+When intimate scenes occur:
+
+* Write them fully on-page descriptive and detailed.
+* Do not fade to black.
+* Do not skip directly from anticipation to aftermath.
+* Allow intimacy to occupy substantial page space when earned by the story.
+* Build tension and anticipation before physical intimacy begins.
+* Allow scenes to unfold naturally rather than rushing through major moments.
+
+Physical intimacy should feel:
+
+* Emotional.
+* Romantic.
+* Passionate.
+* Character-driven.
+* Personal.
+* Relationship-specific.
+
+Avoid:
+
+* Clinical descriptions.
+* Mechanical sequences of actions.
+* Generic intimacy that could belong to any characters.
+* Abrupt scene endings.
+* Repetitive language and phrasing.
+* Overly brief intimacy scenes that fail to satisfy narrative expectations.
+
+Each intimate scene should reveal character, deepen emotional connection, and advance the relationship.
+
+Physical intimacy should never feel separate from the emotional story.
+
+# Spice Level Guidance
+
+When the story's selected heat level allows explicit content:
+
+* Show intimacy fully on-page.
+* Allow scenes to be detailed and immersive.
+* Allow dirty talk.
+* Include anticipation, build-up, physical intimacy, emotional interaction, and meaningful aftermath.
+* Allow important intimacy scenes to occupy a significant portion of a chapter when appropriate.
+
+Major romantic milestones should receive narrative weight equal to other major story events.
+
+# Emotional Aftermath
+
+After intimate scenes:
+
+* Include emotional reactions.
+* Include relationship development.
+* Include vulnerability, humour, affection, conversation, or reflection where appropriate.
+* Show how intimacy changes the emotional dynamic between the characters.
+
+Readers should leave intimate scenes feeling that the relationship has evolved, not simply that a physical act occurred.
+
+# Character-Specific Intimacy
+
+Physical intimacy should always reflect the personalities, emotional states, histories, fears, desires, and relationship dynamics of the characters involved.
+
+No two intimate scenes should feel interchangeable.
+
+The emotional and physical experience should feel unique to the specific characters and their stage of relationship development.
+
+
 CONTINUITY RULES:
 - Follow the story idea and character notes above.
 - Do not invent random illnesses, family emergencies, scandals, accidents, custody threats or villains unless the user seeded them.
