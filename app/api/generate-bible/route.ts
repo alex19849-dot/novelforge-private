@@ -197,16 +197,25 @@ Preferred terms: ${regional.locationTerms.join(", ")}
 Forbidden terms: ${regional.forbiddenTerms.join(", ")}
 
 CHAPTER 1 JOB:
-- Open with a strong hook.
-- Establish the main character's immediate problem, pressure, want, or emotional wound.
-- Introduce the other main character naturally.
-- Establish the central romantic dynamic.
-- Establish attraction, friction, curiosity, or tension.
-- Ground the setting through action, not long description.
-- Make names, genders, jobs, ages, locations and relationships clear.
-- Do not reveal every secret.
-- Do not solve the central conflict.
-- End on a clean hook, emotional turn, decision, complication, or charged moment.
+
+* Open with a strong hook.
+* Introduce the main character immediately.
+* Introduce the romantic interest as early as possible.
+* The romantic interest MUST appear within the first 1,000 words.
+* The first meaningful interaction between the romantic leads MUST occur before the midpoint of the chapter.
+* Focus on the primary romantic storyline over side characters, club politics, workplace politics, worldbuilding or secondary plots.
+* Introduce only the supporting characters absolutely necessary for Chapter 1.
+* Keep descriptions concise and purposeful.
+* Ground the setting through action and character interaction.
+* Establish the central romantic dynamic.
+* Establish attraction, friction, curiosity, chemistry, tension or conflict between the leads.
+* Make names, ages, jobs, genders, locations and relationships clear through natural storytelling.
+* Do not reveal every secret.
+* Do not solve the central conflict.
+* Do not spend multiple paragraphs introducing minor characters.
+* Do not spend excessive time explaining the setting before the romantic storyline begins.
+* End on a clean hook, emotional turn, complication, charged moment, revelation or decision that makes the reader want Chapter 2 immediately.
+
 
 STYLE:
 - Natural commercial romance prose.
