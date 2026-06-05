@@ -231,13 +231,16 @@ Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
 - Target ${wordTarget}.
-- Write one complete chapter.
-- Prioritise a complete chapter over a longer chapter.
-- Reach the main emotional beat by the middle of the chapter.
-- Do not spend too long on setup.
+- Write one complete chapter with a clear beginning, middle and end.
+- Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
+- Reach the main emotional beat or story turn by the middle of the chapter.
+- The final 20 percent of the chapter must resolve the current scene and land the chapter ending.
+- Prioritise a finished chapter over length.
+- If running short on space, compress description and reflection, not the ending.
 - Do not cut off mid-scene.
 - Do not stop during dialogue.
 - Do not stop during a confrontation.
+- Do not introduce a new scene, new conflict or new location near the end unless it is the final hook.
 - Finish the final scene fully.
 - End with a proper chapter ending: an emotional beat, decision, reveal, complication, romantic turn or hook.
 `;
