@@ -321,16 +321,21 @@ LENGTH:
       max_output_tokens: maxTokens,
     });
 
-    if (response.status === "incomplete") {
-      return Response.json(
-        {
-          result:
-            "Chapter generation stopped before finishing. The chapter was not saved. Reduce the chapter length target or increase the output limit before trying again.",
-          storyState: openingStoryState,
-        },
-        { status: 500 }
-      );
-    }
+  if (response.status === "incomplete") {
+  const partialChapter = cleanOutput(response.output_text || "");
+
+  return Response.json(
+    {
+      result:
+        partialChapter ||
+        "Chapter generation stopped before finishing, but no partial text was returned.",
+      storyState: openingStoryState,
+      warning:
+        "The chapter may be incomplete because the model hit the output limit."
+    },
+    { status: 200 }
+  );
+}
 
     const chapter = cleanOutput(response.output_text || "");
 
