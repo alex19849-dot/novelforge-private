@@ -460,7 +460,7 @@ Do not leave placeholder fields empty.
   }
 
   const bibleText = cleanOutput(response.output_text || "");
-
+const bible = JSON.parse(bibleText);
   if (!bibleText.trim()) {
     return Response.json(
       {
@@ -470,11 +470,12 @@ Do not leave placeholder fields empty.
       { status: 500 }
     );
   }
-
-  return Response.json({
-    result: bibleText,
-    storyState: openingStoryState,
-  });
+console.log("BIBLE GENERATED");
+console.log(bibleText);
+return Response.json({
+  bible,
+  storyState: openingStoryState,
+});
 } catch (error) {
   console.error(error);
 
