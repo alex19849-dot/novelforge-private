@@ -1,3 +1,4 @@
+```ts
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -9,19 +10,15 @@ function cleanOutput(text: string) {
 }
 
 function getMaxTokens(length: string) {
-  if (String(length).includes("Short Novel")) return 8000;
   if (String(length).includes("Long Novel")) return 11000;
+  if (String(length).includes("Short Novel")) return 8000;
   return 6500;
 }
 
 function getWordTarget(length: string) {
-  if (String(length).includes("Short Novel")) return "1500 to 2200 words";
   if (String(length).includes("Long Novel")) return "1800 to 2500 words";
+  if (String(length).includes("Short Novel")) return "1500 to 2200 words";
   return "1200 to 1800 words";
-}
-
-function getBibleLength(bible: any, form: any) {
-  return bible?.storyDNA?.length || form?.length || "Novella";
 }
 
 function getChapterRoadmapEntry(bible: any, chapterNumber: number) {
@@ -30,6 +27,78 @@ function getChapterRoadmapEntry(bible: any, chapterNumber: number) {
       (entry: any) => Number(entry.chapter) === Number(chapterNumber)
     ) || null
   );
+}
+
+function makeBibleSummary(bible: any) {
+  if (!bible) return "No story bible provided.";
+
+  const mainCharacters = (bible.mainCharacters || [])
+    .map((c: any) => {
+      return [
+        "Name: " + (c.name || ""),
+        "Age: " + (c.age || ""),
+        "Role: " + (c.role || ""),
+        "Species: " + (c.species || ""),
+        "Appearance: " + JSON.stringify(c.appearance || {}),
+        "Personality: " + (c.personality || []).join(", "),
+        "Fear: " + (c.fears || []).join(", "),
+        "Need: " + (c.need || ""),
+        "Arc: " + (c.growthArc || ""),
+        "Relationship Dynamic: " + (c.relationshipDynamic || ""),
+        "Speech Style: " + (c.speechStyle || ""),
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  const supportingCharacters = (bible.supportingCharacters || [])
+    .map((c: any) => {
+      return [
+        "Name: " + (c.name || ""),
+        "Role: " + (c.role || ""),
+        "Appearance: " + (c.appearance || ""),
+        "Personality: " + (c.personality || []).join(", "),
+        "Story Purpose: " + (c.storyPurpose || ""),
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  const locations = (bible.locations || [])
+    .map((l: any) => {
+      return [
+        "Name: " + (l.name || ""),
+        "Description: " + (l.description || ""),
+        "Purpose: " + (l.storyPurpose || ""),
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  return [
+    "STORY DNA",
+    "Title: " + (bible.storyDNA?.workingTitle || ""),
+    "Genre: " + (bible.storyDNA?.genre || ""),
+    "Subgenre: " + (bible.storyDNA?.subGenre || ""),
+    "Length: " + (bible.storyDNA?.length || ""),
+    "Heat: " + (bible.storyDNA?.heatLevel || ""),
+    "Burn: " + (bible.storyDNA?.burnType || bible.storyDNA?.burnPacing || ""),
+    "Theme: " + (bible.storyDNA?.coreTheme || ""),
+    "Promise: " + (bible.storyDNA?.emotionalPromise || ""),
+    "",
+    "MAIN CHARACTERS",
+    mainCharacters,
+    "",
+    "SUPPORTING CHARACTERS",
+    supportingCharacters,
+    "",
+    "WORLD RULES",
+    JSON.stringify(bible.worldRules?.settingRules || {}),
+    JSON.stringify(bible.worldRules?.speciesRules || {}),
+    JSON.stringify(bible.worldRules?.powerRules || {}),
+    JSON.stringify(bible.worldRules?.weaknessRules || {}),
+    JSON.stringify(bible.worldRules?.relationshipRules || {}),
+    "",
+    "LOCATIONS",
+    locations,
+  ].join("\n");
 }
 
 export async function POST(req: Request) {
@@ -42,15 +111,13 @@ export async function POST(req: Request) {
   const incomingState = body.storyState || {};
   const chapterGuidance = body.chapterGuidance || "";
 
-  const length = getBibleLength(bible, form);
+  const length = bible?.storyDNA?.length || form.length || "Novella";
   const maxTokens = getMaxTokens(length);
   const wordTarget = getWordTarget(length);
 
   const roadmapEntry = getChapterRoadmapEntry(bible, nextChapterNumber);
   const targetChapters = bible?.chapterRoadmap?.length || incomingState.targetChapters || 10;
-
-  const isEpilogue = nextChapterNumber > targetChapters;
-  const chapterLabel = isEpilogue ? "Epilogue" : "Chapter " + nextChapterNumber;
+  const chapterLabel = "Chapter " + nextChapterNumber;
 
   const updatedStoryState = {
     ...incomingState,
@@ -66,87 +133,75 @@ export async function POST(req: Request) {
       " must continue directly from Chapter " +
       nextChapterNumber +
       " without resetting continuity.",
-    shouldWriteEpilogue: nextChapterNumber === targetChapters,
-    epilogueWritten: isEpilogue,
+    shouldWriteEpilogue: nextChapterNumber >= targetChapters,
   };
 
   const prompt = [
     "You are NovelForge.",
     "",
-    "Write " + chapterLabel + " of a commercial adult romance novel.",
-    "IMPORTANT:",
-"You are not creating a story bible.",
-"You are not creating JSON.",
-"You are not creating character sheets.",
-"You are not creating worldbuilding notes.",
-"You are writing the actual novel chapter.",
-"The story bible is reference material only.",
-"Your output must be chapter prose from the POV character.",
+    "Write the actual novel chapter prose.",
+    "Do not write a story bible.",
+    "Do not write JSON.",
+    "Do not output character profiles.",
+    "Do not output worldbuilding notes.",
+    "Do not summarize the plan.",
     "",
-    "Return only polished chapter prose.",
-    "Do not include notes.",
-    "Do not include analysis.",
-    "Do not include JSON.",
-    "Do not include markdown.",
+    "Write " + chapterLabel + ".",
     "",
     "The output must begin exactly with:",
-    "",
     chapterLabel,
     "POV_NAME",
     "",
-    "Replace POV_NAME with the correct point-of-view character name in uppercase.",
+    "STORY REFERENCE SUMMARY:",
+    makeBibleSummary(bible),
     "",
-    "STORY BIBLE:",
-    bible ? JSON.stringify(bible, null, 2) : "No story bible provided.",
-    "",
-    "USER STORY INPUT:",
-    form.plot || "No story idea provided.",
-    "",
-    "USER CHARACTER NOTES:",
-    form.characterNotes || "No character notes provided.",
-    "",
-    "USER MUST AVOID:",
-    form.mustNotHave || "Nothing specific provided.",
-    "",
-    "CHAPTER GUIDANCE:",
-    chapterGuidance || "None provided.",
-    "",
-    "CURRENT STORY STATE:",
-    JSON.stringify(updatedStoryState, null, 2),
-    "",
-    "ROADMAP ENTRY FOR THIS CHAPTER:",
+    "ROADMAP FOR THIS CHAPTER:",
     roadmapEntry ? JSON.stringify(roadmapEntry, null, 2) : "No roadmap entry found.",
     "",
     "PREVIOUS CHAPTERS:",
-    previousChapter ||
-      "No previous chapter text provided. If this is Chapter 1, begin the novel using the story bible.",
+    previousChapter || "No previous chapters. This is Chapter 1.",
     "",
-    "PRIMARY JOB:",
-    "- Use the STORY BIBLE as the source of truth.",
-    "- Follow the chapter roadmap entry for this chapter.",
-    "- Preserve all character names, appearances, ages, roles, personalities, wounds, secrets, locations, world rules and relationship dynamics.",
-    "- Do not contradict the continuity database.",
-    "- Do not invent random new villains, exes, scandals, illnesses, accidents, pregnancies, custody threats or family emergencies unless already seeded in the bible.",
-    "- Every chapter must advance romance, character development, mystery, external conflict, worldbuilding or intimacy.",
+    "USER GUIDANCE:",
+    chapterGuidance || "None provided.",
+    "",
+    "MUST AVOID:",
+    form.mustNotHave || "Nothing specific provided.",
+    "",
+    "CHAPTER JOB:",
+    "- Write one complete chapter in prose.",
+    "- Use the story reference only as background.",
+    "- Follow the roadmap entry for this chapter.",
+    "- Open with an immediate scene, action, dialogue, tension, or emotional hook.",
+    "- Do not explain the bible.",
+    "- Do not list facts.",
+    "- Do not include JSON.",
+    "- Do not include bullet points.",
+    "- Do not include notes.",
+    "- Do not include analysis.",
+    "- Keep character names, appearances, world rules, secrets and locations consistent.",
+    "- Advance romance, conflict, mystery, intimacy, character development, or worldbuilding.",
     "",
     "ROMANCE AND INTIMACY:",
-    "- Follow the heat level and burn pacing in the story bible.",
-    "- Track physical intimacy and emotional intimacy separately.",
-    "- If intimacy occurs, make it character-specific and emotionally consequential.",
-    "- Do not fade to black if the bible calls for explicit adult content.",
+    "- Follow the heat level and burn pacing.",
+    "- If intimacy occurs, write it as adult romantic prose.",
+    "- Do not fade to black when explicit content is expected.",
+    "- Make intimacy emotional, character-specific and consequential.",
     "- All romantic and sexual content must involve adults only.",
     "",
     "STYLE:",
     "- Natural commercial romance prose.",
-    "- Keep dialogue grounded and character-specific.",
+    "- Strong character voice.",
+    "- Human dialogue.",
+    "- Dark humour only where natural.",
     "- Avoid therapy-speak.",
     "- Avoid purple prose.",
     "- Avoid fake profound lines.",
+    "- Avoid repeating the same romance beats.",
     "- Do not use em dashes or en dashes.",
     "",
     "LENGTH:",
     "- Target " + wordTarget + ".",
-    "- Write one complete chapter with a clear beginning, middle and end.",
+    "- Write a full chapter with a beginning, middle and end.",
     "- Do not cut off mid-scene.",
     "- End with an emotional beat, decision, reveal, complication, romantic turn or hook.",
   ].join("\n");
@@ -164,7 +219,7 @@ export async function POST(req: Request) {
       return Response.json(
         {
           result:
-            "Chapter generation stopped before finishing. Nothing has been saved. Try shorter guidance or reduce the chapter length.",
+            "Chapter generation stopped before finishing. Nothing has been saved.",
           storyState: incomingState,
           incomplete: true,
         },
@@ -205,3 +260,4 @@ export async function POST(req: Request) {
     );
   }
 }
+```
