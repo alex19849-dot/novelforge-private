@@ -1,3 +1,4 @@
+```ts
 import OpenAI from "openai";
 
 const openai = new OpenAI({
@@ -9,134 +10,66 @@ function cleanOutput(text: string) {
 }
 
 function getMaxTokens(length: string) {
- if (length === "Short Novel") return 8000;
- if (length === "Long Novel") return 11000;
- return 6500;
+  if (length?.includes("Short Novel")) return 8000;
+  if (length?.includes("Long Novel")) return 11000;
+  return 6500;
 }
+
 function getWordTarget(length: string) {
- if (length === "Short Novel") return "1500 to 2200 words";
- if (length === "Long Novel") return "1800 to 2500 words";
- return "1200 to 1800 words";
+  if (length?.includes("Short Novel")) return "1500 to 2200 words";
+  if (length?.includes("Long Novel")) return "1800 to 2500 words";
+  return "1200 to 1800 words";
 }
 
-function nextRelationshipStage(current: number, chapter: number) {
-  if (chapter <= 2) return Math.min(current + 1, 2);
-  if (chapter <= 4) return Math.min(current + 1, 4);
-  if (chapter <= 6) return Math.min(current + 1, 5);
-  if (chapter <= 8) return Math.min(current + 1, 6);
-  return Math.min(current + 1, 8);
+function getBibleLength(bible: any, form: any) {
+  return bible?.storyDNA?.length || form?.length || "Novella";
 }
 
-function nextPhysicalStage(current: number, form: any, chapter: number) {
-  const heat = form.heat || "";
-  const burn = form.burnPacing || "";
-
-  if (heat === "Fade to black") return Math.min(current + 1, 3);
-
-  if (heat === "Mild") {
-    if (chapter <= 2) return 1;
-    if (chapter <= 4) return 2;
-    return 3;
-  }
-
-  if (heat === "Spicy") {
-    if (chapter <= 2) return 2;
-    if (chapter === 3) return 3;
-    if (chapter === 4) return 4;
-    if (chapter === 5) return 5;
-    return 6;
-  }
-
-  if (heat === "Explicit adult" && burn === "Fast burn") {
-    if (chapter <= 2) return 2;
-    if (chapter === 3) return 4;
-    if (chapter === 4) return 5;
-    if (chapter === 5) return 6;
-    return 7;
-  }
-
-  if (heat === "Explicit adult" && burn === "Medium burn") {
-    if (chapter <= 2) return 2;
-    if (chapter === 3) return 3;
-    if (chapter === 4) return 4;
-    if (chapter === 5) return 5;
-    if (chapter === 6) return 6;
-    return 7;
-  }
-
-  if (heat === "Explicit adult") {
-    if (chapter <= 3) return 2;
-    if (chapter === 4) return 3;
-    if (chapter === 5) return 4;
-    if (chapter === 6) return 5;
-    return 6;
-  }
-
-  return Math.min(current + 1, 4);
+function getChapterRoadmapEntry(bible: any, chapterNumber: number) {
+  return bible?.chapterRoadmap?.find(
+    (entry: any) => Number(entry.chapter) === Number(chapterNumber)
+  ) || null;
 }
 
 export async function POST(req: Request) {
   const body = await req.json();
 
   const form = body.form || {};
+  const bible = body.bible || body.storyState?.bible || null;
   const previousChapter = body.previousChapter || "";
-  const nextChapterNumber = body.nextChapterNumber || 2;
+  const nextChapterNumber = body.nextChapterNumber || 1;
   const incomingState = body.storyState || {};
   const chapterGuidance = body.chapterGuidance || "";
 
-  const length = form.length || "Novella";
+  const length = getBibleLength(bible, form);
   const maxTokens = getMaxTokens(length);
   const wordTarget = getWordTarget(length);
 
-  const targetRelationshipStage = nextRelationshipStage(
-    incomingState.relationshipStage || 1,
-    nextChapterNumber
-  );
+  const roadmapEntry = getChapterRoadmapEntry(bible, nextChapterNumber);
+  const targetChapters =
+    bible?.chapterRoadmap?.length ||
+    incomingState.targetChapters ||
+    10;
 
-  const targetPhysicalStage = nextPhysicalStage(
-    incomingState.physicalStage || 1,
-    form,
-    nextChapterNumber
-  );
-
-  const targetChapters = incomingState.targetChapters || 10;
-
-  const endingPhase =
-    nextChapterNumber >= targetChapters + 1
-      ? "epilogue"
-      : nextChapterNumber >= targetChapters - 2
-      ? "resolution-runway"
-      : "middle-build";
-
-  const shouldWriteEpilogue = nextChapterNumber === targetChapters + 1;
+  const isEpilogue = nextChapterNumber > targetChapters;
+  const chapterLabel = isEpilogue ? "Epilogue" : `Chapter ${nextChapterNumber}`;
 
   const updatedStoryState = {
     ...incomingState,
+    bible,
     chapter: nextChapterNumber,
-    relationshipStage: targetRelationshipStage,
-    physicalStage: targetPhysicalStage,
-    trust: Math.min((incomingState.trust || 5) + 6, 100),
-    attraction: Math.min((incomingState.attraction || 20) + 8, 100),
-    jealousy: Math.min((incomingState.jealousy || 0) + 4, 100),
-    vulnerability: Math.min((incomingState.vulnerability || 2) + 5, 100),
-    sexualTension: Math.min((incomingState.sexualTension || 20) + 8, 100),
-    endingPhase,
-    shouldWriteEpilogue,
-    epilogueWritten: shouldWriteEpilogue ? true : incomingState.epilogueWritten || false,
-    lastMajorBeat: `Chapter ${nextChapterNumber} continued the relationship, conflict and emotional consequences.`,
-    nextRequiredConsequence: `Chapter ${
-      nextChapterNumber + 1
-    } must continue directly from Chapter ${nextChapterNumber} without resetting the characters.`,
+    targetChapters,
+    currentRoadmapEntry: roadmapEntry,
+    lastMajorBeat: roadmapEntry?.summary || `Chapter ${nextChapterNumber} continued the story.`,
+    nextRequiredConsequence: `Chapter ${nextChapterNumber + 1} must continue directly from Chapter ${nextChapterNumber} without resetting continuity.`,
+    shouldWriteEpilogue: nextChapterNumber === targetChapters,
+    epilogueWritten: isEpilogue,
   };
-
-  const chapterLabel = shouldWriteEpilogue
-    ? "Epilogue"
-    : `Chapter ${nextChapterNumber}`;
 
   const prompt = `
 You are NovelForge.
 
-Continue the current commercial adult romance story.
+Write ${chapterLabel} of a commercial adult romance novel.
 
 Return only polished chapter prose.
 Do not include notes.
@@ -144,27 +77,23 @@ Do not include analysis.
 Do not include JSON.
 Do not include markdown.
 
-Write ${chapterLabel} only.
-
 The output must begin exactly with:
 
 ${chapterLabel}
-
 POV_NAME
 
 Replace POV_NAME with the correct point-of-view character name in uppercase.
 
-If writing an Epilogue, begin exactly with:
+STORY BIBLE:
+${bible ? JSON.stringify(bible, null, 2) : "No story bible provided."}
 
-Epilogue
-
-STORY IDEA:
+USER STORY INPUT:
 ${form.plot || "No story idea provided."}
 
-CHARACTERS:
+USER CHARACTER NOTES:
 ${form.characterNotes || "No character notes provided."}
 
-MUST AVOID:
+USER MUST AVOID:
 ${form.mustNotHave || "Nothing specific provided."}
 
 CHAPTER GUIDANCE:
@@ -173,76 +102,69 @@ ${chapterGuidance || "None provided."}
 CURRENT STORY STATE:
 ${JSON.stringify(updatedStoryState, null, 2)}
 
+ROADMAP ENTRY FOR THIS CHAPTER:
+${roadmapEntry ? JSON.stringify(roadmapEntry, null, 2) : "No roadmap entry found. Continue logically from the story bible and previous chapter."}
+
 PREVIOUS CHAPTERS:
-${previousChapter || "No previous chapter text provided."}
+${previousChapter || "No previous chapter text provided. If this is Chapter 1, begin the novel using the story bible."}
 
-CONTINUATION JOB:
-- Continue directly from the previous chapter.
+PRIMARY JOB:
+- Use the STORY BIBLE as the source of truth.
+- Follow the chapter roadmap entry for this chapter.
+- Preserve all character names, appearances, ages, roles, personalities, wounds, secrets, locations, world rules and relationship dynamics.
+- Do not contradict the continuity database.
+- Do not change species rules, vampire rules, location facts, known secrets or unknown secrets.
+- Do not invent random new villains, exes, scandals, illnesses, accidents, pregnancies, custody threats or family emergencies unless already seeded in the bible.
+- Do not add filler.
+- Every chapter must advance at least one of: romance, character development, mystery, external conflict, worldbuilding or intimacy.
+
+IF THIS IS CHAPTER 1:
+- Open with a strong hook.
+- Introduce the main POV character immediately.
+- Bring the romantic lead into the chapter early.
+- Establish the central romantic dynamic.
+- Establish the world tone through action, not exposition.
+- Seed the core mystery or danger.
+- End with a hook that makes Chapter 2 necessary.
+
+IF THIS IS A LATER CHAPTER:
+- Continue directly from previous events.
 - Do not restart the story.
-- Do not repeat the opening setup.
-- Do not reintroduce characters as if they are new.
-- Carry forward the emotional fallout from the previous chapter.
-- Keep all names, genders, jobs, relationships and locations consistent.
-- Follow the user's chapter guidance unless it contradicts established continuity.
-- Do not invent random illnesses, accidents, scandals, family emergencies, blackmail, custody threats or new villains unless already seeded.
-- Do not add filler scenes just to make the chapter longer.
+- Do not reintroduce characters as if new.
+- Carry forward emotional, romantic and practical consequences.
+- Escalate from the previous chapter.
 
-CHAPTER ARC:
-- This is Chapter ${nextChapterNumber} of around ${targetChapters}.
-- Current relationship stage: ${targetRelationshipStage}.
-- Current physical stage: ${targetPhysicalStage}.
-- Current ending phase: ${endingPhase}.
-- If this is the middle of the book, escalate conflict, attraction, trust, vulnerability or stakes.
-- If this is near the ending, start resolving the main emotional and romantic conflict.
-- If this is the epilogue, give soft future-facing payoff and do not introduce new major drama.
-
-ROMANCE PACING:
-- Let the relationship evolve cumulatively.
-- Do not reset attraction, trust, conflict or intimacy.
-- Do not make the couple emotionally safe too quickly.
-- Keep flaws, friction and uncertainty alive.
-- Show attraction through specific behaviour, not generic staring.
-- Include emotional intimacy as well as romantic or physical tension.
-- If intimacy occurs, it must change the relationship dynamic afterwards.
-- Keep all romantic and sexual content adult-only.
+ROMANCE AND INTIMACY:
+- Follow the heat level and burn pacing in the story bible.
+- Track physical intimacy and emotional intimacy separately.
+- If intimacy occurs, make it character-specific and emotionally consequential.
+- Do not fade to black if the bible calls for explicit adult content.
+- Do not make sex generic or interchangeable.
+- After intimacy, show the emotional effect on the relationship.
+- All romantic and sexual content must involve adults only.
+- Consent, agency and boundaries must remain clear.
 
 STYLE:
 - Natural commercial romance prose.
-- First person if the story is already first person.
-- Preserve the established POV style and character voices.
-- Keep dialogue human and grounded.
-- Avoid constant banter.
-- Avoid over-polished comebacks every line.
-- Use short replies, interruptions, hesitation and deflection where natural.
-- Keep humour character-specific.
+- Preserve the POV style specified in the bible.
+- Keep dialogue grounded and character-specific.
+- Use humour naturally, not constantly.
 - Avoid therapy-speak.
 - Avoid purple prose.
-- Avoid random object descriptions.
-- Avoid over-described rooms.
 - Avoid fake profound lines.
-- Avoid repeated symbolic closing lines.
-- Avoid repeated phrases like "his eyes darkened", "my pulse kicked", "something shifted", "his jaw tightened", "he went still".
+- Avoid over-described rooms.
+- Avoid repetitive romance beats like "his eyes darkened", "my pulse kicked", "something shifted", "his jaw tightened", "he went still".
 - Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
-
-REGIONAL LANGUAGE:
-Use ${incomingState.regionalLanguage || form.locale || "British English"}.
-Preferred terms: ${(incomingState.locationTerms || []).join(", ")}.
-Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
 - Target ${wordTarget}.
 - Write one complete chapter with a clear beginning, middle and end.
-- Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
-- Reach the main emotional beat or story turn by the middle of the chapter.
-- The final 20 percent of the chapter must resolve the current scene and land the chapter ending.
-- Prioritise a finished chapter over length.
-- If running short on space, compress description and reflection, not the ending.
+- Reach the main emotional or plot turn by the middle of the chapter.
+- Resolve the current scene properly before ending.
 - Do not cut off mid-scene.
 - Do not stop during dialogue.
 - Do not stop during a confrontation.
-- Do not introduce a new scene, new conflict or new location near the end unless it is the final hook.
-- Finish the final scene fully.
-- End with a proper chapter ending: an emotional beat, decision, reveal, complication, romantic turn or hook.
+- End with an emotional beat, decision, reveal, complication, romantic turn or hook.
 `;
 
   try {
@@ -254,49 +176,49 @@ LENGTH:
       max_output_tokens: maxTokens,
     });
 
+    if (response.status === "incomplete") {
+      return Response.json(
+        {
+          result:
+            "Chapter generation stopped before finishing. Nothing has been saved. Try shorter guidance or reduce the chapter length.",
+          storyState: incomingState,
+          incomplete: true,
+        },
+        { status: 200 }
+      );
+    }
 
-   if (response.status === "incomplete") {
-  return Response.json(
-    {
-      result:
-        "Chapter generation stopped before finishing. Nothing has been saved. Try shorter guidance or reduce the chapter length.",
-      storyState: incomingState,
-      incomplete: true,
-    },
-    { status: 200 }
-  );
+    const chapter = cleanOutput(response.output_text || "");
+
+    if (!chapter.trim()) {
+      return Response.json(
+        {
+          result: "No chapter text was returned.",
+          storyState: incomingState,
+          incomplete: true,
+        },
+        { status: 200 }
+      );
+    }
+
+    return Response.json({
+      result: chapter,
+      storyState: updatedStoryState,
+    });
+  } catch (error) {
+    console.error("CONTINUE STORY ERROR:", error);
+
+    return Response.json(
+      {
+        result:
+          error instanceof Error
+            ? `Continue error: ${error.message}`
+            : "Unknown continue error.",
+        storyState: incomingState,
+        incomplete: true,
+      },
+      { status: 200 }
+    );
+  }
 }
-
-const chapter = cleanOutput(response.output_text || "");
-
-if (!chapter.trim()) {
-  return Response.json(
-    {
-      result: "No chapter text was returned.",
-      storyState: incomingState,
-      incomplete: true,
-    },
-    { status: 200 }
-  );
-}
-
-return Response.json({
-  result: chapter,
-  storyState: updatedStoryState,
-});
-} catch (error) {
-console.error("CONTINUE STORY ERROR:", error);
-
-return Response.json(
-  {
-    result:
-      error instanceof Error
-        ? `Continue error: ${error.message}`
-        : "Unknown continue error.",
-    storyState: incomingState,
-    incomplete: true,
-  },
-  { status: 200 }
-);
-}
-}
+```
