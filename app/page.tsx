@@ -310,25 +310,52 @@ export default function Home() {
     setPageIndex(0);
 
     try {
-      const response = await fetch("/api/generate-bible", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(preparedForm),
-      });
+     const bibleResponse = await fetch("/api/generate-bible", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(preparedForm),
+});
 
-      if (!response.ok) {
-        throw new Error(`Generate failed: ${response.status}`);
-      }
+if (!bibleResponse.ok) {
+  throw new Error(`Bible generation failed: ${bibleResponse.status}`);
+}
 
-      const data = await response.json();
+const bibleData = await bibleResponse.json();
+const bible = bibleData.bible;
 
-const bible = data.bible;
+const chapterResponse = await fetch("/api/continue-story", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    form: preparedForm,
+    bible,
+    previousChapter: "",
+    nextChapterNumber: 1,
+    storyState: {
+      ...(bibleData.storyState || {}),
+      bible,
+    },
+    chapterGuidance: "",
+  }),
+});
 
-const newStoryState = data.storyState || {};
+if (!chapterResponse.ok) {
+  throw new Error(`Chapter generation failed: ${chapterResponse.status}`);
+}
 
-const newChapters = [
-  JSON.stringify(bible, null, 2)
-];
+const chapterData = await chapterResponse.json();
+
+if (chapterData.incomplete) {
+  throw new Error(chapterData.result || "Chapter generation was incomplete.");
+}
+
+if (!chapterData.result) {
+  throw new Error("No chapter returned.");
+}
+
+const chapter = chapterData.result;
+const newStoryState = chapterData.storyState || { bible };
+const newChapters = [chapter];
       setStoryState(newStoryState);
       setChapters(newChapters);
       setActiveChapterIndex(0);
