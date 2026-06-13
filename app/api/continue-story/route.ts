@@ -188,10 +188,10 @@ const prompt = [
 
     return Response.json(
       {
-        result:
-          error instanceof Error
-            ? `Continue error: ${error.message}`
-            : "Unknown continue error.",
+       result:
+  error instanceof Error
+    ? "Continue error: " + error.message
+    : "Unknown continue error.",
         storyState: incomingState,
         incomplete: true,
       },
