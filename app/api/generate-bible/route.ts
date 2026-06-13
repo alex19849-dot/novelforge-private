@@ -121,6 +121,7 @@ export async function POST(req: Request) {
   const storyIdea = body.plot || "";
   const characters = body.characterNotes || "";
   const mustAvoid = body.mustNotHave || "";
+  const bible = body.bible || null;
 
   const fullInput = `${storyIdea}\n\n${characters}\n\n${mustAvoid}`;
   const length = body.length || "Novella";
@@ -160,6 +161,12 @@ export async function POST(req: Request) {
   };
 
   const prompt = `
+  ${bible ? `
+
+STORY BIBLE:
+${JSON.stringify(bible, null, 2)}
+
+` : ""}
 You are NovelForge.
 
 Create a complete story bible for a commercial adult romance novel.
@@ -470,8 +477,7 @@ const bible = JSON.parse(bibleText);
       { status: 500 }
     );
   }
-console.log("BIBLE GENERATED");
-console.log(bibleText);
+
 return Response.json({
   bible,
   storyState: openingStoryState,
