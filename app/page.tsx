@@ -387,13 +387,14 @@ const newChapters = [chapter];
       const response = await fetch("/api/continue-story", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          form: preparedForm,
-          previousChapter,
-          nextChapterNumber: chapters.length + 1,
-          storyState,
-          chapterGuidance,
-        }),
+     body: JSON.stringify({
+  form: preparedForm,
+  bible: storyState?.bible || null,
+  previousChapter,
+  nextChapterNumber: chapters.length + 1,
+  storyState,
+  chapterGuidance,
+}),
       });
 
       if (!response.ok) {
