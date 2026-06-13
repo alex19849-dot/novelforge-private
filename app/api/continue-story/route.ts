@@ -60,8 +60,14 @@ export async function POST(req: Request) {
     chapter: nextChapterNumber,
     targetChapters,
     currentRoadmapEntry: roadmapEntry,
-    lastMajorBeat: roadmapEntry?.summary || `Chapter ${nextChapterNumber} continued the story.`,
-    nextRequiredConsequence: `Chapter ${nextChapterNumber + 1} must continue directly from Chapter ${nextChapterNumber} without resetting continuity.`,
+    lastMajorBeat:
+  roadmapEntry?.summary || "Chapter " + nextChapterNumber + " continued the story.",
+nextRequiredConsequence:
+  "Chapter " +
+  (nextChapterNumber + 1) +
+  " must continue directly from Chapter " +
+  nextChapterNumber +
+  " without resetting continuity.",
     shouldWriteEpilogue: nextChapterNumber === targetChapters,
     epilogueWritten: isEpilogue,
   };
