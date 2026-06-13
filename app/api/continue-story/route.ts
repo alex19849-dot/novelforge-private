@@ -52,7 +52,7 @@ export async function POST(req: Request) {
     10;
 
   const isEpilogue = nextChapterNumber > targetChapters;
-  const chapterLabel = isEpilogue ? "Epilogue" : `Chapter ${nextChapterNumber}`;
+  const chapterLabel = isEpilogue ? "Epilogue" : "Chapter " + nextChapterNumber;
 
   const updatedStoryState = {
     ...incomingState,
