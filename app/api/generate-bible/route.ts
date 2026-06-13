@@ -163,6 +163,24 @@ export async function POST(req: Request) {
 You are NovelForge.
 
 Create a complete story bible for a commercial adult romance novel.
+The bible must be written as a professional story development document.
+
+Think like an experienced romance editor, developmental editor, and series planner.
+
+Prioritize:
+- Strong emotional arcs
+- Character consistency
+- Long-term continuity
+- Story cohesion
+- Reader satisfaction
+- Commercial romance expectations
+
+The bible should be detailed enough that a separate AI could write the entire novel while remaining consistent.
+Infer genre, tone, length, burn pacing, relationship type, setting, themes and heat level from the user's story idea and character notes.
+
+If information is missing, make the most commercially appropriate choice based on the story concept.
+
+Prefer strong story-specific decisions over generic defaults.
 
 Return only valid JSON.
 Do not write chapter prose.
@@ -188,6 +206,24 @@ Regional language: ${regional.regionalLanguage}
 Preferred terms: ${regional.locationTerms.join(", ")}
 Forbidden terms: ${regional.forbiddenTerms.join(", ")}
 
+Before creating the bible, analyse the user's story idea and identify:
+
+- Genre
+- Subgenre
+- Relationship type
+- Heat level
+- Burn pacing
+- Setting
+- Main tropes
+- Character archetypes
+- Emotional theme
+- Emotional promise
+- External conflict
+- Internal conflict
+
+Use those findings to drive every section of the bible.
+
+All characters, locations, world rules, mysteries, side characters and chapter roadmap entries must directly support the identified story.
 Create the following JSON structure:
 
 {
@@ -203,26 +239,199 @@ Create the following JSON structure:
     "centralQuestion": "",
     "readerExperienceGoal": ""
   },
-  "mainCharacters": [],
-  "supportingCharacters": [],
-  "worldRules": {},
-  "locations": [],
-  "relationshipArc": [],
-  "mandatoryStoryBeats": [],
-  "chapterRoadmap": [],
-  "openingStoryState": {}
+ "mainCharacters": [
+  {
+    "name": "",
+    "age": "",
+    "role": "",
+    "species": "",
+    "romanticOrientation": "",
+    "appearance": {},
+    "personality": [],
+    "fears": [],
+    "misbelief": "",
+    "need": "",
+    "want": "",
+    "growthArc": "",
+    "relationshipDynamic": "",
+    "speechStyle": "",
+    "backstory": ""
+  }
+],
+  "supportingCharacters": [
+  {
+    "name": "",
+    "age": "",
+    "role": "",
+    "appearance": "",
+    "personality": [],
+    "knowsSecrets": false,
+    "secretsKnown": [],
+    "storyPurpose": ""
+  }
+],
+  "worldRules": {
+  "continuityDatabase": {
+  "characterFacts": [],
+  "locationFacts": [],
+  "worldFacts": [],
+  "knownSecrets": [],
+  "unknownSecrets": [],
+  "activeMysteries": [],
+  "activeThreats": [],
+  "importantObjects": [],
+  "importantDates": [],
+  "importantRelationships": []
+},
+  "settingRules": {},
+  "speciesRules": {},
+  "powerRules": {},
+  "weaknessRules": {},
+  "societyRules": {},
+  "relationshipRules": {},
+  "continuityRules": {}
+},
+ "locations": [
+  {
+    "name": "",
+    "type": "",
+    "owner": "",
+    "description": "",
+    "storyPurpose": "",
+    "secrets": []
+  }
+],
+  "relationshipArc": [
+  {
+    "stage": "",
+    "chapters": [],
+    "summary": "",
+    "physicalProgression": "",
+    "emotionalProgression": "",
+    "relationshipState": ""
+  }
+],
+"mandatoryStoryBeats": [
+  {
+    "beat": "",
+    "description": "",
+    "completed": false,
+    "importance": "major"
+  }
+],
+  "chapterRoadmap": [
+  {
+    "chapter": 1,
+    "title": "",
+    "pov": "",
+    "summary": "",
+    "romanceBeat": "",
+    "plotBeat": "",
+    "characterDevelopment": "",
+    "mysteryProgress": "",
+    "heatBeat": "",
+    "cliffhangerOrHook": ""
+  }
+],
+ "openingStoryState": {
+  "currentChapter": 1,
+  "currentPOV": "",
+  "relationshipStatus": "",
+  "physicalRelationshipStatus": "",
+  "emotionalRelationshipStatus": "",
+  "knownSecrets": [],
+  "unknownSecrets": [],
+  "activeMysteries": [],
+  "activeThreats": [],
+  "unresolvedConflicts": [],
+  "completedBeats": [],
+  "pendingBeats": []
+}
+  "subGenre": "",
+"setting": "",
+"burnPacing": "",
+"primaryTropes": [],
+"secondaryTropes": []
 }
 
 Rules:
 - Make all romantic and sexual characters adults.
-- Keep the bible specific to the user's story idea.
+- Generate only story elements that directly support the user's concept.
+- Do not introduce unrelated subplots, genres, themes, occupations, settings, creatures, powers, organizations, or conflicts.
+- Every character, location, mystery, threat, and chapter beat must connect back to the core story.
+- Prefer depth over breadth.
+- A smaller number of highly relevant elements is better than a large number of loosely connected elements.
+- Never override user supplied tropes, sexuality, romantic history, relationship dynamics, genre, heat level, story length, burn type, character roles, or worldbuilding.
+- Every main character must have a complete character profile.
+- Every supporting character must have a complete character profile.
+- Every location must contain at least one story purpose and one secret if relevant.
+- Every mystery introduced must appear in activeMysteries.
+- Every unresolved conflict introduced must appear in unresolvedConflicts.
+- Relationship progression must be tracked separately for physical intimacy and emotional intimacy.
+- The chapter roadmap must cover the entire requested book length.
+- Long Novel defaults to approximately 25-35 chapters unless otherwise specified.
+- User supplied information always takes priority over inferred information.
+- If the user specifies Gay First Time, the character cannot have previous sexual experience with men.
+- If the user specifies Long Novel, the story length must be Long Novel.
+- If the user specifies Paranormal Romance, do not replace it with Sports Romance, Contemporary Romance, or any other genre.
 - Include names, ages, appearances, personalities, fears, misbeliefs, needs and growth arcs for main characters.
-- Include side characters with names, ages, roles, appearances, personalities and whether they know any secrets.
-- Include clear world rules so continuity stays consistent.
-- Include locations with names, descriptions, owners and story purpose.
+- Include side characters with names, ages, roles, appearances, personalities, secrets known, story purpose, relationship to the main characters, and their impact on the plot.
+- Every supporting character must serve at least one function:
+  - Ally
+  - Mentor
+  - Antagonist
+  - Rival
+  - Comic Relief
+  - Found Family
+  - Gatekeeper
+  - Informant
+  - Love Interest Support
+  - Threat
+- Do not create filler characters.
+- Every supporting character must affect either the romance, mystery, worldbuilding, conflict, or protagonist growth.
+- Create a continuity database that can be used by future chapter generation.
+- Every fact introduced must have a permanent home in the bible.
+- Character facts belong in character profiles.
+- Location facts belong in locations.
+- Species facts belong in world rules.
+- Secrets belong in knownSecrets or unknownSecrets.
+- Mysteries belong in activeMysteries.
+- Threats belong in activeThreats.
+- The bible must function as a reference database for the entire novel.
+- Include locations with names, descriptions, owners, story purpose, secrets, recurring characters, and plot relevance.
+- Every major location must answer:
+  - Why does this location exist?
+  - What story purpose does it serve?
+  - What secrets are connected to it?
+  - Which characters are most associated with it?
+- Do not create locations that are unlikely to appear in the story.
+- Locations should support the romance, mystery, worldbuilding, conflict, or character development.
 - Include a chapter roadmap for the full target chapter count.
+- Every chapter must have a purpose.
+- Every chapter must advance at least one of:
+  - Romance
+  - Character Development
+  - Mystery
+  - External Conflict
+  - Worldbuilding
+- No chapter should exist purely as filler.
+- The roadmap should show how the story escalates from beginning, to midpoint, to climax, to resolution.
+- Relationship progression, mystery progression, and character growth should all move forward throughout the roadmap.
 - Do not use em dashes or en dashes.
 - Return JSON only.
+The JSON must be internally consistent.
+
+Do not contradict previously established facts.
+
+Character ages, appearances, personalities, fears, motivations, locations, species rules, mysteries, relationships and worldbuilding must remain logically consistent throughout the entire bible.
+
+Do not leave placeholder fields empty.
+
+- Create long-term continuity anchors.
+- Identify all important objects, secrets, relationships, locations, organizations, enemies, allies, and mysteries.
+- Add them to the continuityDatabase.
+- Anything likely to matter after Chapter 5 should appear somewhere in the continuityDatabase.
+- The continuityDatabase should be sufficient for another AI to continue the novel without reading the full bible.
 `;
 
   try {
