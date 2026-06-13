@@ -321,10 +321,14 @@ export default function Home() {
       }
 
       const data = await response.json();
-      const chapter = data.result || "Something went wrong.";
-      const newStoryState = data.storyState || {};
-      const newChapters = [chapter];
 
+const bible = data.bible;
+
+const newStoryState = data.storyState || {};
+
+const newChapters = [
+  JSON.stringify(bible, null, 2)
+];
       setStoryState(newStoryState);
       setChapters(newChapters);
       setActiveChapterIndex(0);
