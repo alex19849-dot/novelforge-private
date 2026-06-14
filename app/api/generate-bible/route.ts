@@ -187,6 +187,114 @@ ${characters || "No character notes provided."}
 MUST AVOID:
 ${mustAvoid || "Nothing specific provided."}
 
+STORY-SPECIFIC DNA:
+This story is a long MM erotic paranormal romance set in a small town in America.
+
+The story must be deeply relationship-focused above all else.
+
+The romance is the story.
+
+External threats exist only to create pressure on the relationship, never to replace it.
+
+Avoid large wars, chosen one plots, apocalypse storylines, ancient prophecies, political vampire councils dominating the story, or mystery-driven plots.
+
+The emotional focus should remain on the two main characters throughout the novel.
+
+SETTING:
+A small American town with a strong sense of community.
+
+The town should feel lived-in, warm, quirky and memorable.
+
+Vampires are not publicly known.
+
+A small number of trusted humans are aware of their existence.
+
+Some vampires maintain human familiars who willingly assist them and keep their secrets.
+
+Include recurring locations such as the funeral home, the bar purchased by MC2, the local diner, hardware store, town square, cemetery, and forested outskirts.
+
+MAIN CHARACTER ONE:
+Lucian Bedford
+Male vampire.
+Over 400 years old.
+Owns the local funeral home.
+Extremely proper, gentlemanly, reserved, grumpy, protective and possessive.
+Feared and respected by other vampires.
+Secretly soft-hearted.
+Protects the town from dangerous outsiders.
+Feeds from criminals, dangerous people, and consenting lovers.
+Refuses to feed from animals.
+Will never admit how much he loves animals.
+Owns a large shaggy Saint Bernard familiar.
+
+MAIN CHARACTER TWO:
+Reed Marshall
+Male human.
+35 years old.
+Recently divorced from his wife.
+Has relocated to town for a fresh start.
+Purchases the local bar.
+Easy-going, funny, warm, optimistic and sunshine.
+Comfortable around people.
+Naturally flirtatious without always realising it.
+Emotionally intelligent.
+The first person in years capable of getting under MC1's skin.
+
+RELATIONSHIP DYNAMIC:
+Grumpy / Sunshine.
+Vampire / Human.
+Gay awakening.
+Friends to lovers.
+Fast burn emotionally and physically.
+High chemistry from the first meeting.
+Immediate attraction, but neither man initially understands what it is.
+Their connection develops through friendship, time spent together, jealousy, emotional intimacy and shared trust.
+
+ROMANCE REQUIREMENTS:
+The romance must remain active throughout the book.
+Do not delay progression unnecessarily.
+Include flirting, banter, sexual tension, touching, kissing, physical intimacy, domestic intimacy and emotional vulnerability.
+The reader should constantly feel the relationship evolving.
+
+JEALOUSY:
+Jealousy is a major emotional engine.
+The town's single women should be extremely interested in MC2.
+There should be a recurring female character who has romantic interest in MC1.
+MC1 never seriously pursues her.
+Both main characters should experience jealousy.
+Include moments where one character sees the other being flirted with, kissed, touched, or physically pursued by someone else.
+The jealousy should deepen emotional investment.
+
+ANGST:
+Strong emotional angst is encouraged.
+MC2 should remain unaware that MC1 is a vampire for a significant portion of the story.
+Near discoveries should create tension.
+The eventual reveal must feel earned.
+
+PARANORMAL RULES:
+Use traditional vampire folklore.
+Vampires can be harmed or exposed by traditional weaknesses and vulnerabilities.
+The supernatural elements should feel grounded, dangerous and intimate.
+
+TONE:
+Balance humour, heat, angst, tenderness, possessiveness, vulnerability, danger and intimacy.
+The story should be sexy, romantic, funny, dangerous, intimate and deeply character-driven.
+
+STYLE RULES:
+Avoid repetitive modern romance dialogue patterns.
+Avoid overusing:
+"You good?"
+"Spiritually."
+"Emotionally."
+"Fair."
+"Jesus Christ."
+"Christ."
+Excessive one-word banter responses.
+
+Avoid repetitive descriptions.
+Avoid repeated references to teeth, smirks, growls, raised eyebrows, and breath catching every scene.
+Create fresh imagery and varied emotional expression.
+
 STORY SETTINGS:
 Relationship type: ${relationship}
 Book length: ${length}
