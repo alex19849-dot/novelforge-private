@@ -225,7 +225,9 @@ export async function POST(req: Request) {
         { status: 200 }
       );
     }
-
+console.log("MODEL OUTPUT START");
+console.log(response.output_text);
+console.log("MODEL OUTPUT END");
     const chapter = cleanOutput(response.output_text || "");
 
     if (!chapter.trim()) {
