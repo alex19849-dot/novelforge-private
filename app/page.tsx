@@ -310,52 +310,21 @@ export default function Home() {
     setPageIndex(0);
 
     try {
-     const bibleResponse = await fetch("/api/generate-bible", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(preparedForm),
-});
+      const response = await fetch("/api/generate-bible", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(preparedForm),
+      });
 
-if (!bibleResponse.ok) {
-  throw new Error(`Bible generation failed: ${bibleResponse.status}`);
-}
+      if (!response.ok) {
+        throw new Error(`Generate failed: ${response.status}`);
+      }
 
-const bibleData = await bibleResponse.json();
-const bible = bibleData.bible;
+      const data = await response.json();
+      const chapter = data.result || "Something went wrong.";
+      const newStoryState = data.storyState || {};
+      const newChapters = [chapter];
 
-const chapterResponse = await fetch("/api/continue-story", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    form: preparedForm,
-    bible,
-    previousChapter: "",
-    nextChapterNumber: 1,
-    storyState: {
-      ...(bibleData.storyState || {}),
-      bible,
-    },
-    chapterGuidance: "",
-  }),
-});
-
-if (!chapterResponse.ok) {
-  throw new Error(`Chapter generation failed: ${chapterResponse.status}`);
-}
-
-const chapterData = await chapterResponse.json();
-
-if (chapterData.incomplete) {
-  throw new Error(chapterData.result || "Chapter generation was incomplete.");
-}
-
-if (!chapterData.result) {
-  throw new Error("No chapter returned.");
-}
-
-const chapter = chapterData.result;
-const newStoryState = chapterData.storyState || { bible };
-const newChapters = [chapter];
       setStoryState(newStoryState);
       setChapters(newChapters);
       setActiveChapterIndex(0);
@@ -387,14 +356,13 @@ const newChapters = [chapter];
       const response = await fetch("/api/continue-story", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({
-  form: preparedForm,
-  bible: storyState?.bible || null,
-  previousChapter,
-  nextChapterNumber: chapters.length + 1,
-  storyState,
-  chapterGuidance,
-}),
+        body: JSON.stringify({
+          form: preparedForm,
+          previousChapter,
+          nextChapterNumber: chapters.length + 1,
+          storyState,
+          chapterGuidance,
+        }),
       });
 
       if (!response.ok) {
