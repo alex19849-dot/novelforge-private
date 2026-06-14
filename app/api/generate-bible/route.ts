@@ -121,7 +121,6 @@ export async function POST(req: Request) {
   const storyIdea = body.plot || "";
   const characters = body.characterNotes || "";
   const mustAvoid = body.mustNotHave || "";
-  const bible = body.bible || null;
 
   const fullInput = `${storyIdea}\n\n${characters}\n\n${mustAvoid}`;
   const length = body.length || "Novella";
@@ -161,39 +160,23 @@ export async function POST(req: Request) {
   };
 
   const prompt = `
-  ${bible ? `
-
-STORY BIBLE:
-${JSON.stringify(bible, null, 2)}
-
-` : ""}
 You are NovelForge.
 
-Create a complete story bible for a commercial adult romance novel.
-The bible must be written as a professional story development document.
+Write Chapter 1 of a commercial adult romance novel.
 
-Think like an experienced romance editor, developmental editor, and series planner.
-
-Prioritize:
-- Strong emotional arcs
-- Character consistency
-- Long-term continuity
-- Story cohesion
-- Reader satisfaction
-- Commercial romance expectations
-
-The bible should be detailed enough that a separate AI could write the entire novel while remaining consistent.
-Infer genre, tone, length, burn pacing, relationship type, setting, themes and heat level from the user's story idea and character notes.
-
-If information is missing, make the most commercially appropriate choice based on the story concept.
-
-Prefer strong story-specific decisions over generic defaults.
-
-Return only valid JSON.
-Do not write chapter prose.
-Do not include markdown.
+Return only polished chapter prose.
 Do not include notes.
 Do not include analysis.
+Do not include JSON.
+Do not include markdown.
+
+The chapter must begin exactly with:
+
+Chapter 1
+
+POV_NAME
+
+Replace POV_NAME with the correct point-of-view character name in uppercase.
 
 STORY IDEA:
 ${storyIdea || "No story idea provided."}
@@ -213,285 +196,198 @@ Regional language: ${regional.regionalLanguage}
 Preferred terms: ${regional.locationTerms.join(", ")}
 Forbidden terms: ${regional.forbiddenTerms.join(", ")}
 
-Before creating the bible, analyse the user's story idea and identify:
+CHAPTER 1 JOB:
 
-- Genre
-- Subgenre
-- Relationship type
-- Heat level
-- Burn pacing
-- Setting
-- Main tropes
-- Character archetypes
-- Emotional theme
-- Emotional promise
-- External conflict
-- Internal conflict
+* Open with a strong hook.
+* Introduce the main character immediately.
+* Introduce the romantic interest as early as possible.
+* The romantic interest MUST appear within the first 1,000 words.
+* The first meaningful interaction between the romantic leads MUST occur before the midpoint of the chapter.
+* Focus on the primary romantic storyline over side characters, club politics, workplace politics, worldbuilding or secondary plots.
+* Introduce only the supporting characters absolutely necessary for Chapter 1.
+* Keep descriptions concise and purposeful.
+* Ground the setting through action and character interaction.
+* Establish the central romantic dynamic.
+* Establish attraction, friction, curiosity, chemistry, tension or conflict between the leads.
+* Make names, ages, jobs, genders, locations and relationships clear through natural storytelling.
+* Do not reveal every secret.
+* Do not solve the central conflict.
+* Do not spend multiple paragraphs introducing minor characters.
+* Do not spend excessive time explaining the setting before the romantic storyline begins.
+* End on a clean hook, emotional turn, complication, charged moment, revelation or decision that makes the reader want Chapter 2 immediately.
 
-Use those findings to drive every section of the bible.
 
-All characters, locations, world rules, mysteries, side characters and chapter roadmap entries must directly support the identified story.
-Create the following JSON structure:
+STYLE:
+- Natural commercial romance prose.
+- First person if the story idea or characters imply it, otherwise use the most natural romance POV.
+- Keep the prose readable, grounded, emotionally alive and character-led.
+- Use distinct character voices.
+- Dialogue should sound human, not over-polished.
+- Keep humour and banter natural, not constant.
+- Avoid therapy-speak.
+- Avoid purple prose.
+- Avoid random object descriptions.
+- Avoid over-described rooms.
+- Avoid fake profound lines.
+- Avoid repeating the same phrase or sentence rhythm.
+- Do not use em dashes or en dashes. Use commas, full stops, colons or parentheses instead.
 
-{
-  "storyDNA": {
-    "workingTitle": "",
-    "genre": "",
-    "length": "",
-    "heatLevel": "",
-    "burnType": "",
-    "tone": [],
-    "coreTheme": "",
-    "emotionalPromise": "",
-    "centralQuestion": "",
-    "readerExperienceGoal": ""
-  },
- "mainCharacters": [
-  {
-    "name": "",
-    "age": "",
-    "role": "",
-    "species": "",
-    "romanticOrientation": "",
-    "appearance": {},
-    "personality": [],
-    "fears": [],
-    "misbelief": "",
-    "need": "",
-    "want": "",
-    "growthArc": "",
-    "relationshipDynamic": "",
-    "speechStyle": "",
-    "backstory": ""
-  }
-],
-  "supportingCharacters": [
-  {
-    "name": "",
-    "age": "",
-    "role": "",
-    "appearance": "",
-    "personality": [],
-    "knowsSecrets": false,
-    "secretsKnown": [],
-    "storyPurpose": ""
-  }
-],
-  "worldRules": {
-  "continuityDatabase": {
-  "characterFacts": [],
-  "locationFacts": [],
-  "worldFacts": [],
-  "knownSecrets": [],
-  "unknownSecrets": [],
-  "activeMysteries": [],
-  "activeThreats": [],
-  "importantObjects": [],
-  "importantDates": [],
-  "importantRelationships": []
-},
-  "settingRules": {},
-  "speciesRules": {},
-  "powerRules": {},
-  "weaknessRules": {},
-  "societyRules": {},
-  "relationshipRules": {},
-  "continuityRules": {}
-},
- "locations": [
-  {
-    "name": "",
-    "type": "",
-    "owner": "",
-    "description": "",
-    "storyPurpose": "",
-    "secrets": []
-  }
-],
-  "relationshipArc": [
-  {
-    "stage": "",
-    "chapters": [],
-    "summary": "",
-    "physicalProgression": "",
-    "emotionalProgression": "",
-    "relationshipState": ""
-  }
-],
-"mandatoryStoryBeats": [
-  {
-    "beat": "",
-    "description": "",
-    "completed": false,
-    "importance": "major"
-  }
-],
-  "chapterRoadmap": [
-  {
-    "chapter": 1,
-    "title": "",
-    "pov": "",
-    "summary": "",
-    "romanceBeat": "",
-    "plotBeat": "",
-    "characterDevelopment": "",
-    "mysteryProgress": "",
-    "heatBeat": "",
-    "cliffhangerOrHook": ""
-  }
-],
- "openingStoryState": {
-  "currentChapter": 1,
-  "currentPOV": "",
-  "relationshipStatus": "",
-  "physicalRelationshipStatus": "",
-  "emotionalRelationshipStatus": "",
-  "knownSecrets": [],
-  "unknownSecrets": [],
-  "activeMysteries": [],
-  "activeThreats": [],
-  "unresolvedConflicts": [],
-  "completedBeats": [],
-  "pendingBeats": []
-}
-  "subGenre": "",
-"setting": "",
-"burnPacing": "",
-"primaryTropes": [],
-"secondaryTropes": []
-}
+ROMANCE RULES:
+- Do not make the couple emotionally safe too quickly.
+- Do not rush full intimacy in Chapter 1.
+- If the story is explicit or fast burn, include clear physical awareness and one charged physical beat, but do not jump to full sexual payoff unless the user's story idea specifically requires it.
+- If the story is slow burn or closed door, focus on tension, emotion and restraint.
+- All romantic and sexual content must involve adults only.
 
-Rules:
-- Make all romantic and sexual characters adults.
-- Generate only story elements that directly support the user's concept.
-- Do not introduce unrelated subplots, genres, themes, occupations, settings, creatures, powers, organizations, or conflicts.
-- Every character, location, mystery, threat, and chapter beat must connect back to the core story.
-- Prefer depth over breadth.
-- A smaller number of highly relevant elements is better than a large number of loosely connected elements.
-- Never override user supplied tropes, sexuality, romantic history, relationship dynamics, genre, heat level, story length, burn type, character roles, or worldbuilding.
-- Every main character must have a complete character profile.
-- Every supporting character must have a complete character profile.
-- Every location must contain at least one story purpose and one secret if relevant.
-- Every mystery introduced must appear in activeMysteries.
-- Every unresolved conflict introduced must appear in unresolvedConflicts.
-- Relationship progression must be tracked separately for physical intimacy and emotional intimacy.
-- The chapter roadmap must cover the entire requested book length.
-- Long Novel defaults to approximately 25-35 chapters unless otherwise specified.
-- User supplied information always takes priority over inferred information.
-- If the user specifies Gay First Time, the character cannot have previous sexual experience with men.
-- If the user specifies Long Novel, the story length must be Long Novel.
-- If the user specifies Paranormal Romance, do not replace it with Sports Romance, Contemporary Romance, or any other genre.
-- Include names, ages, appearances, personalities, fears, misbeliefs, needs and growth arcs for main characters.
-- Include side characters with names, ages, roles, appearances, personalities, secrets known, story purpose, relationship to the main characters, and their impact on the plot.
-- Every supporting character must serve at least one function:
-  - Ally
-  - Mentor
-  - Antagonist
-  - Rival
-  - Comic Relief
-  - Found Family
-  - Gatekeeper
-  - Informant
-  - Love Interest Support
-  - Threat
-- Do not create filler characters.
-- Every supporting character must affect either the romance, mystery, worldbuilding, conflict, or protagonist growth.
-- Create a continuity database that can be used by future chapter generation.
-- Every fact introduced must have a permanent home in the bible.
-- Character facts belong in character profiles.
-- Location facts belong in locations.
-- Species facts belong in world rules.
-- Secrets belong in knownSecrets or unknownSecrets.
-- Mysteries belong in activeMysteries.
-- Threats belong in activeThreats.
-- The bible must function as a reference database for the entire novel.
-- Include locations with names, descriptions, owners, story purpose, secrets, recurring characters, and plot relevance.
-- Every major location must answer:
-  - Why does this location exist?
-  - What story purpose does it serve?
-  - What secrets are connected to it?
-  - Which characters are most associated with it?
-- Do not create locations that are unlikely to appear in the story.
-- Locations should support the romance, mystery, worldbuilding, conflict, or character development.
-- Include a chapter roadmap for the full target chapter count.
-- Every chapter must have a purpose.
-- Every chapter must advance at least one of:
-  - Romance
-  - Character Development
-  - Mystery
-  - External Conflict
-  - Worldbuilding
-- No chapter should exist purely as filler.
-- The roadmap should show how the story escalates from beginning, to midpoint, to climax, to resolution.
-- Relationship progression, mystery progression, and character growth should all move forward throughout the roadmap.
-- Do not use em dashes or en dashes.
-- Return JSON only.
-The JSON must be internally consistent.
+# Physical Intimacy & Relationship Progression
 
-Do not contradict previously established facts.
+Physical intimacy is an important part of romantic storytelling and should be treated as meaningful character and relationship development rather than a brief event or transition.
 
-Character ages, appearances, personalities, fears, motivations, locations, species rules, mysteries, relationships and worldbuilding must remain logically consistent throughout the entire bible.
+When intimate scenes occur:
 
-Do not leave placeholder fields empty.
+* Write them fully on-page descriptive and detailed.
+* Do not fade to black.
+* Do not skip directly from anticipation to aftermath.
+* Allow intimacy to occupy substantial page space when earned by the story.
+* Build tension and anticipation before physical intimacy begins.
+* Allow scenes to unfold naturally rather than rushing through major moments.
 
-- Create long-term continuity anchors.
-- Identify all important objects, secrets, relationships, locations, organizations, enemies, allies, and mysteries.
-- Add them to the continuityDatabase.
-- Anything likely to matter after Chapter 5 should appear somewhere in the continuityDatabase.
-- The continuityDatabase should be sufficient for another AI to continue the novel without reading the full bible.
+Physical intimacy should feel:
+
+* Emotional.
+* Romantic.
+* Passionate.
+* Character-driven.
+* Personal.
+* Relationship-specific.
+
+Avoid:
+
+* Clinical descriptions.
+* Mechanical sequences of actions.
+* Generic intimacy that could belong to any characters.
+* Abrupt scene endings.
+* Repetitive language and phrasing.
+* Overly brief intimacy scenes that fail to satisfy narrative expectations.
+
+Each intimate scene should reveal character, deepen emotional connection, and advance the relationship.
+
+Physical intimacy should never feel separate from the emotional story.
+
+# Spice Level Guidance
+
+When the story's selected heat level allows explicit content:
+
+* Show intimacy fully on-page.
+* Allow scenes to be detailed and immersive.
+* Allow dirty talk.
+* Include anticipation, build-up, physical intimacy, emotional interaction, and meaningful aftermath.
+* Allow important intimacy scenes to occupy a significant portion of a chapter when appropriate.
+
+Major romantic milestones should receive narrative weight equal to other major story events.
+
+# Emotional Aftermath
+
+After intimate scenes:
+
+* Include emotional reactions.
+* Include relationship development.
+* Include vulnerability, humour, affection, conversation, or reflection where appropriate.
+* Show how intimacy changes the emotional dynamic between the characters.
+
+Readers should leave intimate scenes feeling that the relationship has evolved, not simply that a physical act occurred.
+
+# Character-Specific Intimacy
+
+Physical intimacy should always reflect the personalities, emotional states, histories, fears, desires, and relationship dynamics of the characters involved.
+
+No two intimate scenes should feel interchangeable.
+
+The emotional and physical experience should feel unique to the specific characters and their stage of relationship development.
+
+
+CONTINUITY RULES:
+- Follow the story idea and character notes above.
+- Do not invent random illnesses, family emergencies, scandals, accidents, custody threats or villains unless the user seeded them.
+- Do not change character genders, names, roles or relationships.
+- Do not include anything from the must avoid section.
+
+LENGTH:
+- Target ${wordTarget}.
+- Write one complete chapter with a clear beginning, middle and end.
+- Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
+- Reach the main emotional beat or story turn by the middle of the chapter.
+- The final 20 percent of the chapter must resolve the current scene and land the chapter ending.
+- Prioritise a finished chapter over length.
+- If running short on space, compress description and reflection, not the ending.
+- Do not cut off mid-scene.
+- Do not stop during dialogue.
+- Do not stop during a confrontation.
+- Do not introduce a new scene, new conflict or new location near the end unless it is the final hook.
+- Finish the final scene fully.
+- End with a proper chapter ending: an emotional beat, decision, reveal, complication, romantic turn or hook.
 `;
 
   try {
-  const response = await openai.responses.create({
-    model: "gpt-5.5",
-    reasoning: { effort: "low" },
-    text: { verbosity: "medium" },
-    input: prompt,
-    max_output_tokens: maxTokens,
-  });
+    const response = await openai.responses.create({
+      model: "gpt-5.5",
+      reasoning: { effort: "low" },
+      text: { verbosity: "medium" },
+      input: prompt,
+      max_output_tokens: maxTokens,
+    });
 
   if (response.status === "incomplete") {
-    const partialBible = cleanOutput(response.output_text || "");
+  const partialChapter = cleanOutput(response.output_text || "");
+
+  return Response.json(
+    {
+      result:
+        partialChapter ||
+        "Chapter generation stopped before finishing, but no partial text was returned.",
+      storyState: openingStoryState,
+      warning:
+        "The chapter may be incomplete because the model hit the output limit."
+    },
+    { status: 200 }
+  );
+}
+
+    const chapter = cleanOutput(response.output_text || "");
+
+    if (!chapter.trim()) {
+      return Response.json(
+        {
+          result: "No chapter text was returned.",
+          storyState: openingStoryState,
+        },
+        { status: 500 }
+      );
+    }
+
+    const storyState = {
+      ...openingStoryState,
+      chapter: 1,
+      lastMajorBeat:
+        "Chapter 1 introduced the leads, central conflict, attraction and opening consequence.",
+      nextRequiredConsequence:
+        "Chapter 2 must directly follow the emotional and practical fallout from Chapter 1. Do not reset the characters.",
+    };
+
+    return Response.json({
+      result: chapter,
+      storyState,
+    });
+  } catch (error) {
+    console.error(error);
 
     return Response.json(
       {
         result:
-          partialBible ||
-          "Bible generation stopped before finishing, but no partial text was returned.",
-        storyState: openingStoryState,
-        warning:
-          "The bible may be incomplete because the model hit the output limit.",
-      },
-      { status: 200 }
-    );
-  }
-
-  const bibleText = cleanOutput(response.output_text || "");
-const bible = JSON.parse(bibleText);
-  if (!bibleText.trim()) {
-    return Response.json(
-      {
-        result: "No bible text was returned.",
+          "Something went wrong while generating Chapter 1. The app is sulking in a corner.",
         storyState: openingStoryState,
       },
       { status: 500 }
     );
   }
-
-return Response.json({
-  bible,
-  storyState: openingStoryState,
-});
-} catch (error) {
-  console.error(error);
-
-  return Response.json(
-    {
-      result:
-        "Something went wrong while generating the story bible. The vampire paperwork department has collapsed.",
-      storyState: openingStoryState,
-    },
-    { status: 500 }
-  );
 }
-}  
