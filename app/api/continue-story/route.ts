@@ -176,6 +176,9 @@ ${JSON.stringify(updatedStoryState, null, 2)}
 PREVIOUS CHAPTERS:
 ${previousChapter || "No previous chapter text provided."}
 
+STORY-SPECIFIC DNA REMINDER:
+This is a long MM erotic paranormal romance with a 400+ year-old proper vampire funeral-home owner and a divorced 35-year-old human bar owner. Keep the story relationship-focused, high heat, funny, intimate, jealous, dangerous, and grounded in traditional vampire folklore. Avoid big wars, chosen-one plots, heavy mysteries, and repetitive wording.
+
 CONTINUATION JOB:
 - Continue directly from the previous chapter.
 - Do not restart the story.
