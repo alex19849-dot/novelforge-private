@@ -357,7 +357,7 @@ ROMANCE RULES:
 Physical intimacy is an important part of romantic storytelling and should be treated as meaningful character and relationship development rather than a brief event or transition.
 
 When intimate scenes occur:
-
+* Write them graphic and erotic.
 * Write them fully on-page descriptive and detailed.
 * Do not fade to black.
 * Do not skip directly from anticipation to aftermath.
@@ -390,10 +390,10 @@ Physical intimacy should never feel separate from the emotional story.
 # Spice Level Guidance
 
 When the story's selected heat level allows explicit content:
-
+* Detail intimacy fully on page.
 * Show intimacy fully on-page.
 * Allow scenes to be detailed and immersive.
-* Allow dirty talk.
+* Use dirty talk.
 * Include anticipation, build-up, physical intimacy, emotional interaction, and meaningful aftermath.
 * Allow important intimacy scenes to occupy a significant portion of a chapter when appropriate.
 
