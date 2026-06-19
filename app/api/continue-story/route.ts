@@ -180,8 +180,57 @@ ${JSON.stringify(updatedStoryState, null, 2)}
 PREVIOUS CHAPTERS:
 ${previousChapter || "No previous chapter text provided."}
 
-STORY-SPECIFIC DNA REMINDER:
-This is a long MM erotic paranormal romance with a 400+ year-old proper vampire funeral-home owner and a divorced 35-year-old human bar owner. Keep the story relationship-focused, high heat, funny, intimate, jealous, dangerous, and grounded in traditional vampire folklore. Avoid big wars, chosen-one plots, heavy mysteries, and repetitive wording.
+STORY CONTINUITY RULES
+
+Maintain complete consistency with all established character personalities, histories, relationships, motivations, emotional wounds, speech patterns, and story events.
+
+Characters must remember previous conversations, conflicts, promises, arguments, mistakes, and emotional milestones.
+
+Relationship progression must feel earned and cumulative.
+
+Avoid resetting emotional progress between chapters.
+
+Each chapter should build upon previous chapters rather than repeating the same conflicts.
+
+Track and evolve:
+
+• Relationship development
+• Character growth
+• Emotional intimacy
+• Sexual intimacy
+• Trust
+• Jealousy
+• Possessiveness
+• Vulnerability
+• External conflicts
+
+Every chapter must introduce meaningful change.
+
+No filler scenes.
+
+No repetitive arguments.
+
+No repetitive emotional beats.
+
+No repetitive intimacy scenes.
+
+The protagonists should never feel emotionally identical to how they felt five chapters earlier unless there is a story reason.
+
+Side characters should continue developing lives, relationships, and goals outside the protagonists.
+
+The story world should feel alive and evolving.
+
+Always escalate or deepen existing conflicts rather than restarting them.
+
+Before writing any chapter, identify:
+
+1. What has changed since the previous chapter.
+2. What emotional development must occur next.
+3. What new information, conflict, or progression this chapter introduces.
+4. How the relationship evolves during this chapter.
+
+Every chapter must move the story forward.
+
 
 CONTINUATION JOB:
 - Continue directly from the previous chapter.
