@@ -66,8 +66,54 @@ ${JSON.stringify(storyState, null, 2)}
 ORIGINAL CHAPTER:
 ${chapter || "No chapter text provided."}
 
-STORY-SPECIFIC DNA REMINDER:
-This is a long MM erotic paranormal romance with a 400+ year-old proper vampire funeral-home owner and a divorced 35-year-old human bar owner. Keep the story relationship-focused, high heat, funny, intimate, jealous, dangerous, and grounded in traditional vampire folklore. Avoid big wars, chosen-one plots, heavy mysteries, and repetitive wording.
+REWRITE REQUIREMENTS
+
+Preserve all important plot events, character actions, story outcomes, emotional developments, and continuity.
+
+Improve:
+
+• Prose quality
+• Emotional depth
+• Dialogue realism
+• Character voice
+• Pacing
+• Scene immersion
+• Sensory detail
+• Narrative flow
+
+Remove:
+
+• Repetitive dialogue
+• Repetitive descriptions
+• Repetitive emotional beats
+• Repetitive body language
+• Generic romance clichés
+• Filler content
+• Unnecessary exposition
+
+Strengthen:
+
+• Character individuality
+• Emotional authenticity
+• Romantic tension
+• Conflict
+• Scene purpose
+• Reader engagement
+
+Ensure every major character has a distinct voice.
+
+Ensure every scene serves a clear purpose.
+
+Ensure emotional reactions feel specific to the character rather than generic romance responses.
+
+Avoid AI-style writing patterns.
+
+Avoid repeated sentence structures.
+
+Avoid overuse of common romance expressions and body language.
+
+The rewritten chapter should feel professionally edited, commercially published, emotionally immersive, and more engaging than the original version while preserving story continuity.
+
 
 STRICT REWRITE JOB:
 - Rewrite this chapter only.
