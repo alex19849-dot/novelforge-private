@@ -170,6 +170,35 @@ STYLE:
 - Use natural contractions.
 - Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
 
+DIALOGUE RULES
+
+Every conversation must have a unique purpose.
+
+Avoid repeated exchanges where characters:
+
+• Trade the same insults.
+• Repeat the same argument.
+• Discuss reactions repeatedly.
+• Revisit identical emotional territory.
+
+Conversations should reveal:
+
+• Character.
+• History.
+• Vulnerability.
+• Humour.
+• Desire.
+• Frustration.
+• Ambition.
+• Fear.
+• Real life concerns.
+
+Characters should occasionally surprise each other and the reader.
+
+Avoid multiple chapters where conversations serve only to maintain sexual tension.
+
+Sexual tension should evolve and change rather than repeat.
+
 ROMANCE AND INTIMACY:
 - Preserve the current heat level: ${form.heat || storyState.heat || "Spicy"}.
 - Preserve the current relationship stage: ${storyState.relationshipStage ?? "unknown"}.
