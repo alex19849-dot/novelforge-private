@@ -252,6 +252,35 @@ CHAPTER ARC:
 - If this is near the ending, start resolving the main emotional and romantic conflict.
 - If this is the epilogue, give soft future-facing payoff and do not introduce new major drama.
 
+DIALOGUE RULES
+
+Every conversation must have a unique purpose.
+
+Avoid repeated exchanges where characters:
+
+• Trade the same insults.
+• Repeat the same argument.
+• Discuss reactions repeatedly.
+• Revisit identical emotional territory.
+
+Conversations should reveal:
+
+• Character.
+• History.
+• Vulnerability.
+• Humour.
+• Desire.
+• Frustration.
+• Ambition.
+• Fear.
+• Real life concerns.
+
+Characters should occasionally surprise each other and the reader.
+
+Avoid multiple chapters where conversations serve only to maintain sexual tension.
+
+Sexual tension should evolve and change rather than repeat.
+
 ROMANCE PACING:
 - Let the relationship evolve cumulatively.
 - Do not reset attraction, trust, conflict or intimacy.
