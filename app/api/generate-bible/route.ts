@@ -8,24 +8,6 @@ function cleanOutput(text: string) {
   return text.replace(/[—–]/g, ",");
 }
 
-function getTargetChapters(length: string) {
-  if (length === "Short Novel") return 18;
-  if (length === "Long Novel") return 30;
-  return 10;
-}
-
-function getWordTarget(length: string) {
- if (length === "Short Novel") return "1500 to 2200 words";
- if (length === "Long Novel") return "1800 to 2500 words";
- return "1200 to 1800 words";
-}
-
-function getMaxTokens(length: string) {
- if (length === "Short Novel") return 8000;
- if (length === "Long Novel") return 11000;
- return 6500;
-}
-
 function detectLocale(text: string) {
   const lower = text.toLowerCase();
 
@@ -123,18 +105,12 @@ export async function POST(req: Request) {
   const mustAvoid = body.mustNotHave || "";
 
   const fullInput = `${storyIdea}\n\n${characters}\n\n${mustAvoid}`;
-  const length = body.length || "Novella";
-  const targetChapters = getTargetChapters(length);
-  const wordTarget = getWordTarget(length);
-  const maxTokens = getMaxTokens(length);
   const regional = detectLocale(fullInput);
   const relationship = body.relationship || detectRelationship(fullInput);
   const heat = body.heat || detectHeat(fullInput);
 
   const openingStoryState = {
     chapter: 1,
-    targetChapters,
-    wordTarget,
     relationship,
     heat,
     regionalLanguage: regional.regionalLanguage,
@@ -1379,8 +1355,6 @@ The reader should never feel they have already read a scene simply because a sim
 
 STORY SETTINGS:
 Relationship type: ${relationship}
-Book length: ${length}
-Target chapter count: ${targetChapters}
 Heat level: ${heat}
 Regional language: ${regional.regionalLanguage}
 Preferred terms: ${regional.locationTerms.join(", ")}
@@ -1496,7 +1470,6 @@ CONTINUITY RULES:
 - Do not include anything from the must avoid section.
 
 LENGTH:
-- Target ${wordTarget}.
 - Write one complete chapter with a clear beginning, middle and end.
 - Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
 - Reach the main emotional beat or story turn by the middle of the chapter.
@@ -1517,7 +1490,7 @@ LENGTH:
       reasoning: { effort: "low" },
       text: { verbosity: "medium" },
       input: prompt,
-      max_output_tokens: maxTokens,
+      max_output_tokens: 12000,
     });
 
   if (response.status === "incomplete") {
