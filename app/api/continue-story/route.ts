@@ -311,7 +311,7 @@ LENGTH:
       reasoning: { effort: "low" },
       text: { verbosity: "medium" },
       input: prompt,
-      max_output_tokens: maxTokens,
+      max_output_tokens: 12000,
     });
 
 
