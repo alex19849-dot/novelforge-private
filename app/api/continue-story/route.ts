@@ -18,23 +18,21 @@ export async function POST(req: Request) {
   const incomingState = body.storyState || {};
   const chapterGuidance = body.chapterGuidance || "";
 
-  const updatedStoryState = {
-    ...incomingState,
-    chapter: nextChapterNumber,
-    relationshipStage: incomingState.relationshipStage || 1,
-    physicalStage: incomingState.physicalStage || 1,
-   trust: incomingState.trust || 5,
-attraction: incomingState.attraction || 20,
-jealousy: incomingState.jealousy || 0,
-vulnerability: incomingState.vulnerability || 2,
-sexualTension: incomingState.sexualTension || 20,
-   endingPhase: incomingState.endingPhase || "ongoing",
-epilogueWritten: incomingState.epilogueWritten || false,
-   lastMajorBeat: incomingState.lastMajorBeat || "",
-
-nextRequiredConsequence: incomingState.nextRequiredConsequence || "",
-    } must continue directly from Chapter ${nextChapterNumber} without resetting the characters.`,
-  };
+ const updatedStoryState = {
+  ...incomingState,
+  chapter: nextChapterNumber,
+  relationshipStage: incomingState.relationshipStage || 1,
+  physicalStage: incomingState.physicalStage || 1,
+  trust: incomingState.trust || 5,
+  attraction: incomingState.attraction || 20,
+  jealousy: incomingState.jealousy || 0,
+  vulnerability: incomingState.vulnerability || 2,
+  sexualTension: incomingState.sexualTension || 20,
+  endingPhase: incomingState.endingPhase || "ongoing",
+  epilogueWritten: incomingState.epilogueWritten || false,
+  lastMajorBeat: incomingState.lastMajorBeat || "",
+  nextRequiredConsequence: incomingState.nextRequiredConsequence || "",
+};
 
 const chapterLabel = `Chapter ${nextChapterNumber}`;
 
