@@ -158,9 +158,6 @@ ${characters || "No character notes provided."}
 MUST AVOID:
 ${mustAvoid || "Nothing specific provided."}
 
-STORY-SPECIFIC DNA:
-
-
 
 STYLE RULES
 
