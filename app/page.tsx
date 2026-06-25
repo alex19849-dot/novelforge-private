@@ -27,7 +27,6 @@ const defaultForm: StoryForm = {
   storyLocation: "London, UK",
   subgenre: "Workplace",
   subgenreDetail: "Office romance",
-  length: "Novella",
   heat: "Explicit adult",
   burnPacing: "Fast burn",
   pov: "First person, dual POV",
