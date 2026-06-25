@@ -185,8 +185,6 @@ Sexual tension should evolve and change rather than repeat.
 
 ROMANCE AND INTIMACY:
 - Preserve the current heat level: ${form.heat || storyState.heat || "Spicy"}.
-- Preserve the current relationship stage: ${storyState.relationshipStage ?? "unknown"}.
-- Preserve the current physical stage: ${storyState.physicalStage ?? "unknown"}.
 - If the original chapter includes intimacy, do not remove it unless the user asks.
 - If the original chapter is explicit, do not fade it to black unless the user asks.
 - Keep romantic and sexual content adult-only.
