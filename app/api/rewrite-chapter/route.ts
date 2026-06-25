@@ -8,18 +8,6 @@ function cleanOutput(text: string) {
   return text.replace(/[—–]/g, ",");
 }
 
-function getMaxTokens(length: string) {
- if (length === "Short Novel") return 8000;
- if (length === "Long Novel") return 11000;
- return 6500;
-}
-
-function getWordTarget(length: string) {
- if (length === "Short Novel") return "1500 to 2200 words";
- if (length === "Long Novel") return "1800 to 2500 words";
- return "1200 to 1800 words";
-}
-
 export async function POST(req: Request) {
   const body = await req.json();
 
@@ -27,10 +15,6 @@ export async function POST(req: Request) {
   const instruction = body.instruction || "";
   const form = body.form || {};
   const storyState = body.storyState || {};
-
-  const length = form.length || "Novella";
-  const maxTokens = getMaxTokens(length);
-  const wordTarget = getWordTarget(length);
 
   const prompt = `
 You are NovelForge.
@@ -247,7 +231,6 @@ Preferred terms: ${(storyState.locationTerms || []).join(", ")}.
 Forbidden terms: ${(storyState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
-- Target ${wordTarget}.
 - Preserve the approximate size and shape of the original chapter unless the user asks otherwise.
 - Prioritise a complete chapter over a longer chapter.
 - Do not cut off mid-scene.
@@ -266,7 +249,7 @@ Return only the rewritten chapter.
       reasoning: { effort: "low" },
       text: { verbosity: "medium" },
       input: prompt,
-      max_output_tokens: maxTokens,
+      max_output_tokens: 12000,
     });
 
     if (response.status === "incomplete") {
