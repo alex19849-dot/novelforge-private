@@ -109,31 +109,17 @@ export async function POST(req: Request) {
   const relationship = body.relationship || detectRelationship(fullInput);
   const heat = body.heat || detectHeat(fullInput);
 
-  const openingStoryState = {
-    chapter: 1,
-    relationship,
-    heat,
-    regionalLanguage: regional.regionalLanguage,
-    locationTerms: regional.locationTerms,
-    forbiddenTerms: regional.forbiddenTerms,
-
-    relationshipStage: 1,
-    physicalStage: 1,
-
-    trust: 5,
-    attraction: heat === "Explicit adult" ? 30 : 15,
-    jealousy: 0,
-    vulnerability: 2,
-    sexualTension: heat === "Explicit adult" ? 35 : 18,
-
-    lastMajorBeat: "Chapter 1 introduced the story, the main characters, the central conflict and the first emotional hook.",
-    nextRequiredConsequence:
-      "Chapter 2 must continue directly from Chapter 1 and carry forward the emotional and practical consequences. Do not reset the characters.",
-
-    shouldWriteEpilogue: false,
-    epilogueWritten: false,
-    endingPhase: "opening",
-  };
+ const openingStoryState = {
+  chapter: 1,
+  relationship,
+  heat,
+  regionalLanguage: regional.regionalLanguage,
+  locationTerms: regional.locationTerms,
+  forbiddenTerms: regional.forbiddenTerms,
+  lastMajorBeat: "",
+  nextRequiredConsequence: "",
+  endingPhase: "ongoing",
+};
 
   const prompt = `
 You are NovelForge.
@@ -1521,14 +1507,10 @@ LENGTH:
       );
     }
 
-    const storyState = {
-      ...openingStoryState,
-      chapter: 1,
-      lastMajorBeat:
-        "Chapter 1 introduced the leads, central conflict, attraction and opening consequence.",
-      nextRequiredConsequence:
-        "Chapter 2 must directly follow the emotional and practical fallout from Chapter 1. Do not reset the characters.",
-    };
+  const storyState = {
+  ...openingStoryState,
+  chapter: 1,
+};
 
     return Response.json({
       result: chapter,
