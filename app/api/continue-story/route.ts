@@ -8,17 +8,6 @@ function cleanOutput(text: string) {
   return text.replace(/[—–]/g, ",");
 }
 
-function getMaxTokens(length: string) {
- if (length === "Short Novel") return 8000;
- if (length === "Long Novel") return 11000;
- return 6500;
-}
-function getWordTarget(length: string) {
- if (length === "Short Novel") return "1500 to 2200 words";
- if (length === "Long Novel") return "1800 to 2500 words";
- return "1200 to 1800 words";
-}
-
 function nextRelationshipStage(current: number, chapter: number) {
   if (chapter <= 2) return Math.min(current + 1, 2);
   if (chapter <= 4) return Math.min(current + 1, 4);
@@ -83,10 +72,6 @@ export async function POST(req: Request) {
   const nextChapterNumber = body.nextChapterNumber || 2;
   const incomingState = body.storyState || {};
   const chapterGuidance = body.chapterGuidance || "";
-
-  const length = form.length || "Novella";
-  const maxTokens = getMaxTokens(length);
-  const wordTarget = getWordTarget(length);
 
   const targetRelationshipStage = nextRelationshipStage(
     incomingState.relationshipStage || 1,
