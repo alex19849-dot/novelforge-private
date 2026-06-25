@@ -97,7 +97,13 @@ Avoid repeated sentence structures.
 Avoid overuse of common romance expressions and body language.
 
 The rewritten chapter should feel professionally edited, commercially published, emotionally immersive, and more engaging than the original version while preserving story continuity.
+Treat the original chapter as canon.
 
+Improve how the story is told, never what the story is.
+
+If something can be improved without changing established events, always prefer improvement over alteration.
+
+The reader should finish the rewrite believing this was always the original chapter, only written better.
 
 STRICT REWRITE JOB:
 - Rewrite this chapter only.
@@ -134,11 +140,13 @@ CONTINUITY:
 - Do not soften established conflict unless the instruction asks for it.
 - Do not change who knows what.
 - Do not change previous events.
-- Do not change living situation, family situation, injuries, secrets, relationship stage or unresolved consequences unless the user directly asks.
+- Do not change living situations, family circumstances, injuries, secrets, unresolved consequences or any established facts unless the user directly asks.
 
 STYLE:
-- Natural commercial romance prose.
-- Preserve the established story voice.
+- Write with the quality, confidence and polish of a traditionally published bestselling romance novel.
+- Preserve the established story voice completely.
+- Improve the writing without making it feel like a different author wrote it.
+- Show rather than tell wherever possible.
 - Keep character voices distinct.
 - Keep dialogue human, varied and grounded.
 - Avoid constant banter.
@@ -193,6 +201,9 @@ ROMANCE AND INTIMACY:
 - Avoid rushed transitions, repetitive phrasing and generic romance clichés.
 - Make physical affection feel unique to the personalities, history and emotional state of the characters.
 - Give important romantic moments enough page space to feel earned and emotionally satisfying.
+- Preserve the emotional and romantic purpose of every intimate scene.
+- Never shorten, summarise or fade important intimate scenes unless the user specifically requests it.
+- Preserve the pacing of emotional build-up, intimacy and aftermath.
 
 QUALITY FIXES:
 - Improve flow.
