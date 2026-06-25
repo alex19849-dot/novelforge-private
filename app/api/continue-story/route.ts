@@ -84,16 +84,8 @@ export async function POST(req: Request) {
     nextChapterNumber
   );
 
-  const targetChapters = incomingState.targetChapters || 10;
-
-  const endingPhase =
-    nextChapterNumber >= targetChapters + 1
-      ? "epilogue"
-      : nextChapterNumber >= targetChapters - 2
-      ? "resolution-runway"
-      : "middle-build";
-
-  const shouldWriteEpilogue = nextChapterNumber === targetChapters + 1;
+ const endingPhase = "ongoing";
+const shouldWriteEpilogue = false;
 
   const updatedStoryState = {
     ...incomingState,
@@ -229,7 +221,6 @@ CONTINUATION JOB:
 - Do not add filler scenes just to make the chapter longer.
 
 CHAPTER ARC:
-- This is Chapter ${nextChapterNumber} of around ${targetChapters}.
 - Current relationship stage: ${targetRelationshipStage}.
 - Current physical stage: ${targetPhysicalStage}.
 - Current ending phase: ${endingPhase}.
@@ -300,7 +291,6 @@ Preferred terms: ${(incomingState.locationTerms || []).join(", ")}.
 Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
-- Target ${wordTarget}.
 - Write one complete chapter with a clear beginning, middle and end.
 - Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
 - Reach the main emotional beat or story turn by the middle of the chapter.
