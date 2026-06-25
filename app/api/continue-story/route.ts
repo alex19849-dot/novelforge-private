@@ -8,61 +8,6 @@ function cleanOutput(text: string) {
   return text.replace(/[—–]/g, ",");
 }
 
-function nextRelationshipStage(current: number, chapter: number) {
-  if (chapter <= 2) return Math.min(current + 1, 2);
-  if (chapter <= 4) return Math.min(current + 1, 4);
-  if (chapter <= 6) return Math.min(current + 1, 5);
-  if (chapter <= 8) return Math.min(current + 1, 6);
-  return Math.min(current + 1, 8);
-}
-
-function nextPhysicalStage(current: number, form: any, chapter: number) {
-  const heat = form.heat || "";
-  const burn = form.burnPacing || "";
-
-  if (heat === "Fade to black") return Math.min(current + 1, 3);
-
-  if (heat === "Mild") {
-    if (chapter <= 2) return 1;
-    if (chapter <= 4) return 2;
-    return 3;
-  }
-
-  if (heat === "Spicy") {
-    if (chapter <= 2) return 2;
-    if (chapter === 3) return 3;
-    if (chapter === 4) return 4;
-    if (chapter === 5) return 5;
-    return 6;
-  }
-
-  if (heat === "Explicit adult" && burn === "Fast burn") {
-    if (chapter <= 2) return 2;
-    if (chapter === 3) return 4;
-    if (chapter === 4) return 5;
-    if (chapter === 5) return 6;
-    return 7;
-  }
-
-  if (heat === "Explicit adult" && burn === "Medium burn") {
-    if (chapter <= 2) return 2;
-    if (chapter === 3) return 3;
-    if (chapter === 4) return 4;
-    if (chapter === 5) return 5;
-    if (chapter === 6) return 6;
-    return 7;
-  }
-
-  if (heat === "Explicit adult") {
-    if (chapter <= 3) return 2;
-    if (chapter === 4) return 3;
-    if (chapter === 5) return 4;
-    if (chapter === 6) return 5;
-    return 6;
-  }
-
-  return Math.min(current + 1, 4);
-}
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -73,36 +18,26 @@ export async function POST(req: Request) {
   const incomingState = body.storyState || {};
   const chapterGuidance = body.chapterGuidance || "";
 
-  const targetRelationshipStage = nextRelationshipStage(
-    incomingState.relationshipStage || 1,
-    nextChapterNumber
-  );
-
-  const targetPhysicalStage = nextPhysicalStage(
-    incomingState.physicalStage || 1,
-    form,
-    nextChapterNumber
-  );
-
  const endingPhase = "ongoing";
 const shouldWriteEpilogue = false;
 
   const updatedStoryState = {
     ...incomingState,
     chapter: nextChapterNumber,
-    relationshipStage: targetRelationshipStage,
-    physicalStage: targetPhysicalStage,
+    relationshipStage: incomingState.relationshipStage || 1,
+    physicalStage: incomingState.physicalStage || 1,
     trust: Math.min((incomingState.trust || 5) + 6, 100),
-    attraction: Math.min((incomingState.attraction || 20) + 8, 100),
-    jealousy: Math.min((incomingState.jealousy || 0) + 4, 100),
-    vulnerability: Math.min((incomingState.vulnerability || 2) + 5, 100),
-    sexualTension: Math.min((incomingState.sexualTension || 20) + 8, 100),
+   trust: incomingState.trust || 5,
+attraction: incomingState.attraction || 20,
+jealousy: incomingState.jealousy || 0,
+vulnerability: incomingState.vulnerability || 2,
+sexualTension: incomingState.sexualTension || 20,
     endingPhase,
     shouldWriteEpilogue,
     epilogueWritten: shouldWriteEpilogue ? true : incomingState.epilogueWritten || false,
-    lastMajorBeat: `Chapter ${nextChapterNumber} continued the relationship, conflict and emotional consequences.`,
-    nextRequiredConsequence: `Chapter ${
-      nextChapterNumber + 1
+   lastMajorBeat: incomingState.lastMajorBeat || "",
+
+nextRequiredConsequence: incomingState.nextRequiredConsequence || "",
     } must continue directly from Chapter ${nextChapterNumber} without resetting the characters.`,
   };
 
@@ -221,12 +156,12 @@ CONTINUATION JOB:
 - Do not add filler scenes just to make the chapter longer.
 
 CHAPTER ARC:
-- Current relationship stage: ${targetRelationshipStage}.
-- Current physical stage: ${targetPhysicalStage}.
-- Current ending phase: ${endingPhase}.
-- If this is the middle of the book, escalate conflict, attraction, trust, vulnerability or stakes.
-- If this is near the ending, start resolving the main emotional and romantic conflict.
-- If this is the epilogue, give soft future-facing payoff and do not introduce new major drama.
+- Current relationship stage: ${updatedStoryState.relationshipStage}.
+- Current physical stage: ${updatedStoryState.physicalStage}.
+- Current ending phase: ${updatedStoryState.endingPhase}.
+- Advance the story naturally from the previous chapter.
+- Let the characters determine the pacing.
+- Escalate, slow down, or resolve conflicts only when earned by the story.
 
 DIALOGUE RULES
 
