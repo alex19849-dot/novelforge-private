@@ -16,14 +16,20 @@ export async function POST(req: Request) {
   const previousChapter = body.previousChapter || "";
   const nextChapterNumber = body.nextChapterNumber || 2;
   const incomingState = body.storyState || {};
+  const storyMemory = incomingState.storyMemory || {
+  importantFacts: [],
+  characterDetails: [],
+  relationshipHistory: [],
+  unresolvedThreads: [],
+  pastEvents: [],
+  rules: [],
+};
   const chapterGuidance = body.chapterGuidance || "";
 
 const updatedStoryState = {
   ...incomingState,
   chapter: nextChapterNumber,
-  endingPhase: incomingState.endingPhase || "ongoing",
-  lastMajorBeat: incomingState.lastMajorBeat || "",
-  nextRequiredConsequence: incomingState.nextRequiredConsequence || "",
+  storyMemory,
 };
 const chapterLabel = `Chapter ${nextChapterNumber}`;
 
@@ -67,6 +73,9 @@ ${chapterGuidance || "None provided."}
 
 CURRENT STORY STATE:
 ${JSON.stringify(updatedStoryState, null, 2)}
+
+STORY MEMORY:
+${JSON.stringify(storyMemory, null, 2)}
 
 PREVIOUS CHAPTERS:
 ${previousChapter || "No previous chapter text provided."}
