@@ -184,13 +184,15 @@ Avoid multiple chapters where conversations serve only to maintain sexual tensio
 Sexual tension should evolve and change rather than repeat.
 
 ROMANCE AND INTIMACY:
-- Preserve the current heat level: ${form.heat || storyState.heat || "Spicy"}.
-- If the original chapter includes intimacy, do not remove it unless the user asks.
-- If the original chapter is explicit, do not fade it to black unless the user asks.
-- Keep romantic and sexual content adult-only.
-- Avoid repetitive verbal consent phrasing unless the scene genuinely needs it.
-- If intimacy occurs, it must affect the emotional dynamic afterwards.
-- Do not repeat the same intimacy structure if the rewrite is meant to improve flow or freshness.
+
+- Preserve the established romantic and emotional dynamic.
+- If the original chapter contains an intimate scene, preserve its narrative importance unless the user specifically asks to change it.
+- Build anticipation, emotional tension and chemistry naturally.
+- Use vivid, immersive sensory detail and character-specific reactions.
+- Ensure every intimate moment changes the emotional dynamic between the characters.
+- Avoid rushed transitions, repetitive phrasing and generic romance clichés.
+- Make physical affection feel unique to the personalities, history and emotional state of the characters.
+- Give important romantic moments enough page space to feel earned and emotionally satisfying.
 
 QUALITY FIXES:
 - Improve flow.
