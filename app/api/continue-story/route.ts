@@ -80,6 +80,12 @@ ${JSON.stringify(storyMemory, null, 2)}
 PREVIOUS CHAPTERS:
 ${previousChapter || "No previous chapter text provided."}
 
+Treat the previous chapters and story memory as the source of truth.
+
+If there is ever a conflict between assumptions and established continuity, established continuity always wins.
+
+Never rewrite history. Build upon it.
+
 STORY CONTINUITY RULES
 
 Maintain complete consistency with all established character personalities, histories, relationships, motivations, emotional wounds, speech patterns, and story events.
@@ -106,6 +112,8 @@ Track and evolve:
 
 Every chapter must introduce meaningful change.
 
+Every chapter should permanently change at least one aspect of the story, whether it is the plot, a relationship, a character, the reader's understanding, or the world itself.
+
 No filler scenes.
 
 No repetitive arguments.
@@ -125,9 +133,9 @@ Always escalate or deepen existing conflicts rather than restarting them.
 Before writing any chapter, identify:
 
 1. What has changed since the previous chapter.
-2. What emotional development must occur next.
-3. What new information, conflict, or progression this chapter introduces.
-4. How the relationship evolves during this chapter.
+2. Which established facts and continuity must be preserved.
+3. Which unresolved threads naturally deserve attention in this chapter.
+4. What meaningful change this chapter will leave behind.
 
 Every chapter must move the story forward.
 
@@ -153,6 +161,19 @@ DIALOGUE RULES
 
 Every conversation must have a unique purpose.
 
+Every character should have a recognisable voice.
+
+Dialogue should reflect:
+• Personality
+• Education
+• Background
+• Age
+• Occupation
+• Emotional state
+• Relationship with the person they are speaking to
+
+No two major characters should sound interchangeable.
+
 Avoid repeated exchanges where characters:
 
 • Trade the same insults.
@@ -174,22 +195,32 @@ Conversations should reveal:
 
 Characters should occasionally surprise each other and the reader.
 
+Avoid predictable romance patterns.
+
+Characters should make decisions that feel inevitable because of who they are, not because the plot requires a familiar romance beat.
+
+Choose the most believable outcome, not the most obvious one.
+
 Avoid multiple chapters where conversations serve only to maintain sexual tension.
 
 Sexual tension should evolve and change rather than repeat.
 
-ROMANCE PACING:
-- Let the relationship evolve cumulatively.
-- Do not reset attraction, trust, conflict or intimacy.
-- Do not make the couple emotionally safe too quickly.
-- Keep flaws, friction and uncertainty alive.
-- Show attraction through specific behaviour, not generic staring.
-- Include emotional intimacy as well as romantic or physical tension.
-- If intimacy occurs, it must change the relationship dynamic afterwards.
-- Keep all romantic and sexual content adult-only.
+ROMANCE:
+
+- Let the relationship evolve naturally from the characters, their choices and the consequences of previous chapters.
+- Never advance or delay the relationship because of chapter number or expected romance structure.
+- Keep flaws, friction, uncertainty and personal growth authentic to the characters.
+- Show attraction through meaningful behaviour, dialogue and emotional connection rather than repetitive physical clichés.
+- Emotional intimacy, romantic intimacy and physical intimacy should each develop at their own natural pace.
+- Every meaningful romantic or intimate moment should permanently influence the relationship going forward.
+- Keep all romantic and sexual content between consenting adults.
 
 STYLE:
-- Natural commercial romance prose.
+- Write with the quality, confidence and polish of a traditionally published bestselling romance novel.
+- Prioritise immersive storytelling over explaining.
+- Show rather than tell wherever possible.
+- Preserve the established POV, voice and narrative style.
+- Make every chapter feel like it was written by the same author with the same voice.
 - First person if the story is already first person.
 - Preserve the established POV style and character voices.
 - Keep dialogue human and grounded.
@@ -214,8 +245,7 @@ Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
 LENGTH:
 - Write one complete chapter with a clear beginning, middle and end.
 - Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
-- Reach the main emotional beat or story turn by the middle of the chapter.
-- The final 20 percent of the chapter must resolve the current scene and land the chapter ending.
+- End the chapter where it feels most satisfying for the story. Resolve the current scene unless a deliberate cliffhanger, interruption or unresolved moment creates a stronger chapter ending.
 - Prioritise a finished chapter over length.
 - If running short on space, compress description and reflection, not the ending.
 - Do not cut off mid-scene.
