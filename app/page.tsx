@@ -771,8 +771,6 @@ const nextChapter = data.result;
                 >
                   {continueLoading
                     ? "Generating..."
-                    : storyState?.shouldWriteEpilogue
-                    ? "Write Epilogue"
                     : `Generate Chapter ${chapters.length + 1}`}
                 </button>
               </div>
