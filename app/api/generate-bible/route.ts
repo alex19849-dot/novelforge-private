@@ -134,6 +134,11 @@ Your writing combines commercial appeal, emotional authenticity, sharp dialogue,
 
 Write Chapter 1 of a commercial adult romance novel.
 
+Do not write with a target word count, chapter count or novel length in mind.
+
+Write only what naturally belongs in this chapter.
+
+Future chapters will continue the story until the user decides it has reached its conclusion.
 
 Return only polished chapter prose.
 Do not include notes.
@@ -177,6 +182,7 @@ Avoid overusing phrases such as:
 • "You're impossible."
 • "You're an idiot."
 • "Shut up."
+• "Teeth."
 • Excessive one-word responses.
 
 Characters should have distinct voices.
@@ -318,11 +324,13 @@ The relationship should evolve because of these moments.
 
 PACING
 
-The second half of the novel must continue introducing meaningful conflict, emotional development, and relationship evolution.
+Keep the story evolving naturally.
 
-Avoid the common romance problem where the protagonists become a couple and the story begins repeating itself.
+Continue introducing meaningful conflict, emotional development, relationship evolution and plot progression for as long as the story requires.
 
-The relationship should continue changing until the final chapter.
+Do not assume the story is approaching its ending because of chapter number or perceived novel length.
+
+Allow the story to continue until the user decides it is time to end it.
 
 OVERALL OBJECTIVE
 
@@ -334,6 +342,7 @@ Every major interaction should reveal something new about the characters, the re
 
 The reader should never feel they have already read a scene simply because a similar emotion appeared earlier in the novel.
 
+Every chapter should permanently change something, whether it is the plot, the relationship, the characters, the reader's understanding, or the world itself.
 
 STORY SETTINGS:
 Relationship type: ${relationship}
@@ -347,12 +356,12 @@ CHAPTER 1 JOB:
 * Open with a strong hook.
 * Introduce the main character immediately.
 * Introduce the romantic interest as early as possible.
-* The romantic interest MUST appear within the first 1,000 words.
-* The first meaningful interaction between the romantic leads MUST occur before the midpoint of the chapter.
-* Focus on the primary romantic storyline over side characters, club politics, workplace politics, worldbuilding or secondary plots.
-* Introduce only the supporting characters absolutely necessary for Chapter 1.
+* Introduce the romantic interest as soon as it feels natural for this story.
+* The first meaningful interaction between the romantic leads should happen early enough to engage the reader, but never feel rushed or forced.
+* The romance should remain the emotional heart of the story, but allow worldbuilding, side characters and secondary plots to develop naturally when they strengthen the main story.
+* Introduce supporting characters only when they naturally contribute to the story. Avoid overwhelming the reader with unnecessary introductions, but do not artificially limit the cast.
 * Keep descriptions concise and purposeful.
-* Ground the setting through action and character interaction.
+* Make the setting feel like a real, lived-in place through natural action, dialogue, routine, atmosphere and sensory detail. The world should feel alive without overwhelming the story.
 * Establish the central romantic dynamic.
 * Establish attraction, friction, curiosity, chemistry, tension or conflict between the leads.
 * Make names, ages, jobs, genders, locations and relationships clear through natural storytelling.
@@ -364,8 +373,10 @@ CHAPTER 1 JOB:
 
 
 STYLE:
-- Natural commercial romance prose.
-- First person if the story idea or characters imply it, otherwise use the most natural romance POV.
+- Write with the quality, confidence and polish of a traditionally published bestselling romance novel.
+- Prioritise immersive storytelling over explaining.
+- Show rather than tell whenever possible.
+- Use the point of view requested by the user. If none is specified, choose the perspective that best serves the story and remain consistent throughout.
 - Keep the prose readable, grounded, emotionally alive and character-led.
 - Use distinct character voices.
 - Dialogue should sound human, not over-polished.
@@ -380,8 +391,7 @@ STYLE:
 
 Physical Intimacy & Relationship Progression
 
-Physical intimacy is an important part of romantic storytelling and should be treated as meaningful character and relationship development rather than a brief event or transition.
-
+Physical intimacy is an important part of romantic storytelling when it occurs. It should arise naturally from the characters, their emotional journey, and the needs of the story, never from an expected chapter number or relationship milestone. Every intimate scene should feel earned, emotionally significant, and unique to the characters involved.
 When intimate scenes occur:
 * Write them graphic and erotic.
 * Write them fully on-page descriptive and detailed.
@@ -409,7 +419,7 @@ Avoid:
 * Repetitive language and phrasing.
 * Overly brief intimacy scenes that fail to satisfy narrative expectations.
 
-Each intimate scene should reveal character, deepen emotional connection, and advance the relationship.
+Each intimate scene should reveal character, deepen emotional connection, create lasting consequences, or expose something new about the characters or their relationship. No intimate scene should feel interchangeable or exist only for repetition.
 
 Physical intimacy should never feel separate from the emotional story.
 
@@ -428,11 +438,10 @@ Major romantic milestones should receive narrative weight equal to other major s
 # Emotional Aftermath
 
 After intimate scenes:
-
-* Include emotional reactions.
-* Include relationship development.
-* Include vulnerability, humour, affection, conversation, or reflection where appropriate.
-* Show how intimacy changes the emotional dynamic between the characters.
+* Show the emotional, psychological and relational consequences.
+* Let the characters react in ways that fit their personalities, history and current emotional state.
+* Include conversation, humour, awkwardness, tenderness, conflict, vulnerability or quiet intimacy where appropriate.
+* Physical intimacy should permanently influence future interactions, trust, confidence, desire or conflict rather than feeling isolated to a single scene.
 
 Readers should leave intimate scenes feeling that the relationship has evolved, not simply that a physical act occurred.
 
@@ -446,6 +455,10 @@ The emotional and physical experience should feel unique to the specific charact
 
 
 CONTINUITY RULES:
+- Every established fact is canon unless the user explicitly changes it.
+- Characters remember previous events, conversations, promises, conflicts, injuries, discoveries and emotional milestones unless there is a believable reason they would not.
+- Never contradict an established fact in order to create drama or convenience.
+- Once a fact is established, it becomes canon unless the user explicitly changes it.
 - Follow the story idea and character notes above.
 - Do not invent random illnesses, family emergencies, scandals, accidents, custody threats or villains unless the user seeded them.
 - Do not change character genders, names, roles or relationships.
@@ -454,7 +467,6 @@ CONTINUITY RULES:
 LENGTH:
 - Write one complete chapter with a clear beginning, middle and end.
 - Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
-- Reach the main emotional beat or story turn by the middle of the chapter.
 - The final 20 percent of the chapter must resolve the current scene and land the chapter ending.
 - Prioritise a finished chapter over length.
 - If running short on space, compress description and reflection, not the ending.
