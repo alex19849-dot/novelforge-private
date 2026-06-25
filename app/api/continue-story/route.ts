@@ -18,32 +18,25 @@ export async function POST(req: Request) {
   const incomingState = body.storyState || {};
   const chapterGuidance = body.chapterGuidance || "";
 
- const endingPhase = "ongoing";
-const shouldWriteEpilogue = false;
-
   const updatedStoryState = {
     ...incomingState,
     chapter: nextChapterNumber,
     relationshipStage: incomingState.relationshipStage || 1,
     physicalStage: incomingState.physicalStage || 1,
-    trust: Math.min((incomingState.trust || 5) + 6, 100),
    trust: incomingState.trust || 5,
 attraction: incomingState.attraction || 20,
 jealousy: incomingState.jealousy || 0,
 vulnerability: incomingState.vulnerability || 2,
 sexualTension: incomingState.sexualTension || 20,
-    endingPhase,
-    shouldWriteEpilogue,
-    epilogueWritten: shouldWriteEpilogue ? true : incomingState.epilogueWritten || false,
+   endingPhase: incomingState.endingPhase || "ongoing",
+epilogueWritten: incomingState.epilogueWritten || false,
    lastMajorBeat: incomingState.lastMajorBeat || "",
 
 nextRequiredConsequence: incomingState.nextRequiredConsequence || "",
     } must continue directly from Chapter ${nextChapterNumber} without resetting the characters.`,
   };
 
-  const chapterLabel = shouldWriteEpilogue
-    ? "Epilogue"
-    : `Chapter ${nextChapterNumber}`;
+const chapterLabel = `Chapter ${nextChapterNumber}`;
 
   const prompt = `
 You are NovelForge.
@@ -70,9 +63,6 @@ POV_NAME
 
 Replace POV_NAME with the correct point-of-view character name in uppercase.
 
-If writing an Epilogue, begin exactly with:
-
-Epilogue
 
 STORY IDEA:
 ${form.plot || "No story idea provided."}
