@@ -144,12 +144,10 @@ CONTINUATION JOB:
 - Do not add filler scenes just to make the chapter longer.
 
 CHAPTER ARC:
-- Current relationship stage: ${updatedStoryState.relationshipStage}.
-- Current physical stage: ${updatedStoryState.physicalStage}.
-- Current ending phase: ${updatedStoryState.endingPhase}.
-- Advance the story naturally from the previous chapter.
-- Let the characters determine the pacing.
-- Escalate, slow down, or resolve conflicts only when earned by the story.
+- Continue from the previous chapter naturally.
+- Let the characters, conflict and consequences determine the pacing.
+- Do not advance romance, intimacy, trust, conflict or resolution because of chapter number.
+- Escalate, slow down, pause or resolve only when earned by the story.
 
 DIALOGUE RULES
 
