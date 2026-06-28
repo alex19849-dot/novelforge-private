@@ -350,7 +350,7 @@ export default function Home() {
     setCopyMessage("");
 
     try {
-      const previousChapter = chapters.slice(-3).join("\n\n");
+      const previousChapter = chapters.slice(-1).join("\n\n");
 
       const response = await fetch("/api/continue-story", {
         method: "POST",
