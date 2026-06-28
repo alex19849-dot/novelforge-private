@@ -243,6 +243,7 @@ Preferred terms: ${(incomingState.locationTerms || []).join(", ")}.
 Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
+- Write a complete chapter of approximately 2,500 to 3,500 words.
 - Write one complete chapter with a clear beginning, middle and end.
 - Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
 - End the chapter where it feels most satisfying for the story. Resolve the current scene unless a deliberate cliffhanger, interruption or unresolved moment creates a stronger chapter ending.
@@ -262,7 +263,7 @@ LENGTH:
       reasoning: { effort: "low" },
       text: { verbosity: "medium" },
       input: prompt,
-      max_output_tokens: 8000,
+      max_output_tokens: 10000,
     });
 
 
