@@ -262,7 +262,7 @@ LENGTH:
       reasoning: { effort: "low" },
       text: { verbosity: "medium" },
       input: prompt,
-      max_output_tokens: 12000,
+      max_output_tokens: 8000,
     });
 
 
