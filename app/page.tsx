@@ -618,7 +618,7 @@ const nextChapter = data.result;
         </section>
       )}
 
-      {user && chapters.length === 0 && (
+      {user && (chapters.length === 0 || showStoryBible) && (
         <section className="mx-auto max-w-4xl px-4 py-8">
           <div className="rounded-3xl border border-[#d6c5a3] bg-[#efe3c8] p-5 shadow-xl">
             <div className="mb-6">
