@@ -522,7 +522,7 @@ const nextChapter = data.result;
 
   return (
     <main className="min-h-screen bg-[#f4ecd8] text-[#111111]">
-      <header className="sticky top-0 z-50 border-b border-[#d6c5a3] bg-[#efe3c8]/95 backdrop-blur">
+      <header className={`${chapters.length > 0 ? "hidden" : "sticky"} top-0 z-50 border-b border-[#d6c5a3] bg-[#efe3c8]/95 backdrop-blur`}>
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <h1 className="text-2xl font-black tracking-tight">NovelForge</h1>
 
