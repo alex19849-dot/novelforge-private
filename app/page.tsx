@@ -630,7 +630,9 @@ const nextChapter = data.result;
     ← Back to Reader
   </button>
 )}
-              <h2 className="text-3xl font-black">New Story</h2>
+              <h2 className="text-3xl font-black">
+  {chapters.length > 0 ? "Story Bible" : "New Story"}
+</h2>
               <p className="mt-2 text-sm text-black/70">
                 Three boxes. No cockpit full of buttons. Humanity learns.
               </p>
