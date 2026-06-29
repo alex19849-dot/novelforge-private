@@ -695,6 +695,12 @@ const nextChapter = data.result;
     <button onClick={() => setShowLibrary((prev) => !prev)} className="reader-button">
       Story Library
     </button>
+    <button
+  onClick={() => setShowStorySetup(true)}
+  className="reader-button"
+>
+  Story Bible
+</button>
     <button onClick={() => saveCurrentStory()} className="reader-button">
       Save Story
     </button>
