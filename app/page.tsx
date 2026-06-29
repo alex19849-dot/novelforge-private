@@ -680,18 +680,15 @@ const nextChapter = data.result;
                 ))}
               </select>
 
-              <button onClick={createNewStory} className="reader-button">
-                Home
-              </button>
-              <button onClick={() => setShowLibrary((prev) => !prev)} className="reader-button">
-                Library
-              </button>
-              <button onClick={() => saveCurrentStory()} className="reader-button">
-                Save
-              </button>
-              <button onClick={copyChapter} className="reader-button">
-                Copy
-              </button>
+             <button onClick={createNewStory} className="reader-button">
+  Menu
+</button>
+<button onClick={() => saveCurrentStory()} className="reader-button">
+  Save
+</button>
+<button onClick={copyChapter} className="reader-button">
+  Copy
+</button>
             </div>
           </div>
 
