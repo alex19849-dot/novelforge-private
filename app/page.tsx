@@ -622,6 +622,14 @@ const nextChapter = data.result;
         <section className="mx-auto max-w-4xl px-4 py-8">
           <div className="rounded-3xl border border-[#d6c5a3] bg-[#efe3c8] p-5 shadow-xl">
             <div className="mb-6">
+              {chapters.length > 0 && (
+  <button
+    onClick={() => setShowStoryBible(false)}
+    className="mb-4 reader-button"
+  >
+    ← Back to Reader
+  </button>
+)}
               <h2 className="text-3xl font-black">New Story</h2>
               <p className="mt-2 text-sm text-black/70">
                 Three boxes. No cockpit full of buttons. Humanity learns.
