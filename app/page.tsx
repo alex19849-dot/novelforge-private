@@ -697,6 +697,15 @@ const nextChapter = data.result;
       Story Library
     </button>
     <button
+  onClick={() => {
+    setShowStoryBible(true);
+    setShowReaderMenu(false);
+  }}
+  className="reader-button"
+>
+  Story Bible
+</button>
+    <button
   onClick={() => setShowStorySetup(true)}
   className="reader-button"
 >
