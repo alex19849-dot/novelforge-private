@@ -681,14 +681,11 @@ const nextChapter = data.result;
                 ))}
               </select>
 
-             <button onClick={createNewStory} className="reader-button">
-  Menu
-</button>
-<button onClick={() => saveCurrentStory()} className="reader-button">
-  Save
-</button>
-<button onClick={copyChapter} className="reader-button">
-  Copy
+           <button
+  onClick={() => setShowReaderMenu((prev) => !prev)}
+  className="reader-button"
+>
+  ☰ Menu
 </button>
             </div>
           </div>
