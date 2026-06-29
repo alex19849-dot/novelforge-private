@@ -1,0 +1,10 @@
+{
+  "name": "NovelForge",
+  "short_name": "NovelForge",
+  "description": "Private romance writing and reading app",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4ecd8",
+  "theme_color": "#7a5c3e",
+  "orientation": "portrait"
+}
