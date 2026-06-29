@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const previousChapter = body.previousChapter || "";
   const nextChapterNumber = body.nextChapterNumber || 2;
   const incomingState = body.storyState || {};
-  const storyMemory = incomingState.storyMemory || {
+ const storyMemory = incomingState.storyMemory || {
   importantFacts: [],
   characterDetails: [],
   relationshipHistory: [],
@@ -24,6 +24,10 @@ export async function POST(req: Request) {
   pastEvents: [],
   rules: [],
 };
+
+const manualMemory = chapterGuidance.trim()
+  ? `\nUSER CHAPTER GUIDANCE:\n${chapterGuidance.trim()}`
+  : "";
   const chapterGuidance = body.chapterGuidance || "";
 
 const updatedStoryState = {
