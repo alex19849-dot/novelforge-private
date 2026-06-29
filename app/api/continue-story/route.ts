@@ -31,7 +31,7 @@ const manualMemory = chapterGuidance.trim()
   : "";
 
 
-const updatedStoryState = {
+let updatedStoryState = {
   ...incomingState,
   chapter: nextChapterNumber,
   storyMemory,
@@ -79,8 +79,25 @@ ${chapterGuidance || "None provided."}
 CURRENT STORY STATE:
 ${JSON.stringify(updatedStoryState, null, 2)}
 
-STORY MEMORY:
-${JSON.stringify(storyMemory, null, 2)}
+STORY MEMORY (CANON FACTS):
+
+Important Facts:
+${storyMemory.importantFacts.join("\n- ") || "None"}
+
+Character Details:
+${storyMemory.characterDetails.join("\n- ") || "None"}
+
+Relationship History:
+${storyMemory.relationshipHistory.join("\n- ") || "None"}
+
+Unresolved Threads:
+${storyMemory.unresolvedThreads.join("\n- ") || "None"}
+
+Past Events:
+${storyMemory.pastEvents.join("\n- ") || "None"}
+
+Story Rules:
+${storyMemory.rules.join("\n- ") || "None"}
 
 PREVIOUS CHAPTERS:
 ${previousChapter || "No previous chapter text provided."}
@@ -285,7 +302,63 @@ LENGTH:
 }
 
 const chapter = cleanOutput(response.output_text || "");
+    const memoryPrompt = `
+Update the story memory for this ongoing romance novel.
 
+Return valid JSON only.
+Do not include markdown.
+Do not include notes.
+
+Existing story memory:
+${JSON.stringify(storyMemory, null, 2)}
+
+New chapter:
+${chapter}
+
+Update the memory using this exact structure:
+{
+  "importantFacts": [],
+  "characterDetails": [],
+  "relationshipHistory": [],
+  "unresolvedThreads": [],
+  "pastEvents": [],
+  "rules": []
+}
+
+Only include important details needed for future continuity.
+Do not summarise the whole chapter.
+Do not include temporary emotions unless they will affect future chapters.
+Preserve existing important memory unless it is clearly outdated.
+`;
+let updatedMemory = storyMemory;
+
+try {
+  const memoryResponse = await openai.responses.create({
+    model: "gpt-5.5",
+    reasoning: { effort: "low" },
+    text: { verbosity: "low" },
+    input: memoryPrompt,
+    max_output_tokens: 2500,
+  });
+
+  const memoryText = memoryResponse.output_text || "";
+  const parsedMemory = JSON.parse(memoryText);
+
+  updatedMemory = {
+    importantFacts: Array.isArray(parsedMemory.importantFacts) ? parsedMemory.importantFacts : storyMemory.importantFacts,
+    characterDetails: Array.isArray(parsedMemory.characterDetails) ? parsedMemory.characterDetails : storyMemory.characterDetails,
+    relationshipHistory: Array.isArray(parsedMemory.relationshipHistory) ? parsedMemory.relationshipHistory : storyMemory.relationshipHistory,
+    unresolvedThreads: Array.isArray(parsedMemory.unresolvedThreads) ? parsedMemory.unresolvedThreads : storyMemory.unresolvedThreads,
+    pastEvents: Array.isArray(parsedMemory.pastEvents) ? parsedMemory.pastEvents : storyMemory.pastEvents,
+    rules: Array.isArray(parsedMemory.rules) ? parsedMemory.rules : storyMemory.rules,
+  };
+} catch (memoryError) {
+  console.error("STORY MEMORY UPDATE ERROR:", memoryError);
+}
+    updatedStoryState = {
+  ...updatedStoryState,
+  storyMemory: updatedMemory,
+};
 if (!chapter.trim()) {
   return Response.json(
     {
