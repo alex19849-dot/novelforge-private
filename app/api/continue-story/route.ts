@@ -16,6 +16,7 @@ export async function POST(req: Request) {
   const previousChapter = body.previousChapter || "";
   const nextChapterNumber = body.nextChapterNumber || 2;
   const incomingState = body.storyState || {};
+  const chapterGuidance = body.chapterGuidance || "";
  const storyMemory = incomingState.storyMemory || {
   importantFacts: [],
   characterDetails: [],
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
 const manualMemory = chapterGuidance.trim()
   ? `\nUSER CHAPTER GUIDANCE:\n${chapterGuidance.trim()}`
   : "";
-  const chapterGuidance = body.chapterGuidance || "";
+
 
 const updatedStoryState = {
   ...incomingState,
