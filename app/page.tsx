@@ -63,6 +63,7 @@ export default function Home() {
 
   const [chapterGuidance, setChapterGuidance] = useState("");
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showReaderMenu, setShowReaderMenu] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
 
   const [loading, setLoading] = useState(false);
