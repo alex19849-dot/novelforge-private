@@ -703,7 +703,7 @@ const nextChapter = data.result;
 
           <div
             id="chapter-reader"
-            className="relative h-[calc(100vh-115px)] overflow-hidden bg-[#f4ecd8]"
+            className="relative h-[calc(100vh-70px)] overflow-hidden bg-[#f4ecd8]"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
