@@ -163,6 +163,22 @@ useEffect(() => {
     setReaderTheme(savedTheme);
   }
 }, []);
+    useEffect(() => {
+  localStorage.setItem(
+    "novelforge-font-size",
+    readerFontSize.toString()
+  );
+
+  localStorage.setItem(
+    "novelforge-line-height",
+    readerLineHeight.toString()
+  );
+
+  localStorage.setItem(
+    "novelforge-theme",
+    readerTheme
+  );
+}, [readerFontSize, readerLineHeight, readerTheme]);
     const updatePages = () => {
       const total = Math.ceil(reader.scrollWidth / reader.clientWidth);
       setTotalPages(total || 1);
