@@ -904,6 +904,39 @@ style={{
                 <p className="mt-3 text-center text-xs text-black/50">
                   Page {pageIndex + 1} of {totalPages}
                 </p>
+                {isEditingChapter && (
+  <div className="mt-3 grid grid-cols-2 gap-3">
+    <button
+      onClick={() => {
+        const updatedChapters = [...chapters];
+        updatedChapters[activeChapterIndex] = editedChapterText;
+
+        setChapters(updatedChapters);
+        setIsEditingChapter(false);
+
+        saveCurrentStory({
+          chapters: updatedChapters,
+          activeChapterIndex,
+          storyState,
+          chapterGuidance,
+        });
+      }}
+      className="primary-button"
+    >
+      Save Changes
+    </button>
+
+    <button
+      onClick={() => {
+        setEditedChapterText(activeChapter);
+        setIsEditingChapter(false);
+      }}
+      className="secondary-action-button"
+    >
+      Cancel
+    </button>
+  </div>
+)}
               </div>
             </div>
           </div>
