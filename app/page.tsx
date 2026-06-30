@@ -777,11 +777,13 @@ function previousPage() {
               <div className="flex h-full w-full max-w-[820px] flex-col overflow-hidden">
                 <div ref={readerRef} className="h-[calc(100%-34px)] overflow-hidden">
                   <div
-                    className="h-full whitespace-pre-wrap text-left text-[16px] leading-[1.7] text-[#111111] sm:text-[17px] md:text-[18px]"
-                    style={{
-                      columnWidth: `${readerRef.current?.clientWidth || 820}px`,
-                      columnGap: "0px",
-                    }}
+                   className="h-full whitespace-pre-wrap text-left text-[#111111]"
+style={{
+  fontSize: `${readerFontSize}px`,
+  lineHeight: readerLineHeight,
+  columnWidth: `${readerRef.current?.clientWidth || 820}px`,
+  columnGap: "0px",
+}}
                   >
                     {activeChapter}
                   </div>
