@@ -766,10 +766,9 @@ function previousPage() {
 
     <hr className="border-[#d6c5a3]" />
 
-<p className="text-sm font-black">Reader Settings</p>
+    <p className="text-sm font-black">Reader Settings</p>
 
-<label className="text-sm font-semibold">Font Size</label>
-
+    <label className="text-sm font-semibold">Font Size</label>
     <input
       type="range"
       min="14"
@@ -779,7 +778,6 @@ function previousPage() {
     />
 
     <label className="text-sm font-semibold">Line Spacing</label>
-
     <input
       type="range"
       min="1.3"
@@ -788,36 +786,47 @@ function previousPage() {
       value={readerLineHeight}
       onChange={(e) => setReaderLineHeight(Number(e.target.value))}
     />
-<label className="text-sm font-semibold">Theme</label>
 
-<div className="grid grid-cols-3 gap-2">
-  <button
-    onClick={() => setReaderTheme("light")}
-    className={`reader-button ${
-      readerTheme === "light" ? "ring-2 ring-[#7a5c3e]" : ""
-    }`}
-  >
-    ☀️ Light
-  </button>
+    <label className="text-sm font-semibold">Theme</label>
+    <div className="grid grid-cols-3 gap-2">
+      <button
+        onClick={() => setReaderTheme("light")}
+        className={`reader-button ${
+          readerTheme === "light" ? "ring-2 ring-[#7a5c3e]" : ""
+        }`}
+      >
+        ☀️ Light
+      </button>
 
-  <button
-    onClick={() => setReaderTheme("sepia")}
-    className={`reader-button ${
-      readerTheme === "sepia" ? "ring-2 ring-[#7a5c3e]" : ""
-    }`}
-  >
-    📜 Sepia
-  </button>
+      <button
+        onClick={() => setReaderTheme("sepia")}
+        className={`reader-button ${
+          readerTheme === "sepia" ? "ring-2 ring-[#7a5c3e]" : ""
+        }`}
+      >
+        📜 Sepia
+      </button>
 
-  <button
-    onClick={() => setReaderTheme("dark")}
-    className={`reader-button ${
-      readerTheme === "dark" ? "ring-2 ring-[#7a5c3e]" : ""
-    }`}
-  >
-    🌙 Dark
-  </button>
-</div>
+      <button
+        onClick={() => setReaderTheme("dark")}
+        className={`reader-button ${
+          readerTheme === "dark" ? "ring-2 ring-[#7a5c3e]" : ""
+        }`}
+      >
+        🌙 Dark
+      </button>
+    </div>
+
+    <hr className="border-[#d6c5a3]" />
+
+    <button onClick={() => saveCurrentStory()} className="reader-button">
+      Save Story
+    </button>
+
+    <button onClick={copyChapter} className="reader-button">
+      Copy Chapter
+    </button>
+  </div>
 )}
             </div>
           </div>
