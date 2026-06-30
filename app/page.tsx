@@ -808,7 +808,9 @@ function previousPage() {
               <div className="flex h-full w-full max-w-[820px] flex-col overflow-hidden">
                 <div ref={readerRef} className="h-[calc(100%-34px)] overflow-hidden">
                   <div
-                   className="h-full whitespace-pre-wrap text-left text-[#111111]"
+                  className={`h-full whitespace-pre-wrap text-left ${
+  readerTheme === "dark" ? "text-[#f4ecd8]" : "text-[#111111]"
+}`}
 style={{
   fontSize: `${readerFontSize}px`,
   lineHeight: readerLineHeight,
