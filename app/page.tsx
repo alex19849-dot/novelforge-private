@@ -818,7 +818,18 @@ function previousPage() {
     <button onClick={() => saveCurrentStory()} className="reader-button">
       Save Story
     </button>
-
+    
+<button
+  onClick={() => {
+    setEditedChapterText(activeChapter);
+    setIsEditingChapter(true);
+    setShowReaderMenu(false);
+  }}
+  className="reader-button"
+>
+  Edit Chapter
+</button>
+    
     <button onClick={copyChapter} className="reader-button">
       Copy Chapter
     </button>
