@@ -1001,7 +1001,17 @@ style={{
           <div className="mx-auto max-w-4xl px-4 py-6">
             <div className="rounded-3xl border border-[#d6c5a3] bg-[#efe3c8] p-5 shadow-xl">
               <label className="grid gap-2">
-                <span className="text-sm font-bold">Chapter Guidance</span>
+             <div className="flex items-center justify-between gap-3">
+  <span className="text-sm font-bold">Chapter Guidance</span>
+
+  <button
+    type="button"
+    onClick={toggleDictation}
+    className="reader-button"
+  >
+    {isListening ? "🔴 Listening..." : "🎤 Dictate"}
+  </button>
+</div>
                 <textarea
                   value={chapterGuidance}
                   onChange={(event) => setChapterGuidance(event.target.value)}
