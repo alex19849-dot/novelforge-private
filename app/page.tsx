@@ -885,7 +885,19 @@ style={{
   columnGap: "0px",
 }}
                   >
-                    {activeChapter}
+                    {isEditingChapter ? (
+  <textarea
+    value={editedChapterText}
+    onChange={(e) => setEditedChapterText(e.target.value)}
+    className="h-full w-full resize-none border-none bg-transparent outline-none"
+    style={{
+      fontSize: `${readerFontSize}px`,
+      lineHeight: readerLineHeight,
+    }}
+  />
+) : (
+  activeChapter
+)}
                   </div>
                 </div>
 
