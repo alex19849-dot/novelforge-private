@@ -155,6 +155,7 @@ useEffect(() => {
 
   if (savedFontSize) setReaderFontSize(Number(savedFontSize));
   if (savedLineHeight) setReaderLineHeight(Number(savedLineHeight));
+
   if (
     savedTheme === "light" ||
     savedTheme === "sepia" ||
@@ -163,33 +164,29 @@ useEffect(() => {
     setReaderTheme(savedTheme);
   }
 }, []);
-    useEffect(() => {
-  localStorage.setItem(
-    "novelforge-font-size",
-    readerFontSize.toString()
-  );
 
-  localStorage.setItem(
-    "novelforge-line-height",
-    readerLineHeight.toString()
-  );
-
-  localStorage.setItem(
-    "novelforge-theme",
-    readerTheme
-  );
+useEffect(() => {
+  localStorage.setItem("novelforge-font-size", readerFontSize.toString());
+  localStorage.setItem("novelforge-line-height", readerLineHeight.toString());
+  localStorage.setItem("novelforge-theme", readerTheme);
 }, [readerFontSize, readerLineHeight, readerTheme]);
-    const updatePages = () => {
-      const total = Math.ceil(reader.scrollWidth / reader.clientWidth);
-      setTotalPages(total || 1);
-    };
 
-    setTimeout(updatePages, 80);
-    window.addEventListener("resize", updatePages);
+useEffect(() => {
+  const reader = readerRef.current;
+  if (!reader) return;
 
-    return () => {
-      window.removeEventListener("resize", updatePages);
-    };
+  const updatePages = () => {
+    const total = Math.ceil(reader.scrollWidth / reader.clientWidth);
+    setTotalPages(total || 1);
+  };
+
+  setTimeout(updatePages, 80);
+  window.addEventListener("resize", updatePages);
+
+  return () => {
+    window.removeEventListener("resize", updatePages);
+  };
+}, [activeChapter, readerFontSize, readerLineHeight, readerTheme]);
   }, [activeChapter]);
 
   function updateField(field: string, value: string) {
