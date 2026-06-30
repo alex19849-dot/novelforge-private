@@ -791,26 +791,33 @@ function previousPage() {
 <label className="text-sm font-semibold">Theme</label>
 
 <div className="grid grid-cols-3 gap-2">
-  <button onClick={() => setReaderTheme("light")} className="reader-button">
-    Light
+  <button
+    onClick={() => setReaderTheme("light")}
+    className={`reader-button ${
+      readerTheme === "light" ? "ring-2 ring-[#7a5c3e]" : ""
+    }`}
+  >
+    ☀️ Light
   </button>
-  <button onClick={() => setReaderTheme("sepia")} className="reader-button">
-    Sepia
+
+  <button
+    onClick={() => setReaderTheme("sepia")}
+    className={`reader-button ${
+      readerTheme === "sepia" ? "ring-2 ring-[#7a5c3e]" : ""
+    }`}
+  >
+    📜 Sepia
   </button>
-  <button onClick={() => setReaderTheme("dark")} className="reader-button">
-    Dark
+
+  <button
+    onClick={() => setReaderTheme("dark")}
+    className={`reader-button ${
+      readerTheme === "dark" ? "ring-2 ring-[#7a5c3e]" : ""
+    }`}
+  >
+    🌙 Dark
   </button>
 </div>
-    <hr className="border-[#d6c5a3]" />
-
-    <button onClick={() => saveCurrentStory()} className="reader-button">
-      Save Story
-    </button>
-
-    <button onClick={copyChapter} className="reader-button">
-      Copy Chapter
-    </button>
-  </div>
 )}
             </div>
           </div>
