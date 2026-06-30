@@ -148,7 +148,21 @@ export default function Home() {
   useEffect(() => {
     const reader = readerRef.current;
     if (!reader) return;
+useEffect(() => {
+  const savedFontSize = localStorage.getItem("novelforge-font-size");
+  const savedLineHeight = localStorage.getItem("novelforge-line-height");
+  const savedTheme = localStorage.getItem("novelforge-theme");
 
+  if (savedFontSize) setReaderFontSize(Number(savedFontSize));
+  if (savedLineHeight) setReaderLineHeight(Number(savedLineHeight));
+  if (
+    savedTheme === "light" ||
+    savedTheme === "sepia" ||
+    savedTheme === "dark"
+  ) {
+    setReaderTheme(savedTheme);
+  }
+}, []);
     const updatePages = () => {
       const total = Math.ceil(reader.scrollWidth / reader.clientWidth);
       setTotalPages(total || 1);
