@@ -515,6 +515,61 @@ const nextChapter = data.result;
     }
   }
 
+  function toggleDictation() {
+  const SpeechRecognition =
+    (window as any).SpeechRecognition ||
+    (window as any).webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    setCopyMessage("Voice dictation is not supported in this browser.");
+    return;
+  }
+
+  if (isListening && recognitionRef.current) {
+    recognitionRef.current.stop();
+    setIsListening(false);
+    return;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognitionRef.current = recognition;
+
+  recognition.lang = "en-GB";
+  recognition.continuous = true;
+  recognition.interimResults = false;
+
+  recognition.onstart = () => {
+    setIsListening(true);
+    setCopyMessage("Listening...");
+  };
+
+  recognition.onresult = (event: any) => {
+    let transcript = "";
+
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+
+    setChapterGuidance((previous) =>
+      previous.trim()
+        ? `${previous.trim()}\n\n${transcript.trim()}`
+        : transcript.trim()
+    );
+  };
+
+  recognition.onerror = () => {
+    setIsListening(false);
+    setCopyMessage("Voice dictation stopped or failed.");
+  };
+
+  recognition.onend = () => {
+    setIsListening(false);
+    setCopyMessage("");
+  };
+
+  recognition.start();
+}
+  
 function previousPage() {
   if (pageIndex > 0) {
     setPageIndex(pageIndex - 1);
