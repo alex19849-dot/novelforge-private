@@ -724,8 +724,6 @@ function previousPage() {
   }}
   className="reader-button"
 >
-  Story Bible
-</button>
    <button
   onClick={() => {
     setShowStoryBible(true);
@@ -735,6 +733,32 @@ function previousPage() {
 >
   Story Bible
 </button>
+      <hr className="border-[#d6c5a3]" />
+
+<label className="text-sm font-semibold">
+  Font Size
+</label>
+
+<input
+  type="range"
+  min="14"
+  max="28"
+  value={readerFontSize}
+  onChange={(e) => setReaderFontSize(Number(e.target.value))}
+/>
+
+<label className="text-sm font-semibold">
+  Line Spacing
+</label>
+
+<input
+  type="range"
+  min="1.3"
+  max="2.2"
+  step="0.1"
+  value={readerLineHeight}
+  onChange={(e) => setReaderLineHeight(Number(e.target.value))}
+/>
     <button onClick={() => saveCurrentStory()} className="reader-button">
       Save Story
     </button>
