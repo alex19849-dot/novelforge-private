@@ -690,7 +690,7 @@ function previousPage() {
       )}
 
       {user && chapters.length > 0 && (
-        <section className="min-h-screen bg-[#f4ecd8] text-[#111111]">
+        <section className={`min-h-screen ${readerThemeClasses}`}>
           <div className="sticky top-0 z-40 border-b border-[#d6c5a3] bg-[#efe3c8]/95 px-3 py-2 backdrop-blur">
             <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2">
               <select
