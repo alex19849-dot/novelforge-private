@@ -756,7 +756,19 @@ function previousPage() {
       value={readerLineHeight}
       onChange={(e) => setReaderLineHeight(Number(e.target.value))}
     />
+<label className="text-sm font-semibold">Theme</label>
 
+<div className="grid grid-cols-3 gap-2">
+  <button onClick={() => setReaderTheme("light")} className="reader-button">
+    Light
+  </button>
+  <button onClick={() => setReaderTheme("sepia")} className="reader-button">
+    Sepia
+  </button>
+  <button onClick={() => setReaderTheme("dark")} className="reader-button">
+    Dark
+  </button>
+</div>
     <hr className="border-[#d6c5a3]" />
 
     <button onClick={() => saveCurrentStory()} className="reader-button">
