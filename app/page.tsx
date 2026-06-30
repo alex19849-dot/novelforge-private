@@ -80,7 +80,12 @@ export default function Home() {
 
   const readerRef = useRef<HTMLDivElement | null>(null);
   const activeChapter = chapters[activeChapterIndex] || "";
-
+  const readerThemeClasses =
+  readerTheme === "dark"
+    ? "bg-[#111111] text-[#f4ecd8]"
+    : readerTheme === "light"
+    ? "bg-[#fffaf0] text-[#111111]"
+    : "bg-[#f4ecd8] text-[#111111]";
   const preparedForm = useMemo(() => {
     return {
       ...defaultForm,
