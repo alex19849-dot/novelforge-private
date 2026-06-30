@@ -62,6 +62,8 @@ export default function Home() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [chapterGuidance, setChapterGuidance] = useState("");
+  const [isEditingChapter, setIsEditingChapter] = useState(false);
+  const [editedChapterText, setEditedChapterText] = useState("");
   const [showLibrary, setShowLibrary] = useState(false);
   const [showReaderMenu, setShowReaderMenu] = useState(false);
   const [showStoryBible, setShowStoryBible] = useState(false);
