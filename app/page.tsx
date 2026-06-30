@@ -778,8 +778,14 @@ function previousPage() {
           )}
 
           <div
-            id="chapter-reader"
-            className="relative h-[calc(100vh-70px)] overflow-hidden bg-[#f4ecd8]"
+  id="chapter-reader"
+  className={`relative h-[calc(100vh-70px)] overflow-hidden ${
+    readerTheme === "dark"
+      ? "bg-[#111111]"
+      : readerTheme === "light"
+      ? "bg-[#fffaf0]"
+      : "bg-[#f4ecd8]"
+  }`}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
