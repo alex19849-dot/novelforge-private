@@ -766,7 +766,9 @@ function previousPage() {
 
     <hr className="border-[#d6c5a3]" />
 
-    <label className="text-sm font-semibold">Font Size</label>
+<p className="text-sm font-black">Reader Settings</p>
+
+<label className="text-sm font-semibold">Font Size</label>
 
     <input
       type="range"
