@@ -145,9 +145,6 @@ export default function Home() {
   });
 }, [pageIndex, totalPages]);
 
-  useEffect(() => {
-    const reader = readerRef.current;
-    if (!reader) return;
 useEffect(() => {
   const savedFontSize = localStorage.getItem("novelforge-font-size");
   const savedLineHeight = localStorage.getItem("novelforge-line-height");
@@ -187,7 +184,7 @@ useEffect(() => {
     window.removeEventListener("resize", updatePages);
   };
 }, [activeChapter, readerFontSize, readerLineHeight, readerTheme]);
-  }, [activeChapter]);
+ 
 
   function updateField(field: string, value: string) {
     setForm((previous) => ({ ...previous, [field]: value }));
