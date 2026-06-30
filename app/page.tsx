@@ -471,17 +471,17 @@ const nextChapter = data.result;
     }
   }
 
-  function previousPage() {
-    if (pageIndex > 0) {
-      setPageIndex(pageIndex - 1);
-      return;
-    }
-
-    if (activeChapterIndex > 0) {
-      setActiveChapterIndex(activeChapterIndex - 1);
-      setPageIndex(0);
-    }
+function previousPage() {
+  if (pageIndex > 0) {
+    setPageIndex(pageIndex - 1);
+    return;
   }
+
+  if (activeChapterIndex > 0) {
+    setActiveChapterIndex(activeChapterIndex - 1);
+    setPageIndex(9999);
+  }
+}
 
   function nextPage() {
     if (pageIndex < totalPages - 1) {
