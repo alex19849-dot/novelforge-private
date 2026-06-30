@@ -119,15 +119,23 @@ export default function Home() {
     setPageIndex(0);
   }, [activeChapterIndex]);
 
-  useEffect(() => {
-    const reader = readerRef.current;
-    if (!reader) return;
+ useEffect(() => {
+  const reader = readerRef.current;
+  if (!reader) return;
 
-    reader.scrollTo({
-      left: pageIndex * reader.clientWidth,
-      behavior: "smooth",
-    });
-  }, [pageIndex]);
+  const maxPage = Math.max(totalPages - 1, 0);
+  const safePageIndex = Math.min(pageIndex, maxPage);
+
+  if (safePageIndex !== pageIndex) {
+    setPageIndex(safePageIndex);
+    return;
+  }
+
+  reader.scrollTo({
+    left: safePageIndex * reader.clientWidth,
+    behavior: "smooth",
+  });
+}, [pageIndex, totalPages]);
 
   useEffect(() => {
     const reader = readerRef.current;
