@@ -709,59 +709,55 @@ function previousPage() {
 >
   ☰ Menu
 </button>
-              {showReaderMenu && (
+            {showReaderMenu && (
   <div className="absolute right-3 top-14 z-50 grid min-w-[180px] gap-2 rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] p-3 shadow-xl">
     <button onClick={createNewStory} className="reader-button">
       New Story
     </button>
+
     <button onClick={() => setShowLibrary((prev) => !prev)} className="reader-button">
       Story Library
     </button>
+
     <button
-  onClick={() => {
-    setShowStoryBible(true);
-    setShowReaderMenu(false);
-  }}
-  className="reader-button"
->
-   <button
-  onClick={() => {
-    setShowStoryBible(true);
-    setShowReaderMenu(false);
-  }}
-  className="reader-button"
->
-  Story Bible
-</button>
-      <hr className="border-[#d6c5a3]" />
+      onClick={() => {
+        setShowStoryBible(true);
+        setShowReaderMenu(false);
+      }}
+      className="reader-button"
+    >
+      Story Bible
+    </button>
 
-<label className="text-sm font-semibold">
-  Font Size
-</label>
+    <hr className="border-[#d6c5a3]" />
 
-<input
-  type="range"
-  min="14"
-  max="28"
-  value={readerFontSize}
-  onChange={(e) => setReaderFontSize(Number(e.target.value))}
-/>
+    <label className="text-sm font-semibold">Font Size</label>
 
-<label className="text-sm font-semibold">
-  Line Spacing
-</label>
+    <input
+      type="range"
+      min="14"
+      max="28"
+      value={readerFontSize}
+      onChange={(e) => setReaderFontSize(Number(e.target.value))}
+    />
 
-<input
-  type="range"
-  min="1.3"
-  max="2.2"
-  step="0.1"
-  value={readerLineHeight}
-  onChange={(e) => setReaderLineHeight(Number(e.target.value))}
-/>
+    <label className="text-sm font-semibold">Line Spacing</label>
+
+    <input
+      type="range"
+      min="1.3"
+      max="2.2"
+      step="0.1"
+      value={readerLineHeight}
+      onChange={(e) => setReaderLineHeight(Number(e.target.value))}
+    />
+
+    <hr className="border-[#d6c5a3]" />
+
     <button onClick={() => saveCurrentStory()} className="reader-button">
       Save Story
     </button>
+
     <button onClick={copyChapter} className="reader-button">
       Copy Chapter
     </button>
