@@ -278,7 +278,7 @@ LENGTH:
 - Do not artificially pad chapters.
 - Do not rush scenes to reach the target.
 - Every chapter must still feel complete and satisfying.
-
+`;
   try {
     const response = await openai.responses.create({
       model: "gpt-5.5",
