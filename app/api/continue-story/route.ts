@@ -265,19 +265,14 @@ Preferred terms: ${(incomingState.locationTerms || []).join(", ")}.
 Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
-- Write a complete chapter of approximately 2,500 to 3,500 words.
-- Write one complete chapter with a clear beginning, middle and end.
-- Keep the chapter focused and do not over-expand setup, backstory, description or internal reflection.
-- End the chapter where it feels most satisfying for the story. Resolve the current scene unless a deliberate cliffhanger, interruption or unresolved moment creates a stronger chapter ending.
-- Prioritise a finished chapter over length.
-- If running short on space, compress description and reflection, not the ending.
-- Do not cut off mid-scene.
-- Do not stop during dialogue.
-- Do not stop during a confrontation.
-- Do not introduce a new scene, new conflict or new location near the end unless it is the final hook.
-- Finish the final scene fully.
-- End with a proper chapter ending: an emotional beat, decision, reveal, complication, romantic turn or hook.
-`;
+- Target chapter length: ${form.targetChapterWords} words.
+- This is a hard target, not a suggestion.
+- Never intentionally exceed the target by more than 10%.
+- If the chapter approaches the target length, end at the nearest natural emotional or narrative stopping point.
+- If a scene cannot be completed naturally within the limit, end the chapter cleanly and continue the scene in the next chapter.
+- Do not artificially pad chapters.
+- Do not rush scenes to reach the target.
+- Every chapter must still feel complete and satisfying.
 
   try {
     const response = await openai.responses.create({
