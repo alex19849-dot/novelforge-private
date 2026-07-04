@@ -15,6 +15,7 @@ type SavedStory = {
   custom_rewrite?: string;
   story_state?: any;
   chapter_guidance?: string;
+  targetChapterWords: string;
 };
 
 const defaultForm: StoryForm = {
@@ -22,7 +23,7 @@ const defaultForm: StoryForm = {
   plot: "",
   characterNotes: "",
   mustNotHave: "",
-
+  targetChapterWords: "4000",
   relationship: "MM Romance",
   storyLocation: "London, UK",
   subgenre: "Workplace",
