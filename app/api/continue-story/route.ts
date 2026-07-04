@@ -102,6 +102,11 @@ ${storyMemory.rules.join("\n- ") || "None"}
 PREVIOUS CHAPTERS:
 ${previousChapter || "No previous chapter text provided."}
 
+MUST AVOID:
+${form.mustNotHave || "Nothing specific provided."}
+
+CHAPTER GUIDANCE:
+
 Treat the previous chapters and story memory as the source of truth.
 
 If there is ever a conflict between assumptions and established continuity, established continuity always wins.
