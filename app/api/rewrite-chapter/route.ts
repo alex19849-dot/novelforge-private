@@ -264,7 +264,7 @@ Return only the rewritten chapter.
       reasoning: { effort: "low" },
       text: { verbosity: "medium" },
       input: prompt,
-      max_output_tokens: 8000,
+      max_output_tokens: 10000,
     });
 
     if (response.status === "incomplete") {
