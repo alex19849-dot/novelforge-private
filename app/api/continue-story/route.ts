@@ -242,26 +242,33 @@ ROMANCE:
 - Every meaningful romantic or intimate moment should permanently influence the relationship going forward.
 - Keep all romantic and sexual content between consenting adults.
 
-STYLE:
-- Write with the quality, confidence and polish of a traditionally published bestselling romance novel.
-- Prioritise immersive storytelling over explaining.
-- Show rather than tell wherever possible.
-- Preserve the established POV, voice and narrative style.
-- Make every chapter feel like it was written by the same author with the same voice.
-- First person if the story is already first person.
-- Preserve the established POV style and character voices.
-- Keep dialogue human and grounded.
-- Avoid constant banter.
-- Avoid over-polished comebacks every line.
+STYLE PRIORITIES, IN ORDER:
+
+1. CONTINUITY AND VOICE
+- Preserve the established POV, narrative voice, character voices and overall style.
+- Write polished, immersive commercial romance prose.
+- Keep dialogue human, grounded and character-specific. Avoid constant banter, therapy-speak and overly polished comebacks.
+
+2. PROSE DISCIPLINE
+- Every paragraph must advance character, relationship, conflict, atmosphere, humour or plot.
+- Prefer one precise sentence over several sentences expressing the same idea.
+- Do not restate information, thoughts or emotions the reader already understands.
+- Do not explain dialogue after the dialogue has already made the meaning clear.
+- Do not express the same emotion through narration, internal thought and physical reaction.
+- Internal reflection must add a new realisation, decision, conflict or emotional development.
+- Do not narrate routine actions step by step unless they matter.
+- Enter scenes late, leave scenes early, and move on once a scene has achieved its purpose.
+- Never add filler, repetition, extra description or unnecessary reflection to increase chapter length.
+
+3. NATURAL WRITING
+- Show rather than tell when it strengthens the scene, but do not over-describe actions to avoid telling.
 - Use short replies, interruptions, hesitation and deflection where natural.
 - Keep humour character-specific.
-- Avoid therapy-speak.
-- Avoid purple prose.
-- Avoid random object descriptions.
-- Avoid over-described rooms.
-- Avoid fake profound lines.
-- Avoid repeated symbolic closing lines.
-- Avoid repeated phrases like "his eyes darkened", "my pulse kicked", "something shifted", "his jaw tightened", "he went still".
+- Avoid purple prose, fake profound lines, random object descriptions and over-described rooms.
+- Avoid repeated symbolic chapter endings.
+- Avoid repetitive stock reactions or phrases such as "his eyes darkened", "my pulse kicked", "something shifted", "his jaw tightened" and "he went still".
+
+4. PUNCTUATION
 - Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
 
 REGIONAL LANGUAGE:
