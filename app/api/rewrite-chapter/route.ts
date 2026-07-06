@@ -26,6 +26,10 @@ Your writing combines commercial appeal, emotional authenticity, sharp dialogue,
 
 Rewrite the current chapter from an ongoing commercial adult romance story.
 
+Preserve the approximate size and shape of the original chapter.
+Do not expand the chapter unless the user specifically asks.
+Remove filler, repetition and unnecessary internal reflection.
+
 Return only the rewritten chapter prose.
 Do not include notes.
 Do not include analysis.
