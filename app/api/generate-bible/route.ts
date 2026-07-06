@@ -372,22 +372,34 @@ CHAPTER 1 JOB:
 * End on a clean hook, emotional turn, complication, charged moment, revelation or decision that makes the reader want Chapter 2 immediately.
 
 
-STYLE:
-- Write with the quality, confidence and polish of a traditionally published bestselling romance novel.
-- Prioritise immersive storytelling over explaining.
-- Show rather than tell whenever possible.
-- Use the point of view requested by the user. If none is specified, choose the perspective that best serves the story and remain consistent throughout.
-- Keep the prose readable, grounded, emotionally alive and character-led.
-- Use distinct character voices.
-- Dialogue should sound human, not over-polished.
-- Keep humour and banter natural, not constant.
-- Avoid therapy-speak.
-- Avoid purple prose.
-- Avoid random object descriptions.
-- Avoid over-described rooms.
-- Avoid fake profound lines.
-- Avoid repeating the same phrase or sentence rhythm.
-- Do not use em dashes or en dashes. Use commas, full stops, colons or parentheses instead.
+STYLE PRIORITIES, IN ORDER:
+
+1. CONTINUITY AND VOICE
+- Preserve the established POV, narrative voice, character voices and overall style.
+- Write polished, immersive commercial romance prose.
+- Keep dialogue human, grounded and character-specific. Avoid constant banter, therapy-speak and overly polished comebacks.
+
+2. PROSE DISCIPLINE
+- Every paragraph must advance character, relationship, conflict, atmosphere, humour or plot.
+- Prefer one precise sentence over several sentences expressing the same idea.
+- Do not restate information, thoughts or emotions the reader already understands.
+- Do not explain dialogue after the dialogue has already made the meaning clear.
+- Do not express the same emotion through narration, internal thought and physical reaction.
+- Internal reflection must add a new realisation, decision, conflict or emotional development.
+- Do not narrate routine actions step by step unless they matter.
+- Enter scenes late, leave scenes early, and move on once a scene has achieved its purpose.
+- Never add filler, repetition, extra description or unnecessary reflection to increase chapter length.
+
+3. NATURAL WRITING
+- Show rather than tell when it strengthens the scene, but do not over-describe actions to avoid telling.
+- Use short replies, interruptions, hesitation and deflection where natural.
+- Keep humour character-specific.
+- Avoid purple prose, fake profound lines, random object descriptions and over-described rooms.
+- Avoid repeated symbolic chapter endings.
+- Avoid repetitive stock reactions or phrases such as "his eyes darkened", "my pulse kicked", "something shifted", "his jaw tightened" and "he went still".
+
+4. PUNCTUATION
+- Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
 
 Physical Intimacy & Relationship Progression
 
