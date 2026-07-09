@@ -1170,10 +1170,16 @@ style={{
   />
   Include Title Page
 </label>
-        <label className="flex items-center gap-3 text-sm font-semibold">
-          <input type="checkbox" defaultChecked />
-          Include Content Warnings
-        </label>
+       <label className="flex items-center gap-3 text-sm font-semibold">
+  <input
+    type="checkbox"
+    checked={exportIncludeContentWarnings}
+    onChange={(e) =>
+      setExportIncludeContentWarnings(e.target.checked)
+    }
+  />
+  Include Content Warnings
+</label>
 
         <label className="flex items-center gap-3 text-sm font-semibold">
           <input type="checkbox" defaultChecked />
