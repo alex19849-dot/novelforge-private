@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     const author = body.author || "Marlow Quinn";
     const chapters: string[] = body.chapters || [];
     const includeTitlePage = body.includeTitlePage !== false;
+    const includeContentWarnings = body.includeContentWarnings === true;
 
     const chapterParagraphs = chapters.flatMap((chapter, index) => {
       const { povLine, bodyLines } = cleanChapter(chapter, index);
