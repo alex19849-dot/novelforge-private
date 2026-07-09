@@ -876,6 +876,13 @@ function previousPage() {
     <button onClick={() => saveCurrentStory()} className="reader-button">
       Save Story
     </button>
+
+<button
+  onClick={exportDocx}
+  className="reader-button"
+>
+  Export DOCX
+</button>
     
 <button
   onClick={() => {
