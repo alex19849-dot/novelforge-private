@@ -1196,7 +1196,6 @@ style={{
         >
           Generate DOCX
         </button>
-      </div>
     </div>
   </div>
 )}
