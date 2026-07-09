@@ -1160,12 +1160,14 @@ style={{
         </button>
       </div>
 
-      <div className="grid gap-3">
-        <label className="flex items-center gap-3 text-sm font-semibold">
-          <input type="checkbox" defaultChecked />
-          Include Title Page
-        </label>
-
+     <label className="flex items-center gap-3 text-sm font-semibold">
+  <input
+    type="checkbox"
+    checked={exportIncludeTitlePage}
+    onChange={(e) => setExportIncludeTitlePage(e.target.checked)}
+  />
+  Include Title Page
+</label>
         <label className="flex items-center gap-3 text-sm font-semibold">
           <input type="checkbox" defaultChecked />
           Include Content Warnings
