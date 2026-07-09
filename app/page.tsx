@@ -320,7 +320,45 @@ useEffect(() => {
     await loadStories();
     return data.id;
   }
+async function exportDocx() {
+  if (!chapters.length) {
+    setCopyMessage("No chapters to export.");
+    return;
+  }
 
+  const title = getStoryTitle(form);
+
+  const response = await fetch("/api/export-docx", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      title,
+      author: "Marlow Quinn",
+      chapters,
+    }),
+  });
+
+  if (!response.ok) {
+    setCopyMessage("DOCX export failed.");
+    return;
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${title.replace(/[^a-z0-9]/gi, "_")}.docx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  window.URL.revokeObjectURL(url);
+
+  setCopyMessage("DOCX exported.");
+}
   function loadStory(story: SavedStory) {
     setActiveStoryId(story.id);
     setForm({ ...defaultForm, ...story.form });
