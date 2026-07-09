@@ -3,9 +3,11 @@ import {
   AlignmentType,
   Document,
   ExternalHyperlink,
+  HeadingLevel,
   Packer,
   PageBreak,
   Paragraph,
+  TableOfContents,
   TextRun,
 } from "docx";
 
@@ -111,19 +113,20 @@ function buildChapter(chapter: string, index: number) {
   const { povLine, bodyLines } = cleanChapter(chapter, index);
 
   return [
-    new Paragraph({
-      pageBreakBefore: index !== 0,
-      alignment: AlignmentType.CENTER,
-      spacing: { before: 600, after: 300 },
-      children: [
-        new TextRun({
-          text: `Chapter ${index + 1}`,
-          bold: true,
-          color: "000000",
-          size: 32,
-        }),
-      ],
+  new Paragraph({
+  heading: HeadingLevel.HEADING_1,
+  pageBreakBefore: index !== 0,
+  alignment: AlignmentType.CENTER,
+  spacing: { before: 600, after: 300 },
+  children: [
+    new TextRun({
+      text: `Chapter ${index + 1}`,
+      bold: true,
+      color: "000000",
+      size: 32,
     }),
+  ],
+}),
 
     ...(povLine
       ? [
