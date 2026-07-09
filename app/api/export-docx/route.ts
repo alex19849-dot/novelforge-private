@@ -1,13 +1,30 @@
 import { NextResponse } from "next/server";
 import {
+  AlignmentType,
   Document,
+  HeadingLevel,
   Packer,
+  PageBreak,
   Paragraph,
   TextRun,
-  HeadingLevel,
-  AlignmentType,
-  PageBreak,
 } from "docx";
+
+function cleanChapter(chapter: string, index: number) {
+  const withoutChapterHeading = chapter
+    .replace(new RegExp(`^Chapter\\s+${index + 1}\\s*`, "i"), "")
+    .replace(/^Chapter\s+\d+\s*/i, "")
+    .trim();
+
+  const lines = withoutChapterHeading
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const povLine = lines[0] || "";
+  const bodyLines = lines.slice(1);
+
+  return { povLine, bodyLines };
+}
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +33,50 @@ export async function POST(request: Request) {
     const title = body.title || "Untitled Story";
     const author = body.author || "Marlow Quinn";
     const chapters: string[] = body.chapters || [];
+
+    const chapterParagraphs = chapters.flatMap((chapter, index) => {
+      const { povLine, bodyLines } = cleanChapter(chapter, index);
+
+      return [
+        new Paragraph({
+          text: `Chapter ${index + 1}`,
+          heading: HeadingLevel.HEADING_1,
+          pageBreakBefore: index !== 0,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 240 },
+        }),
+
+        ...(povLine
+          ? [
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 400 },
+                children: [
+                  new TextRun({
+                    text: povLine.toUpperCase(),
+                    bold: true,
+                    size: 24,
+                  }),
+                ],
+              }),
+            ]
+          : []),
+
+        ...bodyLines.map(
+          (line) =>
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: line,
+                  size: 24,
+                }),
+              ],
+              spacing: { after: 180 },
+              indent: { firstLine: 720 },
+            })
+        ),
+      ];
+    });
 
     const doc = new Document({
       sections: [
@@ -28,7 +89,7 @@ export async function POST(request: Request) {
                 new TextRun({
                   text: title,
                   bold: true,
-                  size: 36,
+                  size: 40,
                 }),
               ],
             }),
@@ -38,7 +99,7 @@ export async function POST(request: Request) {
               children: [
                 new TextRun({
                   text: author,
-                  size: 24,
+                  size: 26,
                 }),
               ],
             }),
@@ -47,52 +108,16 @@ export async function POST(request: Request) {
               children: [new PageBreak()],
             }),
 
-           ...chapters.flatMap((chapter, index) => {
-  const cleanedChapter = chapter
-    .replace(/^Chapter\s+\d+\s*/i, "")
-    .trim();
-
-  const lines = cleanedChapter
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const povLine = lines[0] || "";
-  const bodyLines = lines.slice(1);
-
-  return [
-              new Paragraph({
-                text: `Chapter ${index + 1}`,
-                heading: HeadingLevel.HEADING_1,
-                pageBreakBefore: index !== 0,
-                alignment: AlignmentType.CENTER,
-              }),
-
-              ...chapter
-                .split("\n")
-                .filter((line) => line.trim())
-                .map(
-                  (line) =>
-                    new Paragraph({
-                      children: [
-                        new TextRun({
-                          text: line.trim(),
-                          size: 24,
-                        }),
-                      ],
-                      spacing: { after: 240 },
-                    })
-                ),
-            ]),
+            ...chapterParagraphs,
           ],
         },
       ],
     });
 
-const buffer = await Packer.toBuffer(doc);
-const uint8Array = new Uint8Array(buffer);
+    const buffer = await Packer.toBuffer(doc);
+    const uint8Array = new Uint8Array(buffer);
 
-return new NextResponse(uint8Array, {
+    return new NextResponse(uint8Array, {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
