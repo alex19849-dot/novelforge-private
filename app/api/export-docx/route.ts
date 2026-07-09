@@ -163,6 +163,48 @@ const authorBio =
     ]
   : []),
             ...chapterParagraphs,
+            ...(includeAboutAuthor
+  ? [
+      new Paragraph({
+        children: [new PageBreak()],
+      }),
+
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 800, after: 400 },
+        children: [
+          new TextRun({
+            text: "About the Author",
+            bold: true,
+            color: "000000",
+            size: 32,
+          }),
+        ],
+      }),
+
+      new Paragraph({
+        spacing: { after: 300 },
+        children: [
+          new TextRun({
+            text: authorBio,
+            color: "000000",
+            size: 24,
+          }),
+        ],
+      }),
+
+      new Paragraph({
+        spacing: { after: 300 },
+        children: [
+          new TextRun({
+            text: authorWebsite,
+            color: "000000",
+            size: 24,
+          }),
+        ],
+      }),
+    ]
+  : []),
           ],
         },
       ],
