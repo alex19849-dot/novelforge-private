@@ -47,7 +47,20 @@ export async function POST(request: Request) {
               children: [new PageBreak()],
             }),
 
-            ...chapters.flatMap((chapter, index) => [
+           ...chapters.flatMap((chapter, index) => {
+  const cleanedChapter = chapter
+    .replace(/^Chapter\s+\d+\s*/i, "")
+    .trim();
+
+  const lines = cleanedChapter
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const povLine = lines[0] || "";
+  const bodyLines = lines.slice(1);
+
+  return [
               new Paragraph({
                 text: `Chapter ${index + 1}`,
                 heading: HeadingLevel.HEADING_1,
