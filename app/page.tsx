@@ -70,6 +70,7 @@ export default function Home() {
   const [showLibrary, setShowLibrary] = useState(false);
   const [showReaderMenu, setShowReaderMenu] = useState(false);
   const [showStoryBible, setShowStoryBible] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [readerFontSize, setReaderFontSize] = useState(18);
   const [readerLineHeight, setReaderLineHeight] = useState(1.7);
   const [readerTheme, setReaderTheme] = useState<"light" | "sepia" | "dark">("sepia");
@@ -916,10 +917,10 @@ function previousPage() {
     </button>
 
 <button
-  onClick={exportDocx}
+  onClick={() => setShowExportModal(true)}
   className="reader-button"
 >
-  Export DOCX
+  Export Book
 </button>
     
 <button
