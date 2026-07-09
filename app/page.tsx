@@ -343,6 +343,7 @@ async function exportDocx() {
   chapters,
   includeTitlePage: exportIncludeTitlePage,
   includeContentWarnings: exportIncludeContentWarnings,
+  includeAboutAuthor: exportIncludeAboutAuthor,
 }),
   });
 
@@ -1184,9 +1185,13 @@ style={{
 </label>
 
         <label className="flex items-center gap-3 text-sm font-semibold">
-          <input type="checkbox" defaultChecked />
-          Include About the Author
-        </label>
+  <input
+    type="checkbox"
+    checked={exportIncludeAboutAuthor}
+    onChange={(e) => setExportIncludeAboutAuthor(e.target.checked)}
+  />
+  Include About the Author
+</label>
 
         <label className="grid gap-2 text-sm font-semibold">
           Author Website
