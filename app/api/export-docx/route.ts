@@ -39,7 +39,8 @@ const authorWebsite = body.authorWebsite || "https://www.marlowquinn.com";
 const authorBio =
   body.authorBio ||
   "Marlow Quinn writes emotional MM romance filled with heat, heart, found family and unforgettable characters.";
-
+const contentWarnings: string[] = body.contentWarnings || [];
+    
     const chapterParagraphs = chapters.flatMap((chapter, index) => {
       const { povLine, bodyLines } = cleanChapter(chapter, index);
 
