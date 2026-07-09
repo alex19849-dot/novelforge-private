@@ -34,6 +34,11 @@ export async function POST(request: Request) {
     const chapters: string[] = body.chapters || [];
     const includeTitlePage = body.includeTitlePage !== false;
     const includeContentWarnings = body.includeContentWarnings === true;
+    const includeAboutAuthor = body.includeAboutAuthor === true;
+const authorWebsite = body.authorWebsite || "https://www.marlowquinn.com";
+const authorBio =
+  body.authorBio ||
+  "Marlow Quinn writes emotional MM romance filled with heat, heart, found family and unforgettable characters.";
 
     const chapterParagraphs = chapters.flatMap((chapter, index) => {
       const { povLine, bodyLines } = cleanChapter(chapter, index);
