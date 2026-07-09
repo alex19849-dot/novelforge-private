@@ -20,10 +20,213 @@ function cleanChapter(chapter: string, index: number) {
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const povLine = lines[0] || "";
-  const bodyLines = lines.slice(1);
+  return {
+    povLine: lines[0] || "",
+    bodyLines: lines.slice(1),
+  };
+}
 
-  return { povLine, bodyLines };
+function buildTitlePage(title: string, author: string) {
+  return [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 2400, after: 500 },
+      children: [
+        new TextRun({
+          text: title,
+          bold: true,
+          color: "000000",
+          size: 44,
+        }),
+      ],
+    }),
+
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 600 },
+      children: [
+        new TextRun({
+          text: author,
+          color: "000000",
+          size: 28,
+        }),
+      ],
+    }),
+
+    new Paragraph({
+      children: [new PageBreak()],
+    }),
+  ];
+}
+
+function buildContentWarningsPage(contentWarnings: string[]) {
+  return [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 1200, after: 400 },
+      children: [
+        new TextRun({
+          text: "Content Warnings",
+          bold: true,
+          color: "000000",
+          size: 32,
+        }),
+      ],
+    }),
+
+    ...(contentWarnings.length
+      ? contentWarnings.map(
+          (warning) =>
+            new Paragraph({
+              spacing: { after: 180 },
+              children: [
+                new TextRun({
+                  text: `• ${warning}`,
+                  color: "000000",
+                  size: 24,
+                }),
+              ],
+            })
+        )
+      : [
+          new Paragraph({
+            spacing: { after: 300 },
+            children: [
+              new TextRun({
+                text: "This book contains mature themes, explicit romantic content, strong language and emotionally intense scenes.",
+                color: "000000",
+                size: 24,
+              }),
+            ],
+          }),
+        ]),
+
+    new Paragraph({
+      children: [new PageBreak()],
+    }),
+  ];
+}
+
+function buildChapter(chapter: string, index: number) {
+  const { povLine, bodyLines } = cleanChapter(chapter, index);
+
+  return [
+    new Paragraph({
+      pageBreakBefore: index !== 0,
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 600, after: 300 },
+      children: [
+        new TextRun({
+          text: `Chapter ${index + 1}`,
+          bold: true,
+          color: "000000",
+          size: 32,
+        }),
+      ],
+    }),
+
+    ...(povLine
+      ? [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 500 },
+            children: [
+              new TextRun({
+                text: povLine.toUpperCase(),
+                bold: true,
+                color: "000000",
+                size: 24,
+              }),
+            ],
+          }),
+        ]
+      : []),
+
+    ...bodyLines.flatMap((line) => {
+      if (line === "***") {
+        return [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { before: 240, after: 240 },
+            children: [
+              new TextRun({
+                text: "***",
+                bold: true,
+                color: "000000",
+                size: 24,
+              }),
+            ],
+          }),
+        ];
+      }
+
+      return [
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: line,
+              size: 24,
+              color: "000000",
+            }),
+          ],
+          spacing: { after: 120 },
+          indent: { firstLine: 720 },
+        }),
+      ];
+    }),
+  ];
+}
+
+function buildAboutAuthorPage(
+  authorBio: string,
+  authorWebsite: string
+) {
+  return [
+    new Paragraph({
+      children: [new PageBreak()],
+    }),
+
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 800, after: 400 },
+      children: [
+        new TextRun({
+          text: "About the Author",
+          bold: true,
+          color: "000000",
+          size: 32,
+        }),
+      ],
+    }),
+
+    new Paragraph({
+      spacing: { after: 300 },
+      children: [
+        new TextRun({
+          text: authorBio,
+          color: "000000",
+          size: 24,
+        }),
+      ],
+    }),
+
+    new Paragraph({
+      spacing: { after: 300 },
+      children: [
+        new ExternalHyperlink({
+          link: authorWebsite,
+          children: [
+            new TextRun({
+              text: authorWebsite,
+              color: "000000",
+              size: 24,
+              underline: {},
+            }),
+          ],
+        }),
+      ],
+    }),
+  ];
 }
 
 export async function POST(request: Request) {
@@ -33,213 +236,39 @@ export async function POST(request: Request) {
     const title = body.title || "Untitled Story";
     const author = body.author || "Marlow Quinn";
     const chapters: string[] = body.chapters || [];
+
     const includeTitlePage = body.includeTitlePage !== false;
     const includeContentWarnings = body.includeContentWarnings === true;
     const includeAboutAuthor = body.includeAboutAuthor === true;
-const authorWebsite = body.authorWebsite || "https://www.marlowquinn.com";
-const authorBio =
-  body.authorBio ||
-  "Marlow Quinn writes emotional MM romance filled with heat, heart, found family and unforgettable characters.";
-const contentWarnings: string[] = body.contentWarnings || [];
-    
-    const chapterParagraphs = chapters.flatMap((chapter, index) => {
-      const { povLine, bodyLines } = cleanChapter(chapter, index);
 
-      return [
-        new Paragraph({
-          pageBreakBefore: index !== 0,
-          alignment: AlignmentType.CENTER,
-          spacing: {
-            before: 600,
-            after: 300,
-          },
-          children: [
-            new TextRun({
-              text: `Chapter ${index + 1}`,
-              bold: true,
-              color: "000000",
-              size: 32,
-            }),
-          ],
-        }),
+    const contentWarnings: string[] = body.contentWarnings || [];
 
-        ...(povLine
-          ? [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                spacing: { after: 500 },
-                children: [
-                  new TextRun({
-                    text: povLine.toUpperCase(),
-                    bold: true,
-                    color: "000000",
-                    size: 24,
-                  }),
-                ],
-              }),
-            ]
-          : []),
+    const authorWebsite =
+      body.authorWebsite || "https://www.marlowquinn.com";
 
-      ...bodyLines.flatMap((line) => {
-  if (line === "***") {
-    return [
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: {
-          before: 240,
-          after: 240,
-        },
-        children: [
-          new TextRun({
-            text: "***",
-            bold: true,
-            color: "000000",
-            size: 24,
-          }),
-        ],
-      }),
-    ];
-  }
+    const authorBio =
+      body.authorBio ||
+      "Marlow Quinn writes emotional MM romance filled with heat, heart, found family and unforgettable characters.";
 
-  return [
-    new Paragraph({
-      children: [
-        new TextRun({
-          text: line,
-          size: 24,
-          color: "000000",
-        }),
-      ],
-      spacing: { after: 120 },
-      indent: { firstLine: 720 },
-    }),
-  ];
-}),
     const doc = new Document({
       sections: [
         {
           children: [
             ...(includeTitlePage
-              ? [
-                  new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    spacing: { before: 2400, after: 500 },
-                    children: [
-                      new TextRun({
-                        text: title,
-                        bold: true,
-                        color: "000000",
-                        size: 44,
-                      }),
-                    ],
-                  }),
-
-                  new Paragraph({
-                    alignment: AlignmentType.CENTER,
-                    spacing: { after: 600 },
-                    children: [
-                      new TextRun({
-                        text: author,
-                        color: "000000",
-                        size: 28,
-                      }),
-                    ],
-                  }),
-
-                  new Paragraph({
-                    children: [new PageBreak()],
-                  }),
-                ]
+              ? buildTitlePage(title, author)
               : []),
-...(includeContentWarnings
-  ? [
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 1200, after: 400 },
-        children: [
-          new TextRun({
-            text: "Content Warnings",
-            bold: true,
-            color: "000000",
-            size: 32,
-          }),
-        ],
-      }),
 
-     ...(contentWarnings.length
-  ? contentWarnings.map(
-      (warning) =>
-        new Paragraph({
-          spacing: { after: 180 },
-          children: [
-            new TextRun({
-              text: `• ${warning}`,
-              color: "000000",
-              size: 24,
-            }),
-          ],
-        })
-    )
-  : [
-      new Paragraph({
-        spacing: { after: 300 },
-        children: [
-          new TextRun({
-            text: "This book contains mature themes, explicit romantic content, strong language and emotionally intense scenes.",
-            color: "000000",
-            size: 24,
-          }),
-        ],
-      }),
-    ]),
+            ...(includeContentWarnings
+              ? buildContentWarningsPage(contentWarnings)
+              : []),
 
-      new Paragraph({
-        children: [new PageBreak()],
-      }),
-    ]
-  : []),
-            ...chapterParagraphs,
+            ...chapters.flatMap((chapter, index) =>
+              buildChapter(chapter, index)
+            ),
+
             ...(includeAboutAuthor
-  ? [
-      new Paragraph({
-        children: [new PageBreak()],
-      }),
-
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { before: 800, after: 400 },
-        children: [
-          new TextRun({
-            text: "About the Author",
-            bold: true,
-            color: "000000",
-            size: 32,
-          }),
-        ],
-      }),
-
-      new Paragraph({
-        spacing: { after: 300 },
-        children: [
-          new TextRun({
-            text: authorBio,
-            color: "000000",
-            size: 24,
-          }),
-        ],
-      }),
-
-    new Paragraph({
-  spacing: { after: 300 },
-  children: [
-    new TextRun({
-      text: authorWebsite,
-      color: "000000",
-      size: 24,
-      underline: {},
-    }),
-  ],
-}),
+              ? buildAboutAuthorPage(authorBio, authorWebsite)
+              : []),
           ],
         },
       ],
