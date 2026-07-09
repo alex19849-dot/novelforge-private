@@ -76,13 +76,10 @@ export async function POST(request: Request) {
       ],
     });
 
-  const buffer = await Packer.toBuffer(doc);
-const arrayBuffer = buffer.buffer.slice(
-  buffer.byteOffset,
-  buffer.byteOffset + buffer.byteLength
-);
+const buffer = await Packer.toBuffer(doc);
+const uint8Array = new Uint8Array(buffer);
 
-return new NextResponse(arrayBuffer, {
+return new NextResponse(uint8Array, {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
