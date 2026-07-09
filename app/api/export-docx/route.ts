@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   AlignmentType,
   Document,
+  ExternalHyperlink,
   Packer,
   PageBreak,
   Paragraph,
@@ -228,18 +229,17 @@ const contentWarnings: string[] = body.contentWarnings || [];
         ],
       }),
 
-      new Paragraph({
-        spacing: { after: 300 },
-        children: [
-          new TextRun({
-            text: authorWebsite,
-            color: "000000",
-            size: 24,
-          }),
-        ],
-      }),
-    ]
-  : []),
+    new Paragraph({
+  spacing: { after: 300 },
+  children: [
+    new TextRun({
+      text: authorWebsite,
+      color: "000000",
+      size: 24,
+      underline: {},
+    }),
+  ],
+}),
           ],
         },
       ],
