@@ -335,11 +335,12 @@ async function exportDocx() {
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      title,
-      author: "Marlow Quinn",
-      chapters,
-    }),
+   body: JSON.stringify({
+  title,
+  author: "Marlow Quinn",
+  chapters,
+  includeTitlePage: exportIncludeTitlePage,
+}),
   });
 
   if (!response.ok) {
