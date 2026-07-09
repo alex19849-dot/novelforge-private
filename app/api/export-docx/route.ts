@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import {
   AlignmentType,
   Document,
-  HeadingLevel,
   Packer,
   PageBreak,
   Paragraph,
@@ -40,22 +39,32 @@ export async function POST(request: Request) {
 
       return [
         new Paragraph({
-          text: `Chapter ${index + 1}`,
-          heading: HeadingLevel.HEADING_1,
           pageBreakBefore: index !== 0,
           alignment: AlignmentType.CENTER,
-          spacing: { after: 240 },
+          spacing: {
+            before: 600,
+            after: 300,
+          },
+          children: [
+            new TextRun({
+              text: `Chapter ${index + 1}`,
+              bold: true,
+              color: "000000",
+              size: 32,
+            }),
+          ],
         }),
 
         ...(povLine
           ? [
               new Paragraph({
                 alignment: AlignmentType.CENTER,
-                spacing: { after: 400 },
+                spacing: { after: 500 },
                 children: [
                   new TextRun({
                     text: povLine.toUpperCase(),
                     bold: true,
+                    color: "000000",
                     size: 24,
                   }),
                 ],
@@ -70,9 +79,10 @@ export async function POST(request: Request) {
                 new TextRun({
                   text: line,
                   size: 24,
+                  color: "000000",
                 }),
               ],
-              spacing: { after: 180 },
+              spacing: { after: 120 },
               indent: { firstLine: 720 },
             })
         ),
@@ -83,31 +93,38 @@ export async function POST(request: Request) {
       sections: [
         {
           children: [
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 400 },
-              children: [
-                new TextRun({
-                  text: title,
-                  bold: true,
-                  size: 40,
-                }),
-              ],
-            }),
+            ...(includeTitlePage
+              ? [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { before: 2400, after: 500 },
+                    children: [
+                      new TextRun({
+                        text: title,
+                        bold: true,
+                        color: "000000",
+                        size: 44,
+                      }),
+                    ],
+                  }),
 
-            new Paragraph({
-              alignment: AlignmentType.CENTER,
-              children: [
-                new TextRun({
-                  text: author,
-                  size: 26,
-                }),
-              ],
-            }),
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    spacing: { after: 600 },
+                    children: [
+                      new TextRun({
+                        text: author,
+                        color: "000000",
+                        size: 28,
+                      }),
+                    ],
+                  }),
 
-            new Paragraph({
-              children: [new PageBreak()],
-            }),
+                  new Paragraph({
+                    children: [new PageBreak()],
+                  }),
+                ]
+              : []),
 
             ...chapterParagraphs,
           ],
