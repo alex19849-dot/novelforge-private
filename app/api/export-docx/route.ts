@@ -147,6 +147,21 @@ const contentWarnings: string[] = body.contentWarnings || [];
         ],
       }),
 
+     ...(contentWarnings.length
+  ? contentWarnings.map(
+      (warning) =>
+        new Paragraph({
+          spacing: { after: 180 },
+          children: [
+            new TextRun({
+              text: `• ${warning}`,
+              color: "000000",
+              size: 24,
+            }),
+          ],
+        })
+    )
+  : [
       new Paragraph({
         spacing: { after: 300 },
         children: [
@@ -157,6 +172,7 @@ const contentWarnings: string[] = body.contentWarnings || [];
           }),
         ],
       }),
+    ]),
 
       new Paragraph({
         children: [new PageBreak()],
