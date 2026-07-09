@@ -344,7 +344,7 @@ async function exportDocx() {
   includeTitlePage: exportIncludeTitlePage,
   includeContentWarnings: exportIncludeContentWarnings,
   includeAboutAuthor: exportIncludeAboutAuthor,
-  contentWarnings: preparedForm.contentWarnings,
+  contentWarnings: [],
 }),
   });
 
