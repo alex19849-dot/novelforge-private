@@ -341,6 +341,7 @@ async function exportDocx() {
   author: "Marlow Quinn",
   chapters,
   includeTitlePage: exportIncludeTitlePage,
+  includeContentWarnings: exportIncludeContentWarnings,
 }),
   });
 
