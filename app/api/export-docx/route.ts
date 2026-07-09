@@ -265,6 +265,28 @@ export async function POST(request: Request) {
               ? buildContentWarningsPage(contentWarnings)
               : []),
 
+            new Paragraph({
+  alignment: AlignmentType.CENTER,
+  spacing: { before: 1200, after: 400 },
+  children: [
+    new TextRun({
+      text: "Contents",
+      bold: true,
+      color: "000000",
+      size: 32,
+    }),
+  ],
+}),
+
+new TableOfContents("Table of Contents", {
+  hyperlink: true,
+  headingStyleRange: "1-1",
+}),
+
+new Paragraph({
+  children: [new PageBreak()],
+}),
+
             ...chapters.flatMap((chapter, index) =>
               buildChapter(chapter, index)
             ),
