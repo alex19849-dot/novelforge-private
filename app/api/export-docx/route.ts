@@ -126,7 +126,37 @@ export async function POST(request: Request) {
                   }),
                 ]
               : []),
+...(includeContentWarnings
+  ? [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 1200, after: 400 },
+        children: [
+          new TextRun({
+            text: "Content Warnings",
+            bold: true,
+            color: "000000",
+            size: 32,
+          }),
+        ],
+      }),
 
+      new Paragraph({
+        spacing: { after: 300 },
+        children: [
+          new TextRun({
+            text: "This book contains mature themes, explicit romantic content, strong language and emotionally intense scenes.",
+            color: "000000",
+            size: 24,
+          }),
+        ],
+      }),
+
+      new Paragraph({
+        children: [new PageBreak()],
+      }),
+    ]
+  : []),
             ...chapterParagraphs,
           ],
         },
