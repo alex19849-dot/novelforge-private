@@ -79,23 +79,41 @@ const contentWarnings: string[] = body.contentWarnings || [];
             ]
           : []),
 
-        ...bodyLines.map(
-          (line) =>
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: line,
-                  size: 24,
-                  color: "000000",
-                }),
-              ],
-              spacing: { after: 120 },
-              indent: { firstLine: 720 },
-            })
-        ),
-      ];
-    });
+      ...bodyLines.flatMap((line) => {
+  if (line === "***") {
+    return [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: {
+          before: 240,
+          after: 240,
+        },
+        children: [
+          new TextRun({
+            text: "***",
+            bold: true,
+            color: "000000",
+            size: 24,
+          }),
+        ],
+      }),
+    ];
+  }
 
+  return [
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: line,
+          size: 24,
+          color: "000000",
+        }),
+      ],
+      spacing: { after: 120 },
+      indent: { firstLine: 720 },
+    }),
+  ];
+}),
     const doc = new Document({
       sections: [
         {
