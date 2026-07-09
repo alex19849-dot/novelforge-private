@@ -1145,6 +1145,57 @@ style={{
           opacity: 0.55;
         }
       `}</style>
+      {showExportModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
+    <div className="w-full max-w-xl rounded-3xl border border-[#d6c5a3] bg-[#f9f2df] p-5 shadow-2xl">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-black">Export Book</h2>
+
+        <button
+          onClick={() => setShowExportModal(false)}
+          className="reader-button"
+        >
+          Close
+        </button>
+      </div>
+
+      <div className="grid gap-3">
+        <label className="flex items-center gap-3 text-sm font-semibold">
+          <input type="checkbox" defaultChecked />
+          Include Title Page
+        </label>
+
+        <label className="flex items-center gap-3 text-sm font-semibold">
+          <input type="checkbox" defaultChecked />
+          Include Content Warnings
+        </label>
+
+        <label className="flex items-center gap-3 text-sm font-semibold">
+          <input type="checkbox" defaultChecked />
+          Include About the Author
+        </label>
+
+        <label className="grid gap-2 text-sm font-semibold">
+          Author Website
+          <input
+            defaultValue="https://www.marlowquinn.com"
+            className="rounded-2xl border border-[#d6c5a3] bg-white px-4 py-3 text-black outline-none"
+          />
+        </label>
+
+        <button
+          onClick={() => {
+            setShowExportModal(false);
+            exportDocx();
+          }}
+          className="primary-button"
+        >
+          Generate DOCX
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </main>
   );
 }
