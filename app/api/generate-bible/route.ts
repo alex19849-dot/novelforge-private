@@ -108,7 +108,19 @@ const supportingCharacters = body.sideCharacterNotes || "";
 const mustInclude = body.mustHave || "";
 const mustAvoid = body.mustNotHave || "";
 
-  const fullInput = `${storyIdea}\n\n${characters}\n\n${mustAvoid}`;
+ const fullInput = `
+${storyIdea}
+
+${storyOutline}
+
+${characters}
+
+${supportingCharacters}
+
+${mustInclude}
+
+${mustAvoid}
+`.trim();
   const regional = detectLocale(fullInput);
   const relationship = body.relationship || detectRelationship(fullInput);
   const heat = body.heat || detectHeat(fullInput);
