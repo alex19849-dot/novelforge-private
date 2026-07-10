@@ -952,6 +952,29 @@ function previousPage() {
                 updateField={updateField}
                 placeholder="Paste anything the story must avoid."
               />
+              <div className="grid gap-4 rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] p-4">
+  <div>
+    <h3 className="text-lg font-black">Generation Settings</h3>
+    <p className="mt-1 text-sm text-black/60">
+      Controls how each chapter is generated.
+    </p>
+  </div>
+
+  <SelectField
+    label="Target Chapter Length"
+    field="targetChapterWords"
+    form={form}
+    updateField={updateField}
+    options={[
+      "2500",
+      "3000",
+      "3500",
+      "4000",
+      "4500",
+      "5000",
+    ]}
+  />
+</div>
               <button
   onClick={saveStoryBibleChanges}
   disabled={loading || !user}
