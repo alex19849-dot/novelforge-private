@@ -556,41 +556,75 @@ let generatedVoiceProfile = openingStoryState.voiceProfile;
 let generatedRepetitionReport = openingStoryState.repetitionReport;
 let generatedStoryMemory = openingStoryState.storyMemory;
 try {
-  const voiceResponse = await openai.responses.create({
+  const analysisResponse = await openai.responses.create({
     model: "gpt-5.5",
     reasoning: { effort: "low" },
     text: { verbosity: "low" },
     input: `
 Analyse the story details and Chapter 1 below.
 
-Create a permanent voice profile that will keep this novel stylistically distinct from other novels.
-
-The profile must reflect these specific characters and this specific story. Do not default to generic romance sarcasm, constant banter, interchangeable character voices or familiar AI phrasing.
+Create:
+1. A permanent voice profile for this specific novel.
+2. A concise continuity memory for future chapters.
+3. A repetition report that will help Chapter 2 avoid habits already noticeable in Chapter 1.
 
 Return valid JSON only.
+Do not include markdown.
+Do not include commentary outside the JSON.
 
 Use exactly this structure:
 
 {
-  "primaryTone": "",
-  "humourStyle": "",
-  "narrativeStyle": "",
-  "sentenceRhythm": "",
-  "dialogueStyle": "",
-  "emotionalTexture": "",
-  "povVoiceRules": [],
-  "characterVoices": []
+  "voiceProfile": {
+    "primaryTone": "",
+    "humourStyle": "",
+    "narrativeStyle": "",
+    "sentenceRhythm": "",
+    "dialogueStyle": "",
+    "emotionalTexture": "",
+    "povVoiceRules": [],
+    "characterVoices": []
+  },
+  "storyMemory": {
+    "importantFacts": [],
+    "characterDetails": [],
+    "relationshipHistory": [],
+    "unresolvedThreads": [],
+    "pastEvents": [],
+    "rules": []
+  },
+  "repetitionReport": {
+    "overusedWords": [],
+    "repeatedPhrases": [],
+    "repeatedReactions": [],
+    "repeatedHumourPatterns": [],
+    "repeatedSentencePatterns": [],
+    "guidance": []
+  }
 }
 
-Rules:
+VOICE PROFILE RULES:
 
-- Each string must be specific and practical.
-- povVoiceRules must contain concise rules for the narration.
-- characterVoices must contain one concise voice description for each major character.
-- Explain how each character speaks, thinks, notices the world and uses humour.
-- Characters must sound meaningfully different from one another.
-- Do not include markdown.
-- Do not include commentary outside the JSON.
+- Make the profile specific to these characters and this story.
+- Do not default to generic romance sarcasm, constant banter or interchangeable voices.
+- Explain how each major character speaks, thinks, notices the world and uses humour.
+- Character voices must be meaningfully different.
+- Keep every rule practical enough to guide future chapter writing.
+
+STORY MEMORY RULES:
+
+- Include only details needed for future continuity.
+- Record established facts, character details, relationship developments, unresolved threads and permanent story rules.
+- Do not summarise the entire chapter.
+- Do not include temporary emotions unless they will affect future chapters.
+
+REPETITION RULES:
+
+- Only flag repetition that is noticeable enough to weaken the prose.
+- Ignore necessary names, pronouns and ordinary connecting words.
+- Identify repeated phrases, body language, emotional reactions, humour styles and sentence habits.
+- Guidance must contain concise, practical instructions for keeping the next chapter fresh.
+- Do not turn normal language into a rigid blacklist.
 
 STORY TITLE:
 ${title}
@@ -607,16 +641,20 @@ ${mustAvoid || "Nothing specific provided."}
 CHAPTER 1:
 ${chapter}
 `,
-    max_output_tokens: 2000,
+    max_output_tokens: 3500,
   });
 
-  const voiceText = (voiceResponse.output_text || "")
+  const analysisText = (analysisResponse.output_text || "")
     .replace(/^```json\s*/i, "")
     .replace(/^```\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
 
-  const parsedVoiceProfile = JSON.parse(voiceText);
+  const parsedAnalysis = JSON.parse(analysisText);
+
+  const parsedVoiceProfile = parsedAnalysis.voiceProfile || {};
+  const parsedStoryMemory = parsedAnalysis.storyMemory || {};
+  const parsedRepetitionReport = parsedAnalysis.repetitionReport || {};
 
   generatedVoiceProfile = {
     primaryTone: parsedVoiceProfile.primaryTone || "",
@@ -632,8 +670,54 @@ ${chapter}
       ? parsedVoiceProfile.characterVoices
       : [],
   };
-} catch (voiceError) {
-  console.error("Voice profile generation failed:", voiceError);
+
+  generatedStoryMemory = {
+    importantFacts: Array.isArray(parsedStoryMemory.importantFacts)
+      ? parsedStoryMemory.importantFacts
+      : [],
+    characterDetails: Array.isArray(parsedStoryMemory.characterDetails)
+      ? parsedStoryMemory.characterDetails
+      : [],
+    relationshipHistory: Array.isArray(parsedStoryMemory.relationshipHistory)
+      ? parsedStoryMemory.relationshipHistory
+      : [],
+    unresolvedThreads: Array.isArray(parsedStoryMemory.unresolvedThreads)
+      ? parsedStoryMemory.unresolvedThreads
+      : [],
+    pastEvents: Array.isArray(parsedStoryMemory.pastEvents)
+      ? parsedStoryMemory.pastEvents
+      : [],
+    rules: Array.isArray(parsedStoryMemory.rules)
+      ? parsedStoryMemory.rules
+      : [],
+  };
+
+  generatedRepetitionReport = {
+    overusedWords: Array.isArray(parsedRepetitionReport.overusedWords)
+      ? parsedRepetitionReport.overusedWords
+      : [],
+    repeatedPhrases: Array.isArray(parsedRepetitionReport.repeatedPhrases)
+      ? parsedRepetitionReport.repeatedPhrases
+      : [],
+    repeatedReactions: Array.isArray(parsedRepetitionReport.repeatedReactions)
+      ? parsedRepetitionReport.repeatedReactions
+      : [],
+    repeatedHumourPatterns: Array.isArray(
+      parsedRepetitionReport.repeatedHumourPatterns
+    )
+      ? parsedRepetitionReport.repeatedHumourPatterns
+      : [],
+    repeatedSentencePatterns: Array.isArray(
+      parsedRepetitionReport.repeatedSentencePatterns
+    )
+      ? parsedRepetitionReport.repeatedSentencePatterns
+      : [],
+    guidance: Array.isArray(parsedRepetitionReport.guidance)
+      ? parsedRepetitionReport.guidance
+      : [],
+  };
+} catch (analysisError) {
+  console.error("Initial story analysis failed:", analysisError);
 }
 const storyState = {
   ...openingStoryState,
