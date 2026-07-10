@@ -402,10 +402,8 @@ Forbidden terms: ${regional.forbiddenTerms.join(", ")}
 
 CHAPTER 1 JOB:
 
-* Open with a strong hook.
-* Introduce the main character immediately.
-* Introduce the romantic interest as early as possible.
-* Introduce the romantic interest as soon as it feels natural for this story.
+* Open at the most interesting natural point for this story.
+* Introduce the romantic interest whenever the story naturally creates the strongest first meeting.
 * The first meaningful interaction between the romantic leads should happen early enough to engage the reader, but never feel rushed or forced.
 * The romance should remain the emotional heart of the story, but allow worldbuilding, side characters and secondary plots to develop naturally when they strengthen the main story.
 * Introduce supporting characters only when they naturally contribute to the story. Avoid overwhelming the reader with unnecessary introductions, but do not artificially limit the cast.
