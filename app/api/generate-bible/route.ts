@@ -128,6 +128,14 @@ export async function POST(req: Request) {
     povVoiceRules: [],
     characterVoices: [],
   },
+   repetitionReport: {
+  overusedWords: [],
+  repeatedPhrases: [],
+  repeatedReactions: [],
+  repeatedHumourPatterns: [],
+  repeatedSentencePatterns: [],
+  guidance: [],
+},
   storyMemory: {
     importantFacts: [],
     characterDetails: [],
