@@ -112,6 +112,7 @@ export async function POST(req: Request) {
 
  const openingStoryState = {
   chapter: 1,
+   title,
   relationship,
   heat,
   regionalLanguage: regional.regionalLanguage,
