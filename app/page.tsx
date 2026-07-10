@@ -898,7 +898,18 @@ function previousPage() {
         "Third person, single POV",
       ]}
     />
-
+<SelectField
+  label="Regional Language"
+  field="locale"
+  form={form}
+  updateField={updateField}
+  options={[
+    "British English",
+    "American English",
+    "Canadian English",
+    "Australian English",
+  ]}
+/>
     <SelectField
       label="Heat Level"
       field="heat"
