@@ -815,7 +815,7 @@ function previousPage() {
             </div>
 
             <div className="grid gap-4">
-              <TextArea
+              <TextInput
   label="Story Title"
   field="title"
   form={form}
