@@ -544,10 +544,92 @@ LENGTH:
         { status: 500 }
       );
     }
+let generatedVoiceProfile = openingStoryState.voiceProfile;
 
- const storyState = {
+try {
+  const voiceResponse = await openai.responses.create({
+    model: "gpt-5.5",
+    reasoning: { effort: "low" },
+    text: { verbosity: "low" },
+    input: `
+Analyse the story details and Chapter 1 below.
+
+Create a permanent voice profile that will keep this novel stylistically distinct from other novels.
+
+The profile must reflect these specific characters and this specific story. Do not default to generic romance sarcasm, constant banter, interchangeable character voices or familiar AI phrasing.
+
+Return valid JSON only.
+
+Use exactly this structure:
+
+{
+  "primaryTone": "",
+  "humourStyle": "",
+  "narrativeStyle": "",
+  "sentenceRhythm": "",
+  "dialogueStyle": "",
+  "emotionalTexture": "",
+  "povVoiceRules": [],
+  "characterVoices": []
+}
+
+Rules:
+
+- Each string must be specific and practical.
+- povVoiceRules must contain concise rules for the narration.
+- characterVoices must contain one concise voice description for each major character.
+- Explain how each character speaks, thinks, notices the world and uses humour.
+- Characters must sound meaningfully different from one another.
+- Do not include markdown.
+- Do not include commentary outside the JSON.
+
+STORY TITLE:
+${title}
+
+STORY IDEA:
+${storyIdea || "No story idea provided."}
+
+CHARACTERS:
+${characters || "No character notes provided."}
+
+MUST AVOID:
+${mustAvoid || "Nothing specific provided."}
+
+CHAPTER 1:
+${chapter}
+`,
+    max_output_tokens: 2000,
+  });
+
+  const voiceText = (voiceResponse.output_text || "")
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  const parsedVoiceProfile = JSON.parse(voiceText);
+
+  generatedVoiceProfile = {
+    primaryTone: parsedVoiceProfile.primaryTone || "",
+    humourStyle: parsedVoiceProfile.humourStyle || "",
+    narrativeStyle: parsedVoiceProfile.narrativeStyle || "",
+    sentenceRhythm: parsedVoiceProfile.sentenceRhythm || "",
+    dialogueStyle: parsedVoiceProfile.dialogueStyle || "",
+    emotionalTexture: parsedVoiceProfile.emotionalTexture || "",
+    povVoiceRules: Array.isArray(parsedVoiceProfile.povVoiceRules)
+      ? parsedVoiceProfile.povVoiceRules
+      : [],
+    characterVoices: Array.isArray(parsedVoiceProfile.characterVoices)
+      ? parsedVoiceProfile.characterVoices
+      : [],
+  };
+} catch (voiceError) {
+  console.error("Voice profile generation failed:", voiceError);
+}
+const storyState = {
   ...openingStoryState,
   chapter: 1,
+  voiceProfile: generatedVoiceProfile,
   storyMemory: {
     ...openingStoryState.storyMemory,
     importantFacts: [
