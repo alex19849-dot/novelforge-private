@@ -27,10 +27,17 @@ export async function POST(req: Request) {
 };
 const voiceProfile = incomingState.voiceProfile || {
   primaryTone: "",
+  emotionalCadence: "",
   humourStyle: "",
+  humourMechanics: "",
   narrativeStyle: "",
+  narrativeDistance: "",
   sentenceRhythm: "",
   dialogueStyle: "",
+  descriptionStyle: "",
+  internalMonologueStyle: "",
+  conflictStyle: "",
+  romanticStyle: "",
   emotionalTexture: "",
   povVoiceRules: [],
   characterVoices: [],
