@@ -385,33 +385,65 @@ LENGTH:
 }
 
 const chapter = cleanOutput(response.output_text || "");
-    const memoryPrompt = `
-Update the story memory for this ongoing romance novel.
+  const memoryPrompt = `
+Analyse the newly generated chapter for this ongoing romance novel.
+
+Update:
+1. The continuity memory.
+2. The repetition report that should guide the next chapter.
 
 Return valid JSON only.
 Do not include markdown.
-Do not include notes.
+Do not include notes or commentary.
 
 Existing story memory:
 ${JSON.stringify(storyMemory, null, 2)}
 
+Previous repetition report:
+${JSON.stringify(repetitionReport, null, 2)}
+
 New chapter:
 ${chapter}
 
-Update the memory using this exact structure:
+Return exactly this structure:
+
 {
-  "importantFacts": [],
-  "characterDetails": [],
-  "relationshipHistory": [],
-  "unresolvedThreads": [],
-  "pastEvents": [],
-  "rules": []
+  "storyMemory": {
+    "importantFacts": [],
+    "characterDetails": [],
+    "relationshipHistory": [],
+    "unresolvedThreads": [],
+    "pastEvents": [],
+    "rules": []
+  },
+  "repetitionReport": {
+    "overusedWords": [],
+    "repeatedPhrases": [],
+    "repeatedReactions": [],
+    "repeatedHumourPatterns": [],
+    "repeatedSentencePatterns": [],
+    "guidance": []
+  }
 }
 
-Only include important details needed for future continuity.
-Do not summarise the whole chapter.
-Do not include temporary emotions unless they will affect future chapters.
-Preserve existing important memory unless it is clearly outdated.
+STORY MEMORY RULES:
+
+- Preserve important existing memory unless it is clearly outdated.
+- Add only details needed for future continuity.
+- Record established facts, character details, relationship developments, unresolved threads, past events and permanent rules.
+- Do not summarise the entire chapter.
+- Do not include temporary emotions unless they will affect future chapters.
+
+REPETITION RULES:
+
+- Analyse the new chapter together with the previous report.
+- Keep patterns that are still becoming noticeable.
+- Remove old warnings that are no longer relevant.
+- Identify overused words, repeated dialogue, body language, emotional reactions, humour styles and sentence habits.
+- Ignore necessary names, pronouns and ordinary connecting language.
+- Only flag repetition that genuinely weakens the prose.
+- Guidance must contain concise, practical instructions for keeping the next chapter fresh.
+- Do not create a rigid blacklist of normal language.
 `;
 let updatedMemory = storyMemory;
 
