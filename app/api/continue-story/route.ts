@@ -40,10 +40,10 @@ const manualMemory = chapterGuidance.trim()
   : "";
 
 
-let updatedStoryState = {
-  ...incomingState,
-  chapter: nextChapterNumber,
-  storyMemory,
+updatedStoryState = {
+  ...updatedStoryState,
+  storyMemory: updatedMemory,
+  repetitionReport: updatedRepetitionReport,
 };
 const chapterLabel = `Chapter ${nextChapterNumber}`;
 const repetitionReport = incomingState.repetitionReport || {
