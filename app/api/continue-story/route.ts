@@ -129,11 +129,33 @@ ${voiceProfile.dialogueStyle || "Not yet defined"}
 Emotional Texture:
 ${voiceProfile.emotionalTexture || "Not yet defined"}
 
+Emotional Cadence:
+${voiceProfile.emotionalCadence || "Not yet defined"}
+
+Humour Mechanics:
+${voiceProfile.humourMechanics || "Not yet defined"}
+
+Narrative Distance:
+${voiceProfile.narrativeDistance || "Not yet defined"}
+
+Description Style:
+${voiceProfile.descriptionStyle || "Not yet defined"}
+
+Internal Monologue Style:
+${voiceProfile.internalMonologueStyle || "Not yet defined"}
+
+Conflict Style:
+${voiceProfile.conflictStyle || "Not yet defined"}
+
+Romantic Style:
+${voiceProfile.romanticStyle || "Not yet defined"}
+
 POV Voice Rules:
 ${voiceProfile.povVoiceRules.join("\n- ") || "None"}
 
 Character Voices:
 ${voiceProfile.characterVoices.join("\n- ") || "None"}
+
 
 Treat this voice profile as a permanent stylistic constraint for the novel.
 
