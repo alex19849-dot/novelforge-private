@@ -96,7 +96,7 @@ CHAPTER GUIDANCE:
 ${chapterGuidance || "None provided."}
 
 CURRENT STORY STATE:
-${JSON.stringify(updatedStoryState, null, 2)}
+${JSON.stringify(incomingState, null, 2)}
 
 PERMANENT STORY VOICE PROFILE:
 
