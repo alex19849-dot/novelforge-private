@@ -945,7 +945,14 @@ function previousPage() {
                 placeholder="Paste character details, side characters, family, appearances, ages, dynamics, secrets and anything important."
                 tall
               />
-
+<TextArea
+  label="Supporting Characters"
+  field="sideCharacterNotes"
+  form={form}
+  updateField={updateField}
+  placeholder="Friends, family, teammates, work colleagues, pets, antagonists, mentors and anyone who isn't a main POV character."
+  tall
+/>
               <TextArea
                 label="Must Avoid"
                 field="mustNotHave"
