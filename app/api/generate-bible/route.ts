@@ -181,9 +181,15 @@ Allow this novel to develop its own identity through its characters, setting, em
 The writing should feel professionally edited, emotionally authentic and immersive, while remaining unique to this story.
 Write Chapter 1 of a commercial adult romance novel.
 
-Do not write with a target word count, chapter count or novel length in mind.
+Target approximately ${body.targetChapterWords || "4000"} words.
 
-Write only what naturally belongs in this chapter.
+Treat this as a firm chapter target, not an invitation to keep expanding.
+
+Complete the chapter within the available length.
+
+Do not exceed the target by more than 10%.
+
+Prioritise a complete beginning, middle and ending over extra description, backstory or internal reflection.
 
 Future chapters will continue the story until the user decides it has reached its conclusion.
 
