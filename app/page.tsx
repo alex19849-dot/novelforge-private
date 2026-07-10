@@ -95,7 +95,7 @@ export default function Home() {
     : readerTheme === "light"
     ? "bg-[#fffaf0] text-[#111111]"
     : "bg-[#f4ecd8] text-[#111111]";
-  const preparedForm = useMemo(() => {
+  const preparedForm = useMemo<StoryForm>(() => {
     return {
       ...defaultForm,
       ...form,
