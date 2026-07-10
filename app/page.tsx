@@ -98,14 +98,11 @@ export default function Home() {
     ? "bg-[#fffaf0] text-[#111111]"
     : "bg-[#f4ecd8] text-[#111111]";
   const preparedForm = useMemo<StoryForm>(() => {
-    return {
-      ...defaultForm,
-      ...form,
-      locale: "British English",
-      regionVoice: "London / South East",
-      setting: "London",
-    };
-  }, [form]);
+  return {
+    ...defaultForm,
+    ...form,
+  };
+}, [form]);
 
   useEffect(() => {
     async function initAuth() {
