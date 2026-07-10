@@ -553,7 +553,8 @@ LENGTH:
       );
     }
 let generatedVoiceProfile = openingStoryState.voiceProfile;
-
+let generatedRepetitionReport = openingStoryState.repetitionReport;
+let generatedStoryMemory = openingStoryState.storyMemory;
 try {
   const voiceResponse = await openai.responses.create({
     model: "gpt-5.5",
