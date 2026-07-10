@@ -1409,3 +1409,30 @@ function SelectField({
     </label>
   );
 }
+function TextInput({
+  label,
+  field,
+  form,
+  updateField,
+  placeholder = "",
+}: {
+  label: string;
+  field: string;
+  form: StoryForm;
+  updateField: (field: string, value: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="grid gap-2">
+      <span className="text-sm font-bold">{label}</span>
+
+      <input
+        type="text"
+        value={form[field] || ""}
+        onChange={(event) => updateField(field, event.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] px-4 py-3 text-black outline-none"
+      />
+    </label>
+  );
+}
