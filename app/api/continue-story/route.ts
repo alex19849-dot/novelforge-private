@@ -46,7 +46,14 @@ let updatedStoryState = {
   storyMemory,
 };
 const chapterLabel = `Chapter ${nextChapterNumber}`;
-
+let repetitionReport = {
+  overusedWords: [] as string[],
+  repeatedPhrases: [] as string[],
+  repeatedReactions: [] as string[],
+  repeatedHumourPatterns: [] as string[],
+  repeatedSentencePatterns: [] as string[],
+  guidance: [] as string[],
+};
   const prompt = `
 You are NovelForge.
 
