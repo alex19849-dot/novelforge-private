@@ -354,13 +354,16 @@ Preferred terms: ${(storyState.locationTerms || []).join(", ")}.
 Forbidden terms: ${(storyState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
-- Preserve the approximate size and shape of the original chapter unless the user asks otherwise.
-- Prioritise a complete chapter over a longer chapter.
-- Do not cut off mid-scene.
-- Do not stop during dialogue.
-- Do not stop during a confrontation.
-- Finish the final scene fully.
-- End with a proper chapter ending: an emotional beat, decision, reveal, complication, romantic turn or hook.
+
+- Target chapter length: ${body.targetChapterWords || "4000"} words.
+- This is a firm target, not a suggestion.
+- Never intentionally exceed the target by more than 10%.
+- End at the nearest natural emotional or narrative stopping point.
+- If a scene cannot be completed naturally within the limit, end the chapter cleanly and continue it in the next chapter.
+- Do not artificially pad chapters.
+- Do not rush scenes to reach the target.
+- Every chapter must still feel complete and satisfying.
+`;
 
 FINAL OUTPUT:
 Return only the rewritten chapter.
