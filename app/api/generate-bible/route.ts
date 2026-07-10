@@ -118,6 +118,16 @@ export async function POST(req: Request) {
   regionalLanguage: regional.regionalLanguage,
   locationTerms: regional.locationTerms,
   forbiddenTerms: regional.forbiddenTerms,
+     voiceProfile: {
+    primaryTone: "",
+    humourStyle: "",
+    narrativeStyle: "",
+    sentenceRhythm: "",
+    dialogueStyle: "",
+    emotionalTexture: "",
+    povVoiceRules: [],
+    characterVoices: [],
+  },
   storyMemory: {
     importantFacts: [],
     characterDetails: [],
