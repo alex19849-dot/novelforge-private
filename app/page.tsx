@@ -927,20 +927,13 @@ function previousPage() {
       ]}
     />
 
-    <SelectField
-      label="Chapter Length"
-      field="targetChapterWords"
-      form={form}
-      updateField={updateField}
-      options={[
-        "2500",
-        "3000",
-        "3500",
-        "4000",
-        "4500",
-        "5000",
-      ]}
-    />
+    <TextArea
+  label="Must Include"
+  field="mustHave"
+  form={form}
+  updateField={updateField}
+  placeholder="Anything the story must include, themes, scenes, character traits, twists, relationships, jobs, locations, running jokes..."
+/>
   </div>
 </div>
               <TextArea
