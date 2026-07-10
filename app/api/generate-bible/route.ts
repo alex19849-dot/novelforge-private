@@ -102,8 +102,11 @@ export async function POST(req: Request) {
 
   const title = body.title || "Untitled";
   const storyIdea = body.plot || "";
-  const characters = body.characterNotes || "";
-  const mustAvoid = body.mustNotHave || "";
+const storyOutline = body.storyOutline || "";
+const characters = body.characterNotes || "";
+const supportingCharacters = body.sideCharacterNotes || "";
+const mustInclude = body.mustHave || "";
+const mustAvoid = body.mustNotHave || "";
 
   const fullInput = `${storyIdea}\n\n${characters}\n\n${mustAvoid}`;
   const regional = detectLocale(fullInput);
