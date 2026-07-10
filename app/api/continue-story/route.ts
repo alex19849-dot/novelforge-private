@@ -205,7 +205,33 @@ Do not drift back into generic romance prose, interchangeable banter, repetitive
 
 Preserve the differences between each character's speech, internal voice, humour and way of noticing the world.
 
-STORY MEMORY (CANON FACTS):
+RECENT REPETITION ANALYSIS:
+
+Overused Words:
+${repetitionReport.overusedWords.join("\n- ") || "None"}
+
+Repeated Phrases:
+${repetitionReport.repeatedPhrases.join("\n- ") || "None"}
+
+Repeated Reactions:
+${repetitionReport.repeatedReactions.join("\n- ") || "None"}
+
+Repeated Humour Patterns:
+${repetitionReport.repeatedHumourPatterns.join("\n- ") || "None"}
+
+Repeated Sentence Patterns:
+${repetitionReport.repeatedSentencePatterns.join("\n- ") || "None"}
+
+Freshness Guidance:
+${repetitionReport.guidance.join("\n- ") || "None"}
+
+Use this report as guidance, not as a rigid blacklist.
+
+Avoid repeating noticeable habits from recent chapters unless the wording is genuinely necessary for continuity, character voice or clarity.
+
+Do not replace one repeated cliché with another equally generic cliché.
+
+Create fresh phrasing, reactions, humour and sentence movement that still fit the permanent voice profile.
 
 STORY MEMORY (CANON FACTS):
 
