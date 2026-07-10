@@ -42,6 +42,7 @@ const defaultForm: StoryForm = {
   setting: "London",
   authorFlavour: "Spicy commercial romance",
   voiceStyle: "Commercial romance",
+  humourStyle: "Mixed character-specific humour",
   dialogueStyle: "Natural / grounded",
   proseDensity: "Lean",
   chapterOpener: "Character-driven",
