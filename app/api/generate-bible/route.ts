@@ -811,20 +811,28 @@ ${chapter}
   const parsedStoryMemory = parsedAnalysis.storyMemory || {};
   const parsedRepetitionReport = parsedAnalysis.repetitionReport || {};
 
-  generatedVoiceProfile = {
-    primaryTone: parsedVoiceProfile.primaryTone || "",
-    humourStyle: parsedVoiceProfile.humourStyle || "",
-    narrativeStyle: parsedVoiceProfile.narrativeStyle || "",
-    sentenceRhythm: parsedVoiceProfile.sentenceRhythm || "",
-    dialogueStyle: parsedVoiceProfile.dialogueStyle || "",
-    emotionalTexture: parsedVoiceProfile.emotionalTexture || "",
-    povVoiceRules: Array.isArray(parsedVoiceProfile.povVoiceRules)
-      ? parsedVoiceProfile.povVoiceRules
-      : [],
-    characterVoices: Array.isArray(parsedVoiceProfile.characterVoices)
-      ? parsedVoiceProfile.characterVoices
-      : [],
-  };
+generatedVoiceProfile = {
+  primaryTone: parsedVoiceProfile.primaryTone || "",
+  emotionalCadence: parsedVoiceProfile.emotionalCadence || "",
+  humourStyle: parsedVoiceProfile.humourStyle || "",
+  humourMechanics: parsedVoiceProfile.humourMechanics || "",
+  narrativeStyle: parsedVoiceProfile.narrativeStyle || "",
+  narrativeDistance: parsedVoiceProfile.narrativeDistance || "",
+  sentenceRhythm: parsedVoiceProfile.sentenceRhythm || "",
+  dialogueStyle: parsedVoiceProfile.dialogueStyle || "",
+  descriptionStyle: parsedVoiceProfile.descriptionStyle || "",
+  internalMonologueStyle:
+    parsedVoiceProfile.internalMonologueStyle || "",
+  conflictStyle: parsedVoiceProfile.conflictStyle || "",
+  romanticStyle: parsedVoiceProfile.romanticStyle || "",
+  emotionalTexture: parsedVoiceProfile.emotionalTexture || "",
+  povVoiceRules: Array.isArray(parsedVoiceProfile.povVoiceRules)
+    ? parsedVoiceProfile.povVoiceRules
+    : [],
+  characterVoices: Array.isArray(parsedVoiceProfile.characterVoices)
+    ? parsedVoiceProfile.characterVoices
+    : [],
+};
 
   generatedStoryMemory = {
     importantFacts: Array.isArray(parsedStoryMemory.importantFacts)
