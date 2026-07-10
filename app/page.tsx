@@ -832,6 +832,14 @@ function previousPage() {
                 placeholder="Paste the full story idea here."
                 tall
               />
+              <TextArea
+  label="Story Outline"
+  field="storyOutline"
+  form={form}
+  updateField={updateField}
+  placeholder="Add the main plot beats, major turning points, relationship progression, conflicts, reveals and ending direction."
+  tall
+/>
 <div className="grid gap-4 rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] p-4">
   <div>
     <h3 className="text-lg font-black">Story Settings</h3>
