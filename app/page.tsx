@@ -954,6 +954,101 @@ function previousPage() {
 />
   </div>
 </div>
+              <div className="grid gap-4 rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] p-4">
+  <div>
+    <h3 className="text-lg font-black">Voice & Style</h3>
+    <p className="mt-1 text-sm text-black/60">
+      Controls how this specific story should sound.
+    </p>
+  </div>
+
+  <div className="grid gap-4 sm:grid-cols-2">
+    <SelectField
+      label="Overall Voice"
+      field="voiceStyle"
+      form={form}
+      updateField={updateField}
+      options={[
+        "Commercial romance",
+        "Raw and gritty",
+        "Warm and emotional",
+        "Dark and intense",
+        "Light and playful",
+        "Quiet and intimate",
+        "Fast and punchy",
+      ]}
+    />
+
+    <SelectField
+      label="Humour Style"
+      field="humourStyle"
+      form={form}
+      updateField={updateField}
+      options={[
+        "Minimal humour",
+        "Dry observational humour",
+        "Deadpan humour",
+        "Self-deprecating humour",
+        "Situational humour",
+        "Playful humour",
+        "Dark humour",
+        "Mixed character-specific humour",
+      ]}
+    />
+
+    <SelectField
+      label="Dialogue Style"
+      field="dialogueStyle"
+      form={form}
+      updateField={updateField}
+      options={[
+        "Natural / grounded",
+        "Short and direct",
+        "Fast and conversational",
+        "Emotionally restrained",
+        "Open and vulnerable",
+        "Sharp but not constant banter",
+      ]}
+    />
+
+    <SelectField
+      label="Prose Style"
+      field="proseDensity"
+      form={form}
+      updateField={updateField}
+      options={[
+        "Lean",
+        "Balanced",
+        "Rich but controlled",
+        "Atmospheric",
+        "Highly introspective",
+      ]}
+    />
+
+    <SelectField
+      label="Chapter Opening Style"
+      field="chapterOpener"
+      form={form}
+      updateField={updateField}
+      options={[
+        "Character-driven",
+        "Dialogue-first",
+        "Action-first",
+        "Emotional tension",
+        "Immediate conflict",
+        "Quiet atmospheric opening",
+      ]}
+    />
+  </div>
+
+  <TextArea
+    label="Style Notes"
+    field="avoidStyle"
+    form={form}
+    updateField={updateField}
+    placeholder="Describe the tone, humour, prose habits and AI-style phrases this particular story should avoid."
+  />
+</div>
               <TextArea
                 label="Characters"
                 field="characterNotes"
