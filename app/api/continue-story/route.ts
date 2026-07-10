@@ -25,7 +25,16 @@ export async function POST(req: Request) {
   pastEvents: [],
   rules: [],
 };
-
+const voiceProfile = incomingState.voiceProfile || {
+  primaryTone: "",
+  humourStyle: "",
+  narrativeStyle: "",
+  sentenceRhythm: "",
+  dialogueStyle: "",
+  emotionalTexture: "",
+  povVoiceRules: [],
+  characterVoices: [],
+};
 const manualMemory = chapterGuidance.trim()
   ? `\nUSER CHAPTER GUIDANCE:\n${chapterGuidance.trim()}`
   : "";
