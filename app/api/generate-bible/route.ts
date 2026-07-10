@@ -100,6 +100,7 @@ function detectHeat(text: string) {
 export async function POST(req: Request) {
   const body = await req.json();
 
+  const title = body.title || "Untitled";
   const storyIdea = body.plot || "";
   const characters = body.characterNotes || "";
   const mustAvoid = body.mustNotHave || "";
@@ -153,6 +154,12 @@ Chapter 1
 POV_NAME
 
 Replace POV_NAME with the correct point-of-view character name in uppercase.
+
+The chapter must begin exactly with:
+
+
+STORY TITLE:
+${title || "Untitled"}
 
 STORY IDEA:
 ${storyIdea || "No story idea provided."}
