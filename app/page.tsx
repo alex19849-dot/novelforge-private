@@ -388,7 +388,37 @@ async function exportDocx() {
     if (activeStoryId === id) createNewStory();
     await loadStories();
   }
+async function saveStoryBibleChanges() {
+  if (!user) {
+    setAuthMessage("Log in first so the story can save across devices.");
+    return;
+  }
 
+  try {
+    await saveCurrentStory({
+      form: preparedForm,
+      chapters,
+      activeChapterIndex,
+      chapterGuidance,
+      storyState: {
+        ...storyState,
+        title: preparedForm.title,
+      },
+    });
+
+    setStoryState((current) => ({
+      ...current,
+      title: preparedForm.title,
+    }));
+
+    setCopyMessage("Story Bible changes saved.");
+  } catch (error) {
+    console.error("Save Story Bible error:", error);
+    setCopyMessage(
+      error instanceof Error ? error.message : "Could not save Story Bible changes."
+    );
+  }
+}
   async function generateStory() {
     if (!user) {
       setAuthMessage("Log in first so the story can save across devices.");
