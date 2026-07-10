@@ -723,9 +723,11 @@ const storyState = {
   ...openingStoryState,
   chapter: 1,
   voiceProfile: generatedVoiceProfile,
+  repetitionReport: generatedRepetitionReport,
   storyMemory: {
-    ...openingStoryState.storyMemory,
+    ...generatedStoryMemory,
     importantFacts: [
+      ...generatedStoryMemory.importantFacts,
       "Chapter 1 has been written. Use the actual chapter text and user-provided story details as the source of truth for future continuity.",
     ],
   },
