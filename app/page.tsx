@@ -1067,6 +1067,13 @@ function previousPage() {
   tall
 />
               <TextArea
+  label="Must Include"
+  field="mustHave"
+  form={form}
+  updateField={updateField}
+  placeholder="Add anything the story must contain, important scenes, themes, representation, relationship beats, recurring characters, locations, running jokes or specific emotional moments."
+/>
+              <TextArea
                 label="Must Avoid"
                 field="mustNotHave"
                 form={form}
