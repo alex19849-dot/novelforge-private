@@ -817,7 +817,13 @@ function previousPage() {
                 updateField={updateField}
                 placeholder="Paste anything the story must avoid."
               />
-
+              <button
+  onClick={saveStoryBibleChanges}
+  disabled={loading || !user}
+  className="primary-button"
+>
+  Save Changes
+</button>
               <button onClick={generateStory} disabled={loading} className="primary-button">
                 {loading ? "Generating..." : "Generate Story"}
               </button>
