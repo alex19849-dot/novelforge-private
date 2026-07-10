@@ -945,14 +945,6 @@ function previousPage() {
         "Bittersweet ending",
       ]}
     />
-
-    <TextArea
-  label="Must Include"
-  field="mustHave"
-  form={form}
-  updateField={updateField}
-  placeholder="Anything the story must include, themes, scenes, character traits, twists, relationships, jobs, locations, running jokes..."
-/>
   </div>
 </div>
               <div className="grid gap-4 rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] p-4">
