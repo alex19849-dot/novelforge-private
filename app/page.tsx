@@ -837,7 +837,31 @@ function previousPage() {
       These settings shape the story from the beginning.
     </p>
   </div>
+<div className="grid gap-4 sm:grid-cols-2">
+  <TextInput
+    label="Subgenre"
+    field="subgenre"
+    form={form}
+    updateField={updateField}
+    placeholder="Sports romance, paranormal, workplace..."
+  />
 
+  <TextInput
+    label="Subgenre Detail"
+    field="subgenreDetail"
+    form={form}
+    updateField={updateField}
+    placeholder="College hockey, vampire small town, office romance..."
+  />
+
+  <TextInput
+    label="Story Location"
+    field="storyLocation"
+    form={form}
+    updateField={updateField}
+    placeholder="Manchester, UK"
+  />
+</div>
   <div className="grid gap-4 sm:grid-cols-2">
     <SelectField
       label="Relationship"
