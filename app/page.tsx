@@ -1366,3 +1366,34 @@ function TextArea({
     </label>
   );
 }
+function SelectField({
+  label,
+  field,
+  form,
+  updateField,
+  options,
+}: {
+  label: string;
+  field: string;
+  form: StoryForm;
+  updateField: (field: string, value: string) => void;
+  options: string[];
+}) {
+  return (
+    <label className="grid gap-2">
+      <span className="text-sm font-bold">{label}</span>
+
+      <select
+        value={form[field] || ""}
+        onChange={(event) => updateField(field, event.target.value)}
+        className="w-full rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] px-4 py-3 text-black outline-none"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
