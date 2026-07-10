@@ -515,9 +515,10 @@ updatedRepetitionReport = {
 } catch (memoryError) {
   console.error("STORY MEMORY UPDATE ERROR:", memoryError);
 }
-    updatedStoryState = {
+   updatedStoryState = {
   ...updatedStoryState,
   storyMemory: updatedMemory,
+  repetitionReport: updatedRepetitionReport,
 };
 if (!chapter.trim()) {
   return Response.json(
