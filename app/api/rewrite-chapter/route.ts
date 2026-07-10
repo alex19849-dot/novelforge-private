@@ -15,7 +15,75 @@ export async function POST(req: Request) {
   const instruction = body.instruction || "";
   const form = body.form || {};
   const storyState = body.storyState || {};
+const storyMemory = storyState.storyMemory || {
+  importantFacts: [],
+  characterDetails: [],
+  relationshipHistory: [],
+  unresolvedThreads: [],
+  pastEvents: [],
+  rules: [],
+};
 
+const voiceProfile = storyState.voiceProfile || {
+  primaryTone: "",
+  humourStyle: "",
+  narrativeStyle: "",
+  sentenceRhythm: "",
+  dialogueStyle: "",
+  emotionalTexture: "",
+  povVoiceRules: [],
+  characterVoices: [],
+};
+  let repetitionReport = {
+  overusedWords: [] as string[],
+  repeatedPhrases: [] as string[],
+  repeatedReactions: [] as string[],
+  repeatedHumourPatterns: [] as string[],
+  repeatedSentencePatterns: [] as string[],
+  guidance: [] as string[],
+};
+try {
+  const repetitionResponse = await openai.responses.create({
+    model: "gpt-5.5",
+    reasoning: { effort: "low" },
+    text: { verbosity: "low" },
+    input: `
+Analyse this chapter for repetitive writing habits.
+
+Return valid JSON only.
+
+Use exactly this structure:
+
+{
+  "overusedWords": [],
+  "repeatedPhrases": [],
+  "repeatedReactions": [],
+  "repeatedHumourPatterns": [],
+  "repeatedSentencePatterns": [],
+  "guidance": []
+}
+
+Only identify repetition that genuinely hurts the quality of the writing.
+
+Ignore necessary names, pronouns and normal language.
+
+Chapter:
+
+${chapter}
+`,
+    max_output_tokens: 1800,
+  });
+
+  const repetitionText = (repetitionResponse.output_text || "")
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  repetitionReport = JSON.parse(repetitionText);
+} catch (error) {
+  console.error("Rewrite repetition analysis failed:", error);
+}
   const prompt = `
 You are NovelForge.
 
