@@ -389,11 +389,12 @@ Preferred terms: ${(incomingState.locationTerms || []).join(", ")}.
 Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
-- Target chapter length: ${form.targetChapterWords} words.
-- This is a hard target, not a suggestion.
+
+- Target chapter length: ${body.targetChapterWords || "4000"} words.
+- This is a firm target, not a suggestion.
 - Never intentionally exceed the target by more than 10%.
-- If the chapter approaches the target length, end at the nearest natural emotional or narrative stopping point.
-- If a scene cannot be completed naturally within the limit, end the chapter cleanly and continue the scene in the next chapter.
+- End at the nearest natural emotional or narrative stopping point.
+- If a scene cannot be completed naturally within the limit, end the chapter cleanly and continue it in the next chapter.
 - Do not artificially pad chapters.
 - Do not rush scenes to reach the target.
 - Every chapter must still feel complete and satisfying.
