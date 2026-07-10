@@ -446,6 +446,7 @@ REPETITION RULES:
 - Do not create a rigid blacklist of normal language.
 `;
 let updatedMemory = storyMemory;
+let updatedRepetitionReport = repetitionReport;
 
 try {
   const memoryResponse = await openai.responses.create({
@@ -456,17 +457,58 @@ try {
     max_output_tokens: 2500,
   });
 
-  const memoryText = memoryResponse.output_text || "";
-  const parsedMemory = JSON.parse(memoryText);
+  const memoryText = (memoryResponse.output_text || "")
+  .replace(/^```json\s*/i, "")
+  .replace(/^```\s*/i, "")
+  .replace(/\s*```$/i, "")
+  .trim();
 
-  updatedMemory = {
-    importantFacts: Array.isArray(parsedMemory.importantFacts) ? parsedMemory.importantFacts : storyMemory.importantFacts,
-    characterDetails: Array.isArray(parsedMemory.characterDetails) ? parsedMemory.characterDetails : storyMemory.characterDetails,
-    relationshipHistory: Array.isArray(parsedMemory.relationshipHistory) ? parsedMemory.relationshipHistory : storyMemory.relationshipHistory,
-    unresolvedThreads: Array.isArray(parsedMemory.unresolvedThreads) ? parsedMemory.unresolvedThreads : storyMemory.unresolvedThreads,
-    pastEvents: Array.isArray(parsedMemory.pastEvents) ? parsedMemory.pastEvents : storyMemory.pastEvents,
-    rules: Array.isArray(parsedMemory.rules) ? parsedMemory.rules : storyMemory.rules,
-  };
+const parsedAnalysis = JSON.parse(memoryText);
+
+const parsedMemory = parsedAnalysis.storyMemory || {};
+const parsedRepetition = parsedAnalysis.repetitionReport || {};
+
+updatedMemory = {
+  importantFacts: Array.isArray(parsedMemory.importantFacts)
+    ? parsedMemory.importantFacts
+    : storyMemory.importantFacts,
+  characterDetails: Array.isArray(parsedMemory.characterDetails)
+    ? parsedMemory.characterDetails
+    : storyMemory.characterDetails,
+  relationshipHistory: Array.isArray(parsedMemory.relationshipHistory)
+    ? parsedMemory.relationshipHistory
+    : storyMemory.relationshipHistory,
+  unresolvedThreads: Array.isArray(parsedMemory.unresolvedThreads)
+    ? parsedMemory.unresolvedThreads
+    : storyMemory.unresolvedThreads,
+  pastEvents: Array.isArray(parsedMemory.pastEvents)
+    ? parsedMemory.pastEvents
+    : storyMemory.pastEvents,
+  rules: Array.isArray(parsedMemory.rules)
+    ? parsedMemory.rules
+    : storyMemory.rules,
+};
+
+updatedRepetitionReport = {
+  overusedWords: Array.isArray(parsedRepetition.overusedWords)
+    ? parsedRepetition.overusedWords
+    : repetitionReport.overusedWords,
+  repeatedPhrases: Array.isArray(parsedRepetition.repeatedPhrases)
+    ? parsedRepetition.repeatedPhrases
+    : repetitionReport.repeatedPhrases,
+  repeatedReactions: Array.isArray(parsedRepetition.repeatedReactions)
+    ? parsedRepetition.repeatedReactions
+    : repetitionReport.repeatedReactions,
+  repeatedHumourPatterns: Array.isArray(parsedRepetition.repeatedHumourPatterns)
+    ? parsedRepetition.repeatedHumourPatterns
+    : repetitionReport.repeatedHumourPatterns,
+  repeatedSentencePatterns: Array.isArray(parsedRepetition.repeatedSentencePatterns)
+    ? parsedRepetition.repeatedSentencePatterns
+    : repetitionReport.repeatedSentencePatterns,
+  guidance: Array.isArray(parsedRepetition.guidance)
+    ? parsedRepetition.guidance
+    : repetitionReport.guidance,
+};
 } catch (memoryError) {
   console.error("STORY MEMORY UPDATE ERROR:", memoryError);
 }
