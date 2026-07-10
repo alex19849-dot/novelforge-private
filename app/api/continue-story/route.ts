@@ -39,12 +39,6 @@ const manualMemory = chapterGuidance.trim()
   ? `\nUSER CHAPTER GUIDANCE:\n${chapterGuidance.trim()}`
   : "";
 
-
-updatedStoryState = {
-  ...updatedStoryState,
-  storyMemory: updatedMemory,
-  repetitionReport: updatedRepetitionReport,
-};
 const chapterLabel = `Chapter ${nextChapterNumber}`;
 const repetitionReport = incomingState.repetitionReport || {
   overusedWords: [],
