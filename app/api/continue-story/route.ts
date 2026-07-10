@@ -390,7 +390,7 @@ Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
 
 LENGTH:
 
-- Target chapter length: ${body.targetChapterWords || "4000"} words.
+- Target chapter length: ${form.targetChapterWords || "4000"} words.
 - This is a firm target, not a suggestion.
 - Never intentionally exceed the target by more than 10%.
 - End at the nearest natural emotional or narrative stopping point.
