@@ -77,6 +77,72 @@ ${form.mustNotHave || "Nothing specific provided."}
 CURRENT STORY STATE:
 ${JSON.stringify(storyState, null, 2)}
 
+PERMANENT STORY VOICE PROFILE:
+
+Primary Tone:
+${voiceProfile.primaryTone || "Not yet defined"}
+
+Humour Style:
+${voiceProfile.humourStyle || "Not yet defined"}
+
+Narrative Style:
+${voiceProfile.narrativeStyle || "Not yet defined"}
+
+Sentence Rhythm:
+${voiceProfile.sentenceRhythm || "Not yet defined"}
+
+Dialogue Style:
+${voiceProfile.dialogueStyle || "Not yet defined"}
+
+Emotional Texture:
+${voiceProfile.emotionalTexture || "Not yet defined"}
+
+POV Voice Rules:
+${voiceProfile.povVoiceRules.join("\n- ") || "None"}
+
+Character Voices:
+${voiceProfile.characterVoices.join("\n- ") || "None"}
+
+RECENT REPETITION REPORT:
+
+Overused Words:
+${repetitionReport.overusedWords.join("\n- ") || "None"}
+
+Repeated Phrases:
+${repetitionReport.repeatedPhrases.join("\n- ") || "None"}
+
+Repeated Reactions:
+${repetitionReport.repeatedReactions.join("\n- ") || "None"}
+
+Repeated Humour Patterns:
+${repetitionReport.repeatedHumourPatterns.join("\n- ") || "None"}
+
+Repeated Sentence Patterns:
+${repetitionReport.repeatedSentencePatterns.join("\n- ") || "None"}
+
+Freshness Guidance:
+${repetitionReport.guidance.join("\n- ") || "None"}
+
+STORY MEMORY:
+
+Important Facts:
+${storyMemory.importantFacts.join("\n- ") || "None"}
+
+Character Details:
+${storyMemory.characterDetails.join("\n- ") || "None"}
+
+Relationship History:
+${storyMemory.relationshipHistory.join("\n- ") || "None"}
+
+Unresolved Threads:
+${storyMemory.unresolvedThreads.join("\n- ") || "None"}
+
+Past Events:
+${storyMemory.pastEvents.join("\n- ") || "None"}
+
+Story Rules:
+${storyMemory.rules.join("\n- ") || "None"}
+
 ORIGINAL CHAPTER:
 ${chapter || "No chapter text provided."}
 
