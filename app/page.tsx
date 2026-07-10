@@ -21,6 +21,7 @@ type SavedStory = {
 const defaultForm: StoryForm = {
   title: "",
   plot: "",
+  storyOutline: "",
   characterNotes: "",
   sideCharacterNotes: "",
   mustNotHave: "",
