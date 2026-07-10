@@ -68,8 +68,17 @@ ${instruction || "Improve the chapter while preserving the story direction."}
 STORY IDEA:
 ${form.plot || "No story idea provided."}
 
-CHARACTERS:
-${form.characterNotes || "No character notes provided."}
+STORY OUTLINE:
+${form.storyOutline || "No story outline provided."}
+
+MAIN CHARACTERS:
+${form.characterNotes || "No main character notes provided."}
+
+SUPPORTING CHARACTERS:
+${form.sideCharacterNotes || "No supporting character notes provided."}
+
+MUST INCLUDE:
+${form.mustHave || "Nothing specific provided."}
 
 MUST AVOID:
 ${form.mustNotHave || "Nothing specific provided."}
