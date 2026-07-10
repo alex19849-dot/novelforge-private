@@ -26,10 +26,17 @@ const storyMemory = storyState.storyMemory || {
 
 const voiceProfile = storyState.voiceProfile || {
   primaryTone: "",
+  emotionalCadence: "",
   humourStyle: "",
+  humourMechanics: "",
   narrativeStyle: "",
+  narrativeDistance: "",
   sentenceRhythm: "",
   dialogueStyle: "",
+  descriptionStyle: "",
+  internalMonologueStyle: "",
+  conflictStyle: "",
+  romanticStyle: "",
   emotionalTexture: "",
   povVoiceRules: [],
   characterVoices: [],
