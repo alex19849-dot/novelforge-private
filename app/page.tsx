@@ -831,81 +831,93 @@ function previousPage() {
                 tall
               />
 <div className="grid gap-4 rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] p-4">
-  <h3 className="text-lg font-black">Story Settings</h3>
+  <div>
+    <h3 className="text-lg font-black">Story Settings</h3>
+    <p className="mt-1 text-sm text-black/60">
+      These settings shape the story from the beginning.
+    </p>
+  </div>
 
   <div className="grid gap-4 sm:grid-cols-2">
-    <TextInput
-      label="Relationship Type"
+    <SelectField
+      label="Relationship"
       field="relationship"
       form={form}
       updateField={updateField}
-      placeholder="MM Romance"
+      options={[
+        "MM Romance",
+        "MF Romance",
+        "FF Romance",
+        "Poly Romance",
+      ]}
     />
 
-    <TextInput
-      label="Subgenre"
-      field="subgenre"
-      form={form}
-      updateField={updateField}
-      placeholder="Sports romance, paranormal, workplace..."
-    />
-
-    <TextInput
-      label="Subgenre Detail"
-      field="subgenreDetail"
-      form={form}
-      updateField={updateField}
-      placeholder="College hockey, vampire small town..."
-    />
-
-    <TextInput
-      label="Story Location"
-      field="storyLocation"
-      form={form}
-      updateField={updateField}
-      placeholder="Manchester, UK"
-    />
-
-    <TextInput
-      label="POV"
+    <SelectField
+      label="Point of View"
       field="pov"
       form={form}
       updateField={updateField}
-      placeholder="First person, dual POV"
+      options={[
+        "First person, dual POV",
+        "First person, single POV",
+        "Third person, dual POV",
+        "Third person, single POV",
+      ]}
     />
 
-    <TextInput
+    <SelectField
       label="Heat Level"
       field="heat"
       form={form}
       updateField={updateField}
-      placeholder="Explicit adult"
+      options={[
+        "Explicit adult",
+        "High spice",
+        "Open door",
+        "Moderate spice",
+        "Fade to black",
+      ]}
     />
 
-    <TextInput
+    <SelectField
       label="Burn Pacing"
       field="burnPacing"
       form={form}
       updateField={updateField}
-      placeholder="Fast burn"
+      options={[
+        "Fast burn",
+        "Medium burn",
+        "Slow burn",
+      ]}
     />
 
-    <TextInput
+    <SelectField
       label="Ending"
       field="ending"
       form={form}
       updateField={updateField}
-      placeholder="Happy ending"
+      options={[
+        "Happy ending",
+        "Happy for now",
+        "Bittersweet ending",
+      ]}
+    />
+
+    <SelectField
+      label="Chapter Length"
+      field="targetChapterWords"
+      form={form}
+      updateField={updateField}
+      options={[
+        "2500",
+        "3000",
+        "3500",
+        "4000",
+        "4500",
+        "5000",
+      ]}
     />
   </div>
-
-  <TextArea
-    label="Tropes"
-    field="tropes"
-    form={form}
-    updateField={updateField}
-    placeholder="Best friend's dad, forbidden romance, forced proximity..."
-  />
 </div>
               <TextArea
                 label="Characters"
