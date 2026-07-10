@@ -198,12 +198,20 @@ ${title || "Untitled"}
 STORY IDEA:
 ${storyIdea || "No story idea provided."}
 
-CHARACTERS:
-${characters || "No character notes provided."}
+STORY OUTLINE:
+${storyOutline || "No story outline provided."}
+
+MAIN CHARACTERS:
+${characters || "No main character notes provided."}
+
+SUPPORTING CHARACTERS:
+${supportingCharacters || "No supporting character notes provided."}
+
+MUST INCLUDE:
+${mustInclude || "Nothing specific provided."}
 
 MUST AVOID:
 ${mustAvoid || "Nothing specific provided."}
-
 
 STYLE RULES
 
