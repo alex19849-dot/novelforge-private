@@ -146,6 +146,7 @@ ${mustAvoid}
   internalMonologueStyle: "",
   conflictStyle: "",
   romanticStyle: "",
+  emotionalTexture: "",
   povVoiceRules: [],
   characterVoices: [],
 },
