@@ -786,6 +786,13 @@ function previousPage() {
 
             <div className="grid gap-4">
               <TextArea
+  label="Story Title"
+  field="title"
+  form={form}
+  updateField={updateField}
+  placeholder="Enter the story title."
+/>
+              <TextArea
                 label="Story Idea"
                 field="plot"
                 form={form}
