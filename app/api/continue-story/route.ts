@@ -46,92 +46,14 @@ let updatedStoryState = {
   storyMemory,
 };
 const chapterLabel = `Chapter ${nextChapterNumber}`;
-let repetitionReport = {
-  overusedWords: [] as string[],
-  repeatedPhrases: [] as string[],
-  repeatedReactions: [] as string[],
-  repeatedHumourPatterns: [] as string[],
-  repeatedSentencePatterns: [] as string[],
-  guidance: [] as string[],
+const repetitionReport = incomingState.repetitionReport || {
+  overusedWords: [],
+  repeatedPhrases: [],
+  repeatedReactions: [],
+  repeatedHumourPatterns: [],
+  repeatedSentencePatterns: [],
+  guidance: [],
 };
-
-  try {
-  const repetitionResponse = await openai.responses.create({
-    model: "gpt-5.5",
-    reasoning: { effort: "low" },
-    text: { verbosity: "low" },
-    input: `
-Analyse the chapter text below for repeated writing habits.
-
-Return valid JSON only.
-Do not include markdown.
-Do not include commentary.
-
-Use exactly this structure:
-
-{
-  "overusedWords": [],
-  "repeatedPhrases": [],
-  "repeatedReactions": [],
-  "repeatedHumourPatterns": [],
-  "repeatedSentencePatterns": [],
-  "guidance": []
-}
-
-Rules:
-
-- Identify words used unusually often.
-- Identify repeated phrases or dialogue patterns.
-- Identify repeated body language and emotional reactions.
-- Identify repeated humour styles, especially sarcasm, teasing or identical banter.
-- Identify repeated sentence openings, sentence rhythms or paragraph structures.
-- Ignore necessary names, pronouns, articles and common connecting words.
-- Do not ban normal language merely because it appears twice.
-- Only flag patterns that are noticeable enough to make the prose feel repetitive.
-- Guidance must contain practical instructions for making the next chapter feel fresher.
-- Keep every entry concise.
-
-CHAPTER TEXT:
-${previousChapter || "No previous chapter text provided."}
-`,
-    max_output_tokens: 1800,
-  });
-
-  const repetitionText = (repetitionResponse.output_text || "")
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-
-  const parsedRepetition = JSON.parse(repetitionText);
-
-  repetitionReport = {
-    overusedWords: Array.isArray(parsedRepetition.overusedWords)
-      ? parsedRepetition.overusedWords
-      : [],
-    repeatedPhrases: Array.isArray(parsedRepetition.repeatedPhrases)
-      ? parsedRepetition.repeatedPhrases
-      : [],
-    repeatedReactions: Array.isArray(parsedRepetition.repeatedReactions)
-      ? parsedRepetition.repeatedReactions
-      : [],
-    repeatedHumourPatterns: Array.isArray(
-      parsedRepetition.repeatedHumourPatterns
-    )
-      ? parsedRepetition.repeatedHumourPatterns
-      : [],
-    repeatedSentencePatterns: Array.isArray(
-      parsedRepetition.repeatedSentencePatterns
-    )
-      ? parsedRepetition.repeatedSentencePatterns
-      : [],
-    guidance: Array.isArray(parsedRepetition.guidance)
-      ? parsedRepetition.guidance
-      : [],
-  };
-} catch (repetitionError) {
-  console.error("REPETITION ANALYSIS ERROR:", repetitionError);
-}
   const prompt = `
 You are NovelForge.
 
