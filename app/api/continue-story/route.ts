@@ -88,6 +88,40 @@ ${chapterGuidance || "None provided."}
 CURRENT STORY STATE:
 ${JSON.stringify(updatedStoryState, null, 2)}
 
+PERMANENT STORY VOICE PROFILE:
+
+Primary Tone:
+${voiceProfile.primaryTone || "Not yet defined"}
+
+Humour Style:
+${voiceProfile.humourStyle || "Not yet defined"}
+
+Narrative Style:
+${voiceProfile.narrativeStyle || "Not yet defined"}
+
+Sentence Rhythm:
+${voiceProfile.sentenceRhythm || "Not yet defined"}
+
+Dialogue Style:
+${voiceProfile.dialogueStyle || "Not yet defined"}
+
+Emotional Texture:
+${voiceProfile.emotionalTexture || "Not yet defined"}
+
+POV Voice Rules:
+${voiceProfile.povVoiceRules.join("\n- ") || "None"}
+
+Character Voices:
+${voiceProfile.characterVoices.join("\n- ") || "None"}
+
+Treat this voice profile as a permanent stylistic constraint for the novel.
+
+Do not drift back into generic romance prose, interchangeable banter, repetitive sarcasm or stock AI reactions.
+
+Preserve the differences between each character's speech, internal voice, humour and way of noticing the world.
+
+STORY MEMORY (CANON FACTS):
+
 STORY MEMORY (CANON FACTS):
 
 Important Facts:
