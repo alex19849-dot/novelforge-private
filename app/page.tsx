@@ -1050,14 +1050,14 @@ function previousPage() {
     placeholder="Describe the tone, humour, prose habits and AI-style phrases this particular story should avoid."
   />
 </div>
-              <TextArea
-                label="Characters"
-                field="characterNotes"
-                form={form}
-                updateField={updateField}
-                placeholder="Paste character details, side characters, family, appearances, ages, dynamics, secrets and anything important."
-                tall
-              />
+            <TextArea
+  label="Main Characters"
+  field="characterNotes"
+  form={form}
+  updateField={updateField}
+  placeholder="Add each main character's name, age, appearance, occupation, personality, flaws, desires, fears, secrets, speech patterns, humour style and relationship dynamic."
+  tall
+/>
 <TextArea
   label="Supporting Characters"
   field="sideCharacterNotes"
