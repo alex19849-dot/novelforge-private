@@ -830,7 +830,83 @@ function previousPage() {
                 placeholder="Paste the full story idea here."
                 tall
               />
+<div className="grid gap-4 rounded-2xl border border-[#d6c5a3] bg-[#f9f2df] p-4">
+  <h3 className="text-lg font-black">Story Settings</h3>
 
+  <div className="grid gap-4 sm:grid-cols-2">
+    <TextInput
+      label="Relationship Type"
+      field="relationship"
+      form={form}
+      updateField={updateField}
+      placeholder="MM Romance"
+    />
+
+    <TextInput
+      label="Subgenre"
+      field="subgenre"
+      form={form}
+      updateField={updateField}
+      placeholder="Sports romance, paranormal, workplace..."
+    />
+
+    <TextInput
+      label="Subgenre Detail"
+      field="subgenreDetail"
+      form={form}
+      updateField={updateField}
+      placeholder="College hockey, vampire small town..."
+    />
+
+    <TextInput
+      label="Story Location"
+      field="storyLocation"
+      form={form}
+      updateField={updateField}
+      placeholder="Manchester, UK"
+    />
+
+    <TextInput
+      label="POV"
+      field="pov"
+      form={form}
+      updateField={updateField}
+      placeholder="First person, dual POV"
+    />
+
+    <TextInput
+      label="Heat Level"
+      field="heat"
+      form={form}
+      updateField={updateField}
+      placeholder="Explicit adult"
+    />
+
+    <TextInput
+      label="Burn Pacing"
+      field="burnPacing"
+      form={form}
+      updateField={updateField}
+      placeholder="Fast burn"
+    />
+
+    <TextInput
+      label="Ending"
+      field="ending"
+      form={form}
+      updateField={updateField}
+      placeholder="Happy ending"
+    />
+  </div>
+
+  <TextArea
+    label="Tropes"
+    field="tropes"
+    form={form}
+    updateField={updateField}
+    placeholder="Best friend's dad, forbidden romance, forced proximity..."
+  />
+</div>
               <TextArea
                 label="Characters"
                 field="characterNotes"
