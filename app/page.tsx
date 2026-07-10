@@ -1096,16 +1096,23 @@ function previousPage() {
     ]}
   />
 </div>
-              <button
-  onClick={saveStoryBibleChanges}
-  disabled={loading || !user}
-  className="primary-button"
->
-  Save Changes
-</button>
-              <button onClick={generateStory} disabled={loading} className="primary-button">
-                {loading ? "Generating..." : "Generate Story"}
-              </button>
+            {chapters.length > 0 ? (
+  <button
+    onClick={saveStoryBibleChanges}
+    disabled={saving || !user}
+    className="primary-button"
+  >
+    {saving ? "Saving..." : "Save Story Bible Changes"}
+  </button>
+) : (
+  <button
+    onClick={generateStory}
+    disabled={loading || !form.title.trim() || !form.plot.trim()}
+    className="primary-button"
+  >
+    {loading ? "Generating Chapter 1..." : "Generate Story"}
+  </button>
+)}
             </div>
           </div>
         </section>
