@@ -22,6 +22,7 @@ const defaultForm: StoryForm = {
   title: "",
   plot: "",
   characterNotes: "",
+  sideCharacterNotes: "",
   mustNotHave: "",
   targetChapterWords: "4000",
   relationship: "MM Romance",
