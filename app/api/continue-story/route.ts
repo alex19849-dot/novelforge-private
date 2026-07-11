@@ -4,79 +4,242 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+type VoiceProfile = {
+  primaryTone: string;
+  emotionalCadence: string;
+  humourStyle: string;
+  humourMechanics: string;
+  narrativeStyle: string;
+  narrativeDistance: string;
+  sentenceRhythm: string;
+  dialogueStyle: string;
+  descriptionStyle: string;
+  internalMonologueStyle: string;
+  conflictStyle: string;
+  romanticStyle: string;
+  emotionalTexture: string;
+  povVoiceRules: string[];
+  characterVoices: string[];
+};
+
+type StoryMemory = {
+  importantFacts: string[];
+  characterDetails: string[];
+  relationshipHistory: string[];
+  unresolvedThreads: string[];
+  pastEvents: string[];
+  rules: string[];
+};
+
+type RepetitionReport = {
+  overusedWords: string[];
+  repeatedPhrases: string[];
+  repeatedReactions: string[];
+  repeatedHumourPatterns: string[];
+  repeatedSentencePatterns: string[];
+  guidance: string[];
+};
+
 function cleanOutput(text: string) {
-  return text.replace(/[—–]/g, ",");
+  return text.replace(/[—–]/g, ",").trim();
 }
 
+function cleanJsonOutput(text: string) {
+  return text
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter(
+    (item): item is string =>
+      typeof item === "string" && item.trim().length > 0
+  );
+}
+
+function getTargetChapterWords(value: unknown) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return 4000;
+
+  return Math.min(Math.max(Math.round(parsed), 1500), 6000);
+}
+
+function listOrNone(items: string[]) {
+  return items.length ? `- ${items.join("\n- ")}` : "None";
+}
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  try {
+    const body = await req.json();
 
-  const form = body.form || {};
-  const previousChapter = body.previousChapter || "";
-  const nextChapterNumber = body.nextChapterNumber || 2;
-  const incomingState = body.storyState || {};
-  const chapterGuidance = body.chapterGuidance || "";
- const storyMemory = incomingState.storyMemory || {
-  importantFacts: [],
-  characterDetails: [],
-  relationshipHistory: [],
-  unresolvedThreads: [],
-  pastEvents: [],
-  rules: [],
-};
-const voiceProfile = incomingState.voiceProfile || {
-  primaryTone: "",
-  emotionalCadence: "",
-  humourStyle: "",
-  humourMechanics: "",
-  narrativeStyle: "",
-  narrativeDistance: "",
-  sentenceRhythm: "",
-  dialogueStyle: "",
-  descriptionStyle: "",
-  internalMonologueStyle: "",
-  conflictStyle: "",
-  romanticStyle: "",
-  emotionalTexture: "",
-  povVoiceRules: [],
-  characterVoices: [],
-};
-const manualMemory = chapterGuidance.trim()
-  ? `\nUSER CHAPTER GUIDANCE:\n${chapterGuidance.trim()}`
-  : "";
+    const form = body.form || {};
 
-const chapterLabel = `Chapter ${nextChapterNumber}`;
-  let updatedStoryState = {
-  ...incomingState,
-  chapter: nextChapterNumber,
-};
-const repetitionReport = incomingState.repetitionReport || {
-  overusedWords: [],
-  repeatedPhrases: [],
-  repeatedReactions: [],
-  repeatedHumourPatterns: [],
-  repeatedSentencePatterns: [],
-  guidance: [],
-};
-  const prompt = `
+    const previousChapter =
+      typeof body.previousChapter === "string"
+        ? body.previousChapter.trim()
+        : "";
+
+    const nextChapterNumber =
+      Number.isFinite(Number(body.nextChapterNumber)) &&
+      Number(body.nextChapterNumber) > 1
+        ? Math.round(Number(body.nextChapterNumber))
+        : 2;
+
+    const incomingState = body.storyState || {};
+
+    const chapterGuidance =
+      typeof body.chapterGuidance === "string"
+        ? body.chapterGuidance.trim()
+        : "";
+
+    const targetChapterWords = getTargetChapterWords(
+      form.targetChapterWords
+    );
+
+    const emptyVoiceProfile: VoiceProfile = {
+      primaryTone: "",
+      emotionalCadence: "",
+      humourStyle: "",
+      humourMechanics: "",
+      narrativeStyle: "",
+      narrativeDistance: "",
+      sentenceRhythm: "",
+      dialogueStyle: "",
+      descriptionStyle: "",
+      internalMonologueStyle: "",
+      conflictStyle: "",
+      romanticStyle: "",
+      emotionalTexture: "",
+      povVoiceRules: [],
+      characterVoices: [],
+    };
+
+    const emptyStoryMemory: StoryMemory = {
+      importantFacts: [],
+      characterDetails: [],
+      relationshipHistory: [],
+      unresolvedThreads: [],
+      pastEvents: [],
+      rules: [],
+    };
+
+    const emptyRepetitionReport: RepetitionReport = {
+      overusedWords: [],
+      repeatedPhrases: [],
+      repeatedReactions: [],
+      repeatedHumourPatterns: [],
+      repeatedSentencePatterns: [],
+      guidance: [],
+    };
+
+    const savedVoice = incomingState.voiceProfile || {};
+
+    const voiceProfile: VoiceProfile = {
+      primaryTone: savedVoice.primaryTone || "",
+      emotionalCadence: savedVoice.emotionalCadence || "",
+      humourStyle: savedVoice.humourStyle || "",
+      humourMechanics: savedVoice.humourMechanics || "",
+      narrativeStyle: savedVoice.narrativeStyle || "",
+      narrativeDistance: savedVoice.narrativeDistance || "",
+      sentenceRhythm: savedVoice.sentenceRhythm || "",
+      dialogueStyle: savedVoice.dialogueStyle || "",
+      descriptionStyle: savedVoice.descriptionStyle || "",
+      internalMonologueStyle:
+        savedVoice.internalMonologueStyle || "",
+      conflictStyle: savedVoice.conflictStyle || "",
+      romanticStyle: savedVoice.romanticStyle || "",
+      emotionalTexture: savedVoice.emotionalTexture || "",
+      povVoiceRules: stringArray(savedVoice.povVoiceRules),
+      characterVoices: stringArray(savedVoice.characterVoices),
+    };
+
+    const savedMemory = incomingState.storyMemory || {};
+
+    const storyMemory: StoryMemory = {
+      importantFacts:
+        stringArray(savedMemory.importantFacts).length > 0
+          ? stringArray(savedMemory.importantFacts)
+          : emptyStoryMemory.importantFacts,
+      characterDetails:
+        stringArray(savedMemory.characterDetails).length > 0
+          ? stringArray(savedMemory.characterDetails)
+          : emptyStoryMemory.characterDetails,
+      relationshipHistory:
+        stringArray(savedMemory.relationshipHistory).length > 0
+          ? stringArray(savedMemory.relationshipHistory)
+          : emptyStoryMemory.relationshipHistory,
+      unresolvedThreads:
+        stringArray(savedMemory.unresolvedThreads).length > 0
+          ? stringArray(savedMemory.unresolvedThreads)
+          : emptyStoryMemory.unresolvedThreads,
+      pastEvents:
+        stringArray(savedMemory.pastEvents).length > 0
+          ? stringArray(savedMemory.pastEvents)
+          : emptyStoryMemory.pastEvents,
+      rules:
+        stringArray(savedMemory.rules).length > 0
+          ? stringArray(savedMemory.rules)
+          : emptyStoryMemory.rules,
+    };
+
+    const savedRepetition = incomingState.repetitionReport || {};
+
+    const repetitionReport: RepetitionReport = {
+      overusedWords:
+        stringArray(savedRepetition.overusedWords).length > 0
+          ? stringArray(savedRepetition.overusedWords)
+          : emptyRepetitionReport.overusedWords,
+      repeatedPhrases:
+        stringArray(savedRepetition.repeatedPhrases).length > 0
+          ? stringArray(savedRepetition.repeatedPhrases)
+          : emptyRepetitionReport.repeatedPhrases,
+      repeatedReactions:
+        stringArray(savedRepetition.repeatedReactions).length > 0
+          ? stringArray(savedRepetition.repeatedReactions)
+          : emptyRepetitionReport.repeatedReactions,
+      repeatedHumourPatterns:
+        stringArray(savedRepetition.repeatedHumourPatterns).length > 0
+          ? stringArray(savedRepetition.repeatedHumourPatterns)
+          : emptyRepetitionReport.repeatedHumourPatterns,
+      repeatedSentencePatterns:
+        stringArray(savedRepetition.repeatedSentencePatterns).length > 0
+          ? stringArray(savedRepetition.repeatedSentencePatterns)
+          : emptyRepetitionReport.repeatedSentencePatterns,
+      guidance:
+        stringArray(savedRepetition.guidance).length > 0
+          ? stringArray(savedRepetition.guidance)
+          : emptyRepetitionReport.guidance,
+    };
+
+    if (!previousChapter) {
+      return Response.json(
+        {
+          result: "No previous chapter text was provided.",
+          storyState: incomingState,
+          incomplete: true,
+        },
+        { status: 200 }
+      );
+    }
+
+    const chapterLabel = `Chapter ${nextChapterNumber}`;
+
+    const prompt = `
 You are NovelForge.
 
-You are an award-winning, bestselling contemporary EROTIC romance author whose books have won major romance writing awards and sold millions of copies worldwide. Readers praise your ability to create intense chemistry, emotional vulnerability, compelling character arcs, addictive romantic tension, and unforgettable love stories.
-
-Your writing combines commercial appeal, emotional authenticity, sharp dialogue, strong pacing, and high reader engagement. Every chapter should feel professionally published and worthy of a top-selling romance novel.
-
-Continue an ongoing commercial adult EROTIC romance novel.
+Continue this adult romance novel by writing ${chapterLabel}.
 
 Return only polished chapter prose.
-Do not include notes.
-Do not include analysis.
-Do not include JSON.
-Do not include markdown.
+Do not include notes, analysis, JSON or markdown.
 
-Write ${chapterLabel} only.
+FORMAT
 
-The output must begin exactly with:
+Begin exactly with:
 
 ${chapterLabel}
 
@@ -84,322 +247,225 @@ POV_NAME
 
 Replace POV_NAME with the correct point-of-view character name in uppercase.
 
+CHAPTER LENGTH
 
-STORY IDEA:
+Target approximately ${targetChapterWords} words.
+
+Complete the chapter within that target.
+Do not exceed the target by more than 10 percent.
+
+Limit the chapter to scenes that can be completed naturally within the available length.
+
+Do not begin another major scene near the end unless it can be completed.
+
+Prioritise a complete and satisfying final scene over extra description, backstory or internal reflection.
+
+STORY BIBLE
+
+Title:
+${form.title || incomingState.title || "Untitled"}
+
+Story idea:
 ${form.plot || "No story idea provided."}
 
-STORY OUTLINE:
+Story outline:
 ${form.storyOutline || "No story outline provided."}
 
-MAIN CHARACTERS:
+Main characters:
 ${form.characterNotes || "No main character notes provided."}
 
-SUPPORTING CHARACTERS:
+Supporting characters:
 ${form.sideCharacterNotes || "No supporting character notes provided."}
 
-MUST INCLUDE:
+Must include:
 ${form.mustHave || "Nothing specific provided."}
 
-MUST AVOID:
+Must avoid:
 ${form.mustNotHave || "Nothing specific provided."}
 
-CHAPTER GUIDANCE:
-${chapterGuidance || "None provided."}
+STORY SETTINGS
 
-CURRENT STORY STATE:
-${JSON.stringify(incomingState, null, 2)}
+Relationship:
+${form.relationship || incomingState.relationship || "Romance"}
 
-PERMANENT STORY VOICE PROFILE:
+Subgenre:
+${form.subgenre || "Not specified"}
 
-Primary Tone:
+Subgenre detail:
+${form.subgenreDetail || "Not specified"}
+
+Story location:
+${form.storyLocation || "Not specified"}
+
+Point of view:
+${form.pov || "First person, dual POV"}
+
+Heat level:
+${form.heat || incomingState.heat || "Open door"}
+
+Burn pacing:
+${form.burnPacing || "Medium burn"}
+
+Ending:
+${form.ending || "Happy ending"}
+
+Regional language:
+${incomingState.regionalLanguage || form.locale || "British English"}
+
+Preferred regional terms:
+${listOrNone(stringArray(incomingState.locationTerms))}
+
+Avoid conflicting regional terms:
+${listOrNone(stringArray(incomingState.forbiddenTerms))}
+
+USER GUIDANCE FOR THIS CHAPTER
+
+${chapterGuidance || "No additional chapter guidance provided."}
+
+PERMANENT VOICE PROFILE
+
+Primary tone:
 ${voiceProfile.primaryTone || "Not yet defined"}
 
-Humour Style:
-${voiceProfile.humourStyle || "Not yet defined"}
-
-Narrative Style:
-${voiceProfile.narrativeStyle || "Not yet defined"}
-
-Sentence Rhythm:
-${voiceProfile.sentenceRhythm || "Not yet defined"}
-
-Dialogue Style:
-${voiceProfile.dialogueStyle || "Not yet defined"}
-
-Emotional Texture:
-${voiceProfile.emotionalTexture || "Not yet defined"}
-
-Emotional Cadence:
+Emotional cadence:
 ${voiceProfile.emotionalCadence || "Not yet defined"}
 
-Humour Mechanics:
+Humour style:
+${voiceProfile.humourStyle || "Not yet defined"}
+
+Humour mechanics:
 ${voiceProfile.humourMechanics || "Not yet defined"}
 
-Narrative Distance:
+Narrative style:
+${voiceProfile.narrativeStyle || "Not yet defined"}
+
+Narrative distance:
 ${voiceProfile.narrativeDistance || "Not yet defined"}
 
-Description Style:
+Sentence rhythm:
+${voiceProfile.sentenceRhythm || "Not yet defined"}
+
+Dialogue style:
+${voiceProfile.dialogueStyle || "Not yet defined"}
+
+Description style:
 ${voiceProfile.descriptionStyle || "Not yet defined"}
 
-Internal Monologue Style:
+Internal monologue style:
 ${voiceProfile.internalMonologueStyle || "Not yet defined"}
 
-Conflict Style:
+Conflict style:
 ${voiceProfile.conflictStyle || "Not yet defined"}
 
-Romantic Style:
+Romantic style:
 ${voiceProfile.romanticStyle || "Not yet defined"}
 
-POV Voice Rules:
-${voiceProfile.povVoiceRules.join("\n- ") || "None"}
+Emotional texture:
+${voiceProfile.emotionalTexture || "Not yet defined"}
 
-Character Voices:
-${voiceProfile.characterVoices.join("\n- ") || "None"}
+POV voice rules:
+${listOrNone(voiceProfile.povVoiceRules)}
 
+Character voices:
+${listOrNone(voiceProfile.characterVoices)}
 
-Treat this voice profile as a permanent stylistic constraint for the novel.
+Treat this profile as the authority for how this novel sounds.
 
-Do not drift back into generic romance prose, interchangeable banter, repetitive sarcasm or stock AI reactions.
+Preserve the distinctions between each character's narration, speech, humour, observations and emotional habits.
 
-Preserve the differences between each character's speech, internal voice, humour and way of noticing the world.
+Do not drift back into generic romance narration, interchangeable sarcasm or constant banter.
 
-RECENT REPETITION ANALYSIS:
+CONTINUITY MEMORY
 
-Overused Words:
-${repetitionReport.overusedWords.join("\n- ") || "None"}
+Important facts:
+${listOrNone(storyMemory.importantFacts)}
 
-Repeated Phrases:
-${repetitionReport.repeatedPhrases.join("\n- ") || "None"}
+Character details:
+${listOrNone(storyMemory.characterDetails)}
 
-Repeated Reactions:
-${repetitionReport.repeatedReactions.join("\n- ") || "None"}
+Relationship history:
+${listOrNone(storyMemory.relationshipHistory)}
 
-Repeated Humour Patterns:
-${repetitionReport.repeatedHumourPatterns.join("\n- ") || "None"}
+Unresolved threads:
+${listOrNone(storyMemory.unresolvedThreads)}
 
-Repeated Sentence Patterns:
-${repetitionReport.repeatedSentencePatterns.join("\n- ") || "None"}
+Past events:
+${listOrNone(storyMemory.pastEvents)}
 
-Freshness Guidance:
-${repetitionReport.guidance.join("\n- ") || "None"}
+Permanent story rules:
+${listOrNone(storyMemory.rules)}
+
+RECENT REPETITION GUIDANCE
+
+Overused words:
+${listOrNone(repetitionReport.overusedWords)}
+
+Repeated phrases:
+${listOrNone(repetitionReport.repeatedPhrases)}
+
+Repeated reactions:
+${listOrNone(repetitionReport.repeatedReactions)}
+
+Repeated humour patterns:
+${listOrNone(repetitionReport.repeatedHumourPatterns)}
+
+Repeated sentence patterns:
+${listOrNone(repetitionReport.repeatedSentencePatterns)}
+
+Freshness guidance:
+${listOrNone(repetitionReport.guidance)}
 
 Use this report as guidance, not as a rigid blacklist.
 
-Avoid repeating noticeable habits from recent chapters unless the wording is genuinely necessary for continuity, character voice or clarity.
+Do not replace one repeated cliché with another generic reaction.
 
-Do not replace one repeated cliché with another equally generic cliché.
+PREVIOUS CHAPTER
 
-Create fresh phrasing, reactions, humour and sentence movement that still fit the permanent voice profile.
+${previousChapter}
 
-STORY MEMORY (CANON FACTS):
+CONTINUATION JOB
 
-Important Facts:
-${storyMemory.importantFacts.join("\n- ") || "None"}
+Continue naturally from the previous chapter.
 
-Character Details:
-${storyMemory.characterDetails.join("\n- ") || "None"}
+Do not restart the story or repeat its setup.
 
-Relationship History:
-${storyMemory.relationshipHistory.join("\n- ") || "None"}
+Do not reintroduce established characters.
 
-Unresolved Threads:
-${storyMemory.unresolvedThreads.join("\n- ") || "None"}
+Carry forward the immediate emotional, relational and practical consequences of the previous chapter.
 
-Past Events:
-${storyMemory.pastEvents.join("\n- ") || "None"}
+Preserve established names, jobs, locations, relationships, promises, secrets, injuries and knowledge.
 
-Story Rules:
-${storyMemory.rules.join("\n- ") || "None"}
+Build on previous emotional progress. Do not reset attraction, trust, conflict, intimacy or vulnerability.
 
-PREVIOUS CHAPTERS:
-${previousChapter || "No previous chapter text provided."}
+Choose the most believable next development for these characters rather than a familiar romance beat.
 
-MUST AVOID:
-${form.mustNotHave || "Nothing specific provided."}
+Every scene must advance character, relationship, conflict or plot.
 
-CHAPTER GUIDANCE:
+Resolve or deepen existing threads before inventing unrelated drama.
 
-Treat the previous chapters and story memory as the source of truth.
+Do not introduce random illnesses, accidents, scandals, blackmail, family emergencies, custody threats or new villains unless already established in the Story Bible.
 
-If there is ever a conflict between assumptions and established continuity, established continuity always wins.
+Dialogue must sound human and specific to the speaker.
 
-Never rewrite history. Build upon it.
+Humour must arise from character and circumstance, not automatic sarcasm.
 
-STORY CONTINUITY RULES
+Avoid repeated arguments, repeated emotional breakthroughs and repeated jealousy scenes.
 
-Maintain complete consistency with all established character personalities, histories, relationships, motivations, emotional wounds, speech patterns, and story events.
+Internal thoughts must add a new realisation, decision, fear or conflict rather than explaining what the reader already understands.
 
-Characters must remember previous conversations, conflicts, promises, arguments, mistakes, and emotional milestones.
+Use precise, character-specific physical and emotional reactions.
 
-Relationship progression must feel earned and cumulative.
+Avoid stock reactions, repetitive body language, therapy-speak, purple prose, fake profound lines and over-described rooms.
 
-Avoid resetting emotional progress between chapters.
+Respect the selected heat level and established relationship progression.
 
-Each chapter should build upon previous chapters rather than repeating the same conflicts.
+Any romantic or intimate development must involve consenting adults and must influence the relationship afterwards.
 
-Track and evolve:
+Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
 
-• Relationship development
-• Character growth
-• Emotional intimacy
-• Sexual intimacy
-• Trust
-• Jealousy
-• Possessiveness
-• Vulnerability
-• External conflicts
+End with a completed scene and a meaningful emotional turn, decision, complication, discovery or charged moment.
+`.trim();
 
-Every chapter must introduce meaningful change.
-
-Every chapter should permanently change at least one aspect of the story, whether it is the plot, a relationship, a character, the reader's understanding, or the world itself.
-
-No filler scenes.
-
-No repetitive arguments.
-
-No repetitive emotional beats.
-
-No repetitive intimacy scenes.
-
-The protagonists should never feel emotionally identical to how they felt five chapters earlier unless there is a story reason.
-
-Side characters should continue developing lives, relationships, and goals outside the protagonists.
-
-The story world should feel alive and evolving.
-
-Always escalate or deepen existing conflicts rather than restarting them.
-
-Before writing any chapter, identify:
-
-1. What has changed since the previous chapter.
-2. Which established facts and continuity must be preserved.
-3. Which unresolved threads naturally deserve attention in this chapter.
-4. What meaningful change this chapter will leave behind.
-
-Every chapter must move the story forward.
-
-
-CONTINUATION JOB:
-- Continue directly from the previous chapter.
-- Do not restart the story.
-- Do not repeat the opening setup.
-- Do not reintroduce characters as if they are new.
-- Carry forward the emotional fallout from the previous chapter.
-- Keep all names, genders, jobs, relationships and locations consistent.
-- Follow the user's chapter guidance unless it contradicts established continuity.
-- Do not invent random illnesses, accidents, scandals, family emergencies, blackmail, custody threats or new villains unless already seeded.
-- Do not add filler scenes just to make the chapter longer.
-
-CHAPTER ARC:
-- Continue from the previous chapter naturally.
-- Let the characters, conflict and consequences determine the pacing.
-- Do not advance romance, intimacy, trust, conflict or resolution because of chapter number.
-- Escalate, slow down, pause or resolve only when earned by the story.
-
-DIALOGUE RULES
-
-Every conversation must have a unique purpose.
-
-Every character should have a recognisable voice.
-
-Dialogue should reflect:
-• Personality
-• Education
-• Background
-• Age
-• Occupation
-• Emotional state
-• Relationship with the person they are speaking to
-
-No two major characters should sound interchangeable.
-
-Avoid repeated exchanges where characters:
-
-• Trade the same insults.
-• Repeat the same argument.
-• Discuss reactions repeatedly.
-• Revisit identical emotional territory.
-
-Conversations should reveal:
-
-• Character.
-• History.
-• Vulnerability.
-• Humour.
-• Desire.
-• Frustration.
-• Ambition.
-• Fear.
-• Real life concerns.
-
-Characters should occasionally surprise each other and the reader.
-
-Avoid predictable romance patterns.
-
-Characters should make decisions that feel inevitable because of who they are, not because the plot requires a familiar romance beat.
-
-Choose the most believable outcome, not the most obvious one.
-
-Avoid multiple chapters where conversations serve only to maintain sexual tension.
-
-Sexual tension should evolve and change rather than repeat.
-
-ROMANCE:
-
-- Let the relationship evolve naturally from the characters, their choices and the consequences of previous chapters.
-- Never advance or delay the relationship because of chapter number or expected romance structure.
-- Keep flaws, friction, uncertainty and personal growth authentic to the characters.
-- Show attraction through meaningful behaviour, dialogue and emotional connection rather than repetitive physical clichés.
-- Emotional intimacy, romantic intimacy and physical intimacy should each develop at their own natural pace.
-- Every meaningful romantic or intimate moment should permanently influence the relationship going forward.
-- Keep all romantic and sexual content between consenting adults.
-
-STYLE PRIORITIES, IN ORDER:
-
-1. CONTINUITY AND VOICE
-- Preserve the established POV, narrative voice, character voices and overall style.
-- Write polished, immersive commercial romance prose.
-- Keep dialogue human, grounded and character-specific. Avoid constant banter, therapy-speak and overly polished comebacks.
-
-2. PROSE DISCIPLINE
-- Every paragraph must advance character, relationship, conflict, atmosphere, humour or plot.
-- Prefer one precise sentence over several sentences expressing the same idea.
-- Do not restate information, thoughts or emotions the reader already understands.
-- Do not explain dialogue after the dialogue has already made the meaning clear.
-- Do not express the same emotion through narration, internal thought and physical reaction.
-- Internal reflection must add a new realisation, decision, conflict or emotional development.
-- Do not narrate routine actions step by step unless they matter.
-- Enter scenes late, leave scenes early, and move on once a scene has achieved its purpose.
-- Never add filler, repetition, extra description or unnecessary reflection to increase chapter length.
-
-3. NATURAL WRITING
-- Show rather than tell when it strengthens the scene, but do not over-describe actions to avoid telling.
-- Use short replies, interruptions, hesitation and deflection where natural.
-- Keep humour character-specific.
-- Avoid purple prose, fake profound lines, random object descriptions and over-described rooms.
-- Avoid repeated symbolic chapter endings.
-- Avoid repetitive stock reactions or phrases such as "his eyes darkened", "my pulse kicked", "something shifted", "his jaw tightened" and "he went still".
-
-4. PUNCTUATION
-- Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
-
-REGIONAL LANGUAGE:
-Use ${incomingState.regionalLanguage || form.locale || "British English"}.
-Preferred terms: ${(incomingState.locationTerms || []).join(", ")}.
-Forbidden terms: ${(incomingState.forbiddenTerms || []).join(", ")}.
-
-LENGTH:
-
-- Target chapter length: ${form.targetChapterWords || "4000"} words.
-- This is a firm target, not a suggestion.
-- Never intentionally exceed the target by more than 10%.
-- End at the nearest natural emotional or narrative stopping point.
-- If a scene cannot be completed naturally within the limit, end the chapter cleanly and continue it in the next chapter.
-- Do not artificially pad chapters.
-- Do not rush scenes to reach the target.
-- Every chapter must still feel complete and satisfying.
-`;
-  try {
     const response = await openai.responses.create({
       model: "gpt-5.5",
       reasoning: { effort: "low" },
@@ -408,41 +474,42 @@ LENGTH:
       max_output_tokens: 10000,
     });
 
+    if (response.status === "incomplete") {
+      return Response.json(
+        {
+          result:
+            `${chapterLabel} stopped before completion and was not saved.`,
+          storyState: incomingState,
+          incomplete: true,
+        },
+        { status: 200 }
+      );
+    }
 
-   if (response.status === "incomplete") {
-  return Response.json(
-    {
-      result:
-        "Chapter generation stopped before finishing. Nothing has been saved. Try shorter guidance or reduce the chapter length.",
-      storyState: incomingState,
-      incomplete: true,
-    },
-    { status: 200 }
-  );
-}
+    const chapter = cleanOutput(response.output_text || "");
 
-const chapter = cleanOutput(response.output_text || "");
-  const memoryPrompt = `
-Analyse the newly generated chapter for this ongoing romance novel.
+    if (!chapter) {
+      return Response.json(
+        {
+          result: "No chapter text was returned.",
+          storyState: incomingState,
+          incomplete: true,
+        },
+        { status: 200 }
+      );
+    }
 
-Update:
-1. The continuity memory.
-2. The repetition report that should guide the next chapter.
+    let updatedMemory = storyMemory;
+    let updatedRepetitionReport = repetitionReport;
+
+    try {
+      const analysisPrompt = `
+Analyse the new chapter and update the saved guidance for future chapters.
 
 Return valid JSON only.
-Do not include markdown.
-Do not include notes or commentary.
+Do not include markdown, notes or commentary.
 
-Existing story memory:
-${JSON.stringify(storyMemory, null, 2)}
-
-Previous repetition report:
-${JSON.stringify(repetitionReport, null, 2)}
-
-New chapter:
-${chapter}
-
-Return exactly this structure:
+Use exactly this structure:
 
 {
   "storyMemory": {
@@ -463,125 +530,144 @@ Return exactly this structure:
   }
 }
 
-STORY MEMORY RULES:
+EXISTING STORY MEMORY:
+${JSON.stringify(storyMemory, null, 2)}
 
-- Preserve important existing memory unless it is clearly outdated.
-- Add only details needed for future continuity.
-- Record established facts, character details, relationship developments, unresolved threads, past events and permanent rules.
-- Do not summarise the entire chapter.
-- Do not include temporary emotions unless they will affect future chapters.
+PREVIOUS REPETITION REPORT:
+${JSON.stringify(repetitionReport, null, 2)}
 
-REPETITION RULES:
+STORY MEMORY RULES
 
-- Analyse the new chapter together with the previous report.
-- Keep patterns that are still becoming noticeable.
-- Remove old warnings that are no longer relevant.
-- Identify overused words, repeated dialogue, body language, emotional reactions, humour styles and sentence habits.
-- Ignore necessary names, pronouns and ordinary connecting language.
-- Only flag repetition that genuinely weakens the prose.
-- Guidance must contain concise, practical instructions for keeping the next chapter fresh.
-- Do not create a rigid blacklist of normal language.
-`;
-let updatedMemory = storyMemory;
-let updatedRepetitionReport = repetitionReport;
+Preserve established continuity unless the new chapter explicitly changes it.
 
-try {
-  const memoryResponse = await openai.responses.create({
-    model: "gpt-5.5",
-    reasoning: { effort: "low" },
-    text: { verbosity: "low" },
-    input: memoryPrompt,
-    max_output_tokens: 2500,
-  });
+Add only facts needed for future chapters.
 
-  const memoryText = (memoryResponse.output_text || "")
-  .replace(/^```json\s*/i, "")
-  .replace(/^```\s*/i, "")
-  .replace(/\s*```$/i, "")
-  .trim();
+Record character details, relationship developments, unresolved threads, past events and permanent rules.
 
-const parsedAnalysis = JSON.parse(memoryText);
+Remove an unresolved thread only when the new chapter clearly resolves it.
 
-const parsedMemory = parsedAnalysis.storyMemory || {};
-const parsedRepetition = parsedAnalysis.repetitionReport || {};
+Do not summarise the entire chapter.
 
-updatedMemory = {
-  importantFacts: Array.isArray(parsedMemory.importantFacts)
-    ? parsedMemory.importantFacts
-    : storyMemory.importantFacts,
-  characterDetails: Array.isArray(parsedMemory.characterDetails)
-    ? parsedMemory.characterDetails
-    : storyMemory.characterDetails,
-  relationshipHistory: Array.isArray(parsedMemory.relationshipHistory)
-    ? parsedMemory.relationshipHistory
-    : storyMemory.relationshipHistory,
-  unresolvedThreads: Array.isArray(parsedMemory.unresolvedThreads)
-    ? parsedMemory.unresolvedThreads
-    : storyMemory.unresolvedThreads,
-  pastEvents: Array.isArray(parsedMemory.pastEvents)
-    ? parsedMemory.pastEvents
-    : storyMemory.pastEvents,
-  rules: Array.isArray(parsedMemory.rules)
-    ? parsedMemory.rules
-    : storyMemory.rules,
-};
+REPETITION RULES
 
-updatedRepetitionReport = {
-  overusedWords: Array.isArray(parsedRepetition.overusedWords)
-    ? parsedRepetition.overusedWords
-    : repetitionReport.overusedWords,
-  repeatedPhrases: Array.isArray(parsedRepetition.repeatedPhrases)
-    ? parsedRepetition.repeatedPhrases
-    : repetitionReport.repeatedPhrases,
-  repeatedReactions: Array.isArray(parsedRepetition.repeatedReactions)
-    ? parsedRepetition.repeatedReactions
-    : repetitionReport.repeatedReactions,
-  repeatedHumourPatterns: Array.isArray(parsedRepetition.repeatedHumourPatterns)
-    ? parsedRepetition.repeatedHumourPatterns
-    : repetitionReport.repeatedHumourPatterns,
-  repeatedSentencePatterns: Array.isArray(parsedRepetition.repeatedSentencePatterns)
-    ? parsedRepetition.repeatedSentencePatterns
-    : repetitionReport.repeatedSentencePatterns,
-  guidance: Array.isArray(parsedRepetition.guidance)
-    ? parsedRepetition.guidance
-    : repetitionReport.guidance,
-};
-} catch (memoryError) {
-  console.error("STORY MEMORY UPDATE ERROR:", memoryError);
-}
-   updatedStoryState = {
-  ...updatedStoryState,
-  storyMemory: updatedMemory,
-  repetitionReport: updatedRepetitionReport,
-};
-if (!chapter.trim()) {
-  return Response.json(
-    {
-      result: "No chapter text was returned.",
-      storyState: incomingState,
-      incomplete: true,
-    },
-    { status: 200 }
-  );
-}
+Consider the previous report and the new chapter together.
 
-return Response.json({
-  result: chapter,
-  storyState: updatedStoryState,
-});
-} catch (error) {
-console.error("CONTINUE STORY ERROR:", error);
+Keep warnings that remain relevant.
 
-return Response.json(
-  {
-    result:
-      error instanceof Error
-        ? `Continue error: ${error.message}`
-        : "Unknown continue error.",
-    storyState: incomingState,
-    incomplete: true,
-  },
-  { status: 200 }
-);
-}
+Remove warnings that no longer represent a noticeable pattern.
+
+Flag only repetition that could weaken future prose.
+
+Ignore names, pronouns and ordinary connecting language.
+
+Give concise, practical guidance without creating a rigid blacklist.
+
+NEW CHAPTER:
+
+${chapter}
+`.trim();
+
+      const analysisResponse = await openai.responses.create({
+        model: "gpt-5.5",
+        reasoning: { effort: "low" },
+        text: { verbosity: "low" },
+        input: analysisPrompt,
+        max_output_tokens: 2500,
+      });
+
+      if (analysisResponse.status === "completed") {
+        const parsed = JSON.parse(
+          cleanJsonOutput(analysisResponse.output_text || "")
+        );
+
+        const memory = parsed.storyMemory || {};
+        const repetition = parsed.repetitionReport || {};
+
+        updatedMemory = {
+          importantFacts:
+            stringArray(memory.importantFacts).length > 0
+              ? stringArray(memory.importantFacts)
+              : storyMemory.importantFacts,
+          characterDetails:
+            stringArray(memory.characterDetails).length > 0
+              ? stringArray(memory.characterDetails)
+              : storyMemory.characterDetails,
+          relationshipHistory:
+            stringArray(memory.relationshipHistory).length > 0
+              ? stringArray(memory.relationshipHistory)
+              : storyMemory.relationshipHistory,
+          unresolvedThreads: Array.isArray(memory.unresolvedThreads)
+            ? stringArray(memory.unresolvedThreads)
+            : storyMemory.unresolvedThreads,
+          pastEvents:
+            stringArray(memory.pastEvents).length > 0
+              ? stringArray(memory.pastEvents)
+              : storyMemory.pastEvents,
+          rules:
+            stringArray(memory.rules).length > 0
+              ? stringArray(memory.rules)
+              : storyMemory.rules,
+        };
+
+        updatedRepetitionReport = {
+          overusedWords: Array.isArray(repetition.overusedWords)
+            ? stringArray(repetition.overusedWords)
+            : repetitionReport.overusedWords,
+          repeatedPhrases: Array.isArray(repetition.repeatedPhrases)
+            ? stringArray(repetition.repeatedPhrases)
+            : repetitionReport.repeatedPhrases,
+          repeatedReactions: Array.isArray(
+            repetition.repeatedReactions
+          )
+            ? stringArray(repetition.repeatedReactions)
+            : repetitionReport.repeatedReactions,
+          repeatedHumourPatterns: Array.isArray(
+            repetition.repeatedHumourPatterns
+          )
+            ? stringArray(repetition.repeatedHumourPatterns)
+            : repetitionReport.repeatedHumourPatterns,
+          repeatedSentencePatterns: Array.isArray(
+            repetition.repeatedSentencePatterns
+          )
+            ? stringArray(repetition.repeatedSentencePatterns)
+            : repetitionReport.repeatedSentencePatterns,
+          guidance: Array.isArray(repetition.guidance)
+            ? stringArray(repetition.guidance)
+            : repetitionReport.guidance,
+        };
+      }
+    } catch (analysisError) {
+      console.error(
+        "Chapter analysis update failed:",
+        analysisError
+      );
+    }
+
+    const updatedStoryState = {
+      ...incomingState,
+      chapter: nextChapterNumber,
+      voiceProfile,
+      storyMemory: updatedMemory,
+      repetitionReport: updatedRepetitionReport,
+    };
+
+    return Response.json({
+      result: chapter,
+      storyState: updatedStoryState,
+    });
+  } catch (error) {
+    console.error("CONTINUE STORY ERROR:", error);
+
+    return Response.json(
+      {
+        result:
+          error instanceof Error
+            ? `Continue error: ${error.message}`
+            : "Unknown continue error.",
+        storyState: {},
+        incomplete: true,
+      },
+      { status: 200 }
+    );
+  }
 }
