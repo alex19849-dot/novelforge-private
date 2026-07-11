@@ -466,65 +466,120 @@ async function saveStoryBibleChanges() {
     }
   }
 
-  async function continueStory() {
-    if (!activeChapter) return;
+ async function continueStory() {
+  if (!activeChapter) return;
 
-    setContinueLoading(true);
-    setCopyMessage("");
+  setContinueLoading(true);
+  setCopyMessage(`Starting Chapter ${chapters.length + 1}...`);
 
-    try {
-      const previousChapter = chapters.slice(-1).join("\n\n");
+  try {
+    const nextChapterNumber = chapters.length + 1;
 
-      const response = await fetch("/api/continue-story", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          form: preparedForm,
-          previousChapter,
-          nextChapterNumber: chapters.length + 1,
-          storyState,
-          chapterGuidance,
-        }),
-      });
+    const startResponse = await fetch("/api/continue-story", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        form: preparedForm,
+        previousChapter: activeChapter,
+        nextChapterNumber,
+        storyState,
+        chapterGuidance,
+      }),
+    });
 
-      if (!response.ok) {
-        throw new Error(`Continue failed: ${response.status}`);
+    const startData = await startResponse.json();
+
+    if (!startResponse.ok) {
+      throw new Error(
+        startData.result ||
+          startData.error ||
+          `Continue failed: ${startResponse.status}`
+      );
+    }
+
+    if (!startData.jobId) {
+      throw new Error("No background generation job was returned.");
+    }
+
+    const jobId = startData.jobId;
+    const maxPollAttempts = 100;
+    const pollDelayMs = 3000;
+
+    let completedChapter = "";
+
+    for (let attempt = 1; attempt <= maxPollAttempts; attempt++) {
+      setCopyMessage(
+        `Generating Chapter ${nextChapterNumber}...`
+      );
+
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, pollDelayMs)
+      );
+
+      const statusResponse = await fetch(
+        "/api/continue-status",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId }),
+        }
+      );
+
+      const statusData = await statusResponse.json();
+
+      if (!statusResponse.ok || statusData.failed) {
+        throw new Error(
+          statusData.error ||
+            `Chapter status failed: ${statusResponse.status}`
+        );
       }
 
-   const data = await response.json();
-
-if (data.incomplete) {
-  throw new Error(data.result || "Chapter generation was incomplete.");
-}
-
-if (!data.result) {
-  throw new Error("No chapter returned.");
-}
-
-const nextChapter = data.result;
-      const newStoryState = data.storyState || storyState;
-      const newChapters = [...chapters, nextChapter];
-      const newIndex = newChapters.length - 1;
-
-      setChapters(newChapters);
-      setActiveChapterIndex(newIndex);
-      setStoryState(newStoryState);
-      setPageIndex(0);
-
-      await saveCurrentStory({
-        form: preparedForm,
-        chapters: newChapters,
-        activeChapterIndex: newIndex,
-        chapterGuidance,
-        storyState: newStoryState,
-      });
-    } catch (error) {
-      console.error("Continue story error:", error);
-      setCopyMessage(error instanceof Error ? error.message : "Continue failed.");
-    } finally {
-      setContinueLoading(false);
+      if (statusData.complete && statusData.result) {
+        completedChapter = statusData.result;
+        break;
+      }
     }
+
+    if (!completedChapter) {
+      throw new Error(
+        "Chapter generation is still unfinished after five minutes."
+      );
+    }
+
+    const newChapters = [...chapters, completedChapter];
+    const newIndex = newChapters.length - 1;
+
+    const newStoryState = {
+      ...storyState,
+      chapter: nextChapterNumber,
+    };
+
+    setChapters(newChapters);
+    setActiveChapterIndex(newIndex);
+    setStoryState(newStoryState);
+    setPageIndex(0);
+    setChapterGuidance("");
+    setCopyMessage(`Chapter ${nextChapterNumber} generated.`);
+
+    await saveCurrentStory({
+      form: preparedForm,
+      chapters: newChapters,
+      activeChapterIndex: newIndex,
+      chapterGuidance: "",
+      storyState: newStoryState,
+    });
+  } catch (error) {
+    console.error("Continue story error:", error);
+
+    setCopyMessage(
+      error instanceof Error
+        ? error.message
+        : "Continue failed."
+    );
+  } finally {
+    setContinueLoading(false);
   }
+}
 
   async function rewriteChapter() {
     if (!activeChapter || !chapterGuidance.trim()) return;
