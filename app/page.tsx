@@ -546,14 +546,39 @@ async function saveStoryBibleChanges() {
       );
     }
 
-    const newChapters = [...chapters, completedChapter];
-    const newIndex = newChapters.length - 1;
+   const newChapters = [...chapters, completedChapter];
+const newIndex = newChapters.length - 1;
 
-    const newStoryState = {
-      ...storyState,
-      chapter: nextChapterNumber,
+let newStoryState = {
+  ...storyState,
+  chapter: nextChapterNumber,
+};
+
+try {
+  const analysisResponse = await fetch("/api/analyse-chapter", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chapter: completedChapter,
+      storyState: newStoryState,
+    }),
+  });
+
+  if (analysisResponse.ok) {
+    const analysisData = await analysisResponse.json();
+
+    newStoryState = {
+      ...newStoryState,
+      storyMemory:
+        analysisData.storyMemory || newStoryState.storyMemory,
+      repetitionReport:
+        analysisData.repetitionReport ||
+        newStoryState.repetitionReport,
     };
-
+  }
+} catch (analysisError) {
+  console.error("Chapter analysis failed:", analysisError);
+}
     setChapters(newChapters);
     setActiveChapterIndex(newIndex);
     setStoryState(newStoryState);
