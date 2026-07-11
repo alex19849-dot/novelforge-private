@@ -26,6 +26,17 @@ export async function POST(req: Request) {
     }
 
     const response = await openai.responses.retrieve(jobId);
+    console.log("STATUS:", response.status);
+
+if ("incomplete_details" in response) {
+  console.log(
+    "INCOMPLETE:",
+    JSON.stringify(response.incomplete_details, null, 2)
+  );
+}
+
+console.log("FULL RESPONSE:");
+console.log(JSON.stringify(response, null, 2));
 
     if (
       response.status === "queued" ||
