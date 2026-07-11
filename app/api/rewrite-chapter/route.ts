@@ -4,372 +4,417 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+type VoiceProfile = {
+  primaryTone: string;
+  emotionalCadence: string;
+  humourStyle: string;
+  humourMechanics: string;
+  narrativeStyle: string;
+  narrativeDistance: string;
+  sentenceRhythm: string;
+  dialogueStyle: string;
+  descriptionStyle: string;
+  internalMonologueStyle: string;
+  conflictStyle: string;
+  romanticStyle: string;
+  emotionalTexture: string;
+  povVoiceRules: string[];
+  characterVoices: string[];
+};
+
+type StoryMemory = {
+  importantFacts: string[];
+  characterDetails: string[];
+  relationshipHistory: string[];
+  unresolvedThreads: string[];
+  pastEvents: string[];
+  rules: string[];
+};
+
+type RepetitionReport = {
+  overusedWords: string[];
+  repeatedPhrases: string[];
+  repeatedReactions: string[];
+  repeatedHumourPatterns: string[];
+  repeatedSentencePatterns: string[];
+  guidance: string[];
+};
+
 function cleanOutput(text: string) {
-  return text.replace(/[—–]/g, ",");
+  return text.replace(/[—–]/g, ",").trim();
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter(
+    (item): item is string =>
+      typeof item === "string" && item.trim().length > 0
+  );
+}
+
+function listOrNone(items: string[]) {
+  return items.length ? `- ${items.join("\n- ")}` : "None";
+}
+
+function countWords(text: string) {
+  const trimmed = text.trim();
+
+  if (!trimmed) return 0;
+
+  return trimmed.split(/\s+/).length;
 }
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  try {
+    const body = await req.json();
 
-  const chapter = body.chapter || "";
-  const instruction = body.instruction || "";
-  const form = body.form || {};
-  const storyState = body.storyState || {};
-const storyMemory = storyState.storyMemory || {
-  importantFacts: [],
-  characterDetails: [],
-  relationshipHistory: [],
-  unresolvedThreads: [],
-  pastEvents: [],
-  rules: [],
-};
+    const chapter =
+      typeof body.chapter === "string" ? body.chapter.trim() : "";
 
-const voiceProfile = storyState.voiceProfile || {
-  primaryTone: "",
-  emotionalCadence: "",
-  humourStyle: "",
-  humourMechanics: "",
-  narrativeStyle: "",
-  narrativeDistance: "",
-  sentenceRhythm: "",
-  dialogueStyle: "",
-  descriptionStyle: "",
-  internalMonologueStyle: "",
-  conflictStyle: "",
-  romanticStyle: "",
-  emotionalTexture: "",
-  povVoiceRules: [],
-  characterVoices: [],
-};
- const repetitionReport = storyState.repetitionReport || {
-  overusedWords: [],
-  repeatedPhrases: [],
-  repeatedReactions: [],
-  repeatedHumourPatterns: [],
-  repeatedSentencePatterns: [],
-  guidance: [],
-};
-  const prompt = `
+    const instruction =
+      typeof body.instruction === "string"
+        ? body.instruction.trim()
+        : "";
+
+    const form = body.form || {};
+    const storyState = body.storyState || {};
+
+    if (!chapter) {
+      return Response.json(
+        {
+          result: "No chapter text was provided.",
+          storyState,
+        },
+        { status: 400 }
+      );
+    }
+
+    const savedVoice = storyState.voiceProfile || {};
+
+    const voiceProfile: VoiceProfile = {
+      primaryTone: savedVoice.primaryTone || "",
+      emotionalCadence: savedVoice.emotionalCadence || "",
+      humourStyle: savedVoice.humourStyle || "",
+      humourMechanics: savedVoice.humourMechanics || "",
+      narrativeStyle: savedVoice.narrativeStyle || "",
+      narrativeDistance: savedVoice.narrativeDistance || "",
+      sentenceRhythm: savedVoice.sentenceRhythm || "",
+      dialogueStyle: savedVoice.dialogueStyle || "",
+      descriptionStyle: savedVoice.descriptionStyle || "",
+      internalMonologueStyle:
+        savedVoice.internalMonologueStyle || "",
+      conflictStyle: savedVoice.conflictStyle || "",
+      romanticStyle: savedVoice.romanticStyle || "",
+      emotionalTexture: savedVoice.emotionalTexture || "",
+      povVoiceRules: stringArray(savedVoice.povVoiceRules),
+      characterVoices: stringArray(savedVoice.characterVoices),
+    };
+
+    const savedMemory = storyState.storyMemory || {};
+
+    const storyMemory: StoryMemory = {
+      importantFacts: stringArray(savedMemory.importantFacts),
+      characterDetails: stringArray(savedMemory.characterDetails),
+      relationshipHistory: stringArray(
+        savedMemory.relationshipHistory
+      ),
+      unresolvedThreads: stringArray(savedMemory.unresolvedThreads),
+      pastEvents: stringArray(savedMemory.pastEvents),
+      rules: stringArray(savedMemory.rules),
+    };
+
+    const savedRepetition = storyState.repetitionReport || {};
+
+    const repetitionReport: RepetitionReport = {
+      overusedWords: stringArray(savedRepetition.overusedWords),
+      repeatedPhrases: stringArray(savedRepetition.repeatedPhrases),
+      repeatedReactions: stringArray(
+        savedRepetition.repeatedReactions
+      ),
+      repeatedHumourPatterns: stringArray(
+        savedRepetition.repeatedHumourPatterns
+      ),
+      repeatedSentencePatterns: stringArray(
+        savedRepetition.repeatedSentencePatterns
+      ),
+      guidance: stringArray(savedRepetition.guidance),
+    };
+
+    const originalWordCount = countWords(chapter);
+    const minimumWordCount = Math.max(
+      Math.round(originalWordCount * 0.9),
+      1
+    );
+    const maximumWordCount = Math.max(
+      Math.round(originalWordCount * 1.1),
+      minimumWordCount
+    );
+
+    const prompt = `
 You are NovelForge.
 
-You are an award-winning, bestselling contemporary erotic romance author whose books have won major romance writing awards and sold millions of copies worldwide. Readers praise your ability to create intense chemistry, emotional vulnerability, compelling character arcs, addictive romantic tension, and unforgettable love stories.
+Rewrite the supplied chapter from this ongoing adult romance novel.
 
-Your writing combines commercial appeal, emotional authenticity, sharp dialogue, strong pacing, and high reader engagement. Every chapter should feel professionally published and worthy of a top-selling romance novel.
+Return only the complete rewritten chapter.
+Do not include notes, analysis, JSON or markdown.
 
+USER REWRITE INSTRUCTION
 
-Rewrite the current chapter from an ongoing commercial adult romance story.
+${
+  instruction ||
+  "Improve the chapter while preserving its events, purpose and direction."
+}
 
-Preserve the approximate size and shape of the original chapter.
-Do not expand the chapter unless the user specifically asks.
-Remove filler, repetition and unnecessary internal reflection.
+REWRITE LENGTH
 
-Return only the rewritten chapter prose.
-Do not include notes.
-Do not include analysis.
-Do not include JSON.
-Do not include markdown.
+The original chapter is approximately ${originalWordCount} words.
 
-USER REWRITE INSTRUCTION:
-${instruction || "Improve the chapter while preserving the story direction."}
+Unless the user explicitly requests a substantial expansion or reduction, keep the rewrite between approximately ${minimumWordCount} and ${maximumWordCount} words.
 
-STORY IDEA:
+Preserve the chapter's overall scope and shape.
+
+Do not add new scenes merely to increase length.
+
+Do not remove important scenes merely to shorten it.
+
+Prioritise a complete chapter and fully resolved final scene.
+
+STORY BIBLE
+
+Title:
+${form.title || storyState.title || "Untitled"}
+
+Story idea:
 ${form.plot || "No story idea provided."}
 
-STORY OUTLINE:
+Story outline:
 ${form.storyOutline || "No story outline provided."}
 
-MAIN CHARACTERS:
+Main characters:
 ${form.characterNotes || "No main character notes provided."}
 
-SUPPORTING CHARACTERS:
+Supporting characters:
 ${form.sideCharacterNotes || "No supporting character notes provided."}
 
-MUST INCLUDE:
+Must include:
 ${form.mustHave || "Nothing specific provided."}
 
-MUST AVOID:
+Must avoid:
 ${form.mustNotHave || "Nothing specific provided."}
 
-CURRENT STORY STATE:
-${JSON.stringify(storyState, null, 2)}
+STORY SETTINGS
 
-PERMANENT STORY VOICE PROFILE:
+Relationship:
+${form.relationship || storyState.relationship || "Romance"}
 
-Primary Tone:
+Subgenre:
+${form.subgenre || "Not specified"}
+
+Subgenre detail:
+${form.subgenreDetail || "Not specified"}
+
+Story location:
+${form.storyLocation || "Not specified"}
+
+Point of view:
+${form.pov || "First person, dual POV"}
+
+Heat level:
+${form.heat || storyState.heat || "Open door"}
+
+Burn pacing:
+${form.burnPacing || "Medium burn"}
+
+Ending:
+${form.ending || "Happy ending"}
+
+Regional language:
+${storyState.regionalLanguage || form.locale || "British English"}
+
+Preferred regional terms:
+${listOrNone(stringArray(storyState.locationTerms))}
+
+Avoid conflicting regional terms:
+${listOrNone(stringArray(storyState.forbiddenTerms))}
+
+PERMANENT VOICE PROFILE
+
+Primary tone:
 ${voiceProfile.primaryTone || "Not yet defined"}
 
-Humour Style:
+Emotional cadence:
+${voiceProfile.emotionalCadence || "Not yet defined"}
+
+Humour style:
 ${voiceProfile.humourStyle || "Not yet defined"}
 
-Narrative Style:
+Humour mechanics:
+${voiceProfile.humourMechanics || "Not yet defined"}
+
+Narrative style:
 ${voiceProfile.narrativeStyle || "Not yet defined"}
 
-Sentence Rhythm:
+Narrative distance:
+${voiceProfile.narrativeDistance || "Not yet defined"}
+
+Sentence rhythm:
 ${voiceProfile.sentenceRhythm || "Not yet defined"}
 
-Dialogue Style:
+Dialogue style:
 ${voiceProfile.dialogueStyle || "Not yet defined"}
 
-Emotional Texture:
+Description style:
+${voiceProfile.descriptionStyle || "Not yet defined"}
+
+Internal monologue style:
+${voiceProfile.internalMonologueStyle || "Not yet defined"}
+
+Conflict style:
+${voiceProfile.conflictStyle || "Not yet defined"}
+
+Romantic style:
+${voiceProfile.romanticStyle || "Not yet defined"}
+
+Emotional texture:
 ${voiceProfile.emotionalTexture || "Not yet defined"}
 
-POV Voice Rules:
-${voiceProfile.povVoiceRules.join("\n- ") || "None"}
+POV voice rules:
+${listOrNone(voiceProfile.povVoiceRules)}
 
-Character Voices:
-${voiceProfile.characterVoices.join("\n- ") || "None"}
+Character voices:
+${listOrNone(voiceProfile.characterVoices)}
 
-RECENT REPETITION REPORT:
+Preserve this voice profile unless the user's rewrite instruction explicitly asks for a different tone or style.
 
-Overused Words:
-${repetitionReport.overusedWords.join("\n- ") || "None"}
+Do not flatten distinct character voices into generic romance narration.
 
-Repeated Phrases:
-${repetitionReport.repeatedPhrases.join("\n- ") || "None"}
+CONTINUITY MEMORY
 
-Repeated Reactions:
-${repetitionReport.repeatedReactions.join("\n- ") || "None"}
+Important facts:
+${listOrNone(storyMemory.importantFacts)}
 
-Repeated Humour Patterns:
-${repetitionReport.repeatedHumourPatterns.join("\n- ") || "None"}
+Character details:
+${listOrNone(storyMemory.characterDetails)}
 
-Repeated Sentence Patterns:
-${repetitionReport.repeatedSentencePatterns.join("\n- ") || "None"}
+Relationship history:
+${listOrNone(storyMemory.relationshipHistory)}
 
-Freshness Guidance:
-${repetitionReport.guidance.join("\n- ") || "None"}
+Unresolved threads:
+${listOrNone(storyMemory.unresolvedThreads)}
 
-STORY MEMORY:
+Past events:
+${listOrNone(storyMemory.pastEvents)}
 
-Important Facts:
-${storyMemory.importantFacts.join("\n- ") || "None"}
+Permanent story rules:
+${listOrNone(storyMemory.rules)}
 
-Character Details:
-${storyMemory.characterDetails.join("\n- ") || "None"}
+RECENT REPETITION GUIDANCE
 
-Relationship History:
-${storyMemory.relationshipHistory.join("\n- ") || "None"}
+Overused words:
+${listOrNone(repetitionReport.overusedWords)}
 
-Unresolved Threads:
-${storyMemory.unresolvedThreads.join("\n- ") || "None"}
+Repeated phrases:
+${listOrNone(repetitionReport.repeatedPhrases)}
 
-Past Events:
-${storyMemory.pastEvents.join("\n- ") || "None"}
+Repeated reactions:
+${listOrNone(repetitionReport.repeatedReactions)}
 
-Story Rules:
-${storyMemory.rules.join("\n- ") || "None"}
+Repeated humour patterns:
+${listOrNone(repetitionReport.repeatedHumourPatterns)}
 
-ORIGINAL CHAPTER:
-${chapter || "No chapter text provided."}
+Repeated sentence patterns:
+${listOrNone(repetitionReport.repeatedSentencePatterns)}
 
-REWRITE REQUIREMENTS
+Freshness guidance:
+${listOrNone(repetitionReport.guidance)}
 
-Preserve all important plot events, character actions, story outcomes, emotional developments, and continuity.
+Use this report as guidance, not as a rigid blacklist.
 
-Improve:
+Do not replace one repeated phrase or reaction with a different stock cliché.
 
-• Prose quality
-• Emotional depth
-• Dialogue realism
-• Character voice
-• Pacing
-• Scene immersion
-• Sensory detail
-• Narrative flow
+ORIGINAL CHAPTER
 
-Remove:
+${chapter}
 
-• Repetitive dialogue
-• Repetitive descriptions
-• Repetitive emotional beats
-• Repetitive body language
-• Generic romance clichés
-• Filler content
-• Unnecessary exposition
+REWRITE JOB
 
-Strengthen:
+Rewrite this chapter only.
 
-• Character individuality
-• Emotional authenticity
-• Romantic tension
-• Conflict
-• Scene purpose
-• Reader engagement
+Preserve:
 
-Ensure every major character has a distinct voice.
+- The same chapter number.
+- The same POV heading.
+- The same viewpoint character.
+- The same core events.
+- The same story outcomes.
+- The same established facts.
+- The same relationship progression.
+- The chapter's position in the wider novel.
+- Important romantic or intimate moments unless the user asks to change them.
 
-Ensure every scene serves a clear purpose.
+Do not:
 
-Ensure emotional reactions feel specific to the character rather than generic romance responses.
+- Restart the story.
+- Turn the rewrite into a new chapter.
+- Change names, ages, genders, jobs, locations or relationships.
+- Change who knows what.
+- Reset attraction, trust, conflict, intimacy or vulnerability.
+- Add unrelated illnesses, accidents, scandals, villains, blackmail, custody threats, family emergencies or ex drama.
+- Invent major new plotlines unless the user explicitly requests them.
+- Fade out or summarise an important scene unless the user explicitly asks.
 
-Avoid AI-style writing patterns.
+Improve where appropriate:
 
-Avoid repeated sentence structures.
+- Prose clarity and flow.
+- Dialogue realism.
+- Character-specific voice.
+- Emotional precision.
+- Pacing.
+- Scene immersion.
+- Sensory detail.
+- Romantic tension.
+- Paragraph rhythm.
+- Timeline clarity.
+- Weak transitions.
+- Awkward phrasing.
+- Repetition.
+- Unnecessary exposition.
+- Internal reflection that merely repeats what the reader already knows.
 
-Avoid overuse of common romance expressions and body language.
+Every scene must retain a clear purpose.
 
-The rewritten chapter should feel professionally edited, commercially published, emotionally immersive, and more engaging than the original version while preserving story continuity.
-Treat the original chapter as canon.
+Dialogue should sound natural and specific to the speaker.
 
-Improve how the story is told, never what the story is.
+Humour should arise from character and circumstance rather than automatic sarcasm or constant banter.
 
-If something can be improved without changing established events, always prefer improvement over alteration.
+Physical and emotional reactions should be precise to the individual character and moment.
 
-The reader should finish the rewrite believing this was always the original chapter, only written better.
+Avoid therapy-speak, purple prose, fake profound lines, repetitive body language, generic romance clichés and over-described rooms.
 
-STRICT REWRITE JOB:
-- Rewrite this chapter only.
-- Preserve the same chapter number.
-- Preserve the same POV heading.
-- Preserve the same core events.
-- Preserve all character names, genders, jobs, roles, relationships and locations.
-- Preserve established continuity.
-- Preserve the chapter's position in the wider story.
-- Follow the user's rewrite instruction unless it breaks continuity.
-- Do not restart the story.
-- Do not turn this into a new chapter.
-- Do not invent random new illnesses, accidents, scandals, custody threats, family emergencies, blackmail, villains or ex drama.
-- Do not add major new plotlines unless the user specifically asks.
+Respect the selected heat level and the chapter's established romantic purpose.
 
-FORMAT PRESERVATION:
-If the original chapter starts with:
+Any romantic or intimate material must involve consenting adults and remain emotionally connected to the relationship.
+
+Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
+
+FORMAT
+
+If the original chapter begins with:
 
 Chapter Number
 
 POV_NAME
 
-then the rewritten chapter must start with the same chapter number and the correct POV heading.
+the rewrite must begin with the same chapter number and correct uppercase POV heading.
 
-Do not omit the chapter heading.
-Do not omit the POV heading.
-Do not duplicate the chapter heading.
-Do not begin directly with prose.
+Do not duplicate or omit either heading.
 
-CONTINUITY:
-- Keep emotional history intact.
-- Do not reset attraction, trust, conflict, intimacy or vulnerability.
-- Do not make the characters behave like strangers if they already know each other.
-- Do not soften established conflict unless the instruction asks for it.
-- Do not change who knows what.
-- Do not change previous events.
-- Do not change living situations, family circumstances, injuries, secrets, unresolved consequences or any established facts unless the user directly asks.
+Finish the final scene completely.
 
-STYLE:
-- Write with the quality, confidence and polish of a traditionally published bestselling romance novel.
-- Preserve the established story voice completely.
-- Improve the writing without making it feel like a different author wrote it.
-- Show rather than tell wherever possible.
-- Keep character voices distinct.
-- Keep dialogue human, varied and grounded.
-- Avoid constant banter.
-- Avoid every line being a clever comeback.
-- Allow pauses, short replies, unfinished thoughts, deflection and plain speech.
-- Keep humour character-specific.
-- Avoid therapy-speak.
-- Avoid purple prose.
-- Avoid fake profound lines.
-- Avoid random object descriptions.
-- Avoid over-described rooms.
-- Avoid stiff formal narration unless intentional.
-- Use natural contractions.
-- Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
-
-DIALOGUE RULES
-
-Every conversation must have a unique purpose.
-
-Avoid repeated exchanges where characters:
-
-• Trade the same insults.
-• Repeat the same argument.
-• Discuss reactions repeatedly.
-• Revisit identical emotional territory.
-
-Conversations should reveal:
-
-• Character.
-• History.
-• Vulnerability.
-• Humour.
-• Desire.
-• Frustration.
-• Ambition.
-• Fear.
-• Real life concerns.
-
-Characters should occasionally surprise each other and the reader.
-
-Avoid multiple chapters where conversations serve only to maintain sexual tension.
-
-Sexual tension should evolve and change rather than repeat.
-
-ROMANCE AND INTIMACY:
-
-- Preserve the established romantic and emotional dynamic.
-- If the original chapter contains an intimate scene, preserve its narrative importance unless the user specifically asks to change it.
-- Build anticipation, emotional tension and chemistry naturally.
-- Use vivid, immersive sensory detail and character-specific reactions.
-- Ensure every intimate moment changes the emotional dynamic between the characters.
-- Avoid rushed transitions, repetitive phrasing and generic romance clichés.
-- Make physical affection feel unique to the personalities, history and emotional state of the characters.
-- Give important romantic moments enough page space to feel earned and emotionally satisfying.
-- Preserve the emotional and romantic purpose of every intimate scene.
-- Never shorten, summarise or fade important intimate scenes unless the user specifically requests it.
-- Preserve the pacing of emotional build-up, intimacy and aftermath.
-
-QUALITY FIXES:
-- Improve flow.
-- Tighten waffle.
-- Remove repetition.
-- Fix awkward phrasing.
-- Fix confusing dialogue.
-- Fix timeline problems.
-- Fix emotional jumps.
-- Strengthen weak beats.
-- Let important moments land.
-- Keep the chapter moving.
-- Do not over-expand setup.
-- Do not pad scenes just to make the chapter longer.
-- Do not summarise key emotional or intimate moments if they should be shown.
-
-AVOID REPETITION:
-Avoid overusing familiar romance beats such as:
-- his eyes darkened
-- my pulse kicked
-- his mouth curved without humour
-- heat flashed
-- something shifted
-- his jaw tightened
-- he went still
-- careful
-- don't
-- there it is
-- there he is
-
-Use fresher, character-specific reactions instead.
-
-REGIONAL LANGUAGE:
-Use ${storyState.regionalLanguage || form.locale || "British English"}.
-Preferred terms: ${(storyState.locationTerms || []).join(", ")}.
-Forbidden terms: ${(storyState.forbiddenTerms || []).join(", ")}.
-
-LENGTH:
-
-- Target chapter length: ${body.targetChapterWords || "4000"} words.
-- This is a firm target, not a suggestion.
-- Never intentionally exceed the target by more than 10%.
-- End at the nearest natural emotional or narrative stopping point.
-- If a scene cannot be completed naturally within the limit, end the chapter cleanly and continue it in the next chapter.
-- Do not artificially pad chapters.
-- Do not rush scenes to reach the target.
-- Every chapter must still feel complete and satisfying.
-`;
-
-FINAL OUTPUT:
 Return only the rewritten chapter.
-`;
+`.trim();
 
-  try {
     const response = await openai.responses.create({
       model: "gpt-5.5",
       reasoning: { effort: "low" },
@@ -382,16 +427,17 @@ Return only the rewritten chapter.
       return Response.json(
         {
           result:
-            "Chapter rewrite stopped before finishing. The rewrite was not saved. The route correctly blocked an incomplete rewrite instead of saving a cut-off mess.",
+            "Chapter rewrite stopped before completion and was not saved.",
           storyState,
+          incomplete: true,
         },
-        { status: 500 }
+        { status: 422 }
       );
     }
 
     const rewritten = cleanOutput(response.output_text || "");
 
-    if (!rewritten.trim()) {
+    if (!rewritten) {
       return Response.json(
         {
           result: "No rewritten chapter text was returned.",
@@ -406,13 +452,15 @@ Return only the rewritten chapter.
       storyState,
     });
   } catch (error) {
-    console.error(error);
+    console.error("REWRITE CHAPTER ERROR:", error);
 
     return Response.json(
       {
         result:
-          "Something went wrong while rewriting the chapter. The rewrite goblin tripped over itself.",
-        storyState,
+          error instanceof Error
+            ? `Rewrite error: ${error.message}`
+            : "Unknown rewrite error.",
+        storyState: {},
       },
       { status: 500 }
     );
