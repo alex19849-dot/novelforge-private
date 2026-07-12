@@ -1362,7 +1362,7 @@ function previousPage() {
 
             <div className="flex h-full items-start justify-center px-5 py-7 md:px-24">
               <div className="flex h-full w-full max-w-[820px] flex-col overflow-hidden">
-                <div ref={readerRef} className="h-[calc(100%-34px)] overflow-hidden">
+                <div ref={readerRef} className="h-[calc(100%_-_34px)] overflow-hidden">
                   <div
                   className={`h-full whitespace-pre-wrap text-left ${
   readerTheme === "dark" ? "text-[#f4ecd8]" : "text-[#111111]"
