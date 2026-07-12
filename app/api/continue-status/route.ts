@@ -76,7 +76,7 @@ if (response.status !== "completed") {
       "Chapter generation failed.",
   });
 }
-
+const chapter = cleanOutput(response.output_text || "");
    const wordCount = chapter.split(/\s+/).filter(Boolean).length;
 
     if (!chapter) {
