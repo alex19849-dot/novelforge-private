@@ -48,16 +48,34 @@ console.log(JSON.stringify(response, null, 2));
       });
     }
 
-    if (response.status !== "completed") {
-      return Response.json({
-        status: response.status,
-        complete: false,
-        failed: true,
-        error:
-          response.error?.message ||
-          "Chapter generation ended without completing.",
-      });
-    }
+    if (response.status === "incomplete") {
+  const partialChapter = cleanOutput(response.output_text || "");
+
+  return Response.json({
+    status: "incomplete",
+    complete: false,
+    failed: true,
+    partialChapter,
+    reason:
+      response.incomplete_details?.reason ||
+      "unknown",
+    error:
+      response.incomplete_details?.reason === "max_output_tokens"
+        ? "Chapter hit the output limit before reaching the ending."
+        : "Chapter generation ended before completion.",
+  });
+}
+
+if (response.status !== "completed") {
+  return Response.json({
+    status: response.status,
+    complete: false,
+    failed: true,
+    error:
+      response.error?.message ||
+      "Chapter generation failed.",
+  });
+}
 
     const chapter = cleanOutput(response.output_text || "");
 
