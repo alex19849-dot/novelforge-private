@@ -77,7 +77,7 @@ if (response.status !== "completed") {
   });
 }
 
-    const chapter = cleanOutput(response.output_text || "");
+   const wordCount = chapter.split(/\s+/).filter(Boolean).length;
 
     if (!chapter) {
       return Response.json({
@@ -89,10 +89,11 @@ if (response.status !== "completed") {
     }
 
     return Response.json({
-      status: "completed",
-      complete: true,
-      result: chapter,
-    });
+  status: "completed",
+  complete: true,
+  result: chapter,
+  wordCount,
+});
   } catch (error) {
     console.error("CONTINUE STATUS ERROR:", error);
 
