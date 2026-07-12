@@ -400,7 +400,7 @@ End with a completed scene and a meaningful emotional turn, decision, complicati
       reasoning: { effort: "low" },
       text: { verbosity: "medium" },
       input: prompt,
-      max_output_tokens: 10000,
+      max_output_tokens: 16000,
       background: true,
       store: true,
     });
