@@ -502,7 +502,7 @@ async function saveStoryBibleChanges() {
     }
 
     const jobId = startData.jobId;
-    const maxPollAttempts = 100;
+    const maxPollAttempts = 300;
     const pollDelayMs = 3000;
 
     let completedChapter = "";
