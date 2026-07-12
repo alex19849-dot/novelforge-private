@@ -175,17 +175,23 @@ Replace POV_NAME with the correct point-of-view character name in uppercase.
 
 CHAPTER LENGTH
 
-Target approximately ${targetChapterWords} words.
+Write between ${targetChapterWords - 250} and ${targetChapterWords} words.
 
-Complete the chapter within that target.
+Treat this as a hard requirement.
 
-Do not exceed the target by more than 10 percent.
+Plan the chapter before writing.
 
-Limit the chapter to scenes that can be completed naturally within the available length.
+Limit the chapter to two or three meaningful scenes.
 
-Do not begin another major scene near the end unless it can be completed.
+As you approach the target length, begin resolving the current scene.
 
-Prioritise a complete final scene over extra description, backstory or internal reflection.
+Do not start a new scene after approximately 80% of the target length.
+
+If additional story events remain, leave them for the next chapter.
+
+Never continue writing simply because more story exists.
+
+A chapter that ends naturally at the target length is always better than an overlong chapter.
 
 STORY BIBLE
 
