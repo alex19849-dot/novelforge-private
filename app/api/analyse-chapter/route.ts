@@ -169,7 +169,7 @@ ${chapter}
       reasoning: { effort: "low" },
       text: { verbosity: "low" },
       input: prompt,
-      max_output_tokens: 2500,
+      max_output_tokens: 4000,
     });
 
     if (response.status === "incomplete") {
