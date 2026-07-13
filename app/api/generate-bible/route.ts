@@ -555,7 +555,7 @@ ${chapter}
 `.trim();
 
       const analysisResponse = await openai.responses.create({
-        model: "gpt-5.5",
+        model: "gpt-5.6-terra",
         reasoning: { effort: "low" },
         text: { verbosity: "low" },
         input: analysisPrompt,
