@@ -402,7 +402,7 @@ End with a completed scene and a meaningful emotional turn, decision, complicati
 `.trim();
 
     const response = await openai.responses.create({
-      model: "gpt-5.5",
+      model: "gpt-5.6-terra",
       reasoning: { effort: "low" },
       text: { verbosity: "medium" },
       input: prompt,
