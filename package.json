@@ -11,6 +11,7 @@
     "openai": "latest",
     "react": "latest",
     "react-dom": "latest"
+    "typescript": "latest"
   },
   "devDependencies": {
     "@types/node": "latest",
@@ -19,6 +20,5 @@
     "autoprefixer": "latest",
     "postcss": "latest",
     "tailwindcss": "3.4.17",
-    "typescript": "latest"
   }
 }
