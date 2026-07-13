@@ -10,7 +10,7 @@
     "next": "latest",
     "openai": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
     "typescript": "latest"
   },
   "devDependencies": {
@@ -19,6 +19,6 @@
     "@types/react-dom": "latest",
     "autoprefixer": "latest",
     "postcss": "latest",
-    "tailwindcss": "3.4.17",
+    "tailwindcss": "3.4.17"
   }
 }
