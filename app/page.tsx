@@ -420,52 +420,113 @@ async function saveStoryBibleChanges() {
   }
 }
   async function generateStory() {
-    if (!user) {
-      setAuthMessage("Log in first so the story can save across devices.");
-      return;
-    }
-
-    setLoading(true);
-    setCopyMessage("");
-    setChapters([]);
-    setActiveChapterIndex(0);
-    setPageIndex(0);
-
-    try {
-      const response = await fetch("/api/generate-bible", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(preparedForm),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Generate failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const chapter = data.result || "Something went wrong.";
-      const newStoryState = data.storyState || {};
-      const newChapters = [chapter];
-
-      setStoryState(newStoryState);
-      setChapters(newChapters);
-      setActiveChapterIndex(0);
-
-      await saveCurrentStory({
-        form: preparedForm,
-        chapters: newChapters,
-        activeChapterIndex: 0,
-        chapterGuidance,
-        storyState: newStoryState,
-      });
-    } catch (error) {
-      console.error("Generate story error:", error);
-      setCopyMessage(error instanceof Error ? error.message : "Generate failed.");
-    } finally {
-      setLoading(false);
-    }
+  if (!user) {
+    setAuthMessage("Log in first so the story can save across devices.");
+    return;
   }
 
+  setLoading(true);
+  setCopyMessage("Starting Chapter 1...");
+  setChapters([]);
+  setActiveChapterIndex(0);
+  setPageIndex(0);
+
+  try {
+    const startResponse = await fetch("/api/generate-bible", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(preparedForm),
+    });
+
+    const startData = await startResponse.json();
+
+    if (!startResponse.ok) {
+      throw new Error(
+        startData.result ||
+          startData.error ||
+          `Generate failed: ${startResponse.status}`
+      );
+    }
+
+    if (!startData.jobId) {
+      throw new Error("No background generation job was returned.");
+    }
+
+    const jobId = startData.jobId;
+    const openingStoryState = startData.openingStoryState || {};
+    const maxPollAttempts = 300;
+    const pollDelayMs = 3000;
+
+    let chapter = "";
+    let newStoryState = openingStoryState;
+
+    for (let attempt = 1; attempt <= maxPollAttempts; attempt++) {
+      setCopyMessage("Generating Chapter 1...");
+
+      await new Promise((resolve) =>
+        window.setTimeout(resolve, pollDelayMs)
+      );
+
+      const statusResponse = await fetch("/api/generate-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId,
+          form: preparedForm,
+          openingStoryState,
+        }),
+      });
+
+      const statusData = await statusResponse.json();
+
+      if (!statusResponse.ok || statusData.failed) {
+        throw new Error(
+          statusData.error ||
+            `Generate status failed: ${statusResponse.status}`
+        );
+      }
+
+      if (statusData.complete && statusData.result) {
+        chapter = statusData.result;
+        newStoryState =
+          statusData.storyState || openingStoryState;
+        break;
+      }
+    }
+
+    if (!chapter) {
+      throw new Error(
+        "Chapter 1 is still unfinished after fifteen minutes."
+      );
+    }
+
+    const newChapters = [chapter];
+
+    setStoryState(newStoryState);
+    setChapters(newChapters);
+    setActiveChapterIndex(0);
+    setPageIndex(0);
+    setCopyMessage("Chapter 1 generated.");
+
+    await saveCurrentStory({
+      form: preparedForm,
+      chapters: newChapters,
+      activeChapterIndex: 0,
+      chapterGuidance,
+      storyState: newStoryState,
+    });
+  } catch (error) {
+    console.error("Generate story error:", error);
+
+    setCopyMessage(
+      error instanceof Error
+        ? error.message
+        : "Generate failed."
+    );
+  } finally {
+    setLoading(false);
+  }
+}
  async function continueStory() {
   if (!activeChapter) return;
 
