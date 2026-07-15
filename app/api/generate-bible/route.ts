@@ -421,12 +421,20 @@ End with a completed scene and a strong emotional turn, decision, complication, 
 `.trim();
 
     const response = await openai.responses.create({
-      model: "gpt-5.5",
-      reasoning: { effort: "low" },
-      text: { verbosity: "medium" },
-      input: prompt,
-      max_output_tokens: 10000,
-    });
+  model: "gpt-5.6-terra",
+  reasoning: { effort: "low" },
+  text: { verbosity: "medium" },
+  input: prompt,
+  max_output_tokens: 16000,
+  background: true,
+  store: true,
+});
+
+return Response.json({
+  jobId: response.id,
+  status: response.status,
+  openingStoryState,
+});
 
     if (response.status === "incomplete") {
       return Response.json(
