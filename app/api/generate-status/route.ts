@@ -308,9 +308,9 @@ ${chapter}
         );
 
         const voice = parsed.voiceProfile || {};
-        const memory = parsed.storyMemory || {};
-        const repetition =
-          parsed.repetitionReport || {};
+       const memory = parsed.storyMemory || {};
+const summary = parsed.chapterSummary || {};
+const repetition = parsed.repetitionReport || {};
 
         generatedVoiceProfile = {
           primaryTone: voice.primaryTone || "",
