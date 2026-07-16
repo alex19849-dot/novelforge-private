@@ -364,6 +364,14 @@ const repetition = parsed.repetitionReport || {};
           rules: stringArray(memory.rules),
         };
 
+const generatedChapterSummary: ChapterSummary = {
+  currentScene: summary.currentScene || "",
+  lastEvent: summary.lastEvent || "",
+  emotionalState: summary.emotionalState || "",
+  relationshipState: summary.relationshipState || "",
+  immediateNextStep: summary.immediateNextStep || "",
+};
+        
         generatedRepetitionReport = {
           overusedWords: stringArray(
             repetition.overusedWords
