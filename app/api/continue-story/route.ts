@@ -344,6 +344,31 @@ Preserve the differences between each character's narration, speech, humour, obs
 
 Do not drift into generic romance narration, interchangeable sarcasm or constant banter.
 
+CURRENT CONTINUITY CHECKPOINT
+
+Current scene:
+${chapterSummary.currentScene || "Not yet recorded"}
+
+Last meaningful event:
+${chapterSummary.lastEvent || "Not yet recorded"}
+
+Current emotional state:
+${chapterSummary.emotionalState || "Not yet recorded"}
+
+Current relationship state:
+${chapterSummary.relationshipState || "Not yet recorded"}
+
+Immediate logical next step:
+${chapterSummary.immediateNextStep || "Continue naturally from the previous chapter"}
+
+Treat this checkpoint as authoritative.
+
+Continue from this exact story position unless the previous chapter clearly ended with a time or location transition.
+
+Do not invent events, conversations, decisions, discoveries or relationship developments that have not happened.
+
+Do not skip past the immediate next step without showing it on page.
+
 CONTINUITY MEMORY
 
 Important facts:
