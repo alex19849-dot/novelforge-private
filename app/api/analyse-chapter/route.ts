@@ -344,10 +344,11 @@ const updatedChapterSummary: ChapterSummary = {
         : repetitionReport.guidance,
     };
 
-    return Response.json({
-      storyMemory: updatedMemory,
-      repetitionReport: updatedRepetitionReport,
-    });
+   return Response.json({
+  storyMemory: updatedMemory,
+  chapterSummary: updatedChapterSummary,
+  repetitionReport: updatedRepetitionReport,
+});
   } catch (error) {
     console.error("ANALYSE CHAPTER ERROR:", error);
 
