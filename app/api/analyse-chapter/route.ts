@@ -240,7 +240,8 @@ ${chapter}
     );
 
     const memory = parsed.storyMemory || {};
-    const repetition = parsed.repetitionReport || {};
+const summary = parsed.chapterSummary || {};
+const repetition = parsed.repetitionReport || {};
 
     const updatedMemory: StoryMemory = {
       importantFacts: Array.isArray(
