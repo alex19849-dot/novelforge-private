@@ -153,6 +153,24 @@ export async function POST(req: Request) {
       guidance: stringArray(savedRepetition.guidance),
     };
 
+type ChapterSummary = {
+  currentScene: string;
+  lastEvent: string;
+  emotionalState: string;
+  relationshipState: string;
+  immediateNextStep: string;
+};
+
+const savedSummary = incomingState.chapterSummary || {};
+
+const chapterSummary: ChapterSummary = {
+  currentScene: savedSummary.currentScene || "",
+  lastEvent: savedSummary.lastEvent || "",
+  emotionalState: savedSummary.emotionalState || "",
+  relationshipState: savedSummary.relationshipState || "",
+  immediateNextStep: savedSummary.immediateNextStep || "",
+};
+    
     const chapterLabel = `Chapter ${nextChapterNumber}`;
 
     const prompt = `
