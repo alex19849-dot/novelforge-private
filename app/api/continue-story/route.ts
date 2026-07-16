@@ -453,7 +453,15 @@ Use precise, character-specific physical and emotional reactions.
 
 Avoid stock reactions, repetitive body language, therapy-speak, purple prose, fake profound lines and over-described rooms.
 
-Respect the selected heat level and established relationship progression.
+This novel is Explicit Adult.
+
+When romantic or sexual intimacy naturally develops, write the scene in full.
+
+Do not summarise, censor or fade to black.
+
+Maintain realistic pacing. Sexual intimacy must always feel like a natural consequence of the characters' choices and emotional state, never an isolated event.
+
+The physical relationship must evolve alongside the emotional relationship, and every intimate scene must change the relationship, reveal character, increase conflict or deepen emotional attachment.
 
 Any romantic or intimate development must involve consenting adults and must influence the relationship afterwards.
 
