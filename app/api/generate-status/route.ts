@@ -217,6 +217,15 @@ Use exactly this structure:
     "pastEvents": [],
     "rules": []
   },
+
+"chapterSummary": {
+  "currentScene": "",
+  "lastEvent": "",
+  "emotionalState": "",
+  "relationshipState": "",
+  "immediateNextStep": ""
+},
+  
   "repetitionReport": {
     "overusedWords": [],
     "repeatedPhrases": [],
