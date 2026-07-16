@@ -1052,19 +1052,6 @@ function previousPage() {
     "Australian English",
   ]}
 />
-    <SelectField
-      label="Heat Level"
-      field="heat"
-      form={form}
-      updateField={updateField}
-      options={[
-        "Explicit adult",
-        "High spice",
-        "Open door",
-        "Moderate spice",
-        "Fade to black",
-      ]}
-    />
 
     <SelectField
       label="Burn Pacing"
