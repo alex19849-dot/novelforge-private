@@ -22,6 +22,14 @@ type RepetitionReport = {
   guidance: string[];
 };
 
+type ChapterSummary = {
+  currentScene: string;
+  lastEvent: string;
+  emotionalState: string;
+  relationshipState: string;
+  immediateNextStep: string;
+};
+
 function cleanJsonOutput(text: string) {
   return text
     .replace(/^```json\s*/i, "")
