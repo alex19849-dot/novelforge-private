@@ -277,6 +277,33 @@ const repetition = parsed.repetitionReport || {};
         : storyMemory.rules,
     };
 
+const updatedChapterSummary: ChapterSummary = {
+  currentScene:
+    typeof summary.currentScene === "string"
+      ? summary.currentScene
+      : chapterSummary.currentScene,
+
+  lastEvent:
+    typeof summary.lastEvent === "string"
+      ? summary.lastEvent
+      : chapterSummary.lastEvent,
+
+  emotionalState:
+    typeof summary.emotionalState === "string"
+      ? summary.emotionalState
+      : chapterSummary.emotionalState,
+
+  relationshipState:
+    typeof summary.relationshipState === "string"
+      ? summary.relationshipState
+      : chapterSummary.relationshipState,
+
+  immediateNextStep:
+    typeof summary.immediateNextStep === "string"
+      ? summary.immediateNextStep
+      : chapterSummary.immediateNextStep,
+};
+    
     const updatedRepetitionReport: RepetitionReport = {
       overusedWords: Array.isArray(
         repetition.overusedWords
