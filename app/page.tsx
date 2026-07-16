@@ -629,13 +629,15 @@ try {
     const analysisData = await analysisResponse.json();
 
     newStoryState = {
-      ...newStoryState,
-      storyMemory:
-        analysisData.storyMemory || newStoryState.storyMemory,
-      repetitionReport:
-        analysisData.repetitionReport ||
-        newStoryState.repetitionReport,
-    };
+  ...newStoryState,
+  storyMemory:
+    analysisData.storyMemory || newStoryState.storyMemory,
+  chapterSummary:
+    analysisData.chapterSummary || newStoryState.chapterSummary,
+  repetitionReport:
+    analysisData.repetitionReport ||
+    newStoryState.repetitionReport,
+};
   }
 } catch (analysisError) {
   console.error("Chapter analysis failed:", analysisError);
