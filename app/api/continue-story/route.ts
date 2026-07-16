@@ -477,6 +477,8 @@ Continue existing conversations, emotional developments and unresolved situation
 
 Carry forward every established fact including names, ages, jobs, relationships, injuries, promises, secrets, locations and knowledge.
 
+Never contradict an established character's personality, values, speech patterns, fears, desires or previous decisions unless the story has clearly shown the events that caused the change.
+
 Characters must remember what has already happened and behave consistently with previous chapters.
 
 Build on emotional progress.
@@ -487,9 +489,13 @@ Choose the most believable next development rather than a familiar romance trope
 
 Finish existing scenes before beginning new ones.
 
+Show every important emotional turning point on the page. Never tell the reader that something important happened between scenes if it should have been witnessed.
+
 Every scene must advance the characters, relationship, conflict or plot.
 
 Deepen existing threads before creating new ones.
+
+Characters should solve problems through believable decisions, actions and conversations rather than convenient coincidences, sudden revelations or unrealistic misunderstandings.
 
 Do not introduce random illnesses, accidents, scandals, blackmail, family emergencies, custody disputes, villains or external drama unless they have already been established or arise naturally from previous events.
 
