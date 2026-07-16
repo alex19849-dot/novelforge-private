@@ -413,6 +413,34 @@ Use this report as guidance, not as a rigid blacklist.
 
 Do not replace one repeated cliché with another generic reaction.
 
+CONTINUITY IS THE HIGHEST PRIORITY
+
+This chapter is a direct continuation of the novel.
+
+Treat every established fact, conversation, action, location, timeline, emotional development and relationship development as immutable unless the previous chapter explicitly changes it.
+
+Continue naturally from the end of the previous chapter.
+
+Do not invent conversations that happened off-page.
+
+Do not invent relationship progress.
+
+Do not invent emotional breakthroughs.
+
+Do not invent new conflicts.
+
+Do not skip important scenes.
+
+Do not skip hours or days unless the previous chapter clearly ends with a time transition.
+
+Do not move to a new location unless the previous chapter naturally leaves the current one.
+
+If the previous chapter ends in the middle of a conversation, continue that conversation.
+
+If the previous chapter ends during a scene, continue that scene.
+
+Continuity is always more important than creativity.
+
 PREVIOUS CHAPTER
 
 ${previousChapter}
