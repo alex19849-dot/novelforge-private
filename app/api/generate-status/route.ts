@@ -181,7 +181,13 @@ export async function POST(req: Request) {
     let generatedVoiceProfile = emptyVoiceProfile;
     let generatedStoryMemory = emptyStoryMemory;
     let generatedRepetitionReport = emptyRepetitionReport;
-
+let generatedChapterSummary: ChapterSummary = {
+  currentScene: "",
+  lastEvent: "",
+  emotionalState: "",
+  relationshipState: "",
+  immediateNextStep: "",
+};
     try {
       const analysisPrompt = `
 Analyse Chapter 1 and create the saved guidance needed for future chapters.
