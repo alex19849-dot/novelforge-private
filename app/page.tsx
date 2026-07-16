@@ -102,6 +102,7 @@ export default function Home() {
   return {
     ...defaultForm,
     ...form,
+    heat: "Explicit adult",
   };
 }, [form]);
 
