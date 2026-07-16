@@ -303,6 +303,10 @@ unless the character is deliberately speaking formally, emphasising a point, or 
 
 Narration should sound fluent, contemporary and spoken rather than mechanically expanded.
 
+INTIMACY SCENES
+
+All scenes of physical intimacy MUST be detailed, graphic, filthy and erotic. They MUST be immersive, character-driven, and written moment by moment rather than summarised. Show the progression of each interaction through clear actions, believable reactions, changing emotional states, body language, dialogue, pacing, and escalating tension. Avoid vague descriptions, repetitive phrasing, euphemisms, or fade-to-black transitions. Every intimate scene should reveal character, deepen the relationship, shift the power dynamic, or create meaningful consequences for later chapters.
+
 STORY BIBLE
 
 Title:
