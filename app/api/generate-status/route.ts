@@ -370,7 +370,7 @@ const repetition = parsed.repetitionReport || {};
           rules: stringArray(memory.rules),
         };
 
-const generatedChapterSummary: ChapterSummary = {
+generatedChapterSummary = {
   currentScene: summary.currentScene || "",
   lastEvent: summary.lastEvent || "",
   emotionalState: summary.emotionalState || "",
