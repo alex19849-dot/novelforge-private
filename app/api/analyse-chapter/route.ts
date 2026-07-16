@@ -153,6 +153,10 @@ PREVIOUS REPETITION REPORT:
 
 ${JSON.stringify(repetitionReport, null, 2)}
 
+PREVIOUS CHAPTER SUMMARY:
+
+${JSON.stringify(chapterSummary, null, 2)}
+
 STORY MEMORY RULES
 
 Preserve established continuity unless the new chapter explicitly changes it.
@@ -166,6 +170,33 @@ Remove an unresolved thread only when the new chapter clearly resolves it.
 Do not summarise the entire chapter.
 
 Do not include temporary emotions unless they affect later chapters.
+
+CHAPTER SUMMARY RULES
+
+Update the chapter summary to reflect the exact state of the story at the end of this chapter.
+
+currentScene
+Describe where the story is physically and chronologically when the chapter ends.
+
+lastEvent
+Describe the final meaningful event that occurred before the chapter ended.
+
+emotionalState
+Summarise the emotional state of the main viewpoint character and romantic interest at the end of the chapter.
+
+relationshipState
+Describe the current state of the central relationship.
+
+immediateNextStep
+State what should logically happen next if the story continues immediately.
+
+Keep every field concise.
+
+Never invent future events.
+
+Do not skip ahead.
+
+Treat this as the authoritative continuity checkpoint for the next chapter.
 
 REPETITION RULES
 
