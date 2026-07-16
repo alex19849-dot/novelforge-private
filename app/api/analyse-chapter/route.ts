@@ -103,7 +103,15 @@ export async function POST(req: Request) {
       ),
       guidance: stringArray(savedRepetition.guidance),
     };
+const savedSummary = storyState.chapterSummary || {};
 
+const chapterSummary: ChapterSummary = {
+  currentScene: savedSummary.currentScene || "",
+  lastEvent: savedSummary.lastEvent || "",
+  emotionalState: savedSummary.emotionalState || "",
+  relationshipState: savedSummary.relationshipState || "",
+  immediateNextStep: savedSummary.immediateNextStep || "",
+};
     const prompt = `
 Analyse the newly generated chapter and update the saved guidance for future chapters.
 
