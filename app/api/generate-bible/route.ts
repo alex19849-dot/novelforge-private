@@ -416,7 +416,13 @@ Use precise, character-specific physical and emotional reactions.
 
 Avoid stock reactions, repetitive body language, therapy-speak, purple prose, fake profound lines and over-described rooms.
 
-Respect the selected heat level. Do not force intimacy into Chapter 1 merely because the novel is high heat.
+This novel is Explicit Adult.
+
+When romantic or sexual intimacy naturally occurs, write it in full rather than summarising or fading to black.
+
+Do not censor, skip or abbreviate intimate scenes.
+
+However, intimacy must arise naturally from the characters, relationship and story progression. Do not insert sexual content where it would feel forced or damage pacing.
 
 Any romantic or intimate development must involve consenting adults and must affect the relationship afterwards.
 
