@@ -42,6 +42,14 @@ type RepetitionReport = {
   guidance: string[];
 };
 
+type ChapterSummary = {
+  currentScene: string;
+  lastEvent: string;
+  emotionalState: string;
+  relationshipState: string;
+  immediateNextStep: string;
+};
+
 function cleanOutput(text: string) {
   return text.replace(/[—–]/g, ",").trim();
 }
