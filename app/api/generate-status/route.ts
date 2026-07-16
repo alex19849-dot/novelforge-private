@@ -400,14 +400,14 @@ const generatedChapterSummary: ChapterSummary = {
       );
     }
 
-    const storyState = {
-      ...openingStoryState,
-      chapter: 1,
-      voiceProfile: generatedVoiceProfile,
-      storyMemory: generatedStoryMemory,
-      repetitionReport: generatedRepetitionReport,
-    };
-
+   const storyState = {
+  ...openingStoryState,
+  chapter: 1,
+  voiceProfile: generatedVoiceProfile,
+  storyMemory: generatedStoryMemory,
+  chapterSummary: generatedChapterSummary,
+  repetitionReport: generatedRepetitionReport,
+};
     return Response.json({
       status: "completed",
       complete: true,
