@@ -129,6 +129,13 @@ Use exactly this structure:
     "pastEvents": [],
     "rules": []
   },
+  "chapterSummary": {
+    "currentScene": "",
+    "lastEvent": "",
+    "emotionalState": "",
+    "relationshipState": "",
+    "immediateNextStep": ""
+  },
   "repetitionReport": {
     "overusedWords": [],
     "repeatedPhrases": [],
@@ -138,7 +145,6 @@ Use exactly this structure:
     "guidance": []
   }
 }
-
 EXISTING STORY MEMORY:
 
 ${JSON.stringify(storyMemory, null, 2)}
