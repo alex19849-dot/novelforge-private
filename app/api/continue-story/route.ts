@@ -270,7 +270,7 @@ Point of view:
 ${form.pov || "First person, dual POV"}
 
 Heat level:
-${form.heat || incomingState.heat || "Open door"}
+Explicit adult
 
 Burn pacing:
 ${form.burnPacing || "Medium burn"}
