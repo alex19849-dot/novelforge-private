@@ -201,10 +201,7 @@ export async function POST(req: Request) {
         ? body.relationship.trim()
         : "Romance";
 
-    const heat =
-      typeof body.heat === "string" && body.heat.trim()
-        ? body.heat.trim()
-        : "Open door";
+    const heat = "Explicit adult";
 
     const targetChapterWords = getTargetChapterWords(
       body.targetChapterWords
