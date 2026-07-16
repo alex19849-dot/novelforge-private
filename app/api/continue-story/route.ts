@@ -225,6 +225,28 @@ unless the character is deliberately speaking formally, emphasising a point, or 
 
 Narration should sound fluent, contemporary and spoken rather than mechanically expanded.
 
+SCENE STRUCTURE
+
+Write each chapter as a continuous reading experience rather than a collection of disconnected scenes.
+
+Remain in the current scene until it has naturally concluded.
+
+Do not skip conversations, emotional reactions or important character interactions that the reader expects to witness.
+
+Do not jump ahead simply to reach the next plot point.
+
+Characters should react naturally to events before the story moves forward.
+
+Every scene should have a clear beginning, development and resolution.
+
+Only move to a new location or time when the current scene has fully played out or a transition is clearly shown on the page.
+
+Do not rush emotional beats, arguments, intimacy or reconciliation.
+
+Allow important moments to breathe before introducing the next conflict.
+
+If the chapter ends in the middle of an important interaction, end naturally at that moment rather than forcing another scene.
+
 INTIMACY SCENES
 
 All scenes of physical intimacy MUST be detailed, graphic, filthy and erotic. They MUST be immersive, character-driven, and written moment by moment rather than summarised. Show the progression of each interaction through clear actions, believable reactions, changing emotional states, body language, dialogue, pacing, and escalating tension. Avoid vague descriptions, repetitive phrasing, euphemisms, or fade-to-black transitions. Every intimate scene should reveal character, deepen the relationship, shift the power dynamic, or create meaningful consequences for later chapters.
