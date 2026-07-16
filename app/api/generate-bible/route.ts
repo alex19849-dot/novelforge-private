@@ -289,6 +289,20 @@ Limit its scope to material that can be completed naturally within the available
 Do not begin another major scene near the end unless it can be completed.
 Prioritise a satisfying ending over extra setup, description, backstory or internal reflection.
 
+STYLE
+
+Use natural contractions in narration, internal thoughts and dialogue wherever a real person would use them.
+
+Write:
+I’m, I’d, I’ll, I’ve, it’s, isn’t, wasn’t, don’t, didn’t, can’t, won’t, shouldn’t, wouldn’t, he’s, she’s, they’re, we’re.
+
+Avoid stiff, overly formal phrasing such as:
+I am, I did not, it is, he is, she is, we are, they are, cannot, would not, should not,
+
+unless the character is deliberately speaking formally, emphasising a point, or the full form sounds more natural in that specific sentence.
+
+Narration should sound fluent, contemporary and spoken rather than mechanically expanded.
+
 STORY BIBLE
 
 Title:
