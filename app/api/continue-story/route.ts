@@ -469,55 +469,53 @@ ${previousChapter}
 
 CONTINUATION JOB
 
-Continue naturally from the previous chapter.
+Write the next chapter as a direct continuation of the previous one.
 
-Do not restart the story or repeat its setup.
+Build naturally from the final scene without repeating established information.
 
-Do not reintroduce established characters.
+Continue existing conversations, emotional developments and unresolved situations before introducing anything new.
 
-Carry forward the immediate emotional, relational and practical consequences of the previous chapter.
+Carry forward every established fact including names, ages, jobs, relationships, injuries, promises, secrets, locations and knowledge.
 
-Preserve established names, ages, jobs, locations, relationships, promises, secrets, injuries and knowledge.
+Characters must remember what has already happened and behave consistently with previous chapters.
 
-Build on previous emotional progress.
+Build on emotional progress.
 
-Do not reset attraction, trust, conflict, intimacy or vulnerability.
+Never reset attraction, trust, conflict, intimacy or vulnerability.
 
-Choose the most believable next development for these characters rather than a familiar romance beat.
+Choose the most believable next development rather than a familiar romance trope or dramatic twist.
 
-Every scene must advance character, relationship, conflict or plot.
+Finish existing scenes before beginning new ones.
 
-Resolve or deepen existing threads before inventing unrelated drama.
+Every scene must advance the characters, relationship, conflict or plot.
 
-Do not introduce random illnesses, accidents, scandals, blackmail, family emergencies, custody threats or new villains unless they are already established.
+Deepen existing threads before creating new ones.
 
-Dialogue must sound natural and specific to the speaker.
+Do not introduce random illnesses, accidents, scandals, blackmail, family emergencies, custody disputes, villains or external drama unless they have already been established or arise naturally from previous events.
 
-Humour must arise from character and circumstance rather than automatic sarcasm.
+Dialogue must sound unique to each speaker.
 
-Avoid repeated arguments, emotional breakthroughs and jealousy scenes.
+Humour must arise from personality and situation rather than default sarcasm.
 
-Internal thoughts must add a new realisation, decision, fear or conflict rather than explaining what the reader already understands.
+Internal thoughts should reveal new decisions, fears, desires or realisations instead of repeating what the reader already knows.
 
 Use precise, character-specific physical and emotional reactions.
 
-Avoid stock reactions, repetitive body language, therapy-speak, purple prose, fake profound lines and over-described rooms.
+Avoid repetitive body language, stock emotional responses, therapy language, purple prose and over-explained descriptions.
 
 This novel is Explicit Adult.
 
-When romantic or sexual intimacy naturally develops, write the scene in full.
+Intimacy should always develop naturally from the relationship and emotional state of the characters.
 
-Do not summarise, censor or fade to black.
+Never summarise or skip important relationship developments.
 
-Maintain realistic pacing. Sexual intimacy must always feel like a natural consequence of the characters' choices and emotional state, never an isolated event.
+Maintain realistic pacing throughout.
 
-The physical relationship must evolve alongside the emotional relationship, and every intimate scene must change the relationship, reveal character, increase conflict or deepen emotional attachment.
+Use British punctuation rules.
 
-Any romantic or intimate development must involve consenting adults and must influence the relationship afterwards.
+Never use em dashes or en dashes.
 
-Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
-
-End with a completed scene and a meaningful emotional turn, decision, complication, discovery or charged moment.
+End the chapter with a completed scene and a meaningful emotional, relational or plot development that naturally leads into the following chapter.
 `.trim();
 
     const response = await openai.responses.create({
