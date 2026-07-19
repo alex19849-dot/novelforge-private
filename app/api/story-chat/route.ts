@@ -375,6 +375,7 @@ export async function POST(request: Request) {
 
     const rawBody: unknown = await request.json();
     const parsedBody = parseRequestBody(rawBody);
+const currentStory = parsedBody?.story;
 
     if (!parsedBody) {
       return NextResponse.json(
