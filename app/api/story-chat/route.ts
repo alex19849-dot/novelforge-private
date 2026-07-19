@@ -426,13 +426,13 @@ const latestMessage =
 const intent = detectStoryIntent(latestMessage);
  const intentInstruction: Record<typeof intent, string> = {
   create_story:
-    "Create a new story workspace from the user's request.",
+  "Create a brand new story from the user's request. Generate a complete story bible and opening chapter. Do not reuse, modify, or merge with the current story workspace.",
   continue_story:
   "Continue the existing story by writing the next chapter only. Update the story bible only if genuinely necessary to preserve continuity. Do not rewrite or replace existing chapters.",
  rewrite_chapter:
   "Rewrite only the chapter or passage explicitly requested by the user. Preserve the overall story, chronology, characters, and all other chapters unless the user specifically asks for wider changes. Update the story bible only if the rewrite introduces permanent story changes.",
   update_story:
-    "Update the existing story workspace without creating a new story.",
+  "Apply only the specific permanent changes requested by the user. Update the story bible, chapters, characters, or story state only where necessary. Preserve everything else exactly as it is. Never make unrelated edits or invent additional changes.",
  brainstorm:
   "Give useful story ideas only. Do not change the story bible, chapters, timeline, world, notes, or any other part of the current story workspace.",
  general_chat:
