@@ -176,15 +176,23 @@ useEffect(() => {
 }
 
   const updatedMessages = [
-    ...messages,
-    {
-      id: Date.now(),
-      role: "user" as const,
-      content: trimmedMessage,
-    },
-  ];
+  ...messages,
+  {
+    id: Date.now(),
+    role: "user" as const,
+    content: trimmedMessage,
+  },
+];
 
-  
+setStory((current) =>
+  current
+    ? {
+        ...current,
+        messages: updatedMessages,
+      }
+    : null
+);
+
 setInput("");
 setIsThinking(true);
 
