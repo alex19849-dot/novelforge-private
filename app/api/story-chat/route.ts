@@ -469,7 +469,7 @@ if (!reply) {
   throw new Error("The model returned an empty reply.");
 }
 const returnedBible = sanitiseStoryBible(
-  parsedOutput.storyBible,
+  parsedOutput.storyBible ?? {},
 );
 
 const returnedChapters = Array.isArray(parsedOutput.chapters)
