@@ -467,6 +467,10 @@ if (!parsedOutput.storyBible) {
     };
 
    const reply = cleanString(parsedOutput.reply);
+
+if (!reply) {
+  throw new Error("The model returned an empty reply.");
+}
 const returnedBible = sanitiseStoryBible(
   parsedOutput.storyBible,
 );
