@@ -1,16 +1,12 @@
-export type ChatMessage = {
-  id: number;
-  role: "assistant" | "user";
-  content: string;
-};
-
 export type ActiveTab = "chat" | "chapters" | "bible";
 
-export type SeriesType =
-  | "standalone"
-  | "duet"
-  | "trilogy"
-  | "interconnected-standalones";
+export type ChatRole = "user" | "assistant";
+
+export type ChatMessage = {
+  id: number;
+  role: ChatRole;
+  content: string;
+};
 
 export type StoryBible = {
   premise: string;
@@ -25,15 +21,39 @@ export type StoryBible = {
   notes: string[];
 };
 
+export type StoryChapter = {
+  id: string;
+  number: number;
+  title: string;
+  povCharacter: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type StoryWorkspace = {
   id: string;
   title: string;
-  seriesType: SeriesType;
+  seriesType: "standalone" | "series";
   seriesTitle: string;
   bookNumber: number;
   messages: ChatMessage[];
-  chapters: string[];
+  chapters: StoryChapter[];
   storyBible: StoryBible;
   createdAt: string;
   updatedAt: string;
+};
+
+export type StoryChatRequest = {
+  messages: Array<Pick<ChatMessage, "role" | "content">>;
+  storyBible: StoryBible;
+};
+
+export type StoryChatResponse = {
+  reply: string;
+  storyBible: StoryBible;
+  chapters?: StoryChapter[];
+  timeline?: unknown[];
+  world?: Record<string, unknown>;
+  notes?: string[];
 };
