@@ -23,6 +23,7 @@ const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
 const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
+  const [storyTitle, setStoryTitle] = useState("Untitled story");
 useEffect(() => {
   try {
     const savedMessages = window.localStorage.getItem(
