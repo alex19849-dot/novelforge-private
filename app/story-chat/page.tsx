@@ -216,14 +216,21 @@ try {
       throw new Error(data.error || "Unknown error");
     }
 
-    setMessages((current) => [
-      ...current,
-      {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: data.reply,
-      },
-    ]);
+   setStory((current) =>
+  current
+    ? {
+        ...current,
+        messages: [
+          ...current.messages,
+          {
+            id: Date.now() + 1,
+            role: "assistant",
+            content: data.reply,
+          },
+        ],
+      }
+    : null
+);
     } catch (error) {
     console.error(error);
 
