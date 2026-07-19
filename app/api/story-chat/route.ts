@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import type {
   StoryBible,
-  StoryChatRequest,
+  StoryWorkspace,
   StoryChatResponse,
 } from "../../story-chat/types";
 
