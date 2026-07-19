@@ -455,10 +455,11 @@ const conversation = (currentStory?.messages ?? [])
       storyBible?: unknown;
     };
 
-    const reply = cleanString(parsedOutput.reply);
-    const returnedBible = sanitiseStoryBible(
-      parsedOutput.storyBible,
-    );
+   const reply = cleanString(parsedOutput.reply);
+const returnedBible = sanitiseStoryBible(
+  parsedOutput.storyBible,
+);
+const returnedChapters = parsedOutput.chapters ?? [];
 
     if (!reply) {
       throw new Error("The model returned an empty reply.");
