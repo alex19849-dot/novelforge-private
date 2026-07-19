@@ -187,9 +187,18 @@ try {
                 NovelForge
               </p>
 
-              <h1 className="mt-1 text-2xl font-semibold">
-                Story workspace
-              </h1>
+             <input
+  type="text"
+  value={storyTitle}
+  onChange={(event) => setStoryTitle(event.target.value)}
+  onBlur={() => {
+    if (!storyTitle.trim()) {
+      setStoryTitle("Untitled story");
+    }
+  }}
+  aria-label="Story title"
+  className="mt-1 w-full max-w-xl border-none bg-transparent text-2xl font-semibold text-white outline-none placeholder:text-neutral-600"
+/>
             </div>
 
            <button
