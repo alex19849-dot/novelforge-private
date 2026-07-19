@@ -222,9 +222,9 @@ function parseRequestBody(
   story?: StoryWorkspace;
 };
 
-  if (!Array.isArray(body.messages)) {
-    return null;
-  }
+  if (!body.story) {
+  return null;
+}
 
   const messages = body.messages
     .filter(
