@@ -20,26 +20,69 @@ export default function StoryChatPage() {
 
   const [input, setInput] = useState("");
 
-  function sendMessage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+ async function sendMessage(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
 
-    const trimmedMessage = input.trim();
+  const trimmedMessage = input.trim();
 
-    if (!trimmedMessage) {
-      return;
+  if (!trimmedMessage) {
+    return;
+  }
+
+  const updatedMessages = [
+    ...messages,
+    {
+      id: Date.now(),
+      role: "user" as const,
+      content: trimmedMessage,
+    },
+  ];
+
+  setMessages(updatedMessages);
+  setInput("");
+
+  try {
+    const response = await fetch("/api/story-chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messages: updatedMessages.map(({ role, content }) => ({
+          role,
+          content,
+        })),
+      }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unknown error");
     }
 
-    setMessages((currentMessages) => [
-      ...currentMessages,
+    setMessages((current) => [
+      ...current,
       {
-        id: Date.now(),
-        role: "user",
-        content: trimmedMessage,
+        id: Date.now() + 1,
+        role: "assistant",
+        content: data.reply,
       },
     ]);
+  } catch (error) {
+    console.error(error);
 
-    setInput("");
+    setMessages((current) => [
+      ...current,
+      {
+        id: Date.now() + 2,
+        role: "assistant",
+        content:
+          "Something went wrong while I was thinking. Try sending that again.",
+      },
+    ]);
   }
+}
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
