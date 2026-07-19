@@ -389,6 +389,16 @@ export async function POST(request: Request) {
     const rawBody: unknown = await request.json();
     const parsedBody = parseRequestBody(rawBody);
 const currentStory = parsedBody?.story;
+    if (!currentStory) {
+  return NextResponse.json(
+    {
+      error: "A valid story workspace is required.",
+    },
+    {
+      status: 400,
+    },
+  );
+}
 
     if (!parsedBody) {
       return NextResponse.json(
