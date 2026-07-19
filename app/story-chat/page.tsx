@@ -100,10 +100,15 @@ setInput("");
 setStoryTitle("Untitled story");
 setActiveTab("chat");
 
-  window.localStorage.setItem(
-    "novelforge-story-chat-messages",
-    JSON.stringify(freshMessages)
-  );
+ window.localStorage.setItem(
+  "novelforge-story-chat-messages",
+  JSON.stringify(freshMessages)
+);
+
+window.localStorage.setItem(
+  "novelforge-story-chat-title",
+  "Untitled story"
+);
 }
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
