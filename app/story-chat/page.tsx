@@ -298,6 +298,7 @@ try {
     </div>
   </section>
 )}
+        {activeTab === "chat" && (
         <footer className="sticky bottom-0 border-t border-white/10 bg-neutral-950/95 px-5 py-5 backdrop-blur">
           <form onSubmit={sendMessage} className="flex items-end gap-3">
             <textarea
@@ -322,6 +323,7 @@ try {
             The AI is not connected yet. Humanity survives another step.
           </p>
         </footer>
+  )}
       </div>
     </main>
   );
