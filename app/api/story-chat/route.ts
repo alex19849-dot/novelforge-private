@@ -452,13 +452,14 @@ const conversation = (currentStory?.messages ?? [])
     }
 
     const currentChapters = currentStory?.chapters ?? [];
-    const responseBody: StoryChatResponse = {
-      reply,
-      storyBible: mergeStoryBible(
-        currentBible,
-        returnedBible,
-      ),
-    };
+   const responseBody: StoryChatResponse = {
+  reply,
+  storyBible: mergeStoryBible(
+    currentBible,
+    returnedBible,
+  ),
+  chapters: currentChapters,
+};
 
     return NextResponse.json(responseBody);
   } catch (error) {
