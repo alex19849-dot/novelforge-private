@@ -453,9 +453,7 @@ const conversation = currentStory.messages
       throw new Error("The model returned no output.");
     }
 
- const parsedOutput = JSON.parse(
-  outputText,
-) as StoryChatResponse;
+const parsedOutput = JSON.parse(outputText) as Partial<StoryChatResponse>;
 
 if (!parsedOutput.storyBible) {
   throw new Error(
