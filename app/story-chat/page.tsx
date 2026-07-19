@@ -263,27 +263,7 @@ useEffect(() => {
   );
 }
 
- const newWorkspaceId = crypto.randomUUID();
 
-setWorkspaceId(newWorkspaceId);
-setMessages(freshMessages);
-setInput("");
-setStoryTitle("Untitled story");
-setActiveTab("chat");
-
- window.localStorage.setItem(
-  "novelforge-story-chat-messages",
-  JSON.stringify(freshMessages)
-);
-
-window.localStorage.setItem(
-  "novelforge-story-chat-title",
-  "Untitled story"
-);
-    window.localStorage.removeItem(
-  "novelforge-current-story"
-);
-}
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
 
