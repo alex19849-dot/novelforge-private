@@ -2,9 +2,27 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-import { ActiveTab, StoryWorkspace } from "./types";
+import type {
+  ActiveTab,
+  StoryBible,
+  StoryChatResponse,
+  StoryWorkspace,
+} from "./types";
 
 const STORAGE_KEY = "novelforge-current-story";
+
+const EMPTY_STORY_BIBLE: StoryBible = {
+  premise: "",
+  relationship: "",
+  subgenre: "",
+  setting: "",
+  pov: "",
+  heatLevel: "",
+  burnPacing: "",
+  tropes: [],
+  characters: [],
+  notes: [],
+};
 
 function createEmptyStory(): StoryWorkspace {
   const now = new Date().toISOString();
@@ -19,18 +37,13 @@ function createEmptyStory(): StoryWorkspace {
       {
         id: Date.now(),
         role: "assistant",
-        content: "Hi Alex. What kind of story are we building this time?",
+        content:
+          "Hi Alex. What kind of story are we building this time?",
       },
     ],
     chapters: [],
     storyBible: {
-      premise: "",
-      relationship: "",
-      subgenre: "",
-      setting: "",
-      pov: "",
-      heatLevel: "",
-      burnPacing: "",
+      ...EMPTY_STORY_BIBLE,
       tropes: [],
       characters: [],
       notes: [],
@@ -40,7 +53,37 @@ function createEmptyStory(): StoryWorkspace {
   };
 }
 
-function isStoryWorkspace(value: unknown): value is StoryWorkspace {
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.every((item) => typeof item === "string")
+  );
+}
+
+function isStoryBible(value: unknown): value is StoryBible {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const bible = value as Partial<StoryBible>;
+
+  return (
+    typeof bible.premise === "string" &&
+    typeof bible.relationship === "string" &&
+    typeof bible.subgenre === "string" &&
+    typeof bible.setting === "string" &&
+    typeof bible.pov === "string" &&
+    typeof bible.heatLevel === "string" &&
+    typeof bible.burnPacing === "string" &&
+    isStringArray(bible.tropes) &&
+    isStringArray(bible.characters) &&
+    isStringArray(bible.notes)
+  );
+}
+
+function isStoryWorkspace(
+  value: unknown,
+): value is StoryWorkspace {
   if (!value || typeof value !== "object") {
     return false;
   }
@@ -50,34 +93,87 @@ function isStoryWorkspace(value: unknown): value is StoryWorkspace {
   return (
     typeof candidate.id === "string" &&
     typeof candidate.title === "string" &&
+    (candidate.seriesType === "standalone" ||
+      candidate.seriesType === "series") &&
+    typeof candidate.seriesTitle === "string" &&
+    typeof candidate.bookNumber === "number" &&
     Array.isArray(candidate.messages) &&
+    candidate.messages.every(
+      (message) =>
+        Boolean(message) &&
+        typeof message === "object" &&
+        typeof message.id === "number" &&
+        (message.role === "user" ||
+          message.role === "assistant") &&
+        typeof message.content === "string",
+    ) &&
     Array.isArray(candidate.chapters) &&
-    Boolean(candidate.storyBible)
+    isStoryBible(candidate.storyBible) &&
+    typeof candidate.createdAt === "string" &&
+    typeof candidate.updatedAt === "string"
+  );
+}
+
+function isStoryChatResponse(
+  value: unknown,
+): value is StoryChatResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const response = value as Partial<StoryChatResponse>;
+
+  return (
+    typeof response.reply === "string" &&
+    Boolean(response.reply.trim()) &&
+    isStoryBible(response.storyBible)
+  );
+}
+
+function hasStoryBibleContent(
+  storyBible: StoryBible,
+): boolean {
+  return Boolean(
+    storyBible.premise.trim() ||
+      storyBible.relationship.trim() ||
+      storyBible.subgenre.trim() ||
+      storyBible.setting.trim() ||
+      storyBible.pov.trim() ||
+      storyBible.heatLevel.trim() ||
+      storyBible.burnPacing.trim() ||
+      storyBible.tropes.length ||
+      storyBible.characters.length ||
+      storyBible.notes.length,
   );
 }
 
 export default function StoryChatPage() {
-  const [story, setStory] = useState<StoryWorkspace | null>(null);
+  const [story, setStory] =
+    useState<StoryWorkspace | null>(null);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
+  const [activeTab, setActiveTab] =
+    useState<ActiveTab>("chat");
 
   const messages = story?.messages ?? [];
   const storyTitle = story?.title ?? "Untitled story";
   const chapters = story?.chapters ?? [];
-  const storyBible = story?.storyBible;
+  const storyBible =
+    story?.storyBible ?? EMPTY_STORY_BIBLE;
 
   useEffect(() => {
     try {
-      const savedStory = window.localStorage.getItem(STORAGE_KEY);
+      const savedStory =
+        window.localStorage.getItem(STORAGE_KEY);
 
       if (!savedStory) {
         setStory(createEmptyStory());
         return;
       }
 
-      const parsedStory: unknown = JSON.parse(savedStory);
+      const parsedStory: unknown =
+        JSON.parse(savedStory);
 
       if (isStoryWorkspace(parsedStory)) {
         setStory(parsedStory);
@@ -85,7 +181,10 @@ export default function StoryChatPage() {
         setStory(createEmptyStory());
       }
     } catch (error) {
-      console.error("Could not load the saved story:", error);
+      console.error(
+        "Could not load the saved story:",
+        error,
+      );
       setStory(createEmptyStory());
     } finally {
       setHasLoaded(true);
@@ -98,7 +197,10 @@ export default function StoryChatPage() {
     }
 
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(story));
+      window.localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(story),
+      );
     } catch (error) {
       console.error("Could not save the story:", error);
     }
@@ -135,7 +237,10 @@ export default function StoryChatPage() {
 
   function restoreDefaultTitle() {
     setStory((currentStory) => {
-      if (!currentStory || currentStory.title.trim()) {
+      if (
+        !currentStory ||
+        currentStory.title.trim()
+      ) {
         return currentStory;
       }
 
@@ -147,12 +252,18 @@ export default function StoryChatPage() {
     });
   }
 
-  async function sendMessage(event: FormEvent<HTMLFormElement>) {
+  async function sendMessage(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     const trimmedMessage = input.trim();
 
-    if (!story || !trimmedMessage || isThinking) {
+    if (
+      !story ||
+      !trimmedMessage ||
+      isThinking
+    ) {
       return;
     }
 
@@ -162,7 +273,12 @@ export default function StoryChatPage() {
       content: trimmedMessage,
     };
 
-    const requestMessages = [...story.messages, userMessage];
+    const requestMessages = [
+      ...story.messages,
+      userMessage,
+    ];
+
+    const requestStoryBible = story.storyBible;
 
     setStory((currentStory) => {
       if (!currentStory) {
@@ -171,7 +287,10 @@ export default function StoryChatPage() {
 
       return {
         ...currentStory,
-        messages: [...currentStory.messages, userMessage],
+        messages: [
+          ...currentStory.messages,
+          userMessage,
+        ],
         updatedAt: new Date().toISOString(),
       };
     });
@@ -180,18 +299,24 @@ export default function StoryChatPage() {
     setIsThinking(true);
 
     try {
-      const response = await fetch("/api/story-chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        "/api/story-chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: requestMessages.map(
+              ({ role, content }) => ({
+                role,
+                content,
+              }),
+            ),
+            storyBible: requestStoryBible,
+          }),
         },
-        body: JSON.stringify({
-          messages: requestMessages.map(({ role, content }) => ({
-            role,
-            content,
-          })),
-        }),
-      });
+      );
 
       const data: unknown = await response.json();
 
@@ -207,16 +332,10 @@ export default function StoryChatPage() {
         throw new Error(errorMessage);
       }
 
-      const reply =
-        data &&
-        typeof data === "object" &&
-        "reply" in data &&
-        typeof data.reply === "string"
-          ? data.reply
-          : "";
-
-      if (!reply.trim()) {
-        throw new Error("The API returned an empty reply.");
+      if (!isStoryChatResponse(data)) {
+        throw new Error(
+          "The API returned an invalid story response.",
+        );
       }
 
       setStory((currentStory) => {
@@ -231,14 +350,21 @@ export default function StoryChatPage() {
             {
               id: Date.now(),
               role: "assistant",
-              content: reply,
+              content: data.reply,
             },
           ],
+          storyBible: data.storyBible,
+          chapters:
+            data.chapters ??
+            currentStory.chapters,
           updatedAt: new Date().toISOString(),
         };
       });
     } catch (error) {
-      console.error("Story chat request failed:", error);
+      console.error(
+        "Story chat request failed:",
+        error,
+      );
 
       setStory((currentStory) => {
         if (!currentStory) {
@@ -268,11 +394,16 @@ export default function StoryChatPage() {
     return (
       <main className="min-h-screen bg-neutral-950 text-white">
         <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center px-5">
-          <p className="text-sm text-neutral-500">Loading NovelForge...</p>
+          <p className="text-sm text-neutral-500">
+            Loading NovelForge...
+          </p>
         </div>
       </main>
     );
   }
+
+  const bibleHasContent =
+    hasStoryBibleContent(storyBible);
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white">
@@ -287,7 +418,11 @@ export default function StoryChatPage() {
               <input
                 type="text"
                 value={storyTitle}
-                onChange={(event) => updateStoryTitle(event.target.value)}
+                onChange={(event) =>
+                  updateStoryTitle(
+                    event.target.value,
+                  )
+                }
                 onBlur={restoreDefaultTitle}
                 aria-label="Story title"
                 className="mt-1 w-full max-w-xl border-none bg-transparent text-2xl font-semibold text-white outline-none placeholder:text-neutral-600"
@@ -304,10 +439,15 @@ export default function StoryChatPage() {
             </button>
           </div>
 
-          <nav className="mt-5 flex gap-2" aria-label="Story workspace tabs">
+          <nav
+            className="mt-5 flex gap-2"
+            aria-label="Story workspace tabs"
+          >
             <button
               type="button"
-              onClick={() => setActiveTab("chat")}
+              onClick={() =>
+                setActiveTab("chat")
+              }
               className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
                 activeTab === "chat"
                   ? "bg-pink-500 text-white"
@@ -319,7 +459,9 @@ export default function StoryChatPage() {
 
             <button
               type="button"
-              onClick={() => setActiveTab("chapters")}
+              onClick={() =>
+                setActiveTab("chapters")
+              }
               className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
                 activeTab === "chapters"
                   ? "bg-pink-500 text-white"
@@ -331,7 +473,9 @@ export default function StoryChatPage() {
 
             <button
               type="button"
-              onClick={() => setActiveTab("bible")}
+              onClick={() =>
+                setActiveTab("bible")
+              }
               className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
                 activeTab === "bible"
                   ? "bg-pink-500 text-white"
@@ -346,13 +490,16 @@ export default function StoryChatPage() {
         {activeTab === "chat" && (
           <section className="flex-1 space-y-6 overflow-y-auto px-5 py-8">
             {messages.map((message) => {
-              const isUser = message.role === "user";
+              const isUser =
+                message.role === "user";
 
               return (
                 <div
                   key={message.id}
                   className={`flex ${
-                    isUser ? "justify-end" : "justify-start"
+                    isUser
+                      ? "justify-end"
+                      : "justify-start"
                   }`}
                 >
                   <div className="max-w-[85%]">
@@ -363,7 +510,9 @@ export default function StoryChatPage() {
                           : "text-pink-500"
                       }`}
                     >
-                      {isUser ? "You" : "NovelForge"}
+                      {isUser
+                        ? "You"
+                        : "NovelForge"}
                     </p>
 
                     <div
@@ -388,7 +537,8 @@ export default function StoryChatPage() {
                   </p>
 
                   <div className="rounded-2xl rounded-bl-md border border-white/10 bg-white/5 px-5 py-4 text-[15px] text-neutral-400">
-                    Thinking about the story...
+                    Thinking about the
+                    story...
                   </div>
                 </div>
               </div>
@@ -407,15 +557,50 @@ export default function StoryChatPage() {
                 {chapters.length === 0
                   ? "No chapters yet"
                   : `${chapters.length} ${
-                      chapters.length === 1 ? "chapter" : "chapters"
+                      chapters.length === 1
+                        ? "chapter"
+                        : "chapters"
                     }`}
               </h2>
 
-              <p className="mt-3 max-w-2xl leading-7 text-neutral-400">
-                {chapters.length === 0
-                  ? "Chapters generated through the conversation will appear here."
-                  : "Your generated chapters are saved inside this story workspace."}
-              </p>
+              {chapters.length === 0 ? (
+                <p className="mt-3 max-w-2xl leading-7 text-neutral-400">
+                  Chapters generated through
+                  the conversation will appear
+                  here.
+                </p>
+              ) : (
+                <div className="mt-6 space-y-4">
+                  {chapters.map((chapter) => (
+                    <article
+                      key={chapter.id}
+                      className="rounded-xl border border-white/10 bg-neutral-950/40 p-5"
+                    >
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
+                        Chapter {chapter.number}
+                      </p>
+
+                      <h3 className="mt-2 text-xl font-semibold text-white">
+                        {chapter.title ||
+                          `Chapter ${chapter.number}`}
+                      </h3>
+
+                      {chapter.povCharacter && (
+                        <p className="mt-2 text-sm text-neutral-500">
+                          POV:{" "}
+                          {
+                            chapter.povCharacter
+                          }
+                        </p>
+                      )}
+
+                      <p className="mt-4 line-clamp-4 whitespace-pre-wrap leading-7 text-neutral-400">
+                        {chapter.content}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -428,137 +613,163 @@ export default function StoryChatPage() {
               </p>
 
               <h2 className="mt-2 text-2xl font-semibold">
-                {storyBible.premise.trim()
+                {bibleHasContent
                   ? "Story details"
                   : "No story details yet"}
               </h2>
 
-              {storyBible.premise.trim() ? (
-                <div className="mt-6 space-y-6">
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">
-                      Premise
-                    </h3>
-                    <p className="mt-2 whitespace-pre-wrap leading-7 text-neutral-400">
-                      {storyBible.premise}
-                    </p>
-                  </div>
-
-                  {storyBible.relationship.trim() && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">
-                        Relationship
+              {!bibleHasContent ? (
+                <p className="mt-3 max-w-2xl leading-7 text-neutral-400">
+                  Characters, setting, tropes,
+                  plot decisions and series
+                  information will be built
+                  automatically from your
+                  conversation.
+                </p>
+              ) : (
+                <div className="mt-6 grid gap-5 md:grid-cols-2">
+                  {storyBible.premise && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:col-span-2">
+                      <h3 className="text-sm font-semibold text-pink-500">
+                        Premise
                       </h3>
-                      <p className="mt-2 leading-7 text-neutral-400">
-                        {storyBible.relationship}
+                      <p className="mt-2 whitespace-pre-wrap leading-7 text-neutral-300">
+                        {storyBible.premise}
                       </p>
                     </div>
                   )}
 
-                  {storyBible.subgenre.trim() && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">
+                  {storyBible.relationship && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5">
+                      <h3 className="text-sm font-semibold text-pink-500">
+                        Relationship
+                      </h3>
+                      <p className="mt-2 leading-7 text-neutral-300">
+                        {
+                          storyBible.relationship
+                        }
+                      </p>
+                    </div>
+                  )}
+
+                  {storyBible.subgenre && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5">
+                      <h3 className="text-sm font-semibold text-pink-500">
                         Subgenre
                       </h3>
-                      <p className="mt-2 leading-7 text-neutral-400">
+                      <p className="mt-2 leading-7 text-neutral-300">
                         {storyBible.subgenre}
                       </p>
                     </div>
                   )}
 
-                  {storyBible.setting.trim() && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">
+                  {storyBible.setting && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5">
+                      <h3 className="text-sm font-semibold text-pink-500">
                         Setting
                       </h3>
-                      <p className="mt-2 leading-7 text-neutral-400">
+                      <p className="mt-2 whitespace-pre-wrap leading-7 text-neutral-300">
                         {storyBible.setting}
                       </p>
                     </div>
                   )}
 
-                  {storyBible.pov.trim() && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">POV</h3>
-                      <p className="mt-2 leading-7 text-neutral-400">
+                  {storyBible.pov && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5">
+                      <h3 className="text-sm font-semibold text-pink-500">
+                        POV
+                      </h3>
+                      <p className="mt-2 leading-7 text-neutral-300">
                         {storyBible.pov}
                       </p>
                     </div>
                   )}
 
-                  {storyBible.heatLevel.trim() && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">
+                  {storyBible.heatLevel && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5">
+                      <h3 className="text-sm font-semibold text-pink-500">
                         Heat Level
                       </h3>
-                      <p className="mt-2 leading-7 text-neutral-400">
+                      <p className="mt-2 leading-7 text-neutral-300">
                         {storyBible.heatLevel}
                       </p>
                     </div>
                   )}
 
-                  {storyBible.burnPacing.trim() && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">
+                  {storyBible.burnPacing && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5">
+                      <h3 className="text-sm font-semibold text-pink-500">
                         Burn Pacing
                       </h3>
-                      <p className="mt-2 leading-7 text-neutral-400">
+                      <p className="mt-2 leading-7 text-neutral-300">
                         {storyBible.burnPacing}
                       </p>
                     </div>
                   )}
 
-                  {storyBible.tropes.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">
+                  {storyBible.tropes.length >
+                    0 && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:col-span-2">
+                      <h3 className="text-sm font-semibold text-pink-500">
                         Tropes
                       </h3>
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {storyBible.tropes.map((trope, index) => (
-                          <span
-                            key={`${trope}-${index}`}
-                            className="rounded-full border border-pink-500/20 bg-pink-500/10 px-3 py-1 text-sm text-pink-300"
-                          >
-                            {trope}
-                          </span>
-                        ))}
+                        {storyBible.tropes.map(
+                          (trope) => (
+                            <span
+                              key={trope}
+                              className="rounded-full border border-pink-500/20 bg-pink-500/10 px-3 py-1 text-sm text-pink-300"
+                            >
+                              {trope}
+                            </span>
+                          ),
+                        )}
                       </div>
                     </div>
                   )}
 
-                  {storyBible.characters.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">
+                  {storyBible.characters
+                    .length > 0 && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:col-span-2">
+                      <h3 className="text-sm font-semibold text-pink-500">
                         Characters
                       </h3>
-                      <p className="mt-2 leading-7 text-neutral-400">
-                        {storyBible.characters.length}{" "}
-                        {storyBible.characters.length === 1
-                          ? "character"
-                          : "characters"}{" "}
-                        saved
-                      </p>
+                      <div className="mt-3 space-y-3">
+                        {storyBible.characters.map(
+                          (character) => (
+                            <p
+                              key={character}
+                              className="rounded-lg border border-white/5 bg-white/5 px-4 py-3 leading-7 text-neutral-300"
+                            >
+                              {character}
+                            </p>
+                          ),
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  {storyBible.notes.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">
+                  {storyBible.notes.length >
+                    0 && (
+                    <div className="rounded-xl border border-white/10 bg-neutral-950/40 p-5 md:col-span-2">
+                      <h3 className="text-sm font-semibold text-pink-500">
                         Notes
                       </h3>
-                      <p className="mt-2 leading-7 text-neutral-400">
-                        {storyBible.notes.length}{" "}
-                        {storyBible.notes.length === 1 ? "note" : "notes"} saved
-                      </p>
+                      <ul className="mt-3 space-y-3">
+                        {storyBible.notes.map(
+                          (note) => (
+                            <li
+                              key={note}
+                              className="rounded-lg border border-white/5 bg-white/5 px-4 py-3 leading-7 text-neutral-300"
+                            >
+                              {note}
+                            </li>
+                          ),
+                        )}
+                      </ul>
                     </div>
                   )}
                 </div>
-              ) : (
-                <p className="mt-3 max-w-2xl leading-7 text-neutral-400">
-                  Characters, setting, tropes, plot decisions and series
-                  information will be built automatically from your
-                  conversation.
-                </p>
               )}
             </div>
           </section>
@@ -566,16 +777,22 @@ export default function StoryChatPage() {
 
         {activeTab === "chat" && (
           <footer className="sticky bottom-0 border-t border-white/10 bg-neutral-950/95 px-5 py-5 backdrop-blur">
-            <form onSubmit={sendMessage} className="flex items-end gap-3">
+            <form
+              onSubmit={sendMessage}
+              className="flex items-end gap-3"
+            >
               <textarea
                 value={input}
                 disabled={isThinking}
-                onChange={(event) => setInput(event.target.value)}
+                onChange={(event) =>
+                  setInput(event.target.value)
+                }
                 onKeyDown={(event) => {
                   if (
                     event.key === "Enter" &&
                     !event.shiftKey &&
-                    !event.nativeEvent.isComposing
+                    !event.nativeEvent
+                      .isComposing
                   ) {
                     event.preventDefault();
                     event.currentTarget.form?.requestSubmit();
@@ -588,15 +805,21 @@ export default function StoryChatPage() {
 
               <button
                 type="submit"
-                disabled={!input.trim() || isThinking}
+                disabled={
+                  !input.trim() ||
+                  isThinking
+                }
                 className="h-14 rounded-2xl bg-pink-500 px-6 font-semibold text-white transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {isThinking ? "Thinking..." : "Send"}
+                {isThinking
+                  ? "Thinking..."
+                  : "Send"}
               </button>
             </form>
 
             <p className="mt-3 text-center text-xs text-neutral-600">
-              Your story workspace saves automatically on this device.
+              Your story workspace saves
+              automatically on this device.
             </p>
           </footer>
         )}
