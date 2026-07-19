@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type ChatMessage = {
   id: number;
@@ -19,7 +19,41 @@ export default function StoryChatPage() {
   ]);
 const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
+const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
+useEffect(() => {
+  try {
+    const savedMessages = window.localStorage.getItem(
+      "novelforge-story-chat-messages"
+    );
 
+    if (savedMessages) {
+      const parsedMessages = JSON.parse(savedMessages) as ChatMessage[];
+
+      if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
+        setMessages(parsedMessages);
+      }
+    }
+  } catch (error) {
+    console.error("Could not load saved chat:", error);
+  } finally {
+    setHasLoadedMessages(true);
+  }
+}, []);
+useEffect(() => {
+  if (!hasLoadedMessages) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      "novelforge-story-chat-messages",
+      JSON.stringify(messages)
+    );
+  } catch (error) {
+    console.error("Could not save chat:", error);
+  }
+}, [messages, hasLoadedMessages]);
+  
  async function sendMessage(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
 
