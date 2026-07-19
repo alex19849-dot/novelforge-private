@@ -108,20 +108,7 @@ if (savedTitle?.trim()) {
     setHasLoadedMessages(true);
   }
 }, []);
-useEffect(() => {
-  if (!hasLoadedMessages) {
-    return;
-  }
 
-  try {
-    window.localStorage.setItem(
-      "novelforge-story-chat-messages",
-      JSON.stringify(messages)
-    );
-  } catch (error) {
-    console.error("Could not save chat:", error);
-  }
-}, [messages, hasLoadedMessages]);
   
   useEffect(() => {
   if (!hasLoadedMessages) {
