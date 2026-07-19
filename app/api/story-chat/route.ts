@@ -424,23 +424,19 @@ const conversation = currentStory.messages
   }));
     
     const response = await openai.responses.create({
-      model: "gpt-5.5",
+     model: "gpt-5.6-terra",
       reasoning: {
         effort: "low",
       },
       input: [
         {
-          role: "system",
-          content: SYSTEM_PROMPT,
-        },
-        {
-          role: "system",
-          content: `CURRENT STORY BIBLE:\n${JSON.stringify(
-            currentBible,
-            null,
-            2,
-          )}`,
-        },
+  role: "system",
+  content: `CURRENT STORY WORKSPACE:\n${JSON.stringify(
+    currentStory,
+    null,
+    2,
+  )}`,
+},
         ...conversation,
       ],
       text: {
