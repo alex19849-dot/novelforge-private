@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { detectStoryIntent } from "@/src/lib/detect-story-intent";
 
 import type {
   StoryBible,
