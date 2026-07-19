@@ -17,13 +17,18 @@ export function detectStoryIntent(message: string): StoryIntent {
     return "create_story";
   }
 
-  if (
-    text.includes("continue the story") ||
-    text.includes("next chapter") ||
-    text.includes("continue writing")
-  ) {
-    return "continue_story";
-  }
+ if (
+  text.includes("continue the story") ||
+  text.includes("continue story") ||
+  text.includes("continue writing") ||
+  text.includes("next chapter") ||
+  text.includes("write chapter") ||
+  text.includes("write the next") ||
+  text.includes("carry on") ||
+  text.includes("keep going")
+) {
+  return "continue_story";
+}
 
   if (
     text.includes("rewrite chapter") ||
