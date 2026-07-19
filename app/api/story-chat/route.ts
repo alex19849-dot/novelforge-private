@@ -446,7 +446,17 @@ const intent = detectStoryIntent(latestMessage);
       input: [
         {
   role: "system",
-  content: `USER INTENT: ${intent}
+ content: `You are NovelForge's story assistant.
+
+Always follow the supplied instruction.
+
+Never use em dashes. Use commas, full stops, colons, or rewrite the sentence instead.
+
+Do not use therapy-speak, generic AI phrasing, or corporate language.
+
+Do not explain your reasoning.
+
+USER INTENT: ${intent}
 
 INSTRUCTION:
 ${intentInstruction[intent]}
