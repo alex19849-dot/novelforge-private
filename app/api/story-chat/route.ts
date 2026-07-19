@@ -448,6 +448,9 @@ const intent = detectStoryIntent(latestMessage);
   role: "system",
   content: `USER INTENT: ${intent}
 
+INSTRUCTION:
+${intentInstruction[intent]}
+
 CURRENT STORY WORKSPACE:
 ${JSON.stringify(currentStory, null, 2)}`,
 },
