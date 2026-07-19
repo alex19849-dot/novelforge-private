@@ -211,6 +211,18 @@ function mergeStoryBible(
 function parseRequestBody(
   value: unknown,
 ): { story: StoryWorkspace } | null {
+  function isStoryWorkspace(
+  value: unknown,
+): value is StoryWorkspace {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    typeof (value as StoryWorkspace).id === "string" &&
+    Array.isArray((value as StoryWorkspace).messages) &&
+    Array.isArray((value as StoryWorkspace).chapters) &&
+    typeof (value as StoryWorkspace).storyBible === "object"
+  );
+}
   if (!value || typeof value !== "object") {
     return null;
   }
