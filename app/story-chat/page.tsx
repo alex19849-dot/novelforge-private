@@ -96,7 +96,9 @@ useEffect(() => {
   ];
 
   setMessages(freshMessages);
-  setInput("");
+setInput("");
+setStoryTitle("Untitled story");
+setActiveTab("chat");
 
   window.localStorage.setItem(
     "novelforge-story-chat-messages",
