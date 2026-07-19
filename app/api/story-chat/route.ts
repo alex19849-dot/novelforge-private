@@ -451,6 +451,7 @@ const conversation = (currentStory?.messages ?? [])
       throw new Error("The model returned an empty reply.");
     }
 
+    const currentChapters = currentStory?.chapters ?? [];
     const responseBody: StoryChatResponse = {
       reply,
       storyBible: mergeStoryBible(
