@@ -164,7 +164,21 @@ try {
                 </div>
               </div>
             );
-          })}
+                  })}
+
+          {isThinking && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%]">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-pink-500">
+                  NovelForge
+                </p>
+
+                <div className="rounded-2xl rounded-bl-md border border-white/10 bg-white/5 px-5 py-4 text-[15px] text-neutral-400">
+                  Thinking about the story...
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         <footer className="sticky bottom-0 border-t border-white/10 bg-neutral-950/95 px-5 py-5 backdrop-blur">
