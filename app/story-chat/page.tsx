@@ -105,22 +105,17 @@ if (savedWorkspace) {
     savedWorkspace
   ) as StoryWorkspace;
 
-  if (parsedWorkspace.id) {
-    setWorkspaceId(parsedWorkspace.id);
-  }
-
-  if (parsedWorkspace.title?.trim()) {
-    setStoryTitle(parsedWorkspace.title);
-  }
-
-  if (
-    Array.isArray(parsedWorkspace.messages) &&
-    parsedWorkspace.messages.length > 0
-  ) {
-    setMessages(parsedWorkspace.messages);
-  }
+  setStory(parsedWorkspace);
+  setWorkspaceId(parsedWorkspace.id);
+  setStoryTitle(parsedWorkspace.title);
+  setMessages(parsedWorkspace.messages);
 } else {
-  setWorkspaceId(crypto.randomUUID());
+  const emptyStory = createEmptyStory();
+
+  setStory(emptyStory);
+  setWorkspaceId(emptyStory.id);
+  setStoryTitle(emptyStory.title);
+  setMessages(emptyStory.messages);
 }
     const savedMessages = window.localStorage.getItem(
       "novelforge-story-chat-messages"
