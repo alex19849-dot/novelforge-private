@@ -226,33 +226,9 @@ function parseRequestBody(
   return null;
 }
 
-  const messages = body.messages
-    .filter(
-      (
-        message,
-      ): message is {
-        role: "user" | "assistant";
-        content: string;
-      } =>
-        Boolean(message) &&
-        typeof message === "object" &&
-        isValidRole(message.role) &&
-        typeof message.content === "string" &&
-        Boolean(message.content.trim()),
-    )
-    .map((message) => ({
-      role: message.role,
-      content: message.content.trim(),
-    }));
-
-  if (messages.length === 0) {
-    return null;
-  }
-
   return {
-    messages,
-    storyBible: sanitiseStoryBible(body.storyBible),
-  };
+  story: body.story,
+};
 }
 
 const SYSTEM_PROMPT = `
