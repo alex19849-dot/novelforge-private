@@ -110,17 +110,6 @@ if (savedTitle?.trim()) {
 }, []);
 
   
-  useEffect(() => {
-  if (!hasLoadedMessages) {
-    return;
-  }
-
-  window.localStorage.setItem(
-    "novelforge-story-chat-title",
-    storyTitle
-  );
-}, [storyTitle, hasLoadedMessages]);
-
 useEffect(() => {
   if (!hasLoadedMessages || !workspaceId) {
     return;
