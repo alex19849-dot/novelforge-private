@@ -8,6 +8,8 @@ type ChatMessage = {
   content: string;
 };
 
+type ActiveTab = "chat" | "chapters" | "bible";
+
 export default function StoryChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -20,6 +22,7 @@ export default function StoryChatPage() {
 const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
 const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
 useEffect(() => {
   try {
     const savedMessages = window.localStorage.getItem(
@@ -173,30 +176,45 @@ try {
 </button>
           </div>
 
-          <nav className="mt-5 flex gap-2">
-            <button
-              type="button"
-              className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-semibold text-white"
-            >
-              Chat
-            </button>
+         <nav className="mt-5 flex gap-2">
+  <button
+    type="button"
+    onClick={() => setActiveTab("chat")}
+    className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+      activeTab === "chat"
+        ? "bg-pink-500 text-white"
+        : "text-neutral-400 hover:bg-white/5 hover:text-white"
+    }`}
+  >
+    Chat
+  </button>
 
-            <button
-              type="button"
-              className="rounded-lg px-4 py-2 text-sm text-neutral-400 hover:bg-white/5 hover:text-white"
-            >
-              Chapters
-            </button>
+  <button
+    type="button"
+    onClick={() => setActiveTab("chapters")}
+    className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+      activeTab === "chapters"
+        ? "bg-pink-500 text-white"
+        : "text-neutral-400 hover:bg-white/5 hover:text-white"
+    }`}
+  >
+    Chapters
+  </button>
 
-            <button
-              type="button"
-              className="rounded-lg px-4 py-2 text-sm text-neutral-400 hover:bg-white/5 hover:text-white"
-            >
-              Story Bible
-            </button>
-          </nav>
+  <button
+    type="button"
+    onClick={() => setActiveTab("bible")}
+    className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+      activeTab === "bible"
+        ? "bg-pink-500 text-white"
+        : "text-neutral-400 hover:bg-white/5 hover:text-white"
+    }`}
+  >
+    Story Bible
+  </button>
+</nav>
         </header>
-
+{activeTab === "chat" && (
         <section className="flex-1 space-y-6 overflow-y-auto px-5 py-8">
           {messages.map((message) => {
             const isUser = message.role === "user";
@@ -243,7 +261,43 @@ try {
             </div>
           )}
         </section>
+)}
+        {activeTab === "chapters" && (
+  <section className="flex-1 px-5 py-8">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
+        Chapters
+      </p>
 
+      <h2 className="mt-2 text-2xl font-semibold">
+        No chapters yet
+      </h2>
+
+      <p className="mt-3 max-w-2xl leading-7 text-neutral-400">
+        Chapters generated through the conversation will appear here.
+      </p>
+    </div>
+  </section>
+)}
+
+{activeTab === "bible" && (
+  <section className="flex-1 px-5 py-8">
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
+        Story Bible
+      </p>
+
+      <h2 className="mt-2 text-2xl font-semibold">
+        No story details yet
+      </h2>
+
+      <p className="mt-3 max-w-2xl leading-7 text-neutral-400">
+        Characters, setting, tropes, plot decisions and series information will
+        be built automatically from your conversation.
+      </p>
+    </div>
+  </section>
+)}
         <footer className="sticky bottom-0 border-t border-white/10 bg-neutral-950/95 px-5 py-5 backdrop-blur">
           <form onSubmit={sendMessage} className="flex items-end gap-3">
             <textarea
