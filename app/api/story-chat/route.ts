@@ -456,9 +456,11 @@ const conversation = currentStory.messages
 const parsedOutput = JSON.parse(outputText) as Partial<StoryChatResponse>;
 
 if (!parsedOutput.storyBible) {
-  throw new Error(
-    "The model did not return a story bible.",
-  );
+  throw new Error("The model did not return a story bible.");
+}
+
+if (!parsedOutput.reply) {
+  throw new Error("The model did not return a reply.");
 }
       
    const reply = cleanString(parsedOutput.reply);
