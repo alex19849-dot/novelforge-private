@@ -54,7 +54,34 @@ useEffect(() => {
   }
 }, [messages, hasLoadedMessages]);
   
- async function sendMessage(event: FormEvent<HTMLFormElement>) {
+ 
+  function startNewStory() {
+  const confirmed = window.confirm(
+    "Start a new story? This will clear the current chat on this device."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const freshMessages: ChatMessage[] = [
+    {
+      id: Date.now(),
+      role: "assistant",
+      content:
+        "Hi Alex. What kind of story are we building this time?",
+    },
+  ];
+
+  setMessages(freshMessages);
+  setInput("");
+
+  window.localStorage.setItem(
+    "novelforge-story-chat-messages",
+    JSON.stringify(freshMessages)
+  );
+}
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
 
   const trimmedMessage = input.trim();
