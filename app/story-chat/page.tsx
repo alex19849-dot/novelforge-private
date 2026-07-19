@@ -185,6 +185,7 @@ try {
           <form onSubmit={sendMessage} className="flex items-end gap-3">
             <textarea
               value={input}
+              disabled={isThinking}
               onChange={(event) => setInput(event.target.value)}
               placeholder="Tell NovelForge anything..."
               rows={1}
@@ -193,10 +194,10 @@ try {
 
             <button
               type="submit"
-              disabled={!input.trim()}
+              disabled={!input.trim() || isThinking}
               className="h-14 rounded-2xl bg-pink-500 px-6 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Send
+              {isThinking ? "Thinking..." : "Send"}
             </button>
           </form>
 
