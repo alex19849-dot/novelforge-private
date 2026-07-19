@@ -1,3 +1,5 @@
+import type { StoryIntent } from "@/src/lib/detect-story-intent";
+
 export type ActiveTab = "chat" | "chapters" | "bible";
 
 export type ChatRole = "user" | "assistant";
