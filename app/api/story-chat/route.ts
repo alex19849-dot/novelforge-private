@@ -478,7 +478,6 @@ const returnedBible = sanitiseStoryBible(
 const returnedChapters = Array.isArray(parsedOutput.chapters)
   ? parsedOutput.chapters
   : [];
-const returnedChapters = parsedOutput.chapters ?? [];
 
     if (!reply) {
       throw new Error("The model returned an empty reply.");
