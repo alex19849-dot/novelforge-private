@@ -163,12 +163,14 @@ try {
               </h1>
             </div>
 
-            <button
-              type="button"
-              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-neutral-300"
-            >
-              New story
-            </button>
+           <button
+  type="button"
+  onClick={startNewStory}
+  disabled={isThinking}
+  className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-neutral-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+>
+  New story
+</button>
           </div>
 
           <nav className="mt-5 flex gap-2">
