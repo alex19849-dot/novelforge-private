@@ -47,10 +47,7 @@ export type StoryWorkspace = {
 export type StoryChatRequest = {
   story: StoryWorkspace;
 };
-  messages: Array<Pick<ChatMessage, "role" | "content">>;
-  storyBible: StoryBible;
-};
-
+ 
 export type StoryChatResponse = {
   reply: string;
   storyBible: StoryBible;
