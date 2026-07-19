@@ -73,7 +73,7 @@ setMessages(parsedWorkspace.messages);
 
   setStory(emptyStory);
   setWorkspaceId(emptyStory.id);
-  setMessages(emptyStory.messages);
+  
 }
     
   } catch (error) {
@@ -148,7 +148,6 @@ useEffect(() => {
 
   setStory(newStory);
   setWorkspaceId(newStory.id);
-  setMessages(newStory.messages);
   setInput("");
   setActiveTab("chat");
 
@@ -185,7 +184,7 @@ useEffect(() => {
     },
   ];
 
-  setMessages(updatedMessages);
+  
 setInput("");
 setIsThinking(true);
 
