@@ -378,6 +378,7 @@ async function exportDocx() {
     setChapters(story.chapters || []);
     setActiveChapterIndex(story.active_chapter_index || 0);
     setStoryState(story.story_state || {});
+    setMessages(story.messages || []);
     setChapterGuidance(story.chapter_guidance || story.custom_rewrite || "");
     setShowLibrary(false);
     setCopyMessage("");
