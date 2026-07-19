@@ -30,6 +30,14 @@ useEffect(() => {
       "novelforge-story-chat-messages"
     );
 
+const savedTitle = window.localStorage.getItem(
+  "novelforge-story-chat-title"
+);
+
+if (savedTitle?.trim()) {
+  setStoryTitle(savedTitle);
+}
+    
     if (savedMessages) {
       const parsedMessages = JSON.parse(savedMessages) as ChatMessage[];
 
