@@ -83,25 +83,7 @@ if (savedWorkspace) {
   setStoryTitle(emptyStory.title);
   setMessages(emptyStory.messages);
 }
-    const savedMessages = window.localStorage.getItem(
-      "novelforge-story-chat-messages"
-    );
-
-const savedTitle = window.localStorage.getItem(
-  "novelforge-story-chat-title"
-);
-
-if (savedTitle?.trim()) {
-  setStoryTitle(savedTitle);
-}
     
-    if (savedMessages) {
-      const parsedMessages = JSON.parse(savedMessages) as ChatMessage[];
-
-      if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
-        setMessages(parsedMessages);
-      }
-    }
   } catch (error) {
     console.error("Could not load saved chat:", error);
   } finally {
