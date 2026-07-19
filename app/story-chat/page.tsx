@@ -72,9 +72,9 @@ if (savedWorkspace) {
   ) as StoryWorkspace;
 
 
-  setWorkspaceId(parsedWorkspace.id);
-  setStoryTitle(parsedWorkspace.title);
-  setMessages(parsedWorkspace.messages);
+  setStory(parsedWorkspace);
+setWorkspaceId(parsedWorkspace.id);
+setMessages(parsedWorkspace.messages);
 } else {
   const emptyStory = createEmptyStory();
 
