@@ -388,16 +388,16 @@ const currentStory = parsedBody?.story;
       );
     }
 
-    const currentBible = sanitiseStoryBible(
-      parsedBody.storyBible,
-    );
+   const currentBible = sanitiseStoryBible(
+  currentStory?.storyBible,
+);
 
-    const conversation = parsedBody.messages
-      .slice(-30)
-      .map((message) => ({
-        role: message.role,
-        content: message.content,
-      }));
+const conversation = (currentStory?.messages ?? [])
+  .slice(-30)
+  .map((message) => ({
+    role: message.role,
+    content: message.content,
+  }));
 
     const response = await openai.responses.create({
       model: "gpt-5.5",
