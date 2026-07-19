@@ -43,15 +43,8 @@ function createEmptyStory(): StoryWorkspace {
   };
 }
 
-export default function StoryChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 1,
-      role: "assistant",
-      content:
-        "Hi Alex. Tell me what kind of story you want to build, or open an existing one and we can carry on from there.",
-    },
-  ]);
+const messages = story?.messages ?? [];
+
 const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
 const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
