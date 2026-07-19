@@ -17,7 +17,7 @@ export default function StoryChatPage() {
         "Hi Alex. Tell me what kind of story you want to build, or open an existing one and we can carry on from there.",
     },
   ]);
-
+const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
 
  async function sendMessage(event: FormEvent<HTMLFormElement>) {
