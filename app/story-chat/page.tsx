@@ -265,23 +265,37 @@ useEffect(() => {
   hasLoadedMessages,
 ]);
   
-  function startNewStory() {
+ function startNewStory() {
   const confirmed = window.confirm(
-    "Start a new story? This will clear the current chat on this device."
+    "Start a new story? This will clear the current story on this device."
   );
 
   if (!confirmed) {
     return;
   }
 
-  const freshMessages: ChatMessage[] = [
-    {
-      id: Date.now(),
-      role: "assistant",
-      content:
-        "Hi Alex. What kind of story are we building this time?",
-    },
-  ];
+  const newStory = createEmptyStory();
+
+  setStory(newStory);
+  setWorkspaceId(newStory.id);
+  setStoryTitle(newStory.title);
+  setMessages(newStory.messages);
+  setInput("");
+  setActiveTab("chat");
+
+  window.localStorage.setItem(
+    "novelforge-current-story",
+    JSON.stringify(newStory)
+  );
+
+  window.localStorage.removeItem(
+    "novelforge-story-chat-messages"
+  );
+
+  window.localStorage.removeItem(
+    "novelforge-story-chat-title"
+  );
+}
 
  const newWorkspaceId = crypto.randomUUID();
 
