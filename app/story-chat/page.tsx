@@ -71,7 +71,7 @@ if (savedWorkspace) {
     savedWorkspace
   ) as StoryWorkspace;
 
-  setStory(parsedWorkspace);
+
   setWorkspaceId(parsedWorkspace.id);
   setStoryTitle(parsedWorkspace.title);
   setMessages(parsedWorkspace.messages);
@@ -80,7 +80,6 @@ if (savedWorkspace) {
 
   setStory(emptyStory);
   setWorkspaceId(emptyStory.id);
-  setStoryTitle(emptyStory.title);
   setMessages(emptyStory.messages);
 }
     
