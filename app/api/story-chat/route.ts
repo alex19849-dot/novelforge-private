@@ -412,7 +412,7 @@ const currentStory = parsedBody?.story;
     }
 
    const currentBible = sanitiseStoryBible(
-  currentStory?.storyBible,
+  currentStory.storyBible,
 );
 
 const conversation = currentStory.messages
