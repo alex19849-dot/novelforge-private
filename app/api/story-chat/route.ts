@@ -462,10 +462,7 @@ if (!parsedOutput.storyBible) {
     "The model did not return a story bible.",
   );
 }
-      reply?: unknown;
-      storyBible?: unknown;
-    };
-
+      
    const reply = cleanString(parsedOutput.reply);
 
 if (!reply) {
