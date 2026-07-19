@@ -218,7 +218,9 @@ function parseRequestBody(
     return null;
   }
 
-  const body = value as Partial<StoryChatRequest>;
+  const body = value as {
+  story?: StoryWorkspace;
+};
 
   if (!Array.isArray(body.messages)) {
     return null;
