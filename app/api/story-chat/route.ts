@@ -479,9 +479,6 @@ const returnedChapters = Array.isArray(parsedOutput.chapters)
   ? parsedOutput.chapters
   : [];
 
-    if (!reply) {
-      throw new Error("The model returned an empty reply.");
-    }
 
   const currentChapters = currentStory.chapters;
   const responseBody: StoryChatResponse = {
