@@ -66,6 +66,16 @@ useEffect(() => {
   }
 }, [messages, hasLoadedMessages]);
   
+  useEffect(() => {
+  if (!hasLoadedMessages) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    "novelforge-story-chat-title",
+    storyTitle
+  );
+}, [storyTitle, hasLoadedMessages]);
  
   function startNewStory() {
   const confirmed = window.confirm(
