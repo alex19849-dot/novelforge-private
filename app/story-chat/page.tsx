@@ -155,7 +155,6 @@ useEffect(() => {
 
   setStory(newStory);
   setWorkspaceId(newStory.id);
-  setStoryTitle(newStory.title);
   setMessages(newStory.messages);
   setInput("");
   setActiveTab("chat");
