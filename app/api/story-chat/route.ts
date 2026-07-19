@@ -211,7 +211,9 @@ function isValidRole(value: unknown): value is "user" | "assistant" {
   return value === "user" || value === "assistant";
 }
 
-function parseRequestBody(value: unknown): StoryChatRequest | null {
+function parseRequestBody(
+  value: unknown,
+): { story: StoryWorkspace } | null {
   if (!value || typeof value !== "object") {
     return null;
   }
