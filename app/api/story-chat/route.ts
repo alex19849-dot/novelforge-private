@@ -522,7 +522,9 @@ storyBible:
         returnedBible,
       ),
   chapters:
-    returnedChapters.length > 0
+  intent === "brainstorm" || intent === "general_chat"
+    ? currentChapters
+    : returnedChapters.length > 0
       ? returnedChapters
       : currentChapters,
 };
