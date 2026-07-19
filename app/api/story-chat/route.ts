@@ -450,7 +450,7 @@ const conversation = (currentStory?.messages ?? [])
       throw new Error("The model returned no output.");
     }
 
-    const parsedOutput = JSON.parse(outputText) as {
+   const parsedOutput = JSON.parse(outputText) as StoryChatResponse;
       reply?: unknown;
       storyBible?: unknown;
     };
