@@ -50,6 +50,7 @@ export type StoryChatRequest = {
  
 export type StoryChatResponse = {
   reply: string;
+  intent: StoryIntent;
   storyBible: StoryBible;
   chapters?: StoryChapter[];
   timeline?: unknown[];
