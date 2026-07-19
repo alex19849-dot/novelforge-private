@@ -91,8 +91,36 @@ const [input, setInput] = useState("");
 const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
   const [storyTitle, setStoryTitle] = useState("Untitled story");
+const [workspaceId, setWorkspaceId] = useState("");
+  
 useEffect(() => {
   try {
+    const savedWorkspace = window.localStorage.getItem(
+  "novelforge-current-story"
+);
+
+if (savedWorkspace) {
+  const parsedWorkspace = JSON.parse(
+    savedWorkspace
+  ) as StoryWorkspace;
+
+  if (parsedWorkspace.id) {
+    setWorkspaceId(parsedWorkspace.id);
+  }
+
+  if (parsedWorkspace.title?.trim()) {
+    setStoryTitle(parsedWorkspace.title);
+  }
+
+  if (
+    Array.isArray(parsedWorkspace.messages) &&
+    parsedWorkspace.messages.length > 0
+  ) {
+    setMessages(parsedWorkspace.messages);
+  }
+} else {
+  setWorkspaceId(crypto.randomUUID());
+}
     const savedMessages = window.localStorage.getItem(
       "novelforge-story-chat-messages"
     );
