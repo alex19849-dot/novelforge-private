@@ -268,7 +268,14 @@ onChange={(event) => {
 }}
   onBlur={() => {
     if (!storyTitle.trim()) {
-      setStoryTitle("Untitled story");
+     setStory((current) =>
+  current
+    ? {
+        ...current,
+        title: "Untitled story",
+      }
+    : null
+);
     }
   }}
   aria-label="Story title"
