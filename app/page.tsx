@@ -216,6 +216,7 @@ useEffect(() => {
     setActiveStoryId(null);
     setForm({ ...defaultForm });
     setStoryState({});
+    setMessages([]);
     setChapters([]);
     setActiveChapterIndex(0);
     setPageIndex(0);
