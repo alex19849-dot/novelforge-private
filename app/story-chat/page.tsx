@@ -225,6 +225,45 @@ useEffect(() => {
   workspaceId,
   hasLoadedMessages,
 ]);
+
+useEffect(() => {
+  if (!hasLoadedMessages || !workspaceId) {
+    return;
+  }
+
+  setStory((currentStory) => {
+    const now = new Date().toISOString();
+
+    return {
+      id: workspaceId,
+      title: storyTitle,
+      seriesType: currentStory?.seriesType ?? "standalone",
+      seriesTitle: currentStory?.seriesTitle ?? "",
+      bookNumber: currentStory?.bookNumber ?? 1,
+      messages,
+      chapters: currentStory?.chapters ?? [],
+      storyBible: currentStory?.storyBible ?? {
+        premise: "",
+        relationship: "",
+        subgenre: "",
+        setting: "",
+        pov: "",
+        heatLevel: "",
+        burnPacing: "",
+        tropes: [],
+        characters: [],
+        notes: [],
+      },
+      createdAt: currentStory?.createdAt ?? now,
+      updatedAt: now,
+    };
+  });
+}, [
+  messages,
+  storyTitle,
+  workspaceId,
+  hasLoadedMessages,
+]);
   
   function startNewStory() {
   const confirmed = window.confirm(
