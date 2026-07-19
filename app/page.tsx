@@ -58,6 +58,7 @@ export default function Home() {
 
   const [form, setForm] = useState<StoryForm>({ ...defaultForm });
   const [storyState, setStoryState] = useState<any>({});
+  const [messages, setMessages] = useState<any[]>([]);
   const [savedStories, setSavedStories] = useState<SavedStory[]>([]);
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
 
