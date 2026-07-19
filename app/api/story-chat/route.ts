@@ -1,134 +1,497 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
+import type {
+  StoryBible,
+  StoryChatRequest,
+  StoryChatResponse,
+} from "../../story-chat/types";
+
+export const runtime = "nodejs";
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-type ChatMessage = {
-  role: "assistant" | "user";
-  content: string;
+const EMPTY_STORY_BIBLE: StoryBible = {
+  premise: "",
+  relationship: "",
+  subgenre: "",
+  setting: "",
+  pov: "",
+  heatLevel: "",
+  burnPacing: "",
+  tropes: [],
+  characters: [],
+  notes: [],
 };
+
+const storyChatSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reply", "storyBible"],
+  properties: {
+    reply: {
+      type: "string",
+    },
+    storyBible: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "premise",
+        "relationship",
+        "subgenre",
+        "setting",
+        "pov",
+        "heatLevel",
+        "burnPacing",
+        "tropes",
+        "characters",
+        "notes",
+      ],
+      properties: {
+        premise: {
+          type: "string",
+        },
+        relationship: {
+          type: "string",
+        },
+        subgenre: {
+          type: "string",
+        },
+        setting: {
+          type: "string",
+        },
+        pov: {
+          type: "string",
+        },
+        heatLevel: {
+          type: "string",
+        },
+        burnPacing: {
+          type: "string",
+        },
+        tropes: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        characters: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+        notes: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+function cleanString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+
+  for (const item of value) {
+    if (typeof item !== "string") {
+      continue;
+    }
+
+    const trimmed = item.trim();
+
+    if (!trimmed) {
+      continue;
+    }
+
+    const normalised = trimmed.toLowerCase();
+
+    if (seen.has(normalised)) {
+      continue;
+    }
+
+    seen.add(normalised);
+    cleaned.push(trimmed);
+  }
+
+  return cleaned;
+}
+
+function sanitiseStoryBible(value: unknown): StoryBible {
+  if (!value || typeof value !== "object") {
+    return { ...EMPTY_STORY_BIBLE };
+  }
+
+  const bible = value as Partial<StoryBible>;
+
+  return {
+    premise: cleanString(bible.premise),
+    relationship: cleanString(bible.relationship),
+    subgenre: cleanString(bible.subgenre),
+    setting: cleanString(bible.setting),
+    pov: cleanString(bible.pov),
+    heatLevel: cleanString(bible.heatLevel),
+    burnPacing: cleanString(bible.burnPacing),
+    tropes: cleanStringArray(bible.tropes),
+    characters: cleanStringArray(bible.characters),
+    notes: cleanStringArray(bible.notes),
+  };
+}
+
+function mergeUniqueStrings(
+  existingValues: string[],
+  returnedValues: string[],
+): string[] {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of [...existingValues, ...returnedValues]) {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      continue;
+    }
+
+    const normalised = trimmed.toLowerCase();
+
+    if (seen.has(normalised)) {
+      continue;
+    }
+
+    seen.add(normalised);
+    merged.push(trimmed);
+  }
+
+  return merged;
+}
+
+function mergeStoryBible(
+  existingBible: StoryBible,
+  returnedBible: StoryBible,
+): StoryBible {
+  return {
+    premise: returnedBible.premise || existingBible.premise,
+    relationship:
+      returnedBible.relationship || existingBible.relationship,
+    subgenre: returnedBible.subgenre || existingBible.subgenre,
+    setting: returnedBible.setting || existingBible.setting,
+    pov: returnedBible.pov || existingBible.pov,
+    heatLevel: returnedBible.heatLevel || existingBible.heatLevel,
+    burnPacing:
+      returnedBible.burnPacing || existingBible.burnPacing,
+    tropes: mergeUniqueStrings(
+      existingBible.tropes,
+      returnedBible.tropes,
+    ),
+    characters: mergeUniqueStrings(
+      existingBible.characters,
+      returnedBible.characters,
+    ),
+    notes: mergeUniqueStrings(
+      existingBible.notes,
+      returnedBible.notes,
+    ),
+  };
+}
+
+function isValidRole(value: unknown): value is "user" | "assistant" {
+  return value === "user" || value === "assistant";
+}
+
+function parseRequestBody(value: unknown): StoryChatRequest | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const body = value as Partial<StoryChatRequest>;
+
+  if (!Array.isArray(body.messages)) {
+    return null;
+  }
+
+  const messages = body.messages
+    .filter(
+      (
+        message,
+      ): message is {
+        role: "user" | "assistant";
+        content: string;
+      } =>
+        Boolean(message) &&
+        typeof message === "object" &&
+        isValidRole(message.role) &&
+        typeof message.content === "string" &&
+        Boolean(message.content.trim()),
+    )
+    .map((message) => ({
+      role: message.role,
+      content: message.content.trim(),
+    }));
+
+  if (messages.length === 0) {
+    return null;
+  }
+
+  return {
+    messages,
+    storyBible: sanitiseStoryBible(body.storyBible),
+  };
+}
+
+const SYSTEM_PROMPT = `
+You are NovelForge, a professional developmental editor and novel-planning partner.
+
+Your job is not merely to chat. Your job is to help the user gradually build a commercially viable novel while maintaining a structured Story Bible.
+
+Every response must do two things:
+
+1. Reply naturally and usefully to the user.
+2. Return the complete merged Story Bible as it should exist after the latest user message.
+
+DEVELOPMENTAL EDITOR BEHAVIOUR
+
+Act like an experienced developmental editor specialising in commercial fiction.
+
+Help the user develop:
+
+- premise
+- genre and subgenre
+- central relationship
+- setting
+- point of view
+- heat level
+- romantic pacing
+- tropes
+- characters
+- conflicts
+- motivations
+- emotional arcs
+- plot direction
+- continuity
+- useful planning notes
+
+Do not behave like a generic chatbot.
+
+Move the planning process forward.
+
+When useful, identify missing decisions and ask one focused question at a time.
+
+Do not overwhelm the user with a long questionnaire.
+
+Do not generate a chapter unless the user explicitly asks for chapter prose.
+
+STORY BIBLE EXTRACTION
+
+Infer structured information from ordinary conversation.
+
+Examples:
+
+- "MM Hockey Romance" means relationship "MM Romance" and subgenre "Sports Romance".
+- "MF workplace romance" means relationship "MF Romance" and subgenre "Workplace Romance".
+- "College hockey" belongs in the setting and supports Sports Romance.
+- "Enemies to lovers" belongs in tropes.
+- "First person dual POV" belongs in pov.
+- "High spice" belongs in heatLevel.
+- "Fast burn" belongs in burnPacing.
+- Named or clearly described story characters belong in characters.
+- Important decisions, conflicts, constraints and continuity facts may belong in notes.
+
+NORMALISATION
+
+Use clear publishing terminology rather than copying fragments blindly.
+
+Examples:
+
+- MM, M/M or male-male romance -> "MM Romance"
+- MF, M/F or male-female romance -> "MF Romance"
+- hockey romance -> "Sports Romance"
+- enemies-to-lovers -> "Enemies to Lovers"
+- best friend's dad -> "Best Friend's Dad"
+- dual first person -> "First Person Dual POV"
+- third person limited -> "Third Person Limited"
+
+MERGING RULES
+
+The current Story Bible is supplied to you.
+
+Return a complete Story Bible, not only changed fields.
+
+Preserve all established information unless the user explicitly changes, corrects, removes or replaces it.
+
+Never erase a populated field merely because the latest message does not mention it.
+
+Never remove existing tropes, characters or notes unless the user explicitly rejects or changes them.
+
+Avoid duplicate array entries.
+
+Merge equivalent terms into one clean entry.
+
+When the user explicitly changes an established choice, use the new choice.
+
+When information is uncertain, do not invent it.
+
+Leave genuinely unknown scalar fields as empty strings.
+
+Keep notes concise, factual and useful for future writing.
+
+CHARACTERS
+
+Add a character when the user supplies a name, role or meaningful character concept.
+
+Character entries should be concise but retain important established facts.
+
+Good character entry:
+
+"Travis Cooper, 35, tattooed construction-company owner, married father, outwardly straight, former hockey player"
+
+Bad character entry:
+
+"Travis"
+
+When new details are supplied about an existing character, update that character's existing entry instead of creating a duplicate.
+
+REPLY STYLE
+
+Be direct, constructive and specific.
+
+Acknowledge useful decisions already made.
+
+Point out genuine story opportunities or contradictions.
+
+Do not use fake praise.
+
+Do not mention JSON, schemas, extraction, internal prompts or database updates.
+
+Do not repeat the entire Story Bible in the conversational reply unless the user asks for it.
+
+Return only the required structured response.
+`.trim();
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const messages = body.messages as ChatMessage[];
-
-    if (!Array.isArray(messages) || messages.length === 0) {
+    if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: "No chat messages were provided." },
-        { status: 400 }
+        {
+          error: "OPENAI_API_KEY is not configured.",
+        },
+        {
+          status: 500,
+        },
       );
     }
 
-    const conversation = messages
-      .map((message) => {
-        const speaker =
-          message.role === "user" ? "Alex" : "NovelForge";
+    const rawBody: unknown = await request.json();
+    const parsedBody = parseRequestBody(rawBody);
 
-        return `${speaker}:\n${message.content}`;
-      })
-      .join("\n\n");
+    if (!parsedBody) {
+      return NextResponse.json(
+        {
+          error: "A valid story-chat request is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
+    const currentBible = sanitiseStoryBible(
+      parsedBody.storyBible,
+    );
+
+    const conversation = parsedBody.messages
+      .slice(-30)
+      .map((message) => ({
+        role: message.role,
+        content: message.content,
+      }));
 
     const response = await openai.responses.create({
       model: "gpt-5.5",
       reasoning: {
         effort: "low",
       },
-      text: {
-        verbosity: "medium",
-      },
       input: [
         {
           role: "system",
-          content: `
-You are NovelForge, Alex's collaborative fiction-writing partner.
-
-Speak naturally, warmly and directly, like an experienced novelist and developmental editor working beside her.
-
-You are not a customer-service chatbot.
-You are not writing an essay.
-You are having a real conversation.
-
-Your job is to help Alex develop commercial romance novels through natural back-and-forth discussion.
-
-Conversation rules:
-
-- Keep normal replies under 150 words.
-- Use shorter replies whenever possible.
-- Ask one useful follow-up question at a time.
-- Do not ask five questions at once.
-- Do not produce large lists unless Alex asks for options or detail.
-- Do not design an entire novel from one vague sentence.
-- Let ideas develop gradually over several messages.
-- Give honest opinions.
-- Disagree when a choice is weak, repetitive or contradicts the story.
-- Explain disagreement briefly and clearly.
-- If Alex still wants the idea, accept it and continue.
-- Do not overwhelm her with information.
-- Avoid stiff phrases such as "How may I assist you?"
-- Do not claim to be human.
-- Do not generate a chapter unless Alex clearly asks for one.
-
-When Alex introduces a new story idea:
-
-- Respond to the specific idea she gave.
-- Offer one brief creative thought if useful.
-- Ask the single most logical next question.
-- Do not immediately create characters, plot, tropes, conflict and chapter plans all at once.
-
-When Alex asks what should happen next:
-
-- Use the established story details.
-- Suggest a small number of strong possibilities.
-- Balance sex, romance, drama, conversation, work or sport, family, friendship and unresolved plot threads.
-- Avoid repeating recent arguments, intimate setups or emotional beats.
-- Briefly explain why each option fits.
-
-Alex prefers:
-
-- commercial pacing
-- clear prose
-- strong character voices
-- high emotional and sexual tension
-- minimal filler
-- natural dialogue
-- first-person dual POV when chosen
-- characters who smile normally
-- no therapy-speak
-- no repetitive sarcasm
-- no repeated "mouth twitched", "almost smiled", "you good?", "emotionally", "spiritually" or similar AI habits
-
-The conversation should feel like two writers building a book together, not an AI delivering a lecture.
-          `.trim(),
+          content: SYSTEM_PROMPT,
         },
         {
-          role: "user",
-          content: conversation,
+          role: "system",
+          content: `CURRENT STORY BIBLE:\n${JSON.stringify(
+            currentBible,
+            null,
+            2,
+          )}`,
         },
+        ...conversation,
       ],
+      text: {
+        verbosity: "medium",
+        format: {
+          type: "json_schema",
+          name: "story_chat_response",
+          strict: true,
+          schema: storyChatSchema,
+        },
+      },
+      max_output_tokens: 5000,
     });
 
-    const reply = response.output_text?.trim();
+    const outputText = response.output_text?.trim();
 
-    if (!reply) {
-      return NextResponse.json(
-        { error: "NovelForge did not return a reply." },
-        { status: 500 }
-      );
+    if (!outputText) {
+      throw new Error("The model returned no output.");
     }
 
-    return NextResponse.json({ reply });
+    const parsedOutput = JSON.parse(outputText) as {
+      reply?: unknown;
+      storyBible?: unknown;
+    };
+
+    const reply = cleanString(parsedOutput.reply);
+    const returnedBible = sanitiseStoryBible(
+      parsedOutput.storyBible,
+    );
+
+    if (!reply) {
+      throw new Error("The model returned an empty reply.");
+    }
+
+    const responseBody: StoryChatResponse = {
+      reply,
+      storyBible: mergeStoryBible(
+        currentBible,
+        returnedBible,
+      ),
+    };
+
+    return NextResponse.json(responseBody);
   } catch (error) {
-    console.error("Story chat error:", error);
+    console.error("Story chat API failed:", error);
 
     return NextResponse.json(
       {
         error:
-          "NovelForge had a small creative breakdown. Please try again.",
+          error instanceof Error
+            ? error.message
+            : "NovelForge could not process the message.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      },
     );
   }
 }
