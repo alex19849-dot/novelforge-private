@@ -513,6 +513,7 @@ const returnedChapters = Array.isArray(parsedOutput.chapters)
   : [];
   const responseBody: StoryChatResponse = {
   reply,
+    intent,
  storyBible: mergeStoryBible(
   sanitiseStoryBible(currentStory.storyBible),
   returnedBible,
