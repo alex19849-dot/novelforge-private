@@ -223,7 +223,11 @@ function parseRequestBody(
   return null;
 }
 
-  return {
+ if (!isStoryWorkspace(body.story)) {
+  return null;
+}
+
+return {
   story: body.story,
 };
 }
