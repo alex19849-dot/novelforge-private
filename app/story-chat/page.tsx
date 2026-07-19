@@ -307,14 +307,11 @@ export default function StoryChatPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            messages: requestMessages.map(
-              ({ role, content }) => ({
-                role,
-                content,
-              }),
-            ),
-            storyBible: requestStoryBible,
-          }),
+  story: {
+    ...story,
+    messages: requestMessages,
+  },
+}),
         },
       );
 
