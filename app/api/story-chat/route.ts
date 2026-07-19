@@ -433,8 +433,8 @@ const intent = detectStoryIntent(latestMessage);
     "Rewrite only the chapter requested by the user.",
   update_story:
     "Update the existing story workspace without creating a new story.",
-  brainstorm:
-    "Give useful story ideas without changing the existing story workspace.",
+ brainstorm:
+  "Give useful story ideas only. Do not change the story bible, chapters, timeline, world, notes, or any other part of the current story workspace.",
   general_chat:
     "Answer the user about their story without making unnecessary changes.",
 };   
