@@ -291,6 +291,7 @@ useEffect(() => {
       active_chapter_index: activeIndexToSave,
       custom_rewrite: guidanceToSave,
       story_state: storyStateToSave || {},
+      messages,
       updated_at: new Date().toISOString(),
     };
 
