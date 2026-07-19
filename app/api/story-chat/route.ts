@@ -480,7 +480,9 @@ const returnedChapters = Array.isArray(parsedOutput.chapters)
   : [];
 
 
-  const currentChapters = currentStory.chapters;
+  const currentChapters = Array.isArray(currentStory.chapters)
+  ? currentStory.chapters
+  : [];
   const responseBody: StoryChatResponse = {
   reply,
  storyBible: mergeStoryBible(
