@@ -18,16 +18,16 @@ export default function StoryChatPage() {
     },
   ]);
 
-  const [input, setInput] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
 
  async function sendMessage(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
 
   const trimmedMessage = input.trim();
 
-  if (!trimmedMessage) {
-    return;
-  }
+ if (!trimmedMessage || isThinking) {
+  return;
+}
 
   const updatedMessages = [
     ...messages,
@@ -39,9 +39,10 @@ export default function StoryChatPage() {
   ];
 
   setMessages(updatedMessages);
-  setInput("");
+setInput("");
+setIsThinking(true);
 
-  try {
+try {
     const response = await fetch("/api/story-chat", {
       method: "POST",
       headers: {
@@ -69,7 +70,7 @@ export default function StoryChatPage() {
         content: data.reply,
       },
     ]);
-  } catch (error) {
+    } catch (error) {
     console.error(error);
 
     setMessages((current) => [
@@ -81,6 +82,8 @@ export default function StoryChatPage() {
           "Something went wrong while I was thinking. Try sending that again.",
       },
     ]);
+  } finally {
+    setIsThinking(false);
   }
 }
 
