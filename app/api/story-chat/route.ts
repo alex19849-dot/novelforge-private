@@ -473,10 +473,10 @@ const returnedChapters = parsedOutput.chapters ?? [];
   : [];
   const responseBody: StoryChatResponse = {
   reply,
-  storyBible: mergeStoryBible(
-    currentBible,
-    returnedBible,
-  ),
+ storyBible: mergeStoryBible(
+  sanitiseStoryBible(currentStory.storyBible),
+  returnedBible,
+),
   chapters:
     returnedChapters.length > 0
       ? returnedChapters
