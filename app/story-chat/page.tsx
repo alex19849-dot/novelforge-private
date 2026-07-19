@@ -97,64 +97,6 @@ useEffect(() => {
     return;
   }
 
-  const existingWorkspace = window.localStorage.getItem(
-    "novelforge-current-story"
-  );
-
-  let previousStory: StoryWorkspace | null = null;
-
-  if (existingWorkspace) {
-    try {
-      previousStory = JSON.parse(
-        existingWorkspace
-      ) as StoryWorkspace;
-    } catch (error) {
-      console.error("Could not read existing workspace:", error);
-    }
-  }
-
-  const now = new Date().toISOString();
-
-  const workspace: StoryWorkspace = {
-    id: workspaceId,
-    title: storyTitle,
-    seriesType: previousStory?.seriesType ?? "standalone",
-    seriesTitle: previousStory?.seriesTitle ?? "",
-    bookNumber: previousStory?.bookNumber ?? 1,
-    messages,
-    chapters: previousStory?.chapters ?? [],
-    storyBible: previousStory?.storyBible ?? {
-      premise: "",
-      relationship: "",
-      subgenre: "",
-      setting: "",
-      pov: "",
-      heatLevel: "",
-      burnPacing: "",
-      tropes: [],
-      characters: [],
-      notes: [],
-    },
-    createdAt: previousStory?.createdAt ?? now,
-    updatedAt: now,
-  };
-
-  window.localStorage.setItem(
-    "novelforge-current-story",
-    JSON.stringify(workspace)
-  );
-}, [
-  messages,
-  storyTitle,
-  workspaceId,
-  hasLoadedMessages,
-]);
-
-useEffect(() => {
-  if (!hasLoadedMessages || !workspaceId) {
-    return;
-  }
-
   setStory((currentStory) => {
     const now = new Date().toISOString();
 
@@ -188,6 +130,18 @@ useEffect(() => {
   workspaceId,
   hasLoadedMessages,
 ]);
+  
+ useEffect(() => {
+  if (!hasLoadedMessages || !story) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    "novelforge-current-story",
+    JSON.stringify(story)
+  );
+}, [story, hasLoadedMessages]);
+
   
  function startNewStory() {
   const confirmed = window.confirm(
