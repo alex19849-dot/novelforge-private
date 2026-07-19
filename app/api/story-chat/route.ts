@@ -428,15 +428,15 @@ const intent = detectStoryIntent(latestMessage);
   create_story:
     "Create a new story workspace from the user's request.",
   continue_story:
-    "Continue the existing story by adding the next chapter.",
-  rewrite_chapter:
-    "Rewrite only the chapter requested by the user.",
+  "Continue the existing story by writing the next chapter only. Update the story bible only if genuinely necessary to preserve continuity. Do not rewrite or replace existing chapters.",
+ rewrite_chapter:
+  "Rewrite only the chapter or passage explicitly requested by the user. Preserve the overall story, chronology, characters, and all other chapters unless the user specifically asks for wider changes. Update the story bible only if the rewrite introduces permanent story changes.",
   update_story:
     "Update the existing story workspace without creating a new story.",
  brainstorm:
   "Give useful story ideas only. Do not change the story bible, chapters, timeline, world, notes, or any other part of the current story workspace.",
-  general_chat:
-    "Answer the user about their story without making unnecessary changes.",
+ general_chat:
+  "Answer the user about their story only. Do not change the story bible, chapters, timeline, world, notes, or any other part of the current story workspace.",
 };   
     const response = await openai.responses.create({
      model: "gpt-5.6-terra",
