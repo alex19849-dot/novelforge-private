@@ -466,13 +466,16 @@ const returnedChapters = parsedOutput.chapters ?? [];
     }
 
     const currentChapters = currentStory?.chapters ?? [];
-   const responseBody: StoryChatResponse = {
+  const responseBody: StoryChatResponse = {
   reply,
   storyBible: mergeStoryBible(
     currentBible,
     returnedBible,
   ),
-  chapters: currentChapters,
+  chapters:
+    returnedChapters.length > 0
+      ? returnedChapters
+      : currentChapters,
 };
 
     return NextResponse.json(responseBody);
