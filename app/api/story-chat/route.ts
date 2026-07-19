@@ -419,6 +419,11 @@ const conversation = currentStory.messages
     role: message.role,
     content: message.content,
   }));
+
+const latestMessage =
+  conversation[conversation.length - 1]?.content ?? "";
+
+const intent = detectStoryIntent(latestMessage);
     
     const response = await openai.responses.create({
      model: "gpt-5.6-terra",
