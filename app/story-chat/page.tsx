@@ -92,7 +92,8 @@ const [hasLoadedMessages, setHasLoadedMessages] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
   const [storyTitle, setStoryTitle] = useState("Untitled story");
 const [workspaceId, setWorkspaceId] = useState("");
-  
+const [story, setStory] = useState<StoryWorkspace | null>(null);
+
 useEffect(() => {
   try {
     const savedWorkspace = window.localStorage.getItem(
