@@ -248,7 +248,10 @@ useEffect(() => {
     },
   ];
 
-  setMessages(freshMessages);
+ const newWorkspaceId = crypto.randomUUID();
+
+setWorkspaceId(newWorkspaceId);
+setMessages(freshMessages);
 setInput("");
 setStoryTitle("Untitled story");
 setActiveTab("chat");
