@@ -256,7 +256,16 @@ try {
              <input
   type="text"
   value={storyTitle}
-  onChange={(event) => setStoryTitle(event.target.value)}
+onChange={(event) => {
+  setStory((current) =>
+    current
+      ? {
+          ...current,
+          title: event.target.value,
+        }
+      : null
+  );
+}}
   onBlur={() => {
     if (!storyTitle.trim()) {
       setStoryTitle("Untitled story");
