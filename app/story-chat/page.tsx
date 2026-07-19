@@ -2,45 +2,11 @@
 
 import { FormEvent, useEffect, useState } from "react";
 
-type ChatMessage = {
-  id: number;
-  role: "assistant" | "user";
-  content: string;
-};
-
-type ActiveTab = "chat" | "chapters" | "bible";
-
-type SeriesType =
-  | "standalone"
-  | "duet"
-  | "trilogy"
-  | "interconnected-standalones";
-
-type StoryBible = {
-  premise: string;
-  relationship: string;
-  subgenre: string;
-  setting: string;
-  pov: string;
-  heatLevel: string;
-  burnPacing: string;
-  tropes: string[];
-  characters: string[];
-  notes: string[];
-};
-
-type StoryWorkspace = {
-  id: string;
-  title: string;
-  seriesType: SeriesType;
-  seriesTitle: string;
-  bookNumber: number;
-  messages: ChatMessage[];
-  chapters: string[];
-  storyBible: StoryBible;
-  createdAt: string;
-  updatedAt: string;
-};
+import {
+  ActiveTab,
+  ChatMessage,
+  StoryWorkspace,
+} from "./types";
 
 function createEmptyStory(): StoryWorkspace {
   const now = new Date().toISOString();
