@@ -42,6 +42,41 @@ type StoryWorkspace = {
   updatedAt: string;
 };
 
+function createEmptyStory(): StoryWorkspace {
+  const now = new Date().toISOString();
+
+  return {
+    id: crypto.randomUUID(),
+    title: "Untitled story",
+    seriesType: "standalone",
+    seriesTitle: "",
+    bookNumber: 1,
+    messages: [
+      {
+        id: Date.now(),
+        role: "assistant",
+        content:
+          "Hi Alex. What kind of story are we building this time?",
+      },
+    ],
+    chapters: [],
+    storyBible: {
+      premise: "",
+      relationship: "",
+      subgenre: "",
+      setting: "",
+      pov: "",
+      heatLevel: "",
+      burnPacing: "",
+      tropes: [],
+      characters: [],
+      notes: [],
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 export default function StoryChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
