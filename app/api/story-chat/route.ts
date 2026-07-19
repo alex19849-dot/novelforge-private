@@ -414,7 +414,7 @@ const currentStory = parsedBody?.story;
    const currentBible = sanitiseStoryBible(
   currentStory.storyBible,
 );
-const currentWorkspace = currentStory;
+
     
 const conversation = currentStory.messages
   .slice(-30)
