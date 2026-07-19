@@ -424,7 +424,20 @@ const latestMessage =
   conversation[conversation.length - 1]?.content ?? "";
 
 const intent = detectStoryIntent(latestMessage);
-    
+ const intentInstruction: Record<typeof intent, string> = {
+  create_story:
+    "Create a new story workspace from the user's request.",
+  continue_story:
+    "Continue the existing story by adding the next chapter.",
+  rewrite_chapter:
+    "Rewrite only the chapter requested by the user.",
+  update_story:
+    "Update the existing story workspace without creating a new story.",
+  brainstorm:
+    "Give useful story ideas without changing the existing story workspace.",
+  general_chat:
+    "Answer the user about their story without making unnecessary changes.",
+};   
     const response = await openai.responses.create({
      model: "gpt-5.6-terra",
       reasoning: {
