@@ -415,13 +415,13 @@ const currentStory = parsedBody?.story;
   currentStory?.storyBible,
 );
 
-const conversation = (currentStory?.messages ?? [])
+const conversation = currentStory.messages
   .slice(-30)
   .map((message) => ({
     role: message.role,
     content: message.content,
   }));
-
+    
     const response = await openai.responses.create({
       model: "gpt-5.5",
       reasoning: {
