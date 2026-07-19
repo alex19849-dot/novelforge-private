@@ -234,15 +234,22 @@ try {
     } catch (error) {
     console.error(error);
 
-    setMessages((current) => [
-      ...current,
-      {
-        id: Date.now() + 2,
-        role: "assistant",
-        content:
-          "Something went wrong while I was thinking. Try sending that again.",
-      },
-    ]);
+    setStory((current) =>
+  current
+    ? {
+        ...current,
+        messages: [
+          ...current.messages,
+          {
+            id: Date.now() + 2,
+            role: "assistant",
+            content:
+              "Something went wrong while I was thinking. Try sending that again.",
+          },
+        ],
+      }
+    : null
+);
   } finally {
     setIsThinking(false);
   }
