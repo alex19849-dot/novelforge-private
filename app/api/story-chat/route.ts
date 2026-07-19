@@ -462,6 +462,10 @@ const conversation = currentStory.messages
 const returnedBible = sanitiseStoryBible(
   parsedOutput.storyBible,
 );
+
+const returnedChapters = Array.isArray(parsedOutput.chapters)
+  ? parsedOutput.chapters
+  : [];
 const returnedChapters = parsedOutput.chapters ?? [];
 
     if (!reply) {
