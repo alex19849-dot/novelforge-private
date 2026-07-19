@@ -433,11 +433,10 @@ const intent = detectStoryIntent(latestMessage);
       input: [
         {
   role: "system",
-  content: `CURRENT STORY WORKSPACE:\n${JSON.stringify(
-    currentStory,
-    null,
-    2,
-  )}`,
+  content: `USER INTENT: ${intent}
+
+CURRENT STORY WORKSPACE:
+${JSON.stringify(currentStory, null, 2)}`,
 },
         ...conversation,
       ],
