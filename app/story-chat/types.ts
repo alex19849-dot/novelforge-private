@@ -1,4 +1,4 @@
-import type { StoryIntent } from "@/src/lib/detect-story-intent";
+import type { StoryIntent } from "../../src/lib/detect-story-intent";
 
 export type ActiveTab = "chat" | "chapters" | "bible";
 
