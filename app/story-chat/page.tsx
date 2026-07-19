@@ -265,6 +265,9 @@ window.localStorage.setItem(
   "novelforge-story-chat-title",
   "Untitled story"
 );
+    window.localStorage.removeItem(
+  "novelforge-current-story"
+);
 }
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
   event.preventDefault();
