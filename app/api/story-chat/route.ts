@@ -207,9 +207,6 @@ function mergeStoryBible(
   };
 }
 
-function isValidRole(value: unknown): value is "user" | "assistant" {
-  return value === "user" || value === "assistant";
-}
 
 function parseRequestBody(
   value: unknown,
