@@ -132,48 +132,6 @@ const storyChatSchema = {
         },
       ],
     },
-
-    chapters: {
-  
-chapters: {
-  type: "array",
-  items: {
-    type: "object",
-    additionalProperties: false,
-    required: [
-      "id",
-      "number",
-      "title",
-      "povCharacter",
-      "content",
-      "createdAt",
-      "updatedAt",
-    ],
-    properties: {
-      id: {
-        type: "string",
-      },
-      number: {
-        type: "number",
-      },
-      title: {
-        type: "string",
-      },
-      povCharacter: {
-        type: "string",
-      },
-      content: {
-        type: "string",
-      },
-      createdAt: {
-        type: "string",
-      },
-      updatedAt: {
-        type: "string",
-      },
-    },
-  },
-},
   
 } as const;
 
