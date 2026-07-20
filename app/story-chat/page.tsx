@@ -702,6 +702,7 @@ if (
         {activeTab === "chapters" && (
           <section className="flex-1 px-5 py-8">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
               <div className="mb-6 flex flex-wrap gap-3">
   <button
     type="button"
@@ -813,7 +814,7 @@ if (
     Wide
   </button>
 </div>
-              
+ </div>             
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
                 Chapters
               </p>
