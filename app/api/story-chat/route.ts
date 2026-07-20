@@ -21,6 +21,27 @@ const openrouter = new OpenAI({
     "https://openrouter.ai/api/v1",
 });
 
+async function generateWithAion(prompt: string) {
+  const response = await openrouter.chat.completions.create({
+    model: "aion-labs/aion-3.0-mini",
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+    max_tokens: 5000,
+  });
+
+  const content = response.choices[0]?.message?.content?.trim();
+
+  if (!content) {
+    throw new Error("Aion returned no chapter prose.");
+  }
+
+  return content;
+}
+
 const EMPTY_STORY_BIBLE: StoryBible = {
   premise: "",
   relationship: "",
