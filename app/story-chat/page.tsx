@@ -662,6 +662,31 @@ if (
         {activeTab === "chapters" && (
           <section className="flex-1 px-5 py-8">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <div className="mb-6 flex flex-wrap gap-3">
+  <button
+    type="button"
+    onClick={() => setReaderTheme("light")}
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    Light
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setReaderTheme("sepia")}
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    Sepia
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setReaderTheme("dark")}
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    Dark
+  </button>
+</div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
                 Chapters
               </p>
