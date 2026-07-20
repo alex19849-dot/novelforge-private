@@ -749,6 +749,35 @@ if (
     +
   </button>
 </div>
+
+            <div className="mb-6 flex items-center gap-3">
+  <span className="text-sm">Width</span>
+
+  <button
+    type="button"
+    onClick={() => setReaderWidth("narrow")}
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    Narrow
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setReaderWidth("medium")}
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    Medium
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setReaderWidth("wide")}
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    Wide
+  </button>
+</div>
+              
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
                 Chapters
               </p>
