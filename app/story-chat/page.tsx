@@ -710,9 +710,15 @@ if (
               ) : (
                 <div className="mt-6 space-y-4">
                   {chapters.map((chapter) => (
-                   <article
+                  <article
   key={chapter.id}
-  className="rounded-xl border border-amber-200 bg-[#f4ecd8] p-8 shadow-sm"
+  className={`rounded-xl border p-8 shadow-sm ${
+    readerTheme === "dark"
+      ? "border-neutral-700 bg-neutral-900"
+      : readerTheme === "light"
+        ? "border-neutral-200 bg-white"
+        : "border-amber-200 bg-[#f4ecd8]"
+  }`}
 >
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
                         Chapter {chapter.number}
