@@ -731,21 +731,69 @@ const generatedChapter = parsedOutput.generatedChapter ?? null;
 const currentChapters = Array.isArray(currentStory.chapters)
   ? currentStory.chapters
   : [];
-  const responseBody: StoryChatResponse = {
-  reply,
-    intent,
-storyBible: mergeStoryBible(
-  sanitiseStoryBible(currentStory.storyBible),
-  returnedBible,
-),
-  chapters:
-  intent === "brainstorm" || intent === "general_chat"
-    ? currentChapters
-    : returnedChapters.length > 0
-      ? returnedChapters
-      : currentChapters,
-};
+ const now = new Date().toISOString();
 
+let updatedChapters = currentChapters;
+
+if (generatedChapter) {
+  const replacementNumber =
+    generatedChapter.replaceChapterNumber;
+
+  if (replacementNumber !== null) {
+    updatedChapters = currentChapters.map((chapter) =>
+      chapter.number === replacementNumber
+        ? {
+            ...chapter,
+            title:
+              cleanString(generatedChapter.title) ||
+              chapter.title,
+            povCharacter:
+              cleanString(generatedChapter.povCharacter) ||
+              chapter.povCharacter,
+            content: cleanString(generatedChapter.content),
+            updatedAt: now,
+          }
+        : chapter,
+    );
+  } else {
+    const nextChapterNumber =
+      currentChapters.length > 0
+        ? Math.max(
+            ...currentChapters.map(
+              (chapter) => chapter.number,
+            ),
+          ) + 1
+        : 1;
+
+    updatedChapters = [
+      ...currentChapters,
+      {
+        id: crypto.randomUUID(),
+        number: nextChapterNumber,
+        title:
+          cleanString(generatedChapter.title) ||
+          `Chapter ${nextChapterNumber}`,
+        povCharacter: cleanString(
+          generatedChapter.povCharacter,
+        ),
+        content: cleanString(generatedChapter.content),
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+  }
+}
+
+const responseBody: StoryChatResponse = {
+  reply,
+  intent,
+  storyBible: mergeStoryBible(
+    sanitiseStoryBible(currentStory.storyBible),
+    returnedBible,
+  ),
+  generatedChapter,
+  chapters: updatedChapters,
+};
     return NextResponse.json(responseBody);
   } catch (error) {
     console.error("Story chat API failed:", error);
