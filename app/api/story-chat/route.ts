@@ -193,33 +193,56 @@ function sanitiseStoryBible(value: unknown): StoryBible {
   };
 }
 
-function mergeUniqueStrings(
-  existingValues: string[],
-  returnedValues: string[],
-): string[] {
-  const merged: string[] = [];
-  const seen = new Set<string>();
-
-  for (const value of [...existingValues, ...returnedValues]) {
-    const trimmed = value.trim();
-
-    if (!trimmed) {
-      continue;
-    }
-
-    const normalised = trimmed.toLowerCase();
-
-    if (seen.has(normalised)) {
-      continue;
-    }
-
-    seen.add(normalised);
-    merged.push(trimmed);
-  }
-
-  return merged;
+function getCharacterName(character: string): string {
+  return character.split(",")[0]?.trim().toLowerCase() ?? "";
 }
 
+function mergeCharacters(
+  existingCharacters: string[],
+  returnedCharacters: string[],
+): string[] {
+  const returnedNamedCharacters = returnedCharacters.filter(
+    (character) =>
+      !getCharacterName(character).startsWith("unnamed"),
+  );
+
+  const hasNamedCharacters =
+    returnedNamedCharacters.length > 0;
+
+  const merged = new Map<string, string>();
+
+  for (const character of existingCharacters) {
+    const name = getCharacterName(character);
+
+    if (
+      !name ||
+      (hasNamedCharacters && name.startsWith("unnamed"))
+    ) {
+      continue;
+    }
+
+    merged.set(name, character.trim());
+  }
+
+  for (const character of returnedCharacters) {
+    const name = getCharacterName(character);
+
+    if (!name) {
+      continue;
+    }
+
+    if (
+      hasNamedCharacters &&
+      name.startsWith("unnamed")
+    ) {
+      continue;
+    }
+
+    merged.set(name, character.trim());
+  }
+
+  return Array.from(merged.values());
+}
 function mergeStoryBible(
   existingBible: StoryBible,
   returnedBible: StoryBible,
@@ -238,10 +261,10 @@ function mergeStoryBible(
       existingBible.tropes,
       returnedBible.tropes,
     ),
-    characters: mergeUniqueStrings(
-      existingBible.characters,
-      returnedBible.characters,
-    ),
+    characters: mergeCharacters(
+  existingBible.characters,
+  returnedBible.characters,
+),
     notes: mergeUniqueStrings(
       existingBible.notes,
       returnedBible.notes,
