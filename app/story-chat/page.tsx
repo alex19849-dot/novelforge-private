@@ -683,10 +683,10 @@ if (
               ) : (
                 <div className="mt-6 space-y-4">
                   {chapters.map((chapter) => (
-                    <article
-                      key={chapter.id}
-                      className="rounded-xl border border-white/10 bg-neutral-950/40 p-5"
-                    >
+                   <article
+  key={chapter.id}
+  className="rounded-xl border border-amber-200 bg-[#f4ecd8] p-8 shadow-sm"
+>
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
                         Chapter {chapter.number}
                       </p>
