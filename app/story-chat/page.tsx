@@ -165,6 +165,15 @@ export default function StoryChatPage() {
     story?.storyBible ?? EMPTY_STORY_BIBLE;
 
   useEffect(() => {
+  async function loadUser() {
+    const { data } = await supabase.auth.getUser();
+    setUserId(data.user?.id ?? null);
+  }
+
+  loadUser();
+}, []);
+  
+  useEffect(() => {
     try {
       const savedStory =
         window.localStorage.getItem(STORAGE_KEY);
