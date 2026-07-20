@@ -715,7 +715,13 @@ if (
                         </p>
                       )}
 
-                      <p className="mt-4 whitespace-pre-wrap text-[18px] leading-9 text-black">
+                      <p
+  className="mt-4 whitespace-pre-wrap text-black"
+  style={{
+    fontSize: `${readerFontSize}px`,
+    lineHeight: readerLineHeight,
+  }}
+>
                         {chapter.content}
                       </p>
                     </article>
