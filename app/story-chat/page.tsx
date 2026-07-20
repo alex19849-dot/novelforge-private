@@ -634,15 +634,13 @@ if (
                       {isUser
                         ? "You"
                         : "NovelForge"}
-                    </p>
-
-                    <div
-                      className={`whitespace-pre-wrap rounded-2xl px-5 py-4 text-[15px] leading-7 ${
-                        isUser
-                          ? "rounded-br-md bg-pink-500 text-white"
-                          : "rounded-bl-md border border-white/10 bg-white/5 text-neutral-100"
-                      }`}
-                    >
+                 <p
+  className="mt-4 whitespace-pre-wrap text-black"
+  style={{
+    fontSize: `${readerFontSize}px`,
+    lineHeight: readerLineHeight,
+  }}
+>
                       {message.content}
                     </div>
                   </div>
