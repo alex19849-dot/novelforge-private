@@ -282,6 +282,7 @@ useEffect(() => {
     const activeIndexToSave = override?.activeChapterIndex ?? activeChapterIndex;
     const guidanceToSave = override?.chapterGuidance ?? chapterGuidance;
     const storyStateToSave = override?.storyState ?? storyState;
+    const messagesToSave = messages;
 
     const payload = {
       user_id: user.id,
