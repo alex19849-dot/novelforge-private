@@ -296,7 +296,7 @@ if (
   setStory(newStory);
 
   if (userId) {
-    void supabase.from("stories").insert({
+    void supabase.from("stories").upsert({
       id: newStory.id,
       user_id: userId,
       title: newStory.title,
