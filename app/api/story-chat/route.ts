@@ -30,11 +30,16 @@ const EMPTY_STORY_BIBLE: StoryBible = {
 const storyChatSchema = {
   type: "object",
   additionalProperties: false,
- required: ["reply", "storyBible", "generatedChapter"],
+  required: [
+    "reply",
+    "storyBible",
+    "generatedChapter",
+  ],
   properties: {
     reply: {
       type: "string",
     },
+
     storyBible: {
       type: "object",
       additionalProperties: false,
@@ -92,13 +97,18 @@ const storyChatSchema = {
         },
       },
     },
-  },
 
     generatedChapter: {
       anyOf: [
         {
           type: "object",
           additionalProperties: false,
+          required: [
+            "title",
+            "povCharacter",
+            "content",
+            "replaceChapterNumber",
+          ],
           properties: {
             title: {
               type: "string",
@@ -120,18 +130,14 @@ const storyChatSchema = {
               ],
             },
           },
-          required: [
-            "title",
-            "povCharacter",
-            "content",
-            "replaceChapterNumber",
-          ],
         },
         {
           type: "null",
         },
       ],
     },
+  },
+};
   
 } as const;
 
