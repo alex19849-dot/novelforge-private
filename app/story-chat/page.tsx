@@ -738,8 +738,12 @@ if (
                         </p>
                       )}
 
-                      <p
-  className="mt-4 whitespace-pre-wrap text-black"
+                     <p
+  className={`mt-4 whitespace-pre-wrap ${
+    readerTheme === "dark"
+      ? "text-neutral-100"
+      : "text-black"
+  }`}
   style={{
     fontSize: `${readerFontSize}px`,
     lineHeight: readerLineHeight,
