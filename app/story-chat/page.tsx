@@ -643,7 +643,11 @@ if (
 >
   {message.content}
 </p>
-
+</div>
+                </div>
+              );
+            })}
+                  
             {isThinking && (
               <div className="flex justify-start">
                 <div className="max-w-[85%]">
