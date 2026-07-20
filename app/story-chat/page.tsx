@@ -186,6 +186,10 @@ const [readerFontSize, setReaderFontSize] =
 
 const [readerLineHeight, setReaderLineHeight] =
   useState(2);
+
+const [readerWidth, setReaderWidth] = useState<
+  "narrow" | "medium" | "wide"
+>("medium");
   
   const messages = story?.messages ?? [];
   const storyTitle = story?.title ?? "Untitled story";
