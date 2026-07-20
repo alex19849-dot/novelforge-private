@@ -767,53 +767,58 @@ if (
                 </p>
               ) : (
                 <div className="mt-6 space-y-4">
-                  {chapters.map((chapter) => (
-                  <article
-  key={chapter.id}
-  className={`rounded-xl border p-8 shadow-sm ${
-    readerTheme === "dark"
-      ? "border-neutral-700 bg-neutral-900"
-      : readerTheme === "light"
-        ? "border-neutral-200 bg-white"
-        : "border-amber-200 bg-[#f4ecd8]"
-  }`}
->
-                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
-                        Chapter {chapter.number}
-                      </p>
+                 {chapters.map((chapter) => (
+  <article
+    key={chapter.id}
+    className={`rounded-xl border p-8 shadow-sm ${
+      readerTheme === "dark"
+        ? "border-neutral-700 bg-neutral-900"
+        : readerTheme === "light"
+          ? "border-neutral-200 bg-white"
+          : "border-amber-200 bg-[#f4ecd8]"
+    }`}
+  >
+    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
+      Chapter {chapter.number}
+    </p>
 
-                    <h3
-  className={`mt-2 text-3xl font-bold ${
-    readerTheme === "dark"
-      ? "text-white"
-      : "text-black"
-  }`}
->
+    <h3
+      className={`mt-2 text-3xl font-bold ${
+        readerTheme === "dark"
+          ? "text-white"
+          : "text-black"
+      }`}
+    >
+      {chapter.title || `Chapter ${chapter.number}`}
+    </h3>
 
-                      {chapter.povCharacter && (
-                       <p
-  className={`mt-2 text-base italic ${
-    readerTheme === "dark"
-      ? "text-neutral-400"
-      : "text-neutral-700"
-  }`}
->
+    {chapter.povCharacter && (
+      <p
+        className={`mt-2 text-base italic ${
+          readerTheme === "dark"
+            ? "text-neutral-400"
+            : "text-neutral-700"
+        }`}
+      >
+        POV: {chapter.povCharacter}
+      </p>
+    )}
 
-                     <p
-  className={`mt-4 whitespace-pre-wrap ${
-    readerTheme === "dark"
-      ? "text-neutral-100"
-      : "text-black"
-  }`}
-  style={{
-    fontSize: `${readerFontSize}px`,
-    lineHeight: readerLineHeight,
-  }}
->
-                        {chapter.content}
-                      </p>
-                    </article>
-                  ))}
+    <p
+      className={`mt-4 whitespace-pre-wrap ${
+        readerTheme === "dark"
+          ? "text-neutral-100"
+          : "text-black"
+      }`}
+      style={{
+        fontSize: `${readerFontSize}px`,
+        lineHeight: readerLineHeight,
+      }}
+    >
+      {chapter.content}
+    </p>
+  </article>
+))}
                 </div>
               )}
             </div>
