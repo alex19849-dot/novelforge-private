@@ -756,7 +756,6 @@ Do not explain your decisions.
 Do not include notes before or after the chapter.
 `);
 
-  console.log(chapterText);
 }
     
     const outputText = response.output_text?.trim();
