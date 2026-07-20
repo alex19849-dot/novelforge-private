@@ -726,12 +726,9 @@ const returnedBible = sanitiseStoryBible(
   parsedOutput.storyBible,
 );
 
-const returnedChapters = Array.isArray(parsedOutput.chapters)
-  ? parsedOutput.chapters
-  : [];
+const generatedChapter = parsedOutput.generatedChapter ?? null;
 
-
-  const currentChapters = Array.isArray(currentStory.chapters)
+const currentChapters = Array.isArray(currentStory.chapters)
   ? currentStory.chapters
   : [];
   const responseBody: StoryChatResponse = {
