@@ -634,19 +634,15 @@ if (
                       {isUser
                         ? "You"
                         : "NovelForge"}
-                 <p
+                <p
   className="mt-4 whitespace-pre-wrap text-black"
   style={{
     fontSize: `${readerFontSize}px`,
     lineHeight: readerLineHeight,
   }}
 >
-                      {message.content}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+  {message.content}
+</p>
 
             {isThinking && (
               <div className="flex justify-start">
