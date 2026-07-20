@@ -124,12 +124,15 @@ function isStoryChatResponse(
 
   const response = value as Partial<StoryChatResponse>;
 
-  return (
-    typeof response.reply === "string" &&
-    Boolean(response.reply.trim()) &&
-    isStoryBible(response.storyBible) &&
+ return (
+  typeof response.reply === "string" &&
+  Boolean(response.reply.trim()) &&
+  isStoryBible(response.storyBible) &&
+  (
+    response.chapters === undefined ||
     Array.isArray(response.chapters)
-  );
+  )
+);
 }
 function hasStoryBibleContent(
   storyBible: StoryBible,
