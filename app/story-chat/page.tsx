@@ -127,10 +127,10 @@ function isStoryChatResponse(
   return (
     typeof response.reply === "string" &&
     Boolean(response.reply.trim()) &&
-    isStoryBible(response.storyBible)
+    isStoryBible(response.storyBible) &&
+    Array.isArray(response.chapters)
   );
 }
-
 function hasStoryBibleContent(
   storyBible: StoryBible,
 ): boolean {
