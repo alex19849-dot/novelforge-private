@@ -193,6 +193,33 @@ function sanitiseStoryBible(value: unknown): StoryBible {
   };
 }
 
+function mergeUniqueStrings(
+  existingValues: string[],
+  returnedValues: string[],
+): string[] {
+  const merged: string[] = [];
+  const seen = new Set<string>();
+
+  for (const value of [...existingValues, ...returnedValues]) {
+    const trimmed = value.trim();
+
+    if (!trimmed) {
+      continue;
+    }
+
+    const normalised = trimmed.toLowerCase();
+
+    if (seen.has(normalised)) {
+      continue;
+    }
+
+    seen.add(normalised);
+    merged.push(trimmed);
+  }
+
+  return merged;
+}
+
 function getCharacterName(character: string): string {
   return character.split(",")[0]?.trim().toLowerCase() ?? "";
 }
