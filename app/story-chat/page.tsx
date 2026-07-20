@@ -804,6 +804,18 @@ if (
   <article
     key={chapter.id}
     className={`rounded-xl border p-8 shadow-sm ${
+  readerTheme === "dark"
+    ? "border-neutral-700 bg-neutral-900"
+    : readerTheme === "light"
+      ? "border-neutral-200 bg-white"
+      : "border-amber-200 bg-[#f4ecd8]"
+} ${
+  readerWidth === "narrow"
+    ? "max-w-2xl mx-auto"
+    : readerWidth === "medium"
+      ? "max-w-4xl mx-auto"
+      : "max-w-full"
+}`}
       readerTheme === "dark"
         ? "border-neutral-700 bg-neutral-900"
         : readerTheme === "light"
