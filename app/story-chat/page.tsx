@@ -1100,7 +1100,7 @@ if (
                   }
                 }}
                 placeholder="Tell NovelForge anything..."
-                rows={1}
+                rows={5}
                 className="min-h-14 flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-base text-white outline-none placeholder:text-neutral-600 focus:border-pink-500 disabled:cursor-not-allowed disabled:opacity-60"
               />
 
