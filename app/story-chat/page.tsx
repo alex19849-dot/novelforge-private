@@ -224,6 +224,23 @@ const [readerWidth, setReaderWidth] = useState<
     // Ignore invalid settings
   }
 }, []);
+
+useEffect(() => {
+  localStorage.setItem(
+    "novelforge-reader",
+    JSON.stringify({
+      theme: readerTheme,
+      fontSize: readerFontSize,
+      lineHeight: readerLineHeight,
+      width: readerWidth,
+    })
+  );
+}, [
+  readerTheme,
+  readerFontSize,
+  readerLineHeight,
+  readerWidth,
+]);
   
 useEffect(() => {
   async function loadStory() {
