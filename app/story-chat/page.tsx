@@ -714,6 +714,37 @@ if (
     A+
   </button>
 </div>
+              <div className="mb-6 flex items-center gap-3">
+  <span className="text-sm">Line spacing</span>
+
+  <button
+    type="button"
+    onClick={() =>
+      setReaderLineHeight((height) =>
+        Math.max(1.4, Number((height - 0.1).toFixed(1)))
+      )
+    }
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    -
+  </button>
+
+  <span className="w-10 text-center text-sm">
+    {readerLineHeight.toFixed(1)}
+  </span>
+
+  <button
+    type="button"
+    onClick={() =>
+      setReaderLineHeight((height) =>
+        Math.min(3, Number((height + 0.1).toFixed(1)))
+      )
+    }
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    +
+  </button>
+</div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
                 Chapters
               </p>
