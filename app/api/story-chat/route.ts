@@ -757,7 +757,10 @@ Do not output markdown.
     }
 
 const parsedOutput = JSON.parse(outputText) as Partial<StoryChatResponse>;
-
+if (isWriterMode && parsedOutput.generatedChapter) {
+  parsedOutput.generatedChapter.content = chapterText;
+}
+   
 if (!parsedOutput.storyBible) {
   throw new Error("The model did not return a story bible.");
 }
