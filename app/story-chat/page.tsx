@@ -261,15 +261,20 @@ if (
   async function saveStoryToSupabase() {
     const { error } = await supabase
       .from("stories")
-      .upsert({
-        id: story.id,
-        user_id: userId,
-        title: story.title,
-        form: story.storyBible,
-        chapters: story.chapters,
-        messages: story.messages,
-        updated_at: story.updatedAt,
-      });
+     .upsert(
+  {
+    id: story.id,
+    user_id: userId,
+    title: story.title,
+    form: story.storyBible,
+    chapters: story.chapters,
+    messages: story.messages,
+    updated_at: story.updatedAt,
+  },
+  {
+    onConflict: "id",
+  },
+);
 
     if (error) {
       console.error(
