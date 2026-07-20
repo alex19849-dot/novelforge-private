@@ -449,7 +449,7 @@ const intent = detectStoryIntent(latestMessage);
   "Answer the user about their story only. Do not change the story bible, chapters, timeline, world, notes, or any other part of the current story workspace.",
 };   
     const response = await openai.responses.create({
-     model: "gpt-5.6-terra",
+     model: "gpt-5.5",
       reasoning: {
         effort: "low",
       },
