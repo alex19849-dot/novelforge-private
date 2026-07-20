@@ -175,23 +175,51 @@ export default function StoryChatPage() {
   loadUser();
 }, []);
   
-  useEffect(() => {
+useEffect(() => {
+  async function loadStory() {
     try {
+      if (userId) {
+        const { data } = await supabase
+          .from("stories")
+          .select("*")
+          .eq("user_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          setStory({
+            id: data.id,
+            title: data.title,
+            seriesType: "standalone",
+            seriesTitle: "",
+            bookNumber: 1,
+            messages: data.messages ?? [],
+            chapters: data.chapters ?? [],
+            storyBible: data.form ?? EMPTY_STORY_BIBLE,
+            createdAt: data.created_at,
+            updatedAt: data.updated_at,
+          });
+
+          setHasLoaded(true);
+          setHasLoadedRemoteStory(true);
+          return;
+        }
+      }
+
       const savedStory =
         window.localStorage.getItem(STORAGE_KEY);
 
       if (!savedStory) {
         setStory(createEmptyStory());
-        return;
-      }
-
-      const parsedStory: unknown =
-        JSON.parse(savedStory);
-
-      if (isStoryWorkspace(parsedStory)) {
-        setStory(parsedStory);
       } else {
-        setStory(createEmptyStory());
+        const parsedStory = JSON.parse(savedStory);
+
+        if (isStoryWorkspace(parsedStory)) {
+          setStory(parsedStory);
+        } else {
+          setStory(createEmptyStory());
+        }
       }
     } catch (error) {
       console.error(
@@ -201,8 +229,12 @@ export default function StoryChatPage() {
       setStory(createEmptyStory());
     } finally {
       setHasLoaded(true);
+      setHasLoadedRemoteStory(true);
     }
-  }, []);
+  }
+
+  loadStory();
+}, [userId]);
 
  useEffect(() => {
   if (!hasLoaded || !story) {
