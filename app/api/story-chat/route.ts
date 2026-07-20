@@ -30,7 +30,7 @@ const EMPTY_STORY_BIBLE: StoryBible = {
 const storyChatSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["reply", "storyBible"],
+ required: ["reply", "storyBible", "chapters"],
   properties: {
     reply: {
       type: "string",
@@ -93,6 +93,47 @@ const storyChatSchema = {
       },
     },
   },
+
+chapters: {
+  type: "array",
+  items: {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "id",
+      "number",
+      "title",
+      "povCharacter",
+      "content",
+      "createdAt",
+      "updatedAt",
+    ],
+    properties: {
+      id: {
+        type: "string",
+      },
+      number: {
+        type: "number",
+      },
+      title: {
+        type: "string",
+      },
+      povCharacter: {
+        type: "string",
+      },
+      content: {
+        type: "string",
+      },
+      createdAt: {
+        type: "string",
+      },
+      updatedAt: {
+        type: "string",
+      },
+    },
+  },
+},
+  
 } as const;
 
 function cleanString(value: unknown): string {
