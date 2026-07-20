@@ -151,6 +151,7 @@ function hasStoryBibleContent(
 export default function StoryChatPage() {
   const [story, setStory] =
     useState<StoryWorkspace | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
