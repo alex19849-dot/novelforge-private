@@ -202,20 +202,47 @@ export default function StoryChatPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!hasLoaded || !story) {
-      return;
-    }
+ useEffect(() => {
+  if (!hasLoaded || !story) {
+    return;
+  }
 
-    try {
-      window.localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(story),
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(story),
+    );
+  } catch (error) {
+    console.error("Could not save the story:", error);
+  }
+
+  if (!userId) {
+    return;
+  }
+
+  async function saveStoryToSupabase() {
+    const { error } = await supabase
+      .from("stories")
+      .upsert({
+        id: story.id,
+        user_id: userId,
+        title: story.title,
+        form: story.storyBible,
+        chapters: story.chapters,
+        messages: story.messages,
+        updated_at: story.updatedAt,
+      });
+
+    if (error) {
+      console.error(
+        "Could not save Story Chat to Supabase:",
+        error,
       );
-    } catch (error) {
-      console.error("Could not save the story:", error);
     }
-  }, [story, hasLoaded]);
+  }
+
+  saveStoryToSupabase();
+}, [story, hasLoaded, userId]);
 
   function startNewStory() {
     const confirmed = window.confirm(
