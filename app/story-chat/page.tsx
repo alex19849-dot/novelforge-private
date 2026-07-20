@@ -237,9 +237,13 @@ useEffect(() => {
 }, [userId]);
 
  useEffect(() => {
-  if (!hasLoaded || !story) {
-    return;
-  }
+if (
+  !hasLoaded ||
+  !hasLoadedRemoteStory ||
+  !story
+) {
+  return;
+}
 
   try {
     window.localStorage.setItem(
