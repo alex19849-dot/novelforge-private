@@ -352,7 +352,12 @@ if (
   }
 
   saveStoryToSupabase();
-}, [story, hasLoaded, userId]);
+}, [
+  story,
+  hasLoaded,
+  hasLoadedRemoteStory,
+  userId,
+]);
 
   function startNewStory() {
   const confirmed = window.confirm(
