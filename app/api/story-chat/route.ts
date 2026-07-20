@@ -724,10 +724,11 @@ ${JSON.stringify(currentStory, null, 2)}`,
       max_output_tokens: 5000,
     });
 
+let chapterText = "";    
 if (isWriterMode) {
   const latestUserMessage = latestMessage;
 
-  const chapterText = await generateWithAion(`
+ chapterText = await generateWithAion(`
 ${SYSTEM_PROMPT}
 
 ${intentInstruction[intent]}
