@@ -732,21 +732,28 @@ if (isWriterMode) {
  chapterText = await generateWithAion(`
 ${SYSTEM_PROMPT}
 
+WRITER MODE
+
+Follow every Writer Mode and Style Rule exactly as defined above.
+
+USER INTENT:
+${intent}
+
+INSTRUCTION:
 ${intentInstruction[intent]}
 
-CURRENT STORY WORKSPACE
-
+CURRENT STORY WORKSPACE:
 ${JSON.stringify(currentStory, null, 2)}
 
-USER REQUEST
-
+USER REQUEST:
 ${latestUserMessage}
 
-Return only the requested chapter.
-Do not explain.
-Do not analyse.
+Return only the requested chapter prose.
+
 Do not output JSON.
 Do not output markdown.
+Do not explain your decisions.
+Do not include notes before or after the chapter.
 `);
 
   console.log(chapterText);
