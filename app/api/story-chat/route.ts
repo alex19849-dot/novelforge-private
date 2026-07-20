@@ -674,21 +674,22 @@ For brainstorming, planning, updates, or general conversation:
 
 When writing a brand new chapter:
 
-- return the complete chapter in generatedChapter
+- return generatedChapter with the correct chapter metadata
 - set replaceChapterNumber to null
 - put only the chapter title in title
 - put only the POV character name in povCharacter
-- put the full chapter prose in content
-- do not include the chapter prose in reply
+- set content to an empty string
+- do not write any chapter prose
 - use reply only for a brief confirmation
 
 When rewriting an existing chapter:
 
-- return the complete rewritten chapter in generatedChapter
+- return generatedChapter with the correct chapter metadata
 - set replaceChapterNumber to the exact chapter number being replaced
 - preserve the existing chapter number
-- do not return only the changed passage
-- do not include the rewritten chapter prose in reply
+- set content to an empty string
+- do not write any rewritten chapter prose
+- do not include rewritten prose in reply
 
 Never return IDs, timestamps, chapter numbers, or the full chapters array inside generatedChapter.
 
