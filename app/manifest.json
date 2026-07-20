@@ -3,8 +3,21 @@
   "short_name": "NovelForge",
   "description": "Private romance writing and reading app",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f4ecd8",
   "theme_color": "#7a5c3e",
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
 }
