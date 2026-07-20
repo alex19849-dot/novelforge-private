@@ -579,8 +579,8 @@ const intent = detectStoryIntent(latestMessage);
  general_chat:
   "Answer the user about their story only. Do not change the story bible, chapters, timeline, world, notes, or any other part of the current story workspace.",
 };   
-    const response = await openai.responses.create({
-     model: "gpt-5.5",
+    const response = await openrouter.responses.create({
+     model: "aion-labs/aion-3.0-mini",
       reasoning: {
         effort: "low",
       },
