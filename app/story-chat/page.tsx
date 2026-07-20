@@ -177,6 +177,16 @@ export default function StoryChatPage() {
   const [activeTab, setActiveTab] =
     useState<ActiveTab>("chat");
 
+const [readerTheme, setReaderTheme] = useState<
+  "light" | "dark" | "sepia"
+>("sepia");
+
+const [readerFontSize, setReaderFontSize] =
+  useState(18);
+
+const [readerLineHeight, setReaderLineHeight] =
+  useState(2);
+  
   const messages = story?.messages ?? [];
   const storyTitle = story?.title ?? "Untitled story";
   const chapters = story?.chapters ?? [];
