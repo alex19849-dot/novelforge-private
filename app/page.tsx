@@ -282,16 +282,17 @@ useEffect(() => {
     const storyStateToSave = override?.storyState ?? storyState;
     const messagesToSave = messages;
     
-    const payload = {
-      user_id: user.id,
-      title: getStoryTitle(formToSave),
-      form: formToSave,
-      chapters: chaptersToSave,
-      active_chapter_index: activeIndexToSave,
-      custom_rewrite: guidanceToSave,
-      story_state: storyStateToSave || {},
-      updated_at: new Date().toISOString(),
-    };
+  const payload = {
+  user_id: user.id,
+  title: getStoryTitle(formToSave),
+  form: formToSave,
+  chapters: chaptersToSave,
+  active_chapter_index: activeIndexToSave,
+  custom_rewrite: guidanceToSave,
+  story_state: storyStateToSave || {},
+  messages: messagesToSave,
+  updated_at: new Date().toISOString(),
+};
 
     if (activeStoryId) {
       const { error } = await supabase
