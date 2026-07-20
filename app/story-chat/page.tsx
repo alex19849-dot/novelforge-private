@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { supabase } from "../../lib/supabaseClient";
 
 import type {
   ActiveTab,
