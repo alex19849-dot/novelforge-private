@@ -124,15 +124,29 @@ function isStoryChatResponse(
 
   const response = value as Partial<StoryChatResponse>;
 
- return (
-  typeof response.reply === "string" &&
-  Boolean(response.reply.trim()) &&
-  isStoryBible(response.storyBible) &&
-  (
-    response.chapters === undefined ||
-    Array.isArray(response.chapters)
-  )
-);
+  const generatedChapterIsValid =
+    response.generatedChapter === null ||
+    (
+      Boolean(response.generatedChapter) &&
+      typeof response.generatedChapter?.title === "string" &&
+      typeof response.generatedChapter?.povCharacter === "string" &&
+      typeof response.generatedChapter?.content === "string" &&
+      (
+        response.generatedChapter?.replaceChapterNumber === null ||
+        typeof response.generatedChapter?.replaceChapterNumber === "number"
+      )
+    );
+
+  return (
+    typeof response.reply === "string" &&
+    Boolean(response.reply.trim()) &&
+    isStoryBible(response.storyBible) &&
+    generatedChapterIsValid &&
+    (
+      response.chapters === undefined ||
+      Array.isArray(response.chapters)
+    )
+  );
 }
 function hasStoryBibleContent(
   storyBible: StoryBible,
