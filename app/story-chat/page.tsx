@@ -291,7 +291,21 @@ if (
       return;
     }
 
-    setStory(createEmptyStory());
+   const newStory = createEmptyStory();
+
+setStory(newStory);
+    if (userId) {
+  void supabase.from("stories").insert({
+    id: newStory.id,
+    user_id: userId,
+    title: newStory.title,
+    form: newStory.storyBible,
+    chapters: newStory.chapters,
+    messages: newStory.messages,
+    created_at: newStory.createdAt,
+    updated_at: newStory.updatedAt,
+  });
+}
     setInput("");
     setActiveTab("chat");
     setIsThinking(false);
