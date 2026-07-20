@@ -687,6 +687,33 @@ if (
     Dark
   </button>
 </div>
+              <div className="mb-6 flex items-center gap-3">
+  <span className="text-sm">Font size</span>
+
+  <button
+    type="button"
+    onClick={() =>
+      setReaderFontSize((size) => Math.max(14, size - 1))
+    }
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    A-
+  </button>
+
+  <span className="w-8 text-center text-sm">
+    {readerFontSize}
+  </span>
+
+  <button
+    type="button"
+    onClick={() =>
+      setReaderFontSize((size) => Math.min(30, size + 1))
+    }
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    A+
+  </button>
+</div>
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
                 Chapters
               </p>
