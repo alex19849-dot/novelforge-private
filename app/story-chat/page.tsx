@@ -705,7 +705,7 @@ if (
                         </p>
                       )}
 
-                      <p className="mt-4 whitespace-pre-wrap leading-7 text-neutral-400">
+                      <p className="mt-4 whitespace-pre-wrap text-[18px] leading-9 text-black">
                         {chapter.content}
                       </p>
                     </article>
