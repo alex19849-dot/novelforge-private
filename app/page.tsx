@@ -15,6 +15,7 @@ type SavedStory = {
   custom_rewrite?: string;
   story_state?: any;
   chapter_guidance?: string;
+  messages?: any[];
   targetChapterWords: string;
 };
 
