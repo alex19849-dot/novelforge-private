@@ -205,6 +205,25 @@ const [readerWidth, setReaderWidth] = useState<
 
   loadUser();
 }, []);
+
+  useEffect(() => {
+  const saved = localStorage.getItem("novelforge-reader");
+
+  if (!saved) return;
+
+  try {
+    const settings = JSON.parse(saved);
+
+    if (settings.theme) setReaderTheme(settings.theme);
+    if (settings.fontSize) setReaderFontSize(settings.fontSize);
+    if (settings.lineHeight)
+      setReaderLineHeight(settings.lineHeight);
+    if (settings.width)
+      setReaderWidth(settings.width);
+  } catch {
+    // Ignore invalid settings
+  }
+}, []);
   
 useEffect(() => {
   async function loadStory() {
