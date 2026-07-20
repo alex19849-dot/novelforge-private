@@ -782,19 +782,22 @@ if (
                         Chapter {chapter.number}
                       </p>
 
-                     <h3 className="mt-2 text-3xl font-bold text-black">
-                        {chapter.title ||
-                          `Chapter ${chapter.number}`}
-                      </h3>
+                    <h3
+  className={`mt-2 text-3xl font-bold ${
+    readerTheme === "dark"
+      ? "text-white"
+      : "text-black"
+  }`}
+>
 
                       {chapter.povCharacter && (
-                       <p className="mt-2 text-base italic text-neutral-700">
-                          POV:{" "}
-                          {
-                            chapter.povCharacter
-                          }
-                        </p>
-                      )}
+                       <p
+  className={`mt-2 text-base italic ${
+    readerTheme === "dark"
+      ? "text-neutral-400"
+      : "text-neutral-700"
+  }`}
+>
 
                      <p
   className={`mt-4 whitespace-pre-wrap ${
