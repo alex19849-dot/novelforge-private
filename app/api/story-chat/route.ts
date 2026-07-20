@@ -576,13 +576,10 @@ const returnedChapters = Array.isArray(parsedOutput.chapters)
   const responseBody: StoryChatResponse = {
   reply,
     intent,
-storyBible:
-  intent === "brainstorm" || intent === "general_chat"
-    ? currentStory.storyBible
-    : mergeStoryBible(
-        sanitiseStoryBible(currentStory.storyBible),
-        returnedBible,
-      ),
+storyBible: mergeStoryBible(
+  sanitiseStoryBible(currentStory.storyBible),
+  returnedBible,
+),
   chapters:
   intent === "brainstorm" || intent === "general_chat"
     ? currentChapters
