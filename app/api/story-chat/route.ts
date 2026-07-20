@@ -725,10 +725,7 @@ ${JSON.stringify(currentStory, null, 2)}`,
     });
 
 if (isWriterMode) {
-  const latestUserMessage =
-    typeof latestMessage?.content === "string"
-      ? latestMessage.content
-      : JSON.stringify(latestMessage?.content);
+  const latestUserMessage = latestMessage;
 
   const chapterText = await generateWithAion(`
 ${SYSTEM_PROMPT}
