@@ -724,6 +724,35 @@ ${JSON.stringify(currentStory, null, 2)}`,
       max_output_tokens: 5000,
     });
 
+if (isWriterMode) {
+  const latestUserMessage =
+    typeof latestMessage?.content === "string"
+      ? latestMessage.content
+      : JSON.stringify(latestMessage?.content);
+
+  const chapterText = await generateWithAion(`
+${SYSTEM_PROMPT}
+
+${intentInstruction[intent]}
+
+CURRENT STORY WORKSPACE
+
+${JSON.stringify(currentStory, null, 2)}
+
+USER REQUEST
+
+${latestUserMessage}
+
+Return only the requested chapter.
+Do not explain.
+Do not analyse.
+Do not output JSON.
+Do not output markdown.
+`);
+
+  console.log(chapterText);
+}
+    
     const outputText = response.output_text?.trim();
 
     if (!outputText) {
