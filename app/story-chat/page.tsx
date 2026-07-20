@@ -691,13 +691,13 @@ if (
                         Chapter {chapter.number}
                       </p>
 
-                      <h3 className="mt-2 text-xl font-semibold text-white">
+                     <h3 className="mt-2 text-3xl font-bold text-black">
                         {chapter.title ||
                           `Chapter ${chapter.number}`}
                       </h3>
 
                       {chapter.povCharacter && (
-                        <p className="mt-2 text-sm text-neutral-500">
+                       <p className="mt-2 text-base italic text-neutral-700">
                           POV:{" "}
                           {
                             chapter.povCharacter
