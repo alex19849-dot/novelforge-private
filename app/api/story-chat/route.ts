@@ -137,7 +137,6 @@ const storyChatSchema = {
       ],
     },
   },
-};
   
 } as const;
 
