@@ -283,33 +283,35 @@ if (
 }, [story, hasLoaded, userId]);
 
   function startNewStory() {
-    const confirmed = window.confirm(
-      "Start a new story? This will replace the current story on this device.",
-    );
+  const confirmed = window.confirm(
+    "Start a new story? This will replace the current story on this device.",
+  );
 
-    if (!confirmed) {
-      return;
-    }
-
-   const newStory = createEmptyStory();
-
-setStory(newStory);
-    if (userId) {
-  void supabase.from("stories").insert({
-    id: newStory.id,
-    user_id: userId,
-    title: newStory.title,
-    form: newStory.storyBible,
-    chapters: newStory.chapters,
-    messages: newStory.messages,
-    created_at: newStory.createdAt,
-    updated_at: newStory.updatedAt,
-  });
-}
-    setInput("");
-    setActiveTab("chat");
-    setIsThinking(false);
+  if (!confirmed) {
+    return;
   }
+
+  const newStory = createEmptyStory();
+
+  setStory(newStory);
+
+  if (userId) {
+    void supabase.from("stories").insert({
+      id: newStory.id,
+      user_id: userId,
+      title: newStory.title,
+      form: newStory.storyBible,
+      chapters: newStory.chapters,
+      messages: newStory.messages,
+      created_at: newStory.createdAt,
+      updated_at: newStory.updatedAt,
+    });
+  }
+
+  setInput("");
+  setActiveTab("chat");
+  setIsThinking(false);
+}
 
   function updateStoryTitle(value: string) {
     setStory((currentStory) => {
