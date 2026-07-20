@@ -52,10 +52,18 @@ export type StoryChatRequest = {
   story: StoryWorkspace;
 };
  
+export type GeneratedChapter = {
+  title: string;
+  povCharacter: string;
+  content: string;
+  replaceChapterNumber: number | null;
+};
+
 export type StoryChatResponse = {
   reply: string;
   intent: StoryIntent;
   storyBible: StoryBible;
+  generatedChapter: GeneratedChapter | null;
   chapters?: StoryChapter[];
   timeline?: unknown[];
   world?: Record<string, unknown>;
