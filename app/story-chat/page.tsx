@@ -373,13 +373,18 @@ if (
   },
 );
 
-    if (error) {
-      console.error(
-        "Could not save Story Chat to Supabase:",
-        error,
-      );
-    }
-  }
+   if (error) {
+  console.error(
+    "Could not save Story Chat to Supabase:",
+    error,
+  );
+} else {
+  console.log(
+    "Story saved to Supabase:",
+    story.id,
+    story.chapters,
+  );
+}
 
   saveStoryToSupabase();
 }, [
