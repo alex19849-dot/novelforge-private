@@ -277,6 +277,10 @@ useEffect(() => {
   }
 
         if (data) {
+          window.localStorage.setItem(
+  "novelforge-current-story-id",
+  data.id,
+);
           setStory({
             id: data.id,
             title: data.title,
