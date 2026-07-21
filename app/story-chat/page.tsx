@@ -340,6 +340,10 @@ if (
 
   try {
     window.localStorage.setItem(
+  "novelforge-current-story-id",
+  story.id,
+);
+    window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify(story),
     );
