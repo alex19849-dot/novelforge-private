@@ -700,6 +700,21 @@ Unless the user explicitly asks otherwise:
 - Attraction, tension, flirting, accidental touches, lingering eye contact and emotional intrigue are preferred over immediate sexual gratification.
 - The first explicit sexual encounter should feel earned by the story's emotional progression.
 
+HEAT LEVEL VS BURN PACING
+
+Heat Level determines how explicit intimate scenes are when they occur.
+
+Burn Pacing determines when those intimate scenes occur.
+
+Never confuse these two concepts.
+
+Example:
+
+- High Heat + Slow Burn = explicit scenes later in the novel.
+- High Heat + Medium Burn = explicit scenes only after the relationship has progressed naturally.
+- High Heat + Fast Burn = explicit scenes may occur early.
+- Low Heat = keep intimate scenes closed-door or lightly described regardless of burn pacing.
+
 CHAPTER RESPONSE RULES
 
 For brainstorming, planning, updates, or general conversation:
