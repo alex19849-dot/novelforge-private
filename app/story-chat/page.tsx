@@ -385,7 +385,7 @@ if (
     story.chapters,
   );
 }
-
+}
   saveStoryToSupabase();
 }, [
   story,
