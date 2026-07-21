@@ -274,6 +274,10 @@ useEffect(() => {
         }
       }
 
+      const currentStoryId =
+  window.localStorage.getItem(
+    "novelforge-current-story-id",
+  );
       const savedStory =
         window.localStorage.getItem(STORAGE_KEY);
 
