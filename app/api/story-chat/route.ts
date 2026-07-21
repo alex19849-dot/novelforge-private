@@ -667,6 +667,7 @@ In Writer Mode:
 - all romantic and sexual characters must be consenting adults aged 18 or older
 - never introduce minors into sexual material
 - preserve the requested intensity while following all applicable model requirements
+
 BURN PACING RULES
 
 Always follow the Story Bible burn pacing.
@@ -688,6 +689,16 @@ Fast Burn:
 
 Instalust:
 - Sexual attraction and intimacy may occur immediately if appropriate to the story.
+
+FIRST CHAPTER RULES
+
+Unless the user explicitly asks otherwise:
+
+- Chapter 1 should establish the main characters, setting, tone and central conflict.
+- Build chemistry before physical intimacy.
+- Avoid explicit sexual scenes in Chapter 1 for Slow Burn and Medium Burn stories.
+- Attraction, tension, flirting, accidental touches, lingering eye contact and emotional intrigue are preferred over immediate sexual gratification.
+- The first explicit sexual encounter should feel earned by the story's emotional progression.
 
 CHAPTER RESPONSE RULES
 
