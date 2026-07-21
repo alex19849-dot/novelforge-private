@@ -245,19 +245,24 @@ useEffect(() => {
 useEffect(() => {
   async function loadStory() {
     try {
-     if (userId) {
-  let data = null;
+      const currentStoryId =
+        window.localStorage.getItem(
+          "novelforge-current-story-id",
+        );
 
-  if (currentStoryId) {
-    const { data: current } = await supabase
-      .from("stories")
-      .select("*")
-      .eq("id", currentStoryId)
-      .eq("user_id", userId)
-      .maybeSingle();
+      if (userId) {
+        let data = null;
 
-    data = current;
-  }
+        if (currentStoryId) {
+          const { data: current } = await supabase
+            .from("stories")
+            .select("*")
+            .eq("id", currentStoryId)
+            .eq("user_id", userId)
+            .maybeSingle();
+
+          data = current;
+        }
 
   if (!data) {
     const { data: latest } = await supabase
@@ -291,10 +296,6 @@ useEffect(() => {
         }
       }
 
-      const currentStoryId =
-  window.localStorage.getItem(
-    "novelforge-current-story-id",
-  );
       const savedStory =
         window.localStorage.getItem(STORAGE_KEY);
 
