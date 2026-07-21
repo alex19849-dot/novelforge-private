@@ -603,7 +603,10 @@ const intent = detectStoryIntent(latestMessage);
     const isWriterMode =
   intent === "create_story" ||
   intent === "continue_story" ||
-  intent === "rewrite_chapter";
+  intent === "rewrite_chapter" ||
+  /\b(write|rewrite|rewriting|continue|generate|expand)\b/i.test(
+    latestMessage,
+  );
     
     const response = await openai.responses.create({
   model: "gpt-5.5",
