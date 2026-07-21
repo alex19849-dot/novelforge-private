@@ -585,7 +585,15 @@ const conversation = currentStory.messages
 const latestMessage =
   conversation[conversation.length - 1]?.content ?? "";
 
-const intent = detectStoryIntent(latestMessage);
+let intent = detectStoryIntent(latestMessage);
+
+if (
+  /\b(rewrite|rewriting|rewrite this|rewrite chapter)\b/i.test(
+    latestMessage,
+  )
+) {
+  intent = "rewrite_chapter";
+}
  const intentInstruction: Record<typeof intent, string> = {
   create_story:
   "Create a brand new story from the user's request. Generate a complete story bible and opening chapter. Do not reuse, modify, or merge with the current story workspace.",
