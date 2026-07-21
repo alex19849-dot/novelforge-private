@@ -515,7 +515,8 @@ if (
       );
 
       const data: unknown = await response.json();
-
+      console.log("Story API response:", data);
+      
       if (!response.ok) {
         const errorMessage =
           data &&
