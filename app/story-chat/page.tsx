@@ -245,14 +245,31 @@ useEffect(() => {
 useEffect(() => {
   async function loadStory() {
     try {
-      if (userId) {
-        const { data } = await supabase
-          .from("stories")
-          .select("*")
-          .eq("user_id", userId)
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+     if (userId) {
+  let data = null;
+
+  if (currentStoryId) {
+    const { data: current } = await supabase
+      .from("stories")
+      .select("*")
+      .eq("id", currentStoryId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    data = current;
+  }
+
+  if (!data) {
+    const { data: latest } = await supabase
+      .from("stories")
+      .select("*")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    data = latest;
+  }
 
         if (data) {
           setStory({
