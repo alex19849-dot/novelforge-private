@@ -802,6 +802,24 @@ ${JSON.stringify(currentStory, null, 2)}
 
 USER REQUEST:
 ${latestUserMessage}
+CRITICAL WRITING RULES
+
+Respect the Story Bible exactly.
+
+The selected burn pacing is mandatory.
+
+Do not introduce explicit sexual activity earlier than the burn pacing allows.
+
+High Heat describes how explicit intimate scenes are when they occur.
+It does NOT mean they should happen immediately.
+
+Every chapter should advance the emotional relationship naturally.
+
+Do not skip relationship milestones.
+
+Do not manufacture sexual tension if the current chapter should be focused on plot, character development, conflict or world-building.
+
+If this is Chapter 1 of a Medium Burn or Slow Burn story, establish the characters, setting and chemistry before any explicit sexual content.
 
 Return only the requested chapter prose.
 
