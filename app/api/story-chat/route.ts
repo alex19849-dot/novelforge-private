@@ -1167,6 +1167,7 @@ const responseBody: StoryChatResponse = {
     returnedBible,
   ),
   generatedChapter,
+  chapterBrief,
   chapters: updatedChapters,
 };
     return NextResponse.json(responseBody);
