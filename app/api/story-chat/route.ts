@@ -1076,6 +1076,8 @@ const parsedOutput = JSON.parse(
 ) as Partial<StoryChatResponse>;
 
 const chapterBrief = parsedOutput.chapterBrief ?? "";
+const returnedStoryState =
+  parsedOutput.storyState ?? currentStory.storyState;
 
 if (isWriterMode) {
  const recentChapters = currentStory.chapters.slice(-3);
