@@ -559,7 +559,9 @@ if (
               content: data.reply,
             },
           ],
-          storyBible: data.storyBible,
+          storyState:
+  data.storyState ??
+  currentStory.storyState,
           chapters:
             data.chapters ??
             currentStory.chapters,
