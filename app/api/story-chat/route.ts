@@ -1180,7 +1180,7 @@ const responseBody: StoryChatResponse = {
     sanitiseStoryBible(currentStory.storyBible),
     returnedBible,
   ),
-  storyState: currentStory.storyState,
+  storyState: returnedStoryState,
   generatedChapter,
   chapterBrief,
   chapters: updatedChapters,
