@@ -130,7 +130,7 @@ const storyChatSchema = {
       },
     },
 
-   storyState: {
+    storyState: {
   type: "object",
   additionalProperties: false,
   required: [
@@ -190,6 +190,46 @@ const storyChatSchema = {
     },
   },
 },
+
+    generatedChapter: {
+      anyOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "title",
+            "povCharacter",
+            "content",
+            "replaceChapterNumber",
+          ],
+          properties: {
+            title: {
+              type: "string",
+            },
+            povCharacter: {
+              type: "string",
+            },
+            content: {
+              type: "string",
+            },
+            replaceChapterNumber: {
+              anyOf: [
+                {
+                  type: "integer",
+                },
+                {
+                  type: "null",
+                },
+              ],
+            },
+          },
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
   
 } as const;
 
