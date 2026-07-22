@@ -918,6 +918,7 @@ For brainstorming, planning, updates, or general conversation:
 
 - return generatedChapter as null
 - do not create, rewrite, replace, or append a chapter
+- return chapterBrief as an empty string
 
 When writing a brand new chapter:
 
@@ -928,6 +929,19 @@ When writing a brand new chapter:
 - set content to an empty string
 - do not write any chapter prose
 - use reply only for a brief confirmation
+- generate a detailed chapterBrief for the writing model
+- chapterBrief must contain the writing instructions only
+- include the chapter objective
+- include the POV
+- include emotional progression
+- include relationship progression
+- include continuity reminders
+- include important character voice reminders
+- include the intended opening
+- include the major scene beats
+- include the intended ending or hook
+- include the target word count
+- do not include any chapter prose inside chapterBrief
 
 When rewriting an existing chapter:
 
@@ -937,6 +951,7 @@ When rewriting an existing chapter:
 - set content to an empty string
 - do not write any rewritten chapter prose
 - do not include rewritten prose in reply
+- generate a detailed chapterBrief for the writing model
 
 Never return IDs, timestamps, chapter numbers, or the full chapters array inside generatedChapter.
 
