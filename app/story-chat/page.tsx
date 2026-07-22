@@ -253,6 +253,45 @@ async function loadStoryList(currentUserId: string) {
     })),
   );
 }
+  async function openStory(storyId: string) {
+  if (!userId) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("stories")
+    .select("*")
+    .eq("id", storyId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error || !data) {
+    console.error("Could not open story:", error);
+    return;
+  }
+
+  window.localStorage.setItem(
+    "novelforge-current-story-id",
+    data.id,
+  );
+
+  setStory({
+    id: data.id,
+    title: data.title,
+    seriesType: "standalone",
+    seriesTitle: "",
+    bookNumber: 1,
+    messages: data.messages ?? [],
+    chapters: data.chapters ?? [],
+    storyBible: data.form ?? EMPTY_STORY_BIBLE,
+    storyState: data.story_state ?? {},
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  });
+
+  setActiveTab("chat");
+  setIsMenuOpen(false);
+}
   
   useEffect(() => {
   const saved = localStorage.getItem("novelforge-reader");
