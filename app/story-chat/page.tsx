@@ -301,7 +301,7 @@ async function loadStoryList(currentUserId: string) {
     updatedAt: data.updated_at,
   });
 
-  setActiveTab("chat");
+  setActiveTab("chapters");
   setIsMenuOpen(false);
 }
   async function createNewStory() {
