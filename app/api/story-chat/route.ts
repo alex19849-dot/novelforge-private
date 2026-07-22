@@ -1073,7 +1073,6 @@ ${chapterBrief}
 USER REQUEST:
 ${latestUserMessage}
 `);
-}
     
 if (isWriterMode && parsedOutput.generatedChapter) {
   parsedOutput.generatedChapter.content = chapterText;
