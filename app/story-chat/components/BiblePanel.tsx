@@ -1,4 +1,15 @@
-   {activeTab === "bible" && (
+import type { StoryBible } from "../types";
+
+type BiblePanelProps = {
+  storyBible: StoryBible;
+  bibleHasContent: boolean;
+};
+
+export default function BiblePanel({
+  storyBible,
+  bibleHasContent,
+}: BiblePanelProps) {
+  return (
           <section className="flex-1 px-5 py-8">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
@@ -165,6 +176,7 @@
                 </div>
               )}
             </div>
-          </section>
-        )}
+                 </section>
+  );
+}
 
