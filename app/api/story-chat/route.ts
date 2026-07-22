@@ -181,6 +181,11 @@ function cleanString(value: unknown): string {
     .trim();
 }
 
+function cleanStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
   const seen = new Set<string>();
   const cleaned: string[] = [];
 
