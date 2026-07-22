@@ -622,6 +622,14 @@ if (
       <div className="mx-auto flex min-h-screen max-w-5xl flex-col">
         <header className="border-b border-white/10 px-5 py-5">
           <div className="flex items-center justify-between gap-4">
+            <button
+  type="button"
+  onClick={() => setIsMenuOpen(true)}
+  aria-label="Open menu"
+  className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-2xl text-white transition hover:bg-white/10"
+>
+  ☰
+</button>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pink-500">
                 NovelForge
