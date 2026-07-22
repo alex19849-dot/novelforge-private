@@ -882,8 +882,11 @@ if (
     ))
   )}
 </div>
-        
-        {activeTab === "chat" && (
+    </div>
+  </aside>
+)}
+
+{activeTab === "chat" && (
   <ChatPanel
     messages={messages}
     isThinking={isThinking}
