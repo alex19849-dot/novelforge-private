@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import ChatPanel from "./components/ChatPanel";
 
 import type {
   ActiveTab,
