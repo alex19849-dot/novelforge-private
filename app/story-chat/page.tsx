@@ -859,7 +859,52 @@ if (
 >
   + New Story
 </button>
+<div className="mb-6 space-y-2 border-b border-white/10 pb-6">
+  <button
+    type="button"
+    onClick={() => {
+      setActiveTab("chat");
+      setIsMenuOpen(false);
+    }}
+    className={`w-full rounded-xl px-4 py-3 text-left font-semibold transition ${
+      activeTab === "chat"
+        ? "bg-white/10 text-white"
+        : "text-neutral-400 hover:bg-white/5 hover:text-white"
+    }`}
+  >
+    Chat
+  </button>
 
+  <button
+    type="button"
+    onClick={() => {
+      setActiveTab("chapters");
+      setIsMenuOpen(false);
+    }}
+    className={`w-full rounded-xl px-4 py-3 text-left font-semibold transition ${
+      activeTab === "chapters"
+        ? "bg-white/10 text-white"
+        : "text-neutral-400 hover:bg-white/5 hover:text-white"
+    }`}
+  >
+    Chapters
+  </button>
+
+  <button
+    type="button"
+    onClick={() => {
+      setActiveTab("bible");
+      setIsMenuOpen(false);
+    }}
+    className={`w-full rounded-xl px-4 py-3 text-left font-semibold transition ${
+      activeTab === "bible"
+        ? "bg-white/10 text-white"
+        : "text-neutral-400 hover:bg-white/5 hover:text-white"
+    }`}
+  >
+    Story Bible
+  </button>
+</div>
     <div className="mt-6">
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
         Your Stories
