@@ -823,6 +823,7 @@ if (
       <button
         key={item.id}
         type="button"
+        onClick={() => openStory(item.id)}
         className="w-full rounded-xl border border-white/10 bg-white/5 p-4 text-left transition hover:bg-white/10"
       >
         <p className="truncate font-semibold text-white">
