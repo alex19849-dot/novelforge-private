@@ -928,7 +928,6 @@ if (
     🗑️
   </button>
 </div>
-      </button>
     ))
   )}
 </div>
