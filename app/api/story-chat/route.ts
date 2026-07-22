@@ -1055,7 +1055,8 @@ Write commercially publishable fiction.
     if (!outputText) {
       throw new Error("The model returned no output.");
     }
-
+  
+if (isWriterMode) {
 const parsedOutput = JSON.parse(outputText) as Partial<StoryChatResponse>;
     const chapterBrief = parsedOutput.chapterBrief ?? "";
   chapterText = await generateWithAion(`
