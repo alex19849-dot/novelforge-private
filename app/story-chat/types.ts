@@ -64,6 +64,7 @@ export type StoryChatResponse = {
   reply: string;
   intent: StoryIntent;
   storyBible: StoryBible;
+  storyState: Record<string, unknown>;
   generatedChapter: GeneratedChapter | null;
   chapters?: StoryChapter[];
   timeline?: unknown[];
