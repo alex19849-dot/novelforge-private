@@ -130,50 +130,66 @@ const storyChatSchema = {
       },
     },
 
-    storyState: {
+   storyState: {
   type: "object",
   additionalProperties: false,
-},
+  required: [
+    "importantFacts",
+    "characterStates",
+    "relationshipStates",
+    "unresolvedThreads",
+    "timeline",
+    "locations",
+    "activePOV",
+  ],
+  properties: {
+    importantFacts: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
 
-    generatedChapter: {
-      anyOf: [
-        {
-          type: "object",
-          additionalProperties: false,
-          required: [
-            "title",
-            "povCharacter",
-            "content",
-            "replaceChapterNumber",
-          ],
-          properties: {
-            title: {
-              type: "string",
-            },
-            povCharacter: {
-              type: "string",
-            },
-            content: {
-              type: "string",
-            },
-            replaceChapterNumber: {
-              anyOf: [
-                {
-                  type: "integer",
-                },
-                {
-                  type: "null",
-                },
-              ],
-            },
-          },
-        },
-        {
-          type: "null",
-        },
-      ],
+    characterStates: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+
+    relationshipStates: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+
+    unresolvedThreads: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+
+    timeline: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+
+    locations: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+
+    activePOV: {
+      type: "string",
     },
   },
+},
   
 } as const;
 
