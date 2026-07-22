@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import ChatPanel from "./components/ChatPanel";
+import ChapterPanel from "./components/ChapterPanel";
 
 import type {
   ActiveTab,
@@ -703,6 +704,19 @@ if (
   />
 )}
 
+        {activeTab === "chapters" && (
+  <ChapterPanel
+    chapters={chapters}
+    readerTheme={readerTheme}
+    setReaderTheme={setReaderTheme}
+    readerFontSize={readerFontSize}
+    setReaderFontSize={setReaderFontSize}
+    readerLineHeight={readerLineHeight}
+    setReaderLineHeight={setReaderLineHeight}
+    readerWidth={readerWidth}
+    setReaderWidth={setReaderWidth}
+  />
+)}
        
         {activeTab === "bible" && (
           <section className="flex-1 px-5 py-8">
