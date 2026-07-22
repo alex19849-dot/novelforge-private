@@ -931,6 +931,7 @@ For brainstorming, planning, updates, or general conversation:
 - return generatedChapter as null
 - do not create, rewrite, replace, or append a chapter
 - return chapterBrief as an empty string
+- return an updated storyState reflecting any new facts, relationship changes, emotional changes, unresolved threads, timeline updates and important continuity information
 
 When writing a brand new chapter:
 
@@ -954,6 +955,7 @@ When writing a brand new chapter:
 - include the intended ending or hook
 - include the target word count
 - do not include any chapter prose inside chapterBrief
+- return an updated storyState reflecting everything that changed during the new chapter
 
 When rewriting an existing chapter:
 
@@ -964,6 +966,7 @@ When rewriting an existing chapter:
 - do not write any rewritten chapter prose
 - do not include rewritten prose in reply
 - generate a detailed chapterBrief for the writing model
+- return an updated storyState reflecting the rewritten chapter
 
 Never return IDs, timestamps, chapter numbers, or the full chapters array inside generatedChapter.
 
