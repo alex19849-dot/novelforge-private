@@ -907,14 +907,29 @@ if (
     : "border-white/10 bg-white/5 hover:bg-white/10"
 }`}
       >
-        <p className="truncate font-semibold text-white">
-          {item.title}
-        </p>
+       <div className="flex items-start justify-between gap-3">
+  <div className="min-w-0">
+    <p className="truncate font-semibold text-white">
+      {item.title}
+    </p>
 
-        <p className="mt-1 text-xs text-neutral-500">
-          Updated{" "}
-          {new Date(item.updatedAt).toLocaleDateString()}
-        </p>
+    <p className="mt-1 text-xs text-neutral-500">
+      Updated {new Date(item.updatedAt).toLocaleDateString()}
+    </p>
+  </div>
+
+  <button
+    type="button"
+    onClick={(event) => {
+      event.stopPropagation();
+      void deleteStory(item.id);
+    }}
+    className="rounded-lg p-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
+    aria-label="Delete story"
+  >
+    🗑️
+  </button>
+</div>
       </button>
     ))
   )}
