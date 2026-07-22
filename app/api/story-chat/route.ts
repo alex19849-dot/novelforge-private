@@ -1069,20 +1069,19 @@ const parsedOutput = JSON.parse(
 const chapterBrief = parsedOutput.chapterBrief ?? "";
 
 if (isWriterMode) {
-  chapterText = await generateWithAion(`
+ const recentChapters = currentStory.chapters.slice(-3);
+
+chapterText = await generateWithAion(`
 ${AION_WRITER_PROMPT}
 
-USER INTENT:
-${intent}
+STORY BIBLE:
+${JSON.stringify(currentStory.storyBible, null, 2)}
 
-INSTRUCTION:
-${intentInstruction[intent]}
+RECENT CHAPTERS:
+${JSON.stringify(recentChapters, null, 2)}
 
 CHAPTER BRIEF:
 ${chapterBrief}
-
-USER REQUEST:
-${latestUserMessage}
 `);
 }
 
