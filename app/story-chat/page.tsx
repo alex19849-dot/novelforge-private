@@ -211,10 +211,17 @@ const [readerWidth, setReaderWidth] = useState<
   const storyBible =
     story?.storyBible ?? EMPTY_STORY_BIBLE;
 
-  useEffect(() => {
+ useEffect(() => {
   async function loadUser() {
     const { data } = await supabase.auth.getUser();
-    setUserId(data.user?.id ?? null);
+
+    const id = data.user?.id ?? null;
+
+    setUserId(id);
+
+    if (id) {
+      await loadStoryList(id);
+    }
   }
 
   loadUser();
