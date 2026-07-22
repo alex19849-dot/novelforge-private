@@ -1120,9 +1120,6 @@ const returnedBible = sanitiseStoryBible(
   parsedOutput.storyBible,
 );
 
-    const returnedStoryState =
-  parsedOutput.storyState ?? currentStory.storyState;
-
 const generatedChapter = parsedOutput.generatedChapter ?? null;
 
 const currentChapters = Array.isArray(currentStory.chapters)
