@@ -765,7 +765,7 @@ if (
  content: `${NOVELFORGE_PERSONALITY}
 
 ${SYSTEM_PROMPT}
-`
+
 
 WORKING RELATIONSHIP
 
@@ -913,8 +913,9 @@ INSTRUCTION:
 ${intentInstruction[intent]}
 
 CURRENT STORY WORKSPACE:
-${JSON.stringify(currentStory, null, 2)}`,
-},
+${JSON.stringify(currentStory, null, 2)}
+`,
+    },
         ...conversation,
       ],
       text: {
