@@ -180,6 +180,7 @@ export default function StoryChatPage() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [activeTab, setActiveTab] =
     useState<ActiveTab>("chat");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
 const [readerTheme, setReaderTheme] = useState<
   "light" | "dark" | "sepia"
