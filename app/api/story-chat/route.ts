@@ -1086,6 +1086,9 @@ ${AION_WRITER_PROMPT}
 STORY BIBLE:
 ${JSON.stringify(currentStory.storyBible, null, 2)}
 
+STORY STATE:
+${JSON.stringify(returnedStoryState, null, 2)}
+
 RECENT CHAPTERS:
 ${JSON.stringify(recentChapters, null, 2)}
 
