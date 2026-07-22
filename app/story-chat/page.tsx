@@ -804,9 +804,13 @@ if (
       </button>
     </div>
 
-    <button className="mb-3 w-full rounded-xl bg-pink-500 px-4 py-3 text-left font-semibold text-white">
-      + New Story
-    </button>
+    <button
+  type="button"
+  onClick={createNewStory}
+  className="mb-3 w-full rounded-xl bg-pink-500 px-4 py-3 text-left font-semibold text-white"
+>
+  + New Story
+</button>
 
     <div className="mt-6">
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
