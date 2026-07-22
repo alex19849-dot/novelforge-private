@@ -824,7 +824,11 @@ if (
         key={item.id}
         type="button"
         onClick={() => openStory(item.id)}
-        className="w-full rounded-xl border border-white/10 bg-white/5 p-4 text-left transition hover:bg-white/10"
+       className={`w-full rounded-xl border p-4 text-left transition ${
+  story?.id === item.id
+    ? "border-pink-500 bg-pink-500/10"
+    : "border-white/10 bg-white/5 hover:bg-white/10"
+}`}
       >
         <p className="truncate font-semibold text-white">
           {item.title}
