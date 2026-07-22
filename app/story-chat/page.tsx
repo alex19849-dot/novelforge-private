@@ -49,6 +49,7 @@ function createEmptyStory(): StoryWorkspace {
       characters: [],
       notes: [],
     },
+    storyState: {},
     createdAt: now,
     updatedAt: now,
   };
