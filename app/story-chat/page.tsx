@@ -292,7 +292,43 @@ async function loadStoryList(currentUserId: string) {
   setActiveTab("chat");
   setIsMenuOpen(false);
 }
-  
+  async function createNewStory() {
+  if (!userId) {
+    return;
+  }
+
+  const newStory = createEmptyStory();
+
+  const { error } = await supabase
+    .from("stories")
+    .insert({
+      id: newStory.id,
+      user_id: userId,
+      title: newStory.title,
+      form: newStory.storyBible,
+      chapters: newStory.chapters,
+      messages: newStory.messages,
+      story_state: newStory.storyState,
+      active_chapter_index: 0,
+      custom_rewrite: "",
+    });
+
+  if (error) {
+    console.error("Could not create story:", error);
+    return;
+  }
+
+  window.localStorage.setItem(
+    "novelforge-current-story-id",
+    newStory.id,
+  );
+
+  setStory(newStory);
+  setActiveTab("chat");
+  setIsMenuOpen(false);
+
+  await loadStoryList(userId);
+}
   useEffect(() => {
   const saved = localStorage.getItem("novelforge-reader");
 
