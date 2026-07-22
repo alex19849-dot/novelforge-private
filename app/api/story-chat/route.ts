@@ -172,13 +172,14 @@ const storyChatSchema = {
 } as const;
 
 function cleanString(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function cleanStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
+  if (typeof value !== "string") {
+    return "";
   }
+
+  return value
+    .replace(/[—–]/g, ",")
+    .trim();
+}
 
   const seen = new Set<string>();
   const cleaned: string[] = [];
