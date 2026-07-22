@@ -414,6 +414,7 @@ if (
       user_id: userId,
       title: newStory.title,
       form: newStory.storyBible,
+      story_state: newStory.storyState,
       chapters: newStory.chapters,
       messages: newStory.messages,
       created_at: newStory.createdAt,
