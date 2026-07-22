@@ -897,18 +897,19 @@ if (
     </div>
   ) : (
     stories.map((item) => (
-      <button
-        key={item.id}
-        type="button"
-        onClick={() => openStory(item.id)}
-       className={`w-full rounded-xl border p-4 text-left transition ${
-  story?.id === item.id
-    ? "border-pink-500 bg-pink-500/10"
-    : "border-white/10 bg-white/5 hover:bg-white/10"
-}`}
-      >
-       <div className="flex items-start justify-between gap-3">
-  <div className="min-w-0">
+     <div
+  key={item.id}
+  className={`flex items-center gap-2 rounded-xl border p-2 transition ${
+    story?.id === item.id
+      ? "border-pink-500 bg-pink-500/10"
+      : "border-white/10 bg-white/5 hover:bg-white/10"
+  }`}
+>
+  <button
+    type="button"
+    onClick={() => openStory(item.id)}
+    className="min-w-0 flex-1 text-left"
+  >
     <p className="truncate font-semibold text-white">
       {item.title}
     </p>
@@ -916,19 +917,17 @@ if (
     <p className="mt-1 text-xs text-neutral-500">
       Updated {new Date(item.updatedAt).toLocaleDateString()}
     </p>
-  </div>
+  </button>
 
   <button
     type="button"
-    onClick={(event) => {
-      event.stopPropagation();
-      void deleteStory(item.id);
-    }}
+    onClick={() => void deleteStory(item.id)}
     className="rounded-lg p-2 text-red-400 transition hover:bg-red-500/10 hover:text-red-300"
     aria-label="Delete story"
   >
     🗑️
   </button>
+</div>
 </div>
       </button>
     ))
