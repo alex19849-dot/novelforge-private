@@ -675,7 +675,10 @@ if (
       input: [
       {
   role: "system",
-  content: `${SYSTEM_PROMPT}
+ content: `${NOVELFORGE_PERSONALITY}
+
+${SYSTEM_PROMPT}
+`
 
 WORKING RELATIONSHIP
 
