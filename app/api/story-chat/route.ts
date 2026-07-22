@@ -58,16 +58,19 @@ const EMPTY_STORY_BIBLE: StoryBible = {
 const storyChatSchema = {
   type: "object",
   additionalProperties: false,
-  required: [
-    "reply",
-    "storyBible",
-    "generatedChapter",
-  ],
+ required: [
+  "reply",
+  "storyBible",
+  "generatedChapter",
+  "chapterBrief",
+],
   properties: {
     reply: {
       type: "string",
     },
-
+ chapterBrief: {
+    type: "string",
+  },
     storyBible: {
       type: "object",
       additionalProperties: false,
