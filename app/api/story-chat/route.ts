@@ -130,6 +130,11 @@ const storyChatSchema = {
       },
     },
 
+    storyState: {
+  type: "object",
+  additionalProperties: true,
+},
+
     generatedChapter: {
       anyOf: [
         {
