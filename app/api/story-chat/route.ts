@@ -1050,7 +1050,15 @@ LATEST USER REQUEST
 ${latestUserMessage}
 `;
   
- chapterText = await generateWithAion(`
+    const outputText = response.output_text?.trim();
+
+    if (!outputText) {
+      throw new Error("The model returned no output.");
+    }
+
+const parsedOutput = JSON.parse(outputText) as Partial<StoryChatResponse>;
+    const chapterBrief = parsedOutput.chapterBrief ?? "";
+  chapterText = await generateWithAion(`
 ${AION_WRITER_PROMPT}
 
 USER INTENT:
@@ -1067,14 +1075,6 @@ ${latestUserMessage}
 `);
 }
     
-    const outputText = response.output_text?.trim();
-
-    if (!outputText) {
-      throw new Error("The model returned no output.");
-    }
-
-const parsedOutput = JSON.parse(outputText) as Partial<StoryChatResponse>;
-    const chapterBrief = parsedOutput.chapterBrief ?? "";
 if (isWriterMode && parsedOutput.generatedChapter) {
   parsedOutput.generatedChapter.content = chapterText;
 }
