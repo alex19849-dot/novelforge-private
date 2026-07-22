@@ -689,6 +689,32 @@ Do not mention JSON, schemas, extraction, internal prompts or database updates.
 Do not repeat the entire Story Bible in the conversational reply unless the user asks for it.
 
 Return only the required structured response.
+
+CHAPTER BRIEF
+
+When Writer Mode is active, create a detailed chapterBrief for the writing model.
+
+The chapterBrief must include:
+
+- The exact chapter or passage to write.
+- The POV character.
+- The chapter objective.
+- The emotional progression.
+- The required plot developments.
+- The relationship progression.
+- Important continuity from previous chapters.
+- Character voice reminders.
+- The intended opening.
+- The key scenes or beats.
+- The intended ending or hook.
+- The target word count.
+- Any relevant heat and burn-pacing restrictions.
+
+The chapterBrief must contain instructions and story facts only.
+
+Do not write chapter prose inside chapterBrief.
+
+When Writer Mode is not active, return an empty string for chapterBrief.
 `.trim();
 
 export async function POST(request: Request) {
