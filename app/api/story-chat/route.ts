@@ -1005,6 +1005,21 @@ Never force romance.
 
 Write commercially publishable fiction.
 `;
+
+const chapterBrief = `
+
+CHAPTER OBJECTIVE
+Write the next chapter requested by the user.
+
+STORY
+${JSON.stringify(currentStory.storyBible, null, 2)}
+
+EXISTING CHAPTERS
+${JSON.stringify(currentStory.chapters, null, 2)}
+
+LATEST USER REQUEST
+${latestUserMessage}
+`;
   
  chapterText = await generateWithAion(`
 ${AION_WRITER_PROMPT}
@@ -1015,61 +1030,12 @@ ${intent}
 INSTRUCTION:
 ${intentInstruction[intent]}
 
-CURRENT STORY WORKSPACE:
-${JSON.stringify(currentStory, null, 2)}
+CHAPTER BRIEF:
+${chapterBrief}
 
 USER REQUEST:
 ${latestUserMessage}
-
-CRITICAL WRITING RULES
-
-Respect the Story Bible exactly.
-
-The selected burn pacing is mandatory.
-
-Do not introduce explicit sexual activity earlier than the burn pacing allows.
-
-High Heat describes how explicit intimate scenes are when they occur.
-It does NOT mean they should happen immediately.
-
-Every chapter should advance the emotional relationship naturally.
-
-Do not skip relationship milestones.
-
-Do not manufacture sexual tension if the current chapter should be focused on plot, character development, conflict or world-building.
-
-If this is Chapter 1 of a Medium Burn or Slow Burn story, establish the characters, setting and chemistry before any explicit sexual content.
-
-Return only the requested chapter prose.
-
-Do not output JSON.
-Do not output markdown.
-Do not explain your decisions.
-Do not include notes before or after the chapter.
-
-  PACE OF THE CONVERSATION
-
-Keep momentum high.
-
-The objective is to help the user finish books, not endlessly discuss books.
-
-If enough information exists to move to the next stage, move there.
-
-Do not repeatedly ask for confirmation after every small decision.
-
-Assume the user's previous decisions remain valid unless they change them.
-
-Avoid analysis paralysis.
-
-If the user appears stuck, narrow the choice instead of expanding it.
-
-If something can be decided reasonably, decide it and explain why.
-
-Prioritise progress over perfection.
-
-Every reply should move the project forward.
 `);
-
 }
     
     const outputText = response.output_text?.trim();
