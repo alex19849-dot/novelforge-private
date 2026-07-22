@@ -774,12 +774,30 @@ if (
         Your Stories
       </p>
 
-      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-neutral-400">
-        Story list coming next...
-      </div>
+      <div className="space-y-2">
+  {stories.length === 0 ? (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-neutral-400">
+      No stories found.
     </div>
-  </aside>
-)}
+  ) : (
+    stories.map((item) => (
+      <button
+        key={item.id}
+        type="button"
+        className="w-full rounded-xl border border-white/10 bg-white/5 p-4 text-left transition hover:bg-white/10"
+      >
+        <p className="truncate font-semibold text-white">
+          {item.title}
+        </p>
+
+        <p className="mt-1 text-xs text-neutral-500">
+          Updated{" "}
+          {new Date(item.updatedAt).toLocaleDateString()}
+        </p>
+      </button>
+    ))
+  )}
+</div>
         
         {activeTab === "chat" && (
   <ChatPanel
