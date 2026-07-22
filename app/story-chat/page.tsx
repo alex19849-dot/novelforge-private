@@ -291,6 +291,7 @@ useEffect(() => {
             messages: data.messages ?? [],
             chapters: data.chapters ?? [],
             storyBible: data.form ?? EMPTY_STORY_BIBLE,
+            storyState: data.story_state ?? {},
             createdAt: data.created_at,
             updatedAt: data.updated_at,
           });
