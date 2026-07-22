@@ -366,6 +366,7 @@ if (
     user_id: userId,
     title: story.title,
     form: story.storyBible,
+    story_state: story.storyState,
     chapters: story.chapters,
     messages: story.messages,
     updated_at: story.updatedAt,
