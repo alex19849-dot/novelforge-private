@@ -835,52 +835,6 @@ if (
             </button>
           </div>
 
-          <nav
-            className="mt-5 flex gap-2"
-            aria-label="Story workspace tabs"
-          >
-            <button
-              type="button"
-              onClick={() =>
-                setActiveTab("chat")
-              }
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                activeTab === "chat"
-                  ? "bg-pink-500 text-white"
-                  : "text-neutral-400 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              Chat
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setActiveTab("chapters")
-              }
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                activeTab === "chapters"
-                  ? "bg-pink-500 text-white"
-                  : "text-neutral-400 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              Chapters
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setActiveTab("bible")
-              }
-              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                activeTab === "bible"
-                  ? "bg-pink-500 text-white"
-                  : "text-neutral-400 hover:bg-white/5 hover:text-white"
-              }`}
-            >
-              Story Bible
-            </button>
-          </nav>
         </header>
 {isMenuOpen && (
   <aside className="fixed inset-y-0 left-0 z-50 w-80 border-r border-white/10 bg-neutral-900 p-6 shadow-2xl">
