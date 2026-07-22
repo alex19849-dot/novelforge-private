@@ -706,7 +706,38 @@ if (
             </button>
           </nav>
         </header>
+{isMenuOpen && (
+  <aside className="fixed inset-y-0 left-0 z-50 w-80 border-r border-white/10 bg-neutral-900 p-6 shadow-2xl">
+    <div className="mb-6 flex items-center justify-between">
+      <h2 className="text-xl font-bold text-white">
+        NovelForge
+      </h2>
 
+      <button
+        type="button"
+        onClick={() => setIsMenuOpen(false)}
+        className="text-2xl text-neutral-400 hover:text-white"
+      >
+        ✕
+      </button>
+    </div>
+
+    <button className="mb-3 w-full rounded-xl bg-pink-500 px-4 py-3 text-left font-semibold text-white">
+      + New Story
+    </button>
+
+    <div className="mt-6">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+        Your Stories
+      </p>
+
+      <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-neutral-400">
+        Story list coming next...
+      </div>
+    </div>
+  </aside>
+)}
+        
         {activeTab === "chat" && (
   <ChatPanel
     messages={messages}
