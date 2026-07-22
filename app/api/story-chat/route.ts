@@ -1034,21 +1034,6 @@ Never force romance.
 
 Write commercially publishable fiction.
 `;
-
-const chapterBrief = `
-
-CHAPTER OBJECTIVE
-Write the next chapter requested by the user.
-
-STORY
-${JSON.stringify(currentStory.storyBible, null, 2)}
-
-EXISTING CHAPTERS
-${JSON.stringify(currentStory.chapters, null, 2)}
-
-LATEST USER REQUEST
-${latestUserMessage}
-`;
   
     const outputText = response.output_text?.trim();
 
