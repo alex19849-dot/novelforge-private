@@ -988,9 +988,9 @@ ${JSON.stringify(currentStory, null, 2)}
       max_output_tokens: 5000,
     });
 
-let chapterText = "";    
-if (isWriterMode) {
-  const latestUserMessage = latestMessage;
+let chapterText = "";
+
+const latestUserMessage = latestMessage;
 
 const AION_WRITER_PROMPT = `
 You are an elite commercial fiction erotic romance ghostwriter.
@@ -1049,16 +1049,20 @@ Never force romance.
 
 Write commercially publishable fiction.
 `;
-  
-    const outputText = response.output_text?.trim();
 
-    if (!outputText) {
-      throw new Error("The model returned no output.");
-    }
-  
+const outputText = response.output_text?.trim();
+
+if (!outputText) {
+  throw new Error("The model returned no output.");
+}
+
+const parsedOutput = JSON.parse(
+  outputText,
+) as Partial<StoryChatResponse>;
+
+const chapterBrief = parsedOutput.chapterBrief ?? "";
+
 if (isWriterMode) {
-const parsedOutput = JSON.parse(outputText) as Partial<StoryChatResponse>;
-    const chapterBrief = parsedOutput.chapterBrief ?? "";
   chapterText = await generateWithAion(`
 ${AION_WRITER_PROMPT}
 
@@ -1074,7 +1078,8 @@ ${chapterBrief}
 USER REQUEST:
 ${latestUserMessage}
 `);
-    
+}
+
 if (isWriterMode && parsedOutput.generatedChapter) {
   parsedOutput.generatedChapter.content = chapterText;
 }
