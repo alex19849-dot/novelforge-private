@@ -28,6 +28,16 @@ const EMPTY_STORY_BIBLE: StoryBible = {
   notes: [],
 };
 
+const EMPTY_STORY_STATE = {
+  importantFacts: [],
+  characterStates: [],
+  relationshipStates: [],
+  unresolvedThreads: [],
+  timeline: [],
+  locations: [],
+  activePOV: "",
+};
+
 function createEmptyStory(): StoryWorkspace {
   const now = new Date().toISOString();
 
@@ -52,7 +62,9 @@ function createEmptyStory(): StoryWorkspace {
       characters: [],
       notes: [],
     },
-    storyState: {},
+    storyState: {
+  ...EMPTY_STORY_STATE,
+},
     createdAt: now,
     updatedAt: now,
   };
