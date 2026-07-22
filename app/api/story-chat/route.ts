@@ -61,6 +61,7 @@ const storyChatSchema = {
  required: [
   "reply",
   "storyBible",
+  "storyState",
   "generatedChapter",
   "chapterBrief",
 ],
