@@ -878,21 +878,6 @@ if (
   <button
     type="button"
     onClick={() => {
-      setActiveTab("chapters");
-      setIsMenuOpen(false);
-    }}
-    className={`w-full rounded-xl px-4 py-3 text-left font-semibold transition ${
-      activeTab === "chapters"
-        ? "bg-white/10 text-white"
-        : "text-neutral-400 hover:bg-white/5 hover:text-white"
-    }`}
-  >
-    Chapters
-  </button>
-
-  <button
-    type="button"
-    onClick={() => {
       setActiveTab("bible");
       setIsMenuOpen(false);
     }}
