@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import ChatPanel from "./components/ChatPanel";
 import ChapterPanel from "./components/ChapterPanel";
+import BiblePanel from "./components/BiblePanel";
 
 import type {
   ActiveTab,
@@ -718,7 +719,13 @@ if (
   />
 )}
        
-     
+{activeTab === "bible" && (
+  <BiblePanel
+    storyBible={storyBible}
+    bibleHasContent={bibleHasContent}
+  />
+)}
+        
         {activeTab === "chat" && (
           <footer className="sticky bottom-0 border-t border-white/10 bg-neutral-950/95 px-5 py-5 backdrop-blur">
             <form
