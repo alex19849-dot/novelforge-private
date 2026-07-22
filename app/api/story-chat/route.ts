@@ -948,12 +948,12 @@ let chapterText = "";
 if (isWriterMode) {
   const latestUserMessage = latestMessage;
 
+const AION_WRITER_PROMPT = `
+...
+`;
+  
  chapterText = await generateWithAion(`
-${SYSTEM_PROMPT}
-
-WRITER MODE
-
-Follow every Writer Mode and Style Rule exactly as defined above.
+${AION_WRITER_PROMPT}
 
 USER INTENT:
 ${intent}
@@ -966,6 +966,7 @@ ${JSON.stringify(currentStory, null, 2)}
 
 USER REQUEST:
 ${latestUserMessage}
+
 CRITICAL WRITING RULES
 
 Respect the Story Bible exactly.
