@@ -1074,6 +1074,7 @@ ${latestUserMessage}
     }
 
 const parsedOutput = JSON.parse(outputText) as Partial<StoryChatResponse>;
+    const chapterBrief = parsedOutput.chapterBrief ?? "";
 if (isWriterMode && parsedOutput.generatedChapter) {
   parsedOutput.generatedChapter.content = chapterText;
 }
