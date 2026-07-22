@@ -293,11 +293,27 @@ async function loadStoryList(currentUserId: string) {
   setIsMenuOpen(false);
 }
   async function createNewStory() {
+  const newStory = createEmptyStory();
+
+  window.localStorage.setItem(
+    "novelforge-current-story-id",
+    newStory.id,
+  );
+
+  window.localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(newStory),
+  );
+
+  setStory(newStory);
+  setInput("");
+  setActiveTab("chat");
+  setIsThinking(false);
+  setIsMenuOpen(false);
+
   if (!userId) {
     return;
   }
-
-  const newStory = createEmptyStory();
 
   const { error } = await supabase
     .from("stories")
@@ -311,21 +327,14 @@ async function loadStoryList(currentUserId: string) {
       story_state: newStory.storyState,
       active_chapter_index: 0,
       custom_rewrite: "",
+      created_at: newStory.createdAt,
+      updated_at: newStory.updatedAt,
     });
 
   if (error) {
     console.error("Could not create story:", error);
     return;
   }
-
-  window.localStorage.setItem(
-    "novelforge-current-story-id",
-    newStory.id,
-  );
-
-  setStory(newStory);
-  setActiveTab("chat");
-  setIsMenuOpen(false);
 
   await loadStoryList(userId);
 }
