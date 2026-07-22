@@ -55,6 +55,16 @@ const EMPTY_STORY_BIBLE: StoryBible = {
   notes: [],
 };
 
+const EMPTY_STORY_STATE = {
+  importantFacts: [],
+  characterStates: [],
+  relationshipStates: [],
+  unresolvedThreads: [],
+  timeline: [],
+  locations: [],
+  activePOV: "",
+};
+
 const storyChatSchema = {
   type: "object",
   additionalProperties: false,
@@ -1132,9 +1142,11 @@ const parsedOutput = JSON.parse(
 ) as Partial<StoryChatResponse>;
 
 const chapterBrief = parsedOutput.chapterBrief ?? "";
-const returnedStoryState =
-  parsedOutput.storyState ?? currentStory.storyState;
-
+const returnedStoryState = {
+  ...EMPTY_STORY_STATE,
+  ...(currentStory.storyState ?? {}),
+  ...(parsedOutput.storyState ?? {}),
+};
 if (isWriterMode) {
  const recentChapters = currentStory.chapters.slice(-3);
 
