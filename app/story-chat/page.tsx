@@ -181,8 +181,15 @@ export default function StoryChatPage() {
   const [activeTab, setActiveTab] =
     useState<ActiveTab>("chat");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [stories, setStories] =
-  useState<StoryWorkspace[]>([]);
+ const [stories, setStories] =
+  useState<
+    {
+      id: string;
+      title: string;
+      createdAt: string;
+      updatedAt: string;
+    }[]
+  >([]);
 
 const [readerTheme, setReaderTheme] = useState<
   "light" | "dark" | "sepia"
