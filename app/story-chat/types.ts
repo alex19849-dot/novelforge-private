@@ -68,4 +68,5 @@ export type StoryChatResponse = {
   timeline?: unknown[];
   world?: Record<string, unknown>;
   notes?: string[];
+  chapterBrief: string;
 };
