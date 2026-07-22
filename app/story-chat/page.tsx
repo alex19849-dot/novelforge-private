@@ -696,6 +696,13 @@ if (
           </nav>
         </header>
 
+        {activeTab === "chat" && (
+  <ChatPanel
+    messages={messages}
+    isThinking={isThinking}
+  />
+)}
+
         {activeTab === "chapters" && (
           <section className="flex-1 px-5 py-8">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
