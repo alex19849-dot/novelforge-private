@@ -236,6 +236,7 @@ export default function ChapterPanel({
                 </div>
               )}
             </div>
-          </section>
-        )}
+                   </section>
+  );
+}
 
