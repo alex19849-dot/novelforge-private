@@ -35,6 +35,16 @@ export type StoryChapter = {
   updatedAt: string;
 };
 
+export type StoryState = {
+  importantFacts: string[];
+  characterStates: string[];
+  relationshipStates: string[];
+  unresolvedThreads: string[];
+  timeline: string[];
+  locations: string[];
+  activePOV: string;
+};
+
 export type StoryWorkspace = {
   id: string;
   title: string;
@@ -44,7 +54,7 @@ export type StoryWorkspace = {
   messages: ChatMessage[];
   chapters: StoryChapter[];
   storyBible: StoryBible;
-  storyState: Record<string, unknown>;
+  storyState: StoryState;
   createdAt: string;
   updatedAt: string;
 };
