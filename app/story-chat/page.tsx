@@ -220,6 +220,33 @@ const [readerWidth, setReaderWidth] = useState<
   loadUser();
 }, []);
 
+async function loadStoryList(currentUserId: string) {
+  const { data, error } = await supabase
+    .from("stories")
+    .select("id, title, created_at, updated_at")
+    .eq("user_id", currentUserId)
+    .order("updated_at", {
+      ascending: false,
+    });
+
+  if (error) {
+    console.error(
+      "Could not load story list:",
+      error,
+    );
+    return;
+  }
+
+  setStories(
+    (data ?? []).map((item) => ({
+      id: item.id,
+      title: item.title || "Untitled Story",
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    })),
+  );
+}
+  
   useEffect(() => {
   const saved = localStorage.getItem("novelforge-reader");
 
