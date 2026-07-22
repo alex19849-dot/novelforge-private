@@ -44,6 +44,7 @@ export type StoryWorkspace = {
   messages: ChatMessage[];
   chapters: StoryChapter[];
   storyBible: StoryBible;
+  storyState: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
 };
