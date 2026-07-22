@@ -1,4 +1,43 @@
- {activeTab === "chapters" && (
+"use client";
+
+import type {
+  Dispatch,
+  SetStateAction,
+} from "react";
+import type { StoryChapter } from "../types";
+
+type ChapterPanelProps = {
+  chapters: StoryChapter[];
+  readerTheme: "light" | "sepia" | "dark";
+  setReaderTheme: Dispatch<
+    SetStateAction<"light" | "sepia" | "dark">
+  >;
+  readerFontSize: number;
+  setReaderFontSize: Dispatch<
+    SetStateAction<number>
+  >;
+  readerLineHeight: number;
+  setReaderLineHeight: Dispatch<
+    SetStateAction<number>
+  >;
+  readerWidth: "narrow" | "medium" | "wide";
+  setReaderWidth: Dispatch<
+    SetStateAction<"narrow" | "medium" | "wide">
+  >;
+};
+
+export default function ChapterPanel({
+  chapters,
+  readerTheme,
+  setReaderTheme,
+  readerFontSize,
+  setReaderFontSize,
+  readerLineHeight,
+  setReaderLineHeight,
+  readerWidth,
+  setReaderWidth,
+}: ChapterPanelProps) {
+  return (
           <section className="flex-1 px-5 py-8">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
