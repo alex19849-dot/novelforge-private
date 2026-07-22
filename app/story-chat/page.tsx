@@ -329,6 +329,43 @@ async function loadStoryList(currentUserId: string) {
 
   await loadStoryList(userId);
 }
+
+  async function deleteStory(storyId: string) {
+  if (!userId) {
+    return;
+  }
+
+  const storyToDelete = stories.find(
+    (item) => item.id === storyId,
+  );
+
+  const confirmed = window.confirm(
+    `Delete "${storyToDelete?.title ?? "this story"}"? This cannot be undone.`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const { error } = await supabase
+    .from("stories")
+    .delete()
+    .eq("id", storyId)
+    .eq("user_id", userId);
+
+  if (error) {
+    console.error("Could not delete story:", error);
+    return;
+  }
+
+  if (story?.id === storyId) {
+    await createNewStory();
+    return;
+  }
+
+  await loadStoryList(userId);
+}
+  
   useEffect(() => {
   const saved = localStorage.getItem("novelforge-reader");
 
