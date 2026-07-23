@@ -243,20 +243,22 @@ const selectedChapter =
     className="rounded-lg border border-white/10 px-3 py-2 text-sm"
   >
     ← Back to chapters
-  </button>
-
- <button
+<button
   type="button"
   onClick={() =>
     setShowReaderSettings(
       (current) => !current,
     )
   }
-  className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  className={`rounded-lg border px-3 py-2 text-sm transition ${
+    showReaderSettings
+      ? "border-pink-500 bg-pink-500 text-white"
+      : "border-white/10"
+  }`}
   aria-label="Reader settings"
   title="Reader settings"
 >
-  ☰ Settings
+  ☰
 </button>
 
   {!isEditing && (
