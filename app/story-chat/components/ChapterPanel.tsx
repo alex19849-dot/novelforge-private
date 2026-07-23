@@ -594,41 +594,8 @@ export default function ChapterPanel({
     msOverflowStyle: "none",
   }}
 >
-             <article
-  className="h-full shrink-0 snap-start overflow-hidden"
-  style={{
-    width: "100vw",
-    height: "calc(100dvh - 96px)",
-    padding:
-      readerWidth === "narrow"
-        ? "32px 38px"
-        : readerWidth === "medium"
-          ? "28px 26px"
-          : "24px 18px",
-                  fontFamily:
-                    "Georgia, 'Times New Roman', serif",
-                  fontSize: `${readerFontSize}px`,
-                  lineHeight: readerLineHeight,
-                }}
-              >
-                <div className="break-inside-avoid pb-6">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
-                    Chapter {selectedChapter.number}
-                  </p>
-
-                  <h1 className="mt-3 text-3xl font-bold leading-tight">
-                    {selectedChapter.title ||
-                      `Chapter ${selectedChapter.number}`}
-                  </h1>
-
-                  {selectedChapter.povCharacter && (
-                    <p
-                      className={`mt-2 italic ${mutedTextClasses}`}
-                    >
-                      {selectedChapter.povCharacter}
-                    </p>
-                  )}
-                </div>
+      
+               
 
               {paginateChapter(
   selectedChapter.content,
@@ -649,8 +616,26 @@ export default function ChapterPanel({
       lineHeight: readerLineHeight,
     }}
   >
+     <div className="break-inside-avoid pb-6">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
+                    Chapter {selectedChapter.number}
+                  </p>
+
+                  <h1 className="mt-3 text-3xl font-bold leading-tight">
+                    {selectedChapter.title ||
+                      `Chapter ${selectedChapter.number}`}
+                  </h1>
+
+                  {selectedChapter.povCharacter && (
+                    <p
+                      className={`mt-2 italic ${mutedTextClasses}`}
+                    >
+                      {selectedChapter.povCharacter}
+                    </p>
+                  )}
+                </div>
     {renderChapterContent(page)}
-  </article>
+
 ))}
               </article>
             </div>
