@@ -65,7 +65,13 @@ const selectedChapter =
   
   return (
           <section className="w-full px-3 py-4 sm:px-5 sm:py-8">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-6">
+         <div
+  className={`rounded-2xl border border-white/10 bg-white/5 ${
+    selectedChapter
+      ? "fixed inset-0 z-50 overflow-y-auto p-4 sm:p-8"
+      : "p-3 sm:p-6"
+  }`}
+>
              
               {!selectedChapter && (
   <>
