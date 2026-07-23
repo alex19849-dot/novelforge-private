@@ -596,9 +596,7 @@ export default function ChapterPanel({
       
                
 
-              {paginateChapter(
-  selectedChapter.content,
-).map((page, index) => (
+              {[selectedChapter.content].map((page, index) => (
   <article
     key={index}
     className="h-full w-screen shrink-0 snap-start overflow-hidden"
