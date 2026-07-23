@@ -234,6 +234,65 @@ const selectedChapter =
   </button>
 </div>
 
+{isEditing && (
+  <div className="mb-6 space-y-4 rounded-xl border border-white/10 bg-black/20 p-4">
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-white">
+        Chapter title
+      </label>
+
+      <input
+        id="chapter-title"
+        name="chapterTitle"
+        type="text"
+        value={editTitle}
+        onChange={(event) =>
+          setEditTitle(event.target.value)
+        }
+        className="w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
+      />
+    </div>
+
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-white">
+        POV character
+      </label>
+
+      <input
+        id="chapter-pov"
+        name="chapterPov"
+        type="text"
+        value={editPovCharacter}
+        onChange={(event) =>
+          setEditPovCharacter(event.target.value)
+        }
+        className="w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
+      />
+    </div>
+
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-white">
+        Chapter content
+      </label>
+
+      <textarea
+        id="chapter-content"
+        name="chapterContent"
+        value={editContent}
+        onChange={(event) =>
+          setEditContent(event.target.value)
+        }
+        rows={24}
+        className="w-full resize-y rounded-xl border border-white/10 bg-neutral-900 px-4 py-4 text-white outline-none focus:border-pink-500"
+        style={{
+          fontSize: `${readerFontSize}px`,
+          lineHeight: readerLineHeight,
+        }}
+      />
+    </div>
+  </div>
+)}
+    
     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
       Chapter {selectedChapter.number}
     </p>
