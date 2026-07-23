@@ -97,7 +97,13 @@ const selectedChapter =
                   here.
                 </p>
               ) : (
-                <div className="mt-6 space-y-4 overflow-visible">
+                <div
+  className={`mt-6 space-y-4 ${
+    selectedChapter
+      ? "overflow-hidden"
+      : "overflow-visible"
+  }`}
+>
                  {selectedChapter ? (
   <article
     key={selectedChapter.id}
