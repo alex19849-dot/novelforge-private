@@ -63,7 +63,7 @@ const selectedChapter =
   
   return (
           <section className="w-full px-3 py-4 sm:px-5 sm:py-8">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 sm:p-6">
               <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
               <div className="mb-6 flex flex-wrap gap-3">
   <button
