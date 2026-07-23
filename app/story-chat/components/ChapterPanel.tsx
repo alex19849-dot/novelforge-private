@@ -50,6 +50,8 @@ export default function ChapterPanel({
 
 const [selectedChapterId, setSelectedChapterId] =
   useState<string | null>(null);
+const [showReaderSettings, setShowReaderSettings] =
+  useState(false);
 const [isEditing, setIsEditing] = useState(false);
 const [editTitle, setEditTitle] = useState("");
 const [editPovCharacter, setEditPovCharacter] =
