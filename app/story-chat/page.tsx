@@ -578,7 +578,7 @@ if (
     story_state: story.storyState,
     chapters: story.chapters,
     messages: story.messages,
-    updated_at: story.updatedAt,
+    updated_at: new Date().toISOString(),
   },
   {
     onConflict: "id",
