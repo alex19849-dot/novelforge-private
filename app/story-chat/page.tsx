@@ -1090,18 +1090,20 @@ if (!userId) {
   />
 )}
 
-        {activeTab === "chapters" && (
-  <ChapterPanel
-    chapters={chapters}
-    readerTheme={readerTheme}
-    setReaderTheme={setReaderTheme}
-    readerFontSize={readerFontSize}
-    setReaderFontSize={setReaderFontSize}
-    readerLineHeight={readerLineHeight}
-    setReaderLineHeight={setReaderLineHeight}
-    readerWidth={readerWidth}
-    setReaderWidth={setReaderWidth}
-  />
+{activeTab === "chapters" && (
+  <div className="flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+    <ChapterPanel
+      chapters={chapters}
+      readerTheme={readerTheme}
+      setReaderTheme={setReaderTheme}
+      readerFontSize={readerFontSize}
+      setReaderFontSize={setReaderFontSize}
+      readerLineHeight={readerLineHeight}
+      setReaderLineHeight={setReaderLineHeight}
+      readerWidth={readerWidth}
+      setReaderWidth={setReaderWidth}
+    />
+  </div>
 )}
        
 {activeTab === "bible" && (
