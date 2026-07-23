@@ -486,71 +486,54 @@ const selectedChapter =
           {selectedChapter.content}
         </p>
         
-          <div className="mt-10 flex justify-between border-t border-white/10 pt-6">
-        <button
-          type="button"
-          disabled={selectedChapter.number === 1}
-          onClick={() => {
-            const previous = chapters.find(
-              (chapter) =>
-                chapter.number ===
-                selectedChapter.number - 1,
-            );
+      <div className="mt-10 flex justify-between border-t border-white/10 pt-6">
+  <button
+    type="button"
+    disabled={selectedChapter.number === 1}
+    onClick={() => {
+      const previous = chapters.find(
+        (chapter) =>
+          chapter.number === selectedChapter.number - 1,
+      );
 
-           if (previous) {
-  setSelectedChapterId(previous.id);
+      if (previous) {
+        setSelectedChapterId(previous.id);
+        setEditTitle(previous.title);
+        setEditPovCharacter(previous.povCharacter);
+        setEditContent(previous.content);
+        setShowReaderSettings(false);
+        setIsEditing(false);
+      }
+    }}
+    className="rounded-lg border border-white/10 px-4 py-2 disabled:opacity-40"
+  >
+    ← Previous
+  </button>
 
-  setEditTitle(previous.title);
-  setEditPovCharacter(previous.povCharacter);
-  setEditContent(previous.content);
+  <button
+    type="button"
+    disabled={selectedChapter.number === chapters.length}
+    onClick={() => {
+      const next = chapters.find(
+        (chapter) =>
+          chapter.number === selectedChapter.number + 1,
+      );
 
-  setShowReaderSettings(false);
-  setIsEditing(false);
-}
-          }}
-          className="rounded-lg border border-white/10 px-4 py-2 disabled:opacity-40"
-        >
-          ← Previous
-        </button>
-
-        <button
-  type="button"
-  disabled={
-    selectedChapter.number === chapters.length
-  }
-  onClick={() => {
-    const next = chapters.find(
-      (chapter) =>
-        chapter.number ===
-        selectedChapter.number + 1,
-    );
-
-           <button
-          type="button"
-          disabled={selectedChapter.number === chapters.length}
-          onClick={() => {
-            const next = chapters.find(
-              (chapter) =>
-                chapter.number === selectedChapter.number + 1,
-            );
-
-            if (next) {
-              setSelectedChapterId(next.id);
-
-              setEditTitle(next.title);
-              setEditPovCharacter(next.povCharacter);
-              setEditContent(next.content);
-
-              setShowReaderSettings(false);
-              setIsEditing(false);
-            }
-          }}
-          className="rounded-lg border border-white/10 px-4 py-2 disabled:opacity-40"
-        >
-          Next →
-        </button>
-      </div>
-      </>
+      if (next) {
+        setSelectedChapterId(next.id);
+        setEditTitle(next.title);
+        setEditPovCharacter(next.povCharacter);
+        setEditContent(next.content);
+        setShowReaderSettings(false);
+        setIsEditing(false);
+      }
+    }}
+    className="rounded-lg border border-white/10 px-4 py-2 disabled:opacity-40"
+  >
+    Next →
+  </button>
+</div>
+</>
     )}
   </article>
 ) : (
