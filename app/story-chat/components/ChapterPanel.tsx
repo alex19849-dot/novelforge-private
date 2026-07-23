@@ -232,17 +232,19 @@ const selectedChapter =
     ← Back to chapters
   </button>
 
-  <button
-    type="button"
-    onClick={() =>
-      setShowReaderSettings(
-        (current) => !current,
-      )
-    }
-    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
-  >
-    ☰
-  </button>
+ <button
+  type="button"
+  onClick={() =>
+    setShowReaderSettings(
+      (current) => !current,
+    )
+  }
+  className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  aria-label="Reader settings"
+  title="Reader settings"
+>
+  ☰ Settings
+</button>
 
   {!isEditing && (
     <button
