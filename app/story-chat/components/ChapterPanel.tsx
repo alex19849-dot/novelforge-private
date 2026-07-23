@@ -48,7 +48,7 @@ const selectedChapter =
   ) ?? null;
   
   return (
-          <section className="flex-1 px-5 py-8">
+          <section className="w-full px-5 py-8">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
               <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
               <div className="mb-6 flex flex-wrap gap-3">
