@@ -221,12 +221,45 @@ const selectedChapter =
     }`}
   >
     <div className="mb-6 flex flex-wrap gap-3">
-      <button
-        type="button"
-        onClick={() => {
-          setSelectedChapterId(null);
-          setIsEditing(false);
-        }}
+  <button
+    type="button"
+    onClick={() => {
+      setSelectedChapterId(null);
+      setIsEditing(false);
+    }}
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    ← Back to chapters
+  </button>
+
+  <button
+    type="button"
+    onClick={() =>
+      setShowReaderSettings(
+        (current) => !current,
+      )
+    }
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    ☰
+  </button>
+
+  {!isEditing && (
+    <button
+      type="button"
+      onClick={() => {
+        setEditTitle(selectedChapter.title);
+        setEditPovCharacter(
+          selectedChapter.povCharacter,
+        );
+        setEditContent(selectedChapter.content);
+        setIsEditing(true);
+      }}
+      className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white"
+    >
+      ✏️ Edit
+    </button>
+  )}
         className="rounded-lg border border-white/10 px-3 py-2 text-sm"
       >
         ← Back to chapters
