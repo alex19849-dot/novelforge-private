@@ -216,13 +216,23 @@ const selectedChapter =
           : "max-w-full"
     }`}
   >
-    <button
-      type="button"
-      onClick={() => setSelectedChapterId(null)}
-      className="mb-6 rounded-lg border border-white/10 px-3 py-2 text-sm"
-    >
-      ← Back to chapters
-    </button>
+    <div className="mb-6 flex gap-3">
+  <button
+    type="button"
+    onClick={() => setSelectedChapterId(null)}
+    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+  >
+    ← Back to chapters
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setIsEditing(true)}
+    className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white"
+  >
+    ✏️ Edit
+  </button>
+</div>
 
     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
       Chapter {selectedChapter.number}
