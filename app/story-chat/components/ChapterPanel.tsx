@@ -223,6 +223,8 @@ const selectedChapter =
           : "max-w-full"
     }`}
   >
+    {showReaderSettings && (
+  <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
     <div className="mb-6 flex flex-wrap gap-3">
   <button
     type="button"
