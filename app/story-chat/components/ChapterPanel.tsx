@@ -106,6 +106,9 @@ const selectedChapter =
 >
                  {selectedChapter ? (
   <article
+  style={{
+    minHeight: "100vh",
+  }}
     key={selectedChapter.id}
     className={`min-h-full rounded-xl border p-4 shadow-sm sm:p-8 ${
       readerTheme === "dark"
