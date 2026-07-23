@@ -34,30 +34,8 @@ type ChapterPanelProps = {
 };
 
 function paginateChapter(content: string): string[] {
-  const paragraphs = content
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
-  const pages: string[] = [];
-  let current = "";
-
-  for (const paragraph of paragraphs) {
-    if ((current + "\n\n" + paragraph).length > 2200) {
-      pages.push(current);
-      current = paragraph;
-    } else {
-      current += (current ? "\n\n" : "") + paragraph;
-    }
-  }
-
-  if (current) {
-    pages.push(current);
-  }
-
-  return pages;
+  return [content];
 }
-
 export default function ChapterPanel({
   chapters,
   onSaveChapter,
