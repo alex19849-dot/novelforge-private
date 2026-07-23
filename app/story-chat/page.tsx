@@ -1032,7 +1032,10 @@ if (!userId) {
 >
   <button
     type="button"
-    onClick={() => openStory(item.id)}
+   onClick={async () => {
+  await openStory(item.id);
+  setIsMenuOpen(false);
+}}
     className="min-w-0 flex-1 text-left"
   >
     <p className="truncate font-semibold text-white">
