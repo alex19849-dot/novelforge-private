@@ -484,7 +484,7 @@ const selectedChapter =
         >
           {selectedChapter.content}
         </p>
-      </>
+        
           <div className="mt-10 flex justify-between border-t border-white/10 pt-6">
         <button
           type="button"
