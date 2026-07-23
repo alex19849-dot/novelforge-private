@@ -179,7 +179,8 @@ const selectedChapter =
     Wide
   </button>
 </div>
- </div>             
+ </div>
+  )}
               <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
                 Chapters
               </p>
