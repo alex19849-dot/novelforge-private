@@ -599,7 +599,7 @@ export default function ChapterPanel({
               {[selectedChapter.content].map((page, index) => (
   <article
     key={index}
-    className="h-full w-screen shrink-0 snap-start overflow-hidden"
+    className="min-h-full w-screen shrink-0 snap-start"
     style={{
       padding:
         readerWidth === "narrow"
