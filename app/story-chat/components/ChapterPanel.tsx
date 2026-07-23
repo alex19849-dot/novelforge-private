@@ -220,8 +220,8 @@ export default function ChapterPanel({
 
     return paragraphs.map((paragraph, index) => {
       const messageMatch = paragraph.match(
-        /^([A-Za-z][A-Za-z0-9 .'-]{0,30}):\s*(.+)$/s,
-      );
+  /^([A-Za-z][A-Za-z0-9 .'-]{0,30}):\s*([\s\S]+)$/,
+);
 
       if (messageMatch) {
         const [, characterName, message] =
