@@ -526,10 +526,15 @@ const selectedChapter =
     );
 
     if (next) {
-      setSelectedChapterId(next.id);
-      setShowReaderSettings(false);
-      setIsEditing(false);
-    }
+  setSelectedChapterId(next.id);
+
+  setEditTitle(next.title);
+  setEditPovCharacter(next.povCharacter);
+  setEditContent(next.content);
+
+  setShowReaderSettings(false);
+  setIsEditing(false);
+}
   }}
   className="rounded-lg border border-white/10 px-4 py-2 disabled:opacity-40"
 >
