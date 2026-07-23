@@ -184,11 +184,11 @@ const selectedChapter =
                   here.
                 </p>
               ) : (
-                <div className="mt-6 space-y-4">
+                <div className="mt-6 space-y-4 overflow-visible">
                  {selectedChapter ? (
   <article
     key={selectedChapter.id}
-    className={`rounded-xl border p-4 shadow-sm sm:p-8 ${
+    className={`min-h-full rounded-xl border p-4 shadow-sm sm:p-8 ${
       readerTheme === "dark"
         ? "border-neutral-700 bg-neutral-900"
         : readerTheme === "light"
