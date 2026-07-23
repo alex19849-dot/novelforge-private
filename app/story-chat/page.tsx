@@ -641,6 +641,35 @@ if (
   setIsThinking(false);
 }
 
+function updateChapter(
+  chapterId: string,
+  updates: {
+    title: string;
+    povCharacter: string;
+    content: string;
+  },
+) {
+  setStory((currentStory) => {
+    if (!currentStory) {
+      return currentStory;
+    }
+
+    return {
+      ...currentStory,
+      chapters: currentStory.chapters.map((chapter) =>
+        chapter.id === chapterId
+          ? {
+              ...chapter,
+              ...updates,
+              updatedAt: new Date().toISOString(),
+            }
+          : chapter,
+      ),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+}
+  
   function updateStoryTitle(value: string) {
     setStory((currentStory) => {
       if (!currentStory) {
