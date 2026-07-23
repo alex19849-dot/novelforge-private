@@ -497,11 +497,16 @@ const selectedChapter =
                 selectedChapter.number - 1,
             );
 
-            if (previous) {
-              setSelectedChapterId(previous.id);
-              setShowReaderSettings(false);
-              setIsEditing(false);
-            }
+           if (previous) {
+  setSelectedChapterId(previous.id);
+
+  setEditTitle(previous.title);
+  setEditPovCharacter(previous.povCharacter);
+  setEditContent(previous.content);
+
+  setShowReaderSettings(false);
+  setIsEditing(false);
+}
           }}
           className="rounded-lg border border-white/10 px-4 py-2 disabled:opacity-40"
         >
