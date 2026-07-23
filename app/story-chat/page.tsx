@@ -237,6 +237,8 @@ const [readerWidth, setReaderWidth] = useState<
     if (id) {
       await loadStoryList(id);
     }
+
+    setAuthChecked(true);
   }
 
   loadUser();
