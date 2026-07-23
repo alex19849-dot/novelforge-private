@@ -596,6 +596,9 @@ if (
     story.id,
     story.chapters,
   );
+     if (userId) {
+  await loadStoryList(userId);
+}
 }
 }
   saveStoryToSupabase();
