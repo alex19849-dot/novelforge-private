@@ -260,13 +260,13 @@ const selectedChapter =
         onClick={() =>
           setSelectedChapterId(chapter.id)
         }
-        className="rounded-xl border border-white/10 bg-black/20 p-4 text-left transition hover:bg-white/10"
+        className="group w-full rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-pink-500/40 hover:bg-white/10"
       >
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
           Chapter {chapter.number}
         </p>
 
-        <h3 className="mt-1 text-lg font-semibold text-white">
+        <h3 className="mt-2 text-xl font-semibold text-white transition group-hover:text-pink-400">
           {chapter.title ||
             `Chapter ${chapter.number}`}
         </h3>
