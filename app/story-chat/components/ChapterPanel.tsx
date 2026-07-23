@@ -111,6 +111,128 @@ const selectedChapter =
   >
     {showReaderSettings && (
   <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
+    {showReaderSettings && (
+  <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
+
+    {/* Theme */}
+    <div className="mb-6 flex flex-wrap gap-3">
+      <button
+        type="button"
+        onClick={() => setReaderTheme("light")}
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        Light
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setReaderTheme("sepia")}
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        Sepia
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setReaderTheme("dark")}
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        Dark
+      </button>
+    </div>
+
+    {/* Font */}
+    <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
+      <span className="text-sm">Font size</span>
+
+      <button
+        type="button"
+        onClick={() =>
+          setReaderFontSize((size) => Math.max(14, size - 1))
+        }
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        A-
+      </button>
+
+      <span className="w-8 text-center text-sm">
+        {readerFontSize}
+      </span>
+
+      <button
+        type="button"
+        onClick={() =>
+          setReaderFontSize((size) => Math.min(30, size + 1))
+        }
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        A+
+      </button>
+    </div>
+
+    {/* Line spacing */}
+    <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
+      <span className="text-sm">Line spacing</span>
+
+      <button
+        type="button"
+        onClick={() =>
+          setReaderLineHeight((height) =>
+            Math.max(1.4, Number((height - 0.1).toFixed(1)))
+          )
+        }
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        -
+      </button>
+
+      <span className="w-10 text-center text-sm">
+        {readerLineHeight.toFixed(1)}
+      </span>
+
+      <button
+        type="button"
+        onClick={() =>
+          setReaderLineHeight((height) =>
+            Math.min(3, Number((height + 0.1).toFixed(1)))
+          )
+        }
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        +
+      </button>
+    </div>
+
+    {/* Width */}
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <span className="text-sm">Width</span>
+
+      <button
+        type="button"
+        onClick={() => setReaderWidth("narrow")}
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        Narrow
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setReaderWidth("medium")}
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        Medium
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setReaderWidth("wide")}
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
+      >
+        Wide
+      </button>
+    </div>
+  </div>
+)}
     <div className="mb-6 flex flex-wrap gap-3">
   <button
     type="button"
