@@ -1,8 +1,9 @@
 "use client";
 
-import type {
-  Dispatch,
-  SetStateAction,
+import {
+  useState,
+  type Dispatch,
+  type SetStateAction,
 } from "react";
 import type { StoryChapter } from "../types";
 
