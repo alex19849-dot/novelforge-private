@@ -250,72 +250,53 @@ const selectedChapter =
     <div className="sticky top-0 z-20 -mx-4 mb-6 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-inherit px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8">
   <button
     type="button"
-   onClick={() => {
-  setSelectedChapterId(null);
-  setIsEditing(false);
-  setShowReaderSettings(false);
-}}
+    onClick={() => {
+      setSelectedChapterId(null);
+      setIsEditing(false);
+      setShowReaderSettings(false);
+    }}
     className="rounded-lg border border-white/10 px-3 py-2 text-sm"
   >
     ← Back to chapters
-<button
-  type="button"
-  onClick={() =>
-    setShowReaderSettings(
-      (current) => !current,
-    )
-  }
-  className={`rounded-lg border px-3 py-2 text-sm transition ${
-    showReaderSettings
-      ? "border-pink-500 bg-pink-500 text-white"
-      : "border-white/10"
-  }`}
-  aria-label="Reader settings"
-  title="Reader settings"
->
-  ☰
-</button>
+  </button>
 
-  {!isEditing && (
+  <div className="flex items-center gap-2">
     <button
       type="button"
-      onClick={() => {
-        setEditTitle(selectedChapter.title);
-        setEditPovCharacter(
-          selectedChapter.povCharacter,
-        );
-        setEditContent(selectedChapter.content);
-        setIsEditing(true);
-      }}
-      className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white"
+      onClick={() =>
+        setShowReaderSettings(
+          (current) => !current,
+        )
+      }
+      className={`rounded-lg border px-3 py-2 text-sm transition ${
+        showReaderSettings
+          ? "border-pink-500 bg-pink-500 text-white"
+          : "border-white/10"
+      }`}
+      aria-label="Reader settings"
+      title="Reader settings"
     >
-      ✏️ Edit
+      ☰
     </button>
-  )}
-        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
-      
-        ← Back to chapters
-      </button>
 
-      {!isEditing && (
-        <button
-          type="button"
-          onClick={() => {
-            setEditTitle(selectedChapter.title);
-            setEditPovCharacter(
-              selectedChapter.povCharacter,
-            );
-            setEditContent(selectedChapter.content);
-            setIsEditing(true);
-          }}
-          className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white"
-        >
-          ✏️ Edit
-        </button>
-      )}
-    </div>
-      </div>
-)}
+    {!isEditing && (
+      <button
+        type="button"
+        onClick={() => {
+          setEditTitle(selectedChapter.title);
+          setEditPovCharacter(
+            selectedChapter.povCharacter,
+          );
+          setEditContent(selectedChapter.content);
+          setIsEditing(true);
+        }}
+        className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white"
+      >
+        ✏️ Edit
+      </button>
+    )}
+  </div>
+</div>
 
     {isEditing ? (
       <div className="space-y-4">
