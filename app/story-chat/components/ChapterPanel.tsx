@@ -281,9 +281,15 @@ const selectedChapter =
       <button
         key={chapter.id}
         type="button"
-        onClick={() =>
-          setSelectedChapterId(chapter.id)
-        }
+        onClick={() => {
+  setSelectedChapterId(chapter.id);
+
+  setEditTitle(chapter.title);
+  setEditPovCharacter(chapter.povCharacter);
+  setEditContent(chapter.content);
+
+  setIsEditing(false);
+}}
         className="group w-full rounded-2xl border border-white/10 bg-white/5 p-5 text-left transition hover:border-pink-500/40 hover:bg-white/10"
       >
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
