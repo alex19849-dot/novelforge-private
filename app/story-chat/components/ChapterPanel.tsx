@@ -508,6 +508,25 @@ const selectedChapter =
         </button>
 
         <button
+  type="button"
+  disabled={
+    selectedChapter.number === chapters.length
+  }
+  onClick={() => {
+    const next = chapters.find(
+      (chapter) =>
+        chapter.number ===
+        selectedChapter.number + 1,
+    );
+
+    if (next) {
+      setSelectedChapterId(next.id);
+      setShowReaderSettings(false);
+      setIsEditing(false);
+    }
+  }}
+  className="rounded-lg border border-white/10 px-4 py-2 disabled:opacity-40"
+>
           type="button"
           onClick={() => {
             const next = chapters.find(
