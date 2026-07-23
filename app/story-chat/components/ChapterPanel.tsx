@@ -636,7 +636,7 @@ export default function ChapterPanel({
                 </div>
     {renderChapterContent(page)}
 
-))}
+))
               </article>
             </div>
 
