@@ -594,9 +594,7 @@ export default function ChapterPanel({
               <article
                 className="h-full"
                 style={{
-                  columnWidth: "100vw",
-                  columnGap: "0px",
-                  columnFill: "auto",
+                  
                   padding:
                     readerWidth === "narrow"
                       ? "32px 38px"
