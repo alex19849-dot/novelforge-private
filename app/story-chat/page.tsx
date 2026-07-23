@@ -228,36 +228,42 @@ const [readerWidth, setReaderWidth] = useState<
 
 useEffect(() => {
   async function loadUser() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-    const id = session?.user?.id ?? null;
+      const id = session?.user?.id ?? null;
 
-    setUserId(id);
+      setUserId(id);
+      setAuthChecked(true);
 
-    if (id) {
-      await loadStoryList(id);
+      if (id) {
+        await loadStoryList(id);
+      }
+    } catch (error) {
+      console.error("Failed to check login:", error);
+      setUserId(null);
+      setAuthChecked(true);
     }
-
-    setAuthChecked(true);
   }
 
   loadUser();
 
   const {
     data: { subscription },
-  } = supabase.auth.onAuthStateChange(
-    async (_event, session) => {
-      const id = session?.user?.id ?? null;
+  } = supabase.auth.onAuthStateChange((_event, session) => {
+    const id = session?.user?.id ?? null;
 
-      setUserId(id);
+    setUserId(id);
+    setAuthChecked(true);
 
-      if (id) {
-        await loadStoryList(id);
-      }
-    },
-  );
+    if (id) {
+      loadStoryList(id).catch((error) => {
+        console.error("Failed to load stories:", error);
+      });
+    }
+  });
 
   return () => subscription.unsubscribe();
 }, []);
