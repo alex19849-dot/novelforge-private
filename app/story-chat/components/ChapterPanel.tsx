@@ -289,6 +289,8 @@ const selectedChapter =
         </button>
       )}
     </div>
+      </div>
+)}
 
     {isEditing ? (
       <div className="space-y-4">
