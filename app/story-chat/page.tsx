@@ -226,11 +226,13 @@ const [readerWidth, setReaderWidth] = useState<
   const storyBible =
     story?.storyBible ?? EMPTY_STORY_BIBLE;
 
- useEffect(() => {
+useEffect(() => {
   async function loadUser() {
-    const { data } = await supabase.auth.getUser();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
-    const id = data.user?.id ?? null;
+    const id = session?.user?.id ?? null;
 
     setUserId(id);
 
@@ -242,6 +244,22 @@ const [readerWidth, setReaderWidth] = useState<
   }
 
   loadUser();
+
+  const {
+    data: { subscription },
+  } = supabase.auth.onAuthStateChange(
+    async (_event, session) => {
+      const id = session?.user?.id ?? null;
+
+      setUserId(id);
+
+      if (id) {
+        await loadStoryList(id);
+      }
+    },
+  );
+
+  return () => subscription.unsubscribe();
 }, []);
 
 async function loadStoryList(currentUserId: string) {
