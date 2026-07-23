@@ -951,7 +951,13 @@ if (!userId) {
 
         </header>
 {isMenuOpen && (
-  <aside className="fixed inset-y-0 left-0 z-50 w-80 border-r border-white/10 bg-neutral-900 p-6 shadow-2xl">
+  <>
+    <div
+      className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+      onClick={() => setIsMenuOpen(false)}
+    />
+
+    <aside className="fixed inset-y-0 left-0 z-50 w-80 max-w-[90vw] border-r border-white/10 bg-neutral-900 p-6 shadow-2xl overflow-y-auto">
     <div className="mb-6 flex items-center justify-between">
       <h2 className="text-xl font-bold text-white">
         NovelForge
@@ -1052,6 +1058,7 @@ if (!userId) {
 </div>
     </div>
   </aside>
+      </>
 )}
 
 {activeTab === "chat" && (
