@@ -233,7 +233,7 @@ const selectedChapter =
     </div>
   </div>
 )}
-    <div className="mb-6 flex flex-wrap gap-3">
+    <div className="sticky top-0 z-20 -mx-4 mb-6 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-inherit px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8">
   <button
     type="button"
     onClick={() => {
