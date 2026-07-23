@@ -251,10 +251,11 @@ const selectedChapter =
     <div className="sticky top-0 z-20 -mx-4 mb-6 flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-inherit px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8">
   <button
     type="button"
-    onClick={() => {
-      setSelectedChapterId(null);
-      setIsEditing(false);
-    }}
+   onClick={() => {
+  setSelectedChapterId(null);
+  setIsEditing(false);
+  setShowReaderSettings(false);
+}}
     className="rounded-lg border border-white/10 px-3 py-2 text-sm"
   >
     ← Back to chapters
