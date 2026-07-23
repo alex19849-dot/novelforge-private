@@ -33,6 +33,10 @@ type ChapterPanelProps = {
   >;
 };
 
+function paginateChapter(content: string): string[] {
+  return [content];
+}
+
 export default function ChapterPanel({
   chapters,
   onSaveChapter,
@@ -626,9 +630,28 @@ export default function ChapterPanel({
                   )}
                 </div>
 
-                {renderChapterContent(
-                  selectedChapter.content,
-                )}
+              {paginateChapter(
+  selectedChapter.content,
+).map((page, index) => (
+  <article
+    key={index}
+    className="h-full w-screen shrink-0 snap-start overflow-hidden"
+    style={{
+      padding:
+        readerWidth === "narrow"
+          ? "32px 38px"
+          : readerWidth === "medium"
+            ? "28px 26px"
+            : "24px 18px",
+      fontFamily:
+        "Georgia, 'Times New Roman', serif",
+      fontSize: `${readerFontSize}px`,
+      lineHeight: readerLineHeight,
+    }}
+  >
+    {renderChapterContent(page)}
+  </article>
+))}
               </article>
             </div>
 
