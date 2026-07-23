@@ -634,11 +634,10 @@ export default function ChapterPanel({
                     </p>
                   )}
                 </div>
-    {renderChapterContent(page)}
-
-))
-              </article>
-            </div>
+   {renderChapterContent(page)}
+  </article>
+))}
+</div>
 
             <footer
               className={`absolute inset-x-0 bottom-0 z-30 flex h-10 items-center justify-center border-t text-xs ${
