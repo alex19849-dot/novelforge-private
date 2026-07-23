@@ -237,6 +237,16 @@ const selectedChapter =
       </p>
     )}
 
+<p className="mb-4 text-sm font-semibold text-red-500">
+  Words:{" "}
+  {
+    selectedChapter.content
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length
+  }
+</p>
+    
     <p
       className={`mt-4 whitespace-pre-wrap ${
         readerTheme === "dark"
