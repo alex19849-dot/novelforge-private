@@ -90,7 +90,7 @@ const selectedChapter =
     Dark
   </button>
 </div>
-              <div className="mb-6 flex items-center gap-3">
+              <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
   <span className="text-sm">Font size</span>
 
   <button
@@ -117,7 +117,7 @@ const selectedChapter =
     A+
   </button>
 </div>
-              <div className="mb-6 flex items-center gap-3">
+              <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
   <span className="text-sm">Line spacing</span>
 
   <button
@@ -149,7 +149,7 @@ const selectedChapter =
   </button>
 </div>
 
-            <div className="mb-6 flex items-center gap-3">
+            <div className="mb-6 flex flex-wrap items-center gap-2 sm:gap-3">
   <span className="text-sm">Width</span>
 
   <button
