@@ -947,15 +947,6 @@ if (!userId) {
                 className="mt-1 w-full max-w-xl border-none bg-transparent text-2xl font-semibold text-white outline-none placeholder:text-neutral-600"
               />
             </div>
-
-            <button
-              type="button"
-              onClick={startNewStory}
-              disabled={isThinking}
-              className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-neutral-300 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              New Story
-            </button>
           </div>
 
         </header>
