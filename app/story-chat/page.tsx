@@ -815,6 +815,65 @@ async function sendLoginLink(
     }
   }
 
+if (!authChecked) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-5 text-white">
+      <p className="text-sm text-neutral-500">
+        Checking login...
+      </p>
+    </main>
+  );
+}
+
+if (!userId) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-5 text-white">
+      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-neutral-900 p-6">
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pink-500">
+          NovelForge
+        </p>
+
+        <h1 className="mt-3 text-2xl font-semibold">
+          Sign in
+        </h1>
+
+        <p className="mt-2 text-sm text-neutral-400">
+          Sign in with the same email on every device to access your stories.
+        </p>
+
+        <form
+          onSubmit={sendLoginLink}
+          className="mt-6 space-y-4"
+        >
+          <input
+            type="email"
+            value={email}
+            onChange={(event) =>
+              setEmail(event.target.value)
+            }
+            placeholder="Email address"
+            autoComplete="email"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
+          />
+
+          <button
+            type="submit"
+            className="w-full rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
+          >
+            Send login link
+          </button>
+        </form>
+
+        {authMessage && (
+          <p className="mt-4 text-sm text-neutral-300">
+            {authMessage}
+          </p>
+        )}
+      </div>
+    </main>
+  );
+}
+  
   if (!hasLoaded || !story) {
     return (
       <main className="min-h-screen bg-neutral-950 text-white">
