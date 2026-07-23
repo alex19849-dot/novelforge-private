@@ -585,7 +585,7 @@ export default function ChapterPanel({
             <div
   ref={readerRef}
   onScroll={calculatePages}
-  className="absolute inset-0 top-14 bottom-10 overflow-y-auto"
+ className="absolute inset-0 top-14 bottom-10 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory"
   style={{
     scrollBehavior: "smooth",
     WebkitOverflowScrolling: "touch",
