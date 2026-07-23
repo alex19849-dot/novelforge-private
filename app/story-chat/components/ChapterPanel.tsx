@@ -38,6 +38,15 @@ export default function ChapterPanel({
   readerWidth,
   setReaderWidth,
 }: ChapterPanelProps) {
+
+const [selectedChapterId, setSelectedChapterId] =
+  useState<string | null>(null);
+
+const selectedChapter =
+  chapters.find(
+    (chapter) => chapter.id === selectedChapterId,
+  ) ?? null;
+  
   return (
           <section className="flex-1 px-5 py-8">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
