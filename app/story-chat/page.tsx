@@ -1123,6 +1123,7 @@ if (!userId) {
   <div className="flex-1 overflow-y-auto px-4 py-5 pb-32 sm:px-6">
     <ChapterPanel
       chapters={chapters}
+      onSaveChapter={updateChapter}
       readerTheme={readerTheme}
       setReaderTheme={setReaderTheme}
       readerFontSize={readerFontSize}
