@@ -628,6 +628,38 @@ if (
     });
   }
 
+async function sendLoginLink(
+  event: FormEvent<HTMLFormElement>,
+) {
+  event.preventDefault();
+
+  const trimmedEmail = email.trim();
+
+  if (!trimmedEmail) {
+    setAuthMessage("Enter your email address.");
+    return;
+  }
+
+  setAuthMessage("Sending login link...");
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email: trimmedEmail,
+    options: {
+      emailRedirectTo: `${window.location.origin}/story-chat`,
+    },
+  });
+
+  if (error) {
+    console.error("Could not send login link:", error);
+    setAuthMessage(error.message);
+    return;
+  }
+
+  setAuthMessage(
+    "Check your email and open the login link.",
+  );
+}
+  
   function restoreDefaultTitle() {
     setStory((currentStory) => {
       if (
