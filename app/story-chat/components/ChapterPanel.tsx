@@ -50,7 +50,12 @@ export default function ChapterPanel({
 
 const [selectedChapterId, setSelectedChapterId] =
   useState<string | null>(null);
-
+const [isEditing, setIsEditing] = useState(false);
+const [editTitle, setEditTitle] = useState("");
+const [editPovCharacter, setEditPovCharacter] =
+  useState("");
+const [editContent, setEditContent] = useState("");
+  
 const selectedChapter =
   chapters.find(
     (chapter) => chapter.id === selectedChapterId,
