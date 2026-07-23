@@ -37,6 +37,10 @@ function paginateChapter(content: string): string[] {
   return [content];
 }
 
+function paginateChapter(content: string): string[] {
+  return [content];
+}
+
 export default function ChapterPanel({
   chapters,
   onSaveChapter,
