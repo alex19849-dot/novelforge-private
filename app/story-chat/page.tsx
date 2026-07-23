@@ -995,6 +995,7 @@ if (!userId) {
     Chat
   </button>
 
+  {story && (
   <button
     type="button"
     onClick={() => {
@@ -1009,6 +1010,7 @@ if (!userId) {
   >
     Story Bible
   </button>
+)}
 </div>
     <div className="mt-6">
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-neutral-500">
