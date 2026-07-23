@@ -181,20 +181,23 @@ const selectedChapter =
 </div>
  </div>
   )}
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
-                Chapters
-              </p>
+              {!selectedChapter && (
+  <>
+    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
+      Chapters
+    </p>
 
-              <h2 className="mt-2 text-2xl font-semibold">
-                {chapters.length === 0
-                  ? "No chapters yet"
-                  : `${chapters.length} ${
-                      chapters.length === 1
-                        ? "chapter"
-                        : "chapters"
-                    }`}
-              </h2>
-
+    <h2 className="mt-2 text-2xl font-semibold">
+      {chapters.length === 0
+        ? "No chapters yet"
+        : `${chapters.length} ${
+            chapters.length === 1
+              ? "chapter"
+              : "chapters"
+          }`}
+    </h2>
+  </>
+)}
               {chapters.length === 0 ? (
                 <p className="mt-3 max-w-2xl leading-7 text-neutral-400">
                   Chapters generated through
