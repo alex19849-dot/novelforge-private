@@ -37,6 +37,7 @@ type ChapterPanelProps = {
 
 export default function ChapterPanel({
   chapters,
+  onSaveChapter,
   readerTheme,
   setReaderTheme,
   readerFontSize,
