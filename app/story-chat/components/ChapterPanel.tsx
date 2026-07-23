@@ -580,17 +580,16 @@ export default function ChapterPanel({
         ) : (
           <>
             <div
-              ref={readerRef}
-              onScroll={calculatePages}
-              onTouchEnd={snapToNearestPage}
-              className="absolute inset-x-0 bottom-10 top-14 overflow-x-auto overflow-y-hidden"
-              style={{
-                scrollBehavior: "smooth",
-                overscrollBehavior: "contain",
-                WebkitOverflowScrolling: "touch",
-                scrollbarWidth: "none",
-              }}
-            >
+  ref={readerRef}
+  onScroll={calculatePages}
+  className="absolute inset-0 top-14 bottom-10 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory"
+  style={{
+    scrollBehavior: "smooth",
+    WebkitOverflowScrolling: "touch",
+    scrollbarWidth: "none",
+    msOverflowStyle: "none",
+  }}
+>
               <article
                 className="h-full"
                 style={{
