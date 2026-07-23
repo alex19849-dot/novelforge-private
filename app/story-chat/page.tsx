@@ -185,6 +185,9 @@ export default function StoryChatPage() {
   const [story, setStory] =
     useState<StoryWorkspace | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+const [authMessage, setAuthMessage] = useState("");
+const [authChecked, setAuthChecked] = useState(false);
   const [hasLoadedRemoteStory, setHasLoadedRemoteStory] =
   useState(false);
   const [input, setInput] = useState("");
