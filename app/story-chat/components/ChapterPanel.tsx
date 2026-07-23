@@ -9,6 +9,14 @@ import type { StoryChapter } from "../types";
 
 type ChapterPanelProps = {
   chapters: StoryChapter[];
+  onSaveChapter: (
+  chapterId: string,
+  updates: {
+    title: string;
+    povCharacter: string;
+    content: string;
+  },
+) => void;
   readerTheme: "light" | "sepia" | "dark";
   setReaderTheme: Dispatch<
     SetStateAction<"light" | "sepia" | "dark">
