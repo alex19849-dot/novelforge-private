@@ -216,135 +216,208 @@ const selectedChapter =
           : "max-w-full"
     }`}
   >
-    <div className="mb-6 flex gap-3">
-  <button
-    type="button"
-    onClick={() => setSelectedChapterId(null)}
-    className="rounded-lg border border-white/10 px-3 py-2 text-sm"
-  >
-    ← Back to chapters
-  </button>
-
-  <button
-    type="button"
-    onClick={() => setIsEditing(true)}
-    className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white"
-  >
-    ✏️ Edit
-  </button>
-</div>
-
-{isEditing && (
-  <div className="mb-6 space-y-4 rounded-xl border border-white/10 bg-black/20 p-4">
-    <div>
-      <label className="mb-2 block text-sm font-semibold text-white">
-        Chapter title
-      </label>
-
-      <input
-        id="chapter-title"
-        name="chapterTitle"
-        type="text"
-        value={editTitle}
-        onChange={(event) =>
-          setEditTitle(event.target.value)
-        }
-        className="w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
-      />
-    </div>
-
-    <div>
-      <label className="mb-2 block text-sm font-semibold text-white">
-        POV character
-      </label>
-
-      <input
-        id="chapter-pov"
-        name="chapterPov"
-        type="text"
-        value={editPovCharacter}
-        onChange={(event) =>
-          setEditPovCharacter(event.target.value)
-        }
-        className="w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
-      />
-    </div>
-
-    <div>
-      <label className="mb-2 block text-sm font-semibold text-white">
-        Chapter content
-      </label>
-
-      <textarea
-        id="chapter-content"
-        name="chapterContent"
-        value={editContent}
-        onChange={(event) =>
-          setEditContent(event.target.value)
-        }
-        rows={24}
-        className="w-full resize-y rounded-xl border border-white/10 bg-neutral-900 px-4 py-4 text-white outline-none focus:border-pink-500"
-        style={{
-          fontSize: `${readerFontSize}px`,
-          lineHeight: readerLineHeight,
+    <div className="mb-6 flex flex-wrap gap-3">
+      <button
+        type="button"
+        onClick={() => {
+          setSelectedChapterId(null);
+          setIsEditing(false);
         }}
-      />
-    </div>
-  </div>
-)}
-    
-    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
-      Chapter {selectedChapter.number}
-    </p>
-
-    <h3
-      className={`mt-2 text-2xl font-bold sm:text-3xl ${
-        readerTheme === "dark"
-          ? "text-white"
-          : "text-black"
-      }`}
-    >
-      {selectedChapter.title ||
-        `Chapter ${selectedChapter.number}`}
-    </h3>
-
-    {selectedChapter.povCharacter && (
-      <p
-        className={`mt-2 text-base italic ${
-          readerTheme === "dark"
-            ? "text-neutral-400"
-            : "text-neutral-700"
-        }`}
+        className="rounded-lg border border-white/10 px-3 py-2 text-sm"
       >
-        POV: {selectedChapter.povCharacter}
-      </p>
-    )}
+        ← Back to chapters
+      </button>
 
-<p className="mb-4 text-sm font-semibold text-red-500">
-  Words:{" "}
-  {
-    selectedChapter.content
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean).length
-  }
-</p>
-    
-    <p
-      className={`mt-4 whitespace-pre-wrap ${
-        readerTheme === "dark"
-          ? "text-neutral-100"
-          : "text-black"
-      }`}
-      style={{
-        fontSize: `${readerFontSize}px`,
-        lineHeight: readerLineHeight,
-      }}
-    >
-      {selectedChapter.content}
-    </p>
+      {!isEditing && (
+        <button
+          type="button"
+          onClick={() => {
+            setEditTitle(selectedChapter.title);
+            setEditPovCharacter(
+              selectedChapter.povCharacter,
+            );
+            setEditContent(selectedChapter.content);
+            setIsEditing(true);
+          }}
+          className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white"
+        >
+          ✏️ Edit
+        </button>
+      )}
+    </div>
+
+    {isEditing ? (
+      <div className="space-y-4">
+        <div>
+          <label
+            htmlFor="chapter-title"
+            className={`mb-2 block text-sm font-semibold ${
+              readerTheme === "dark"
+                ? "text-white"
+                : "text-black"
+            }`}
+          >
+            Chapter title
+          </label>
+
+          <input
+            id="chapter-title"
+            name="chapterTitle"
+            type="text"
+            value={editTitle}
+            onChange={(event) =>
+              setEditTitle(event.target.value)
+            }
+            className="w-full rounded-xl border border-neutral-600 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="chapter-pov"
+            className={`mb-2 block text-sm font-semibold ${
+              readerTheme === "dark"
+                ? "text-white"
+                : "text-black"
+            }`}
+          >
+            POV character
+          </label>
+
+          <input
+            id="chapter-pov"
+            name="chapterPov"
+            type="text"
+            value={editPovCharacter}
+            onChange={(event) =>
+              setEditPovCharacter(event.target.value)
+            }
+            className="w-full rounded-xl border border-neutral-600 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="chapter-content"
+            className={`mb-2 block text-sm font-semibold ${
+              readerTheme === "dark"
+                ? "text-white"
+                : "text-black"
+            }`}
+          >
+            Chapter content
+          </label>
+
+          <textarea
+            id="chapter-content"
+            name="chapterContent"
+            value={editContent}
+            onChange={(event) =>
+              setEditContent(event.target.value)
+            }
+            rows={24}
+            className="w-full resize-y rounded-xl border border-neutral-600 bg-neutral-900 px-4 py-4 text-white outline-none focus:border-pink-500"
+            style={{
+              fontSize: `${readerFontSize}px`,
+              lineHeight: readerLineHeight,
+            }}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              onSaveChapter(selectedChapter.id, {
+                title: editTitle,
+                povCharacter: editPovCharacter,
+                content: editContent,
+              });
+
+              setIsEditing(false);
+            }}
+            className="rounded-xl bg-pink-500 px-5 py-3 font-semibold text-white"
+          >
+            💾 Save
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setEditTitle(selectedChapter.title);
+              setEditPovCharacter(
+                selectedChapter.povCharacter,
+              );
+              setEditContent(selectedChapter.content);
+              setIsEditing(false);
+            }}
+            className={`rounded-xl border px-5 py-3 ${
+              readerTheme === "dark"
+                ? "border-white/10 text-white"
+                : "border-black/20 text-black"
+            }`}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    ) : (
+      <>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
+          Chapter {selectedChapter.number}
+        </p>
+
+        <h3
+          className={`mt-2 text-2xl font-bold sm:text-3xl ${
+            readerTheme === "dark"
+              ? "text-white"
+              : "text-black"
+          }`}
+        >
+          {selectedChapter.title ||
+            `Chapter ${selectedChapter.number}`}
+        </h3>
+
+        {selectedChapter.povCharacter && (
+          <p
+            className={`mt-2 text-base italic ${
+              readerTheme === "dark"
+                ? "text-neutral-400"
+                : "text-neutral-700"
+            }`}
+          >
+            POV: {selectedChapter.povCharacter}
+          </p>
+        )}
+
+        <p className="mb-4 text-sm font-semibold text-red-500">
+          Words:{" "}
+          {
+            selectedChapter.content
+              .trim()
+              .split(/\s+/)
+              .filter(Boolean).length
+          }
+        </p>
+
+        <p
+          className={`mt-4 whitespace-pre-wrap ${
+            readerTheme === "dark"
+              ? "text-neutral-100"
+              : "text-black"
+          }`}
+          style={{
+            fontSize: `${readerFontSize}px`,
+            lineHeight: readerLineHeight,
+          }}
+        >
+          {selectedChapter.content}
+        </p>
+      </>
+    )}
   </article>
 ) : (
+
   <div className="grid gap-3">
     {chapters.map((chapter) => (
       <button
