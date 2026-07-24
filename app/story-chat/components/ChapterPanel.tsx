@@ -104,7 +104,7 @@ export default function ChapterPanel({
   const [editContent, setEditContent] = useState("");
   const [pages, setPages] = useState<string[][]>([[]]);
   const [currentPage, setCurrentPage] = useState(1);
-
+const readerRef = useRef<HTMLDivElement | null>(null);
   const measurementRef = useRef<HTMLDivElement | null>(null);
   const paginationFrameRef = useRef<number | null>(null);
 
