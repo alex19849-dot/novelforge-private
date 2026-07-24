@@ -307,14 +307,14 @@ for (const originalParagraph of getParagraphs(selectedChapter.content)) {
 
     paragraph.remove();
 
-    if (currentBlocks.length > 0) {
-      finishPage();
-      continue;
-    }
-
     const fittingPart = findLargestFittingPart(remaining);
 
     if (!fittingPart) {
+      if (currentBlocks.length > 0) {
+        finishPage();
+        continue;
+      }
+
       const fallbackPart = remaining.slice(0, 1);
 
       currentBlocks.push(fallbackPart);
