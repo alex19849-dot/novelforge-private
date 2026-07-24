@@ -162,6 +162,31 @@ measurement.style.padding = "0";
 measurement.style.fontSize = `${readerFontSize}px`;
 measurement.style.lineHeight = String(readerLineHeight);
 measurement.replaceChildren();
+   const createMeasuredParagraph = (content: string): HTMLParagraphElement => {
+  const paragraph = document.createElement("p");
+
+  paragraph.style.margin = "0 0 1em";
+  paragraph.style.whiteSpace = "pre-wrap";
+  paragraph.style.overflowWrap = "anywhere";
+
+  const messageMatch = content.match(MESSAGE_PATTERN);
+
+  if (messageMatch) {
+    const [, characterName, message] = messageMatch;
+
+    const name = document.createElement("strong");
+    name.textContent = `${characterName}:`;
+
+    const text = document.createElement("em");
+    text.textContent = ` ${message}`;
+
+    paragraph.append(name, text);
+  } else {
+    paragraph.textContent = content;
+  }
+
+  return paragraph;
+}; 
     const charactersPerLine = Math.max(
       20,
       Math.floor(contentWidth / (readerFontSize * 0.56)),
