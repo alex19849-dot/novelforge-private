@@ -137,11 +137,15 @@ export default function ChapterPanel({
       return;
     }
 
-    const padding = getReaderPadding(readerWidth);
-    const contentWidth = Math.max(
-      240,
-      readerWidthPixels - padding.horizontal * 2,
-    );
+   const padding = getReaderPadding(readerWidth, readerWidthPixels);
+
+const contentWidth = Math.max(
+  240,
+  Math.min(
+    readerWidthPixels - padding.horizontal * 2,
+    padding.maxContentWidth - padding.horizontal * 2,
+  ),
+);
     const contentHeight = Math.max(
       240,
       readerHeightPixels - padding.vertical * 2,
