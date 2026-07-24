@@ -672,7 +672,7 @@ const contentWidth = Math.max(
               {pages.map((page, pageIndex) => (
                 <article
                   key={`${selectedChapter.id}-${pageIndex}`}
-                  className="h-full w-full min-w-full shrink-0 snap-start snap-always overflow-x-hidden overflow-y-auto"
+                 className="h-full w-full min-w-full shrink-0 snap-start snap-always overflow-hidden"
                   style={{
                     boxSizing: "border-box",
                     padding: `${padding.vertical}px ${padding.horizontal}px`,
