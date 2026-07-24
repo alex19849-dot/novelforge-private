@@ -187,6 +187,44 @@ measurement.replaceChildren();
 
   return paragraph;
 }; 
+
+    const addMeasuredHeading = () => {
+  const headingWrapper = document.createElement("div");
+  headingWrapper.style.paddingBottom = "24px";
+
+  const chapterLabel = document.createElement("p");
+  chapterLabel.textContent = `Chapter ${selectedChapter.number}`;
+  chapterLabel.style.margin = "0";
+  chapterLabel.style.fontFamily = "Arial, sans-serif";
+  chapterLabel.style.fontSize = "12px";
+  chapterLabel.style.fontWeight = "600";
+  chapterLabel.style.lineHeight = "16px";
+  chapterLabel.style.letterSpacing = "0.2em";
+  chapterLabel.style.textTransform = "uppercase";
+
+  const title = document.createElement("h1");
+  title.textContent =
+    selectedChapter.title || `Chapter ${selectedChapter.number}`;
+  title.style.margin = "12px 0 0";
+  title.style.fontSize = "30px";
+  title.style.fontWeight = "700";
+  title.style.lineHeight = "1.25";
+  title.style.overflowWrap = "anywhere";
+
+  headingWrapper.append(chapterLabel, title);
+
+  if (selectedChapter.povCharacter) {
+    const pov = document.createElement("p");
+    pov.textContent = selectedChapter.povCharacter;
+    pov.style.margin = "8px 0 0";
+    pov.style.fontStyle = "italic";
+
+    headingWrapper.appendChild(pov);
+  }
+
+  measurement.appendChild(headingWrapper);
+};
+    
     const charactersPerLine = Math.max(
       20,
       Math.floor(contentWidth / (readerFontSize * 0.56)),
