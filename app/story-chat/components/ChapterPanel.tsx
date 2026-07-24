@@ -41,18 +41,45 @@ function getParagraphs(content: string): string[] {
     .filter(Boolean);
 }
 
-function getReaderPadding(
+function getReaderLayout(
   width: ChapterPanelProps["readerWidth"],
-): { horizontal: number; vertical: number } {
+  viewportWidth: number,
+): {
+  horizontalPadding: number;
+  verticalPadding: number;
+  maxContentWidth: number;
+} {
+  const isMobile = viewportWidth < 640;
+
+  if (isMobile) {
+    return {
+      horizontalPadding: width === "narrow" ? 28 : width === "medium" ? 20 : 14,
+      verticalPadding: 24,
+      maxContentWidth: viewportWidth,
+    };
+  }
+
   if (width === "narrow") {
-    return { horizontal: 38, vertical: 32 };
+    return {
+      horizontalPadding: 38,
+      verticalPadding: 32,
+      maxContentWidth: 720,
+    };
   }
 
   if (width === "medium") {
-    return { horizontal: 26, vertical: 28 };
+    return {
+      horizontalPadding: 32,
+      verticalPadding: 28,
+      maxContentWidth: 780,
+    };
   }
 
-  return { horizontal: 18, vertical: 24 };
+  return {
+    horizontalPadding: 28,
+    verticalPadding: 24,
+    maxContentWidth: 850,
+  };
 }
 
 export default function ChapterPanel({
