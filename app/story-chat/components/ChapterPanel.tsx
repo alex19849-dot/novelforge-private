@@ -160,10 +160,10 @@ const contentWidth = Math.max(
         contentHeight / (readerFontSize * readerLineHeight),
       ),
     );
-    const normalPageLimit = Math.max(
-      350,
-      Math.floor(charactersPerLine * linesPerPage * 0.82),
-    );
+   const normalPageLimit = Math.max(
+  350,
+  Math.floor(charactersPerLine * linesPerPage * 1.18),
+);
 
     let currentBlocks: string[] = [];
     let currentLength = 0;
