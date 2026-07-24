@@ -1,6 +1,4 @@
-import type {
-  StoryIntent,
-} from "../../src/lib/detect-story-intent";
+import type { StoryIntent } from "../../src/lib/detect-story-intent";
 
 export type ActiveTab = "chat" | "chapters" | "bible";
 
@@ -8,77 +6,112 @@ export type ChatRole = "user" | "assistant";
 
 export type ChatMessage = {
   id: number;
+
   role: ChatRole;
+
   content: string;
 };
 
 export type StoryBible = {
   premise: string;
+
   relationship: string;
+
   subgenre: string;
+
   setting: string;
+
   pov: string;
+
   heatLevel: string;
+
   burnPacing: string;
+
   tropes: string[];
+
   characters: string[];
+
   notes: string[];
 };
 
 export type StoryChapter = {
   id: string;
+
   number: number;
+
   title: string;
+
   povCharacter: string;
+
   content: string;
+
   createdAt: string;
+
   updatedAt: string;
 };
 
 export type StoryState = {
   importantFacts: string[];
+
   characterStates: string[];
+
   relationshipStates: string[];
+
   unresolvedThreads: string[];
+
   timeline: string[];
+
   locations: string[];
+
   activePOV: string;
 };
 
 export type StoryWorkspace = {
   id: string;
+
   title: string;
+
   seriesType: "standalone" | "series";
+
   seriesTitle: string;
+
   bookNumber: number;
+
   messages: ChatMessage[];
+
   chapters: StoryChapter[];
+
   storyBible: StoryBible;
+
   storyState: StoryState;
+
   createdAt: string;
+
   updatedAt: string;
 };
 
 export type StoryChatRequest = {
   story: StoryWorkspace;
 };
- 
+
 export type GeneratedChapter = {
   title: string;
+
   povCharacter: string;
+
   content: string;
+
   replaceChapterNumber: number | null;
 };
 
 export type StoryChatResponse = {
   reply: string;
+
   intent: StoryIntent;
-  storyBible: StoryBible;
-  storyState: StoryState;
+
+  story: StoryWorkspace;
+
   generatedChapter: GeneratedChapter | null;
-  chapters?: StoryChapter[];
-  timeline?: unknown[];
-  world?: Record<string, unknown>;
-  notes?: string[];
+
   chapterBrief: string;
 };
