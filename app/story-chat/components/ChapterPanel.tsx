@@ -227,81 +227,101 @@ measurement.replaceChildren();
   measurement.appendChild(headingWrapper);
 };
     
-    const charactersPerLine = Math.max(
-      20,
-      Math.floor(contentWidth / (readerFontSize * 0.56)),
-    );
-    const linesPerPage = Math.max(
-      8,
-      Math.floor(
-        contentHeight / (readerFontSize * readerLineHeight),
-      ),
-    );
-   const normalPageLimit = Math.max(
-  350,
-  Math.floor(charactersPerLine * linesPerPage * 1.18),
-);
+   const nextPages: string[][] = [];
+let currentBlocks: string[] = [];
 
-    let currentBlocks: string[] = [];
-    let currentLength = 0;
-    const nextPages: string[][] = [];
+const resetMeasurementPage = () => {
+  measurement.replaceChildren();
 
-    const finishPage = () => {
-      nextPages.push(currentBlocks);
-      currentBlocks = [];
-      currentLength = 0;
-    };
+  if (nextPages.length === 0) {
+    addMeasuredHeading();
+  }
 
-    for (const originalParagraph of getParagraphs(selectedChapter.content)) {
-      let remaining = originalParagraph;
+  for (const block of currentBlocks) {
+    measurement.appendChild(createMeasuredParagraph(block));
+  }
+};
 
-      while (remaining) {
-        const pageLimit =
-  nextPages.length === 0
-    ? Math.max(220, normalPageLimit - 180)
-    : normalPageLimit;
-        const paragraphSpacing =
-          currentBlocks.length === 0 ? 0 : readerFontSize * 2;
-        const available =
-          pageLimit - currentLength - paragraphSpacing;
+const finishPage = () => {
+  nextPages.push(currentBlocks);
+  currentBlocks = [];
+  resetMeasurementPage();
+};
 
-        if (available <= 0) {
-          finishPage();
-          continue;
-        }
+const findLargestFittingPart = (text: string): string => {
+  const words = text.split(/\s+/).filter(Boolean);
 
-        if (remaining.length <= available) {
-          currentBlocks.push(remaining);
-          currentLength += paragraphSpacing + remaining.length;
-          remaining = "";
-          continue;
-        }
+  let low = 1;
+  let high = words.length;
+  let best = "";
 
-        if (currentBlocks.length > 0) {
-          finishPage();
-          continue;
-        }
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const candidate = words.slice(0, middle).join(" ");
 
-        let splitAt = remaining.lastIndexOf(" ", available);
+    const paragraph = createMeasuredParagraph(candidate);
+    measurement.appendChild(paragraph);
 
-        if (splitAt < 1) {
-          splitAt = Math.min(available, remaining.length);
-        }
+    const fits = !measurementOverflows();
 
-        const pagePart = remaining.slice(0, splitAt).trimEnd();
-        currentBlocks.push(pagePart);
-        currentLength += pagePart.length;
-        remaining = remaining.slice(splitAt).trimStart();
+    paragraph.remove();
 
-        if (remaining) {
-          finishPage();
-        }
-      }
+    if (fits) {
+      best = candidate;
+      low = middle + 1;
+    } else {
+      high = middle - 1;
+    }
+  }
+
+  return best;
+};
+
+resetMeasurementPage();
+
+for (const originalParagraph of getParagraphs(selectedChapter.content)) {
+  let remaining = originalParagraph;
+
+  while (remaining) {
+    const paragraph = createMeasuredParagraph(remaining);
+    measurement.appendChild(paragraph);
+
+    if (!measurementOverflows()) {
+      currentBlocks.push(remaining);
+      remaining = "";
+      continue;
     }
 
-    if (currentBlocks.length > 0 || nextPages.length === 0) {
-      nextPages.push(currentBlocks);
+    paragraph.remove();
+
+    if (currentBlocks.length > 0) {
+      finishPage();
+      continue;
     }
+
+    const fittingPart = findLargestFittingPart(remaining);
+
+    if (!fittingPart) {
+      const fallbackPart = remaining.slice(0, 1);
+
+      currentBlocks.push(fallbackPart);
+      remaining = remaining.slice(1).trimStart();
+      finishPage();
+      continue;
+    }
+
+    currentBlocks.push(fittingPart);
+    remaining = remaining.slice(fittingPart.length).trimStart();
+
+    if (remaining) {
+      finishPage();
+    }
+  }
+}
+
+if (currentBlocks.length > 0 || nextPages.length === 0) {
+  nextPages.push(currentBlocks);
+}
 
     setPages(nextPages);
     setCurrentPage(1);
