@@ -1775,24 +1775,6 @@ Do not finish below ${minimumWordCount} words.
 
 chapterText = await generateWithAion(writingPrompt);
 
-const generatedWordCount = countWords(chapterText);
-
-if (generatedWordCount < retryThreshold) {
-  chapterText = await generateWithAion(`
-${writingPrompt}
-
-Your previous version was only ${generatedWordCount} words and was incomplete.
-
-Rewrite the entire chapter from the beginning.
-
-The complete replacement chapter must be between ${minimumWordCount} and ${maximumWordCount} words.
-
-Do not continue from the previous ending.
-
-Return only the complete replacement chapter.
-`);
-}
-
       if (!chapterText.trim()) {
         throw new Error("The writing model returned no chapter content.");
       }
