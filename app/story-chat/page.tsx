@@ -988,27 +988,42 @@ device.`,
         throw new Error("The API returned an invalid story response.");
       }
 
-      setStory((currentStory) => {
-        if (!currentStory) {
-          return data.story;
-        }
+     const mergedStory = {
+  ...story,
+  ...data.story,
+  messages: data.story.messages,
+  chapters: data.story.chapters,
+  storyBible: data.story.storyBible,
+  storyState: data.story.storyState,
+  updatedAt: data.story.updatedAt,
+};
 
-        return {
-          ...currentStory,
+setStory(mergedStory);
 
-          ...data.story,
+localStorage.setItem(
+  "novelforge-current-story",
+  JSON.stringify(mergedStory),
+);
 
-          messages: data.story.messages,
+if (userId) {
+  const { error: saveError } = await supabase.from("stories").upsert({
+    id: mergedStory.id,
+    user_id: userId,
+    title: mergedStory.title,
+    form: mergedStory.storyBible,
+    story_state: mergedStory.storyState,
+    chapters: mergedStory.chapters,
+    messages: mergedStory.messages,
+    created_at: mergedStory.createdAt,
+    updated_at: mergedStory.updatedAt,
+  });
 
-          chapters: data.story.chapters,
-
-          storyBible: data.story.storyBible,
-
-          storyState: data.story.storyState,
-
-          updatedAt: data.story.updatedAt,
-        };
-      });
+  if (saveError) {
+    console.error("Could not save completed story:", saveError);
+  } else {
+    await loadStoryList(userId);
+  }
+}
     } catch (error) {
       console.error(
         "Story chat request failed:",
