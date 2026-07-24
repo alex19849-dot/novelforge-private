@@ -41,43 +41,43 @@ function getParagraphs(content: string): string[] {
     .filter(Boolean);
 }
 
-function getReaderLayout(
+function getReaderPadding(
   width: ChapterPanelProps["readerWidth"],
-  viewportWidth: number,
+  viewportWidth = 0,
 ): {
-  horizontalPadding: number;
-  verticalPadding: number;
+  horizontal: number;
+  vertical: number;
   maxContentWidth: number;
 } {
-  const isMobile = viewportWidth < 640;
+  const isMobile = viewportWidth > 0 && viewportWidth < 640;
 
   if (isMobile) {
     return {
-      horizontalPadding: width === "narrow" ? 28 : width === "medium" ? 20 : 14,
-      verticalPadding: 24,
+      horizontal: width === "narrow" ? 28 : width === "medium" ? 20 : 14,
+      vertical: 24,
       maxContentWidth: viewportWidth,
     };
   }
 
   if (width === "narrow") {
     return {
-      horizontalPadding: 38,
-      verticalPadding: 32,
+      horizontal: 38,
+      vertical: 32,
       maxContentWidth: 720,
     };
   }
 
   if (width === "medium") {
     return {
-      horizontalPadding: 32,
-      verticalPadding: 28,
+      horizontal: 32,
+      vertical: 28,
       maxContentWidth: 780,
     };
   }
 
   return {
-    horizontalPadding: 28,
-    verticalPadding: 24,
+    horizontal: 28,
+    vertical: 24,
     maxContentWidth: 850,
   };
 }
