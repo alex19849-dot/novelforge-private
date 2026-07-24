@@ -26,27 +26,7 @@ async function generateWithAion(prompt: string) {
   const response = await openrouter.chat.completions.create({
     model: "aion-labs/aion-3.0-mini",
 
-    messages: [
-  {
-    role: "system",
-    content: `You write complete commercial novel chapters.
-
-Follow the user's requested word count strictly.
-
-When asked for 1,000 words, write between 950 and 1,100 words.
-
-When asked for 2,000 words, write between 1,950 and 2,100 words.
-
-When asked for 3,000 words, write between 2,950 and 3,100 words.
-
-When asked for 4,000 words, write between 3,950 and 4,100 words.
-
-Never return an excerpt, preview, sample, summary, outline, or partial chapter.
-
-The chapter must contain a complete beginning, middle, and ending or deliberate chapter-ending hook.
-
-Do not stop early.`,
-  },
+  messages: [
   {
     role: "user",
     content: prompt,
