@@ -180,9 +180,9 @@ const contentWidth = Math.max(
 
       while (remaining) {
         const pageLimit =
-          nextPages.length === 0
-            ? Math.max(220, normalPageLimit - 320)
-            : normalPageLimit;
+  nextPages.length === 0
+    ? Math.max(220, normalPageLimit - 180)
+    : normalPageLimit;
         const paragraphSpacing =
           currentBlocks.length === 0 ? 0 : readerFontSize * 2;
         const available =
