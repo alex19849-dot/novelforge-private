@@ -670,17 +670,24 @@ const contentWidth = Math.max(
               }}
             >
               {pages.map((page, pageIndex) => (
-                <article
-                  key={`${selectedChapter.id}-${pageIndex}`}
-                 className="h-full w-full min-w-full shrink-0 snap-start snap-always overflow-hidden"
-                  style={{
-                    boxSizing: "border-box",
-                    padding: `${padding.vertical}px ${padding.horizontal}px`,
-                    fontFamily: "Georgia, 'Times New Roman', serif",
-                    fontSize: `${readerFontSize}px`,
-                    lineHeight: readerLineHeight,
-                  }}
-                >
+               <article
+  key={`${selectedChapter.id}-${pageIndex}`}
+  className="h-full w-full min-w-full shrink-0 snap-start snap-always overflow-hidden"
+  style={{
+    boxSizing: "border-box",
+    padding: `${padding.vertical}px ${padding.horizontal}px`,
+    fontFamily: "Georgia, 'Times New Roman', serif",
+    fontSize: `${readerFontSize}px`,
+    lineHeight: readerLineHeight,
+  }}
+>
+  <div
+    style={{
+      width: "100%",
+      maxWidth: `${padding.maxContentWidth}px`,
+      margin: "0 auto",
+    }}
+  >
                   {pageIndex === 0 && (
                     <div className="pb-6">
                       <p className="text-xs font-semibold uppercase leading-4 tracking-[0.2em] text-pink-500">
@@ -704,6 +711,7 @@ const contentWidth = Math.max(
                       `${pageIndex}-${paragraphIndex}`,
                     ),
                   )}
+      </div>
                 </article>
               ))}
 
