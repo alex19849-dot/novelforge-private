@@ -33,7 +33,7 @@ async function generateWithAion(prompt: string) {
   },
 ],
 
-    max_tokens: 5000,
+    max_tokens: 8000,
   });
 
   const content = response.choices[0]?.message?.content?.trim();
@@ -43,6 +43,22 @@ async function generateWithAion(prompt: string) {
   }
 
   return content;
+}
+
+function getRequestedWordCount(message: string): number | null {
+  const match = message.match(/\b(\d{3,5})\s*words?\b/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const wordCount = Number(match[1]);
+
+  return Number.isFinite(wordCount) ? wordCount : null;
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 const EMPTY_STORY_BIBLE: StoryBible = {
@@ -1708,7 +1724,22 @@ Write commercially publishable fiction.
 
       const recentChapters = currentStory.chapters.slice(-3);
 
-      chapterText = await generateWithAion(`
+    const explicitlyRequestedWordCount =
+  getRequestedWordCount(latestUserMessage);
+
+const minimumWordCount = explicitlyRequestedWordCount
+  ? Math.floor(explicitlyRequestedWordCount * 0.95)
+  : 3000;
+
+const maximumWordCount = explicitlyRequestedWordCount
+  ? Math.ceil(explicitlyRequestedWordCount * 1.1)
+  : 4000;
+
+const retryThreshold = explicitlyRequestedWordCount
+  ? Math.floor(explicitlyRequestedWordCount * 0.9)
+  : 2800;
+
+const writingPrompt = `
 
 ${AION_WRITER_PROMPT}
 
@@ -1732,7 +1763,35 @@ LATEST USER REQUEST:
 
 ${latestUserMessage}
 
+MANDATORY CHAPTER LENGTH:
+
+Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} words.
+
+Do not return an excerpt, preview, shortened version, partial scene, outline, or summary.
+
+Do not finish below ${minimumWordCount} words.
+
+`;
+
+chapterText = await generateWithAion(writingPrompt);
+
+const generatedWordCount = countWords(chapterText);
+
+if (generatedWordCount < retryThreshold) {
+  chapterText = await generateWithAion(`
+${writingPrompt}
+
+Your previous version was only ${generatedWordCount} words and was incomplete.
+
+Rewrite the entire chapter from the beginning.
+
+The complete replacement chapter must be between ${minimumWordCount} and ${maximumWordCount} words.
+
+Do not continue from the previous ending.
+
+Return only the complete replacement chapter.
 `);
+}
 
       if (!chapterText.trim()) {
         throw new Error("The writing model returned no chapter content.");
