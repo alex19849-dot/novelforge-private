@@ -1735,10 +1735,6 @@ const maximumWordCount = explicitlyRequestedWordCount
   ? Math.ceil(explicitlyRequestedWordCount * 1.1)
   : 4000;
 
-const retryThreshold = explicitlyRequestedWordCount
-  ? Math.floor(explicitlyRequestedWordCount * 0.9)
-  : 2800;
-
 const writingPrompt = `
 
 ${AION_WRITER_PROMPT}
