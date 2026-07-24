@@ -189,6 +189,8 @@ measurement.replaceChildren();
 }; 
 
     const addMeasuredHeading = () => {
+  const measurementOverflows = (): boolean =>
+  measurement.scrollHeight > measurement.clientHeight + 1;
   const headingWrapper = document.createElement("div");
   headingWrapper.style.paddingBottom = "24px";
 
