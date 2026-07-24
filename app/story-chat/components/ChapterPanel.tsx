@@ -583,6 +583,22 @@ const contentWidth = Math.max(
           </div>
         )}
 
+<div
+  ref={measurementRef}
+  aria-hidden="true"
+  className="pointer-events-none absolute left-[-99999px] top-0 overflow-hidden"
+  style={{
+    width: "780px",
+    height: "600px",
+    padding: "28px 32px",
+    boxSizing: "border-box",
+    fontFamily: "Georgia, 'Times New Roman', serif",
+    fontSize: `${readerFontSize}px`,
+    lineHeight: readerLineHeight,
+    visibility: "hidden",
+  }}
+/>
+        
         {isEditing ? (
           <div className="absolute inset-x-0 bottom-0 top-14 overflow-y-auto p-4">
             <div className="mx-auto max-w-4xl space-y-4 pb-10">
