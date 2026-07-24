@@ -1119,11 +1119,28 @@ export async function POST(request: Request) {
     }
 
     const intentInstruction: Record<typeof intent, string> = {
-      create_story: `Create a brand new story from the user's request. Generate a complete
-story title, complete story bible, and opening chapter. Every Story
-Bible scalar field must be populated, with useful tropes and character
-entries. Do not reuse, modify, or merge with the current story
-workspace.`,
+     create_story: `Create a brand new story from the user's request.
+
+Generate:
+- a specific commercial story title
+- a fully populated Story Bible
+- complete metadata for the opening chapter
+
+Never leave any Story Bible field blank.
+
+If the user has not supplied a setting, choose an appropriate specific setting.
+
+If the user has not supplied character names or descriptions, create distinct named adult main characters with ages, appearances, personalities, roles, motivations and relationship conflicts.
+
+Populate premise, relationship, subgenre, setting, pov, heatLevel and burnPacing.
+
+Return at least two useful tropes, at least two fully described named adult characters and useful planning notes.
+
+All romantic and sexual characters must be consenting adults aged 18 or older.
+
+Make sensible creative decisions from the user's request instead of returning empty fields.
+
+Do not reuse, modify or merge with the current story workspace.`,
 
       continue_story: `Continue the existing story by writing the next chapter only. Update
 the story bible only if genuinely necessary to preserve continuity. Do
