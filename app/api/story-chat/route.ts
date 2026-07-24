@@ -967,9 +967,12 @@ Merge equivalent terms into one clean entry.
 When the user explicitly changes an established choice, use the new
 choice.
 
-When information is uncertain, do not invent it.
+For an existing story, when information is genuinely uncertain, preserve the
+existing value and do not invent contradictory details.
 
-Leave genuinely unknown scalar fields as empty strings.
+For create_story only, never leave required Story Bible fields blank. If the
+user has not supplied a required detail, make a sensible commercial-fiction
+choice that fits their request.
 
 Keep notes concise, factual and useful for future writing.
 
