@@ -150,6 +150,18 @@ const contentWidth = Math.max(
       240,
       readerHeightPixels - padding.vertical * 2,
     );
+    const measurement = measurementRef.current;
+
+if (!measurement) {
+  return;
+}
+
+measurement.style.width = `${contentWidth}px`;
+measurement.style.height = `${contentHeight}px`;
+measurement.style.padding = "0";
+measurement.style.fontSize = `${readerFontSize}px`;
+measurement.style.lineHeight = String(readerLineHeight);
+measurement.replaceChildren();
     const charactersPerLine = Math.max(
       20,
       Math.floor(contentWidth / (readerFontSize * 0.56)),
