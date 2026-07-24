@@ -104,7 +104,12 @@ export default function ChapterPanel({
   const [editContent, setEditContent] = useState("");
   const [pages, setPages] = useState<string[][]>([[]]);
   const [currentPage, setCurrentPage] = useState(1);
-const readerRef = useRef<HTMLDivElement | null>(null);
+  const [pageMetrics, setPageMetrics] = useState({
+    horizontalPadding: 32,
+    verticalPadding: 28,
+    contentWidth: 716,
+  });
+  const readerRef = useRef<HTMLDivElement | null>(null);
   const measurementRef = useRef<HTMLDivElement | null>(null);
   const paginationFrameRef = useRef<number | null>(null);
 
@@ -152,17 +157,27 @@ const contentWidth = Math.max(
     );
     const measurement = measurementRef.current;
 
-if (!measurement) {
-  return;
-}
+    if (!measurement) {
+      return;
+    }
 
-measurement.style.width = `${contentWidth}px`;
-measurement.style.height = `${contentHeight}px`;
-measurement.style.padding = "0";
-measurement.style.fontSize = `${readerFontSize}px`;
-measurement.style.lineHeight = String(readerLineHeight);
-measurement.replaceChildren();
-   const createMeasuredParagraph = (content: string): HTMLParagraphElement => {
+    setPageMetrics({
+      horizontalPadding: padding.horizontal,
+      verticalPadding: padding.vertical,
+      contentWidth,
+    });
+
+    measurement.style.width = `${contentWidth}px`;
+    measurement.style.height = `${contentHeight}px`;
+    measurement.style.padding = "0";
+    measurement.style.fontSize = `${readerFontSize}px`;
+    measurement.style.lineHeight = String(readerLineHeight);
+    measurement.replaceChildren();
+
+    const measurementOverflows = (): boolean =>
+      measurement.scrollHeight > measurement.clientHeight + 1;
+
+    const createMeasuredParagraph = (content: string): HTMLParagraphElement => {
   const paragraph = document.createElement("p");
 
   paragraph.style.margin = "0 0 1em";
@@ -189,8 +204,6 @@ measurement.replaceChildren();
 }; 
 
     const addMeasuredHeading = () => {
-  const measurementOverflows = (): boolean =>
-  measurement.scrollHeight > measurement.clientHeight + 1;
   const headingWrapper = document.createElement("div");
   headingWrapper.style.paddingBottom = "24px";
 
@@ -504,8 +517,6 @@ if (currentBlocks.length > 0 || nextPages.length === 0) {
   }
 
   if (selectedChapter) {
-    const padding = getReaderPadding(readerWidth);
-
     return (
       <div
         className={`fixed inset-0 z-[2147483647] isolate h-[100dvh] w-screen overflow-hidden ${themeClasses}`}
@@ -788,7 +799,7 @@ if (currentBlocks.length > 0 || nextPages.length === 0) {
   className="h-full w-full min-w-full shrink-0 snap-start snap-always overflow-hidden"
   style={{
     boxSizing: "border-box",
-    padding: `${padding.vertical}px ${padding.horizontal}px`,
+    padding: `${pageMetrics.verticalPadding}px ${pageMetrics.horizontalPadding}px`,
     fontFamily: "Georgia, 'Times New Roman', serif",
     fontSize: `${readerFontSize}px`,
     lineHeight: readerLineHeight,
@@ -796,8 +807,8 @@ if (currentBlocks.length > 0 || nextPages.length === 0) {
 >
   <div
     style={{
-      width: "100%",
-      maxWidth: `${padding.maxContentWidth}px`,
+      width: `${pageMetrics.contentWidth}px`,
+      maxWidth: "100%",
       margin: "0 auto",
     }}
   >
