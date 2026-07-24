@@ -1704,14 +1704,10 @@ Write commercially publishable fiction.
       throw new Error("The model returned an incomplete story bible.");
     }
 
-    const mergedStoryBible =
-      intent === "create_story"
-        ? returnedBible
-        : mergeStoryBible(
-            sanitiseStoryBible(currentStory.storyBible),
-
-            returnedBible,
-          );
+  const mergedStoryBible = mergeStoryBible(
+  sanitiseStoryBible(currentStory.storyBible),
+  returnedBible,
+);
 
     const storyTitle =
       returnedTitle || cleanString(currentStory.title) || "Untitled story";
