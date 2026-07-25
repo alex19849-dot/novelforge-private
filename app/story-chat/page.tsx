@@ -235,15 +235,15 @@ function isStoryChatResponse(value: unknown): value is StoryChatResponse {
 function hasStoryBibleContent(storyBible: StoryBible): boolean {
   return Boolean(
     storyBible.premise.trim() ||
-      storyBible.relationship.trim() ||
-      storyBible.subgenre.trim() ||
-      storyBible.setting.trim() ||
-      storyBible.pov.trim() ||
-      storyBible.heatLevel.trim() ||
-      storyBible.burnPacing.trim() ||
-      storyBible.tropes.length ||
-      storyBible.characters.length ||
-      storyBible.notes.length,
+    storyBible.relationship.trim() ||
+    storyBible.subgenre.trim() ||
+    storyBible.setting.trim() ||
+    storyBible.pov.trim() ||
+    storyBible.heatLevel.trim() ||
+    storyBible.burnPacing.trim() ||
+    storyBible.tropes.length ||
+    storyBible.characters.length ||
+    storyBible.notes.length,
   );
 }
 
@@ -269,6 +269,8 @@ export default function StoryChatPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const [readerOpen, setReaderOpen] = useState(false);
 
   const [stories, setStories] = useState<
     {
@@ -439,6 +441,8 @@ export default function StoryChatPage() {
 
     setActiveTab("chapters");
 
+    setReaderOpen((data.chapters ?? []).length > 0);
+
     setIsMenuOpen(false);
   }
 
@@ -462,6 +466,8 @@ export default function StoryChatPage() {
     setInput("");
 
     setActiveTab("chat");
+
+    setReaderOpen(false);
 
     setIsThinking(false);
 
@@ -988,42 +994,42 @@ device.`,
         throw new Error("The API returned an invalid story response.");
       }
 
-     const mergedStory = {
-  ...story,
-  ...data.story,
-  messages: data.story.messages,
-  chapters: data.story.chapters,
-  storyBible: data.story.storyBible,
-  storyState: data.story.storyState,
-  updatedAt: data.story.updatedAt,
-};
+      const mergedStory = {
+        ...story,
+        ...data.story,
+        messages: data.story.messages,
+        chapters: data.story.chapters,
+        storyBible: data.story.storyBible,
+        storyState: data.story.storyState,
+        updatedAt: data.story.updatedAt,
+      };
 
-setStory(mergedStory);
+      setStory(mergedStory);
 
-localStorage.setItem(
-  "novelforge-current-story",
-  JSON.stringify(mergedStory),
-);
+      localStorage.setItem(
+        "novelforge-current-story",
+        JSON.stringify(mergedStory),
+      );
 
-if (userId) {
-  const { error: saveError } = await supabase.from("stories").upsert({
-    id: mergedStory.id,
-    user_id: userId,
-    title: mergedStory.title,
-    form: mergedStory.storyBible,
-    story_state: mergedStory.storyState,
-    chapters: mergedStory.chapters,
-    messages: mergedStory.messages,
-    created_at: mergedStory.createdAt,
-    updated_at: mergedStory.updatedAt,
-  });
+      if (userId) {
+        const { error: saveError } = await supabase.from("stories").upsert({
+          id: mergedStory.id,
+          user_id: userId,
+          title: mergedStory.title,
+          form: mergedStory.storyBible,
+          story_state: mergedStory.storyState,
+          chapters: mergedStory.chapters,
+          messages: mergedStory.messages,
+          created_at: mergedStory.createdAt,
+          updated_at: mergedStory.updatedAt,
+        });
 
-  if (saveError) {
-    console.error("Could not save completed story:", saveError);
-  } else {
-    await loadStoryList(userId);
-  }
-}
+        if (saveError) {
+          console.error("Could not save completed story:", saveError);
+        } else {
+          await loadStoryList(userId);
+        }
+      }
     } catch (error) {
       console.error(
         "Story chat request failed:",
@@ -1231,6 +1237,8 @@ transition ${
                     onClick={() => {
                       setActiveTab("chapters");
 
+                      setReaderOpen(chapters.length > 0);
+
                       setIsMenuOpen(false);
                     }}
                     className={`w-full rounded-xl px-4 py-3 text-left font-semibold
@@ -1334,7 +1342,14 @@ hover:text-red-300"
         {activeTab === "chapters" && (
           <div className="flex-1 overflow-y-auto px-4 py-5 pb-32 sm:px-6">
             <ChapterPanel
+              storyId={story.id}
+              storyTitle={storyTitle}
               chapters={chapters}
+              readerOpen={readerOpen}
+              onCloseReader={() => {
+                setReaderOpen(false);
+                setIsMenuOpen(true);
+              }}
               onSaveChapter={updateChapter}
               readerTheme={readerTheme}
               setReaderTheme={setReaderTheme}
