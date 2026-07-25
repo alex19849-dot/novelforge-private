@@ -1145,9 +1145,9 @@ justify-center px-5"
   const bibleHasContent = hasStoryBibleContent(storyBible);
 
   return (
-    <main className="min-h-screen bg-neutral-950 text-white">
-      <div className="mx-auto flex min-h-screen max-w-5xl flex-col">
-        <header className="border-b border-white/10 px-5 py-5">
+    <main className="h-[100dvh] overflow-hidden bg-neutral-950 text-white">
+      <div className="mx-auto flex h-full min-h-0 max-w-5xl flex-col">
+        <header className="z-30 shrink-0 border-b border-white/10 bg-neutral-950/95 px-5 py-5 backdrop-blur">
           <div className="flex items-center justify-between gap-4">
             <button
               type="button"
@@ -1372,7 +1372,7 @@ hover:text-red-300"
 
         {activeTab === "chat" && (
           <footer
-            className="sticky bottom-0 border-t border-white/10
+            className="shrink-0 border-t border-white/10
 bg-neutral-950/95 px-5 py-5 backdrop-blur"
           >
             <form onSubmit={sendMessage} className="flex items-end gap-3">
