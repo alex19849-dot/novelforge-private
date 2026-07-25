@@ -5,28 +5,21 @@ type ChatPanelProps = {
   isThinking: boolean;
 };
 
-export default function ChatPanel({
-  messages,
-  isThinking,
-}: ChatPanelProps) {
+export default function ChatPanel({ messages, isThinking }: ChatPanelProps) {
   return (
-    <section className="flex-1 space-y-6 overflow-y-auto px-5 py-8">
+    <section className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-8">
       {messages.map((message) => {
         const isUser = message.role === "user";
 
         return (
           <div
             key={message.id}
-            className={`flex ${
-              isUser ? "justify-end" : "justify-start"
-            }`}
+            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div className="max-w-[85%]">
               <p
                 className={`mb-2 text-xs font-semibold uppercase tracking-wider ${
-                  isUser
-                    ? "text-right text-neutral-500"
-                    : "text-pink-500"
+                  isUser ? "text-right text-neutral-500" : "text-pink-500"
                 }`}
               >
                 {isUser ? "You" : "NovelForge"}
