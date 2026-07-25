@@ -1785,24 +1785,59 @@ Do not finish below ${minimumWordCount} words.
 
 `;
 
-chapterText = await generateWithAion(writingPrompt);
+      chapterText = await generateWithAion(writingPrompt);
 
       let generatedWordCount = countWords(chapterText);
+      let continuationAttempts = 0;
 
-      if (generatedWordCount < minimumWordCount) {
-        const retryPrompt = `${writingPrompt}
+      while (
+        generatedWordCount < minimumWordCount &&
+        continuationAttempts < 3
+      ) {
+        const wordsStillNeeded = minimumWordCount - generatedWordCount;
+        const continuationTarget = Math.min(
+          1800,
+          Math.max(800, wordsStillNeeded + 250),
+        );
+        const continuationPrompt = `
 
-IMPORTANT RETRY:
+You are continuing an incomplete commercial novel chapter.
 
-Your previous response contained only ${generatedWordCount} words and was incomplete.
+Return only new prose that continues directly after the final sentence
+of the existing chapter below.
 
-Write the entire chapter now. Return only the complete chapter prose.
+Do not repeat or rewrite any existing prose.
 
-The final response must contain between ${minimumWordCount} and ${maximumWordCount} words.
+Do not repeat the chapter heading.
+
+Do not add commentary, an outline, a summary, or markdown.
+
+Maintain the same first-person POV, voice, tense, continuity, pacing,
+characterisation, and scene.
+
+Complete the remaining chapter arc and end at the hook required by the
+chapter brief.
+
+Write approximately ${continuationTarget} new words.
+
+CHAPTER BRIEF:
+
+${chapterBrief}
+
+EXISTING INCOMPLETE CHAPTER:
+
+${chapterText}
 `;
 
-        chapterText = await generateWithAion(retryPrompt);
+        const continuation = await generateWithAion(continuationPrompt);
+
+        if (!continuation.trim()) {
+          break;
+        }
+
+        chapterText = `${chapterText.trim()}\n\n${continuation.trim()}`;
         generatedWordCount = countWords(chapterText);
+        continuationAttempts += 1;
       }
 
       if (generatedWordCount < minimumWordCount) {
@@ -1947,4 +1982,3 @@ The final response must contain between ${minimumWordCount} and ${maximumWordCou
     );
   }
 }
-
