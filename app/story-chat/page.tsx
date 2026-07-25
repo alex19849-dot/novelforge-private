@@ -1364,10 +1364,12 @@ hover:text-red-300"
         )}
 
         {activeTab === "bible" && (
-          <BiblePanel
-            storyBible={storyBible}
-            bibleHasContent={bibleHasContent}
-          />
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <BiblePanel
+              storyBible={storyBible}
+              bibleHasContent={bibleHasContent}
+            />
+          </div>
         )}
 
         {activeTab === "chat" && (
