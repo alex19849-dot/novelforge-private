@@ -12,6 +12,8 @@ import type {
 
 export const runtime = "nodejs";
 
+export const maxDuration = 300;
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -23,26 +25,43 @@ const openrouter = new OpenAI({
 });
 
 async function generateWithAion(prompt: string) {
-  const response = await openrouter.chat.completions.create({
-    model: "aion-labs/aion-3.0-mini",
+  let lastError: unknown = null;
 
-  messages: [
-  {
-    role: "user",
-    content: prompt,
-  },
-],
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await openrouter.chat.completions.create({
+        model: "aion-labs/aion-3.0-mini",
 
-    max_tokens: 8000,
-  });
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
 
-  const content = response.choices[0]?.message?.content?.trim();
+        max_tokens: 8000,
+      });
 
-  if (!content) {
-    throw new Error("Aion returned no chapter prose.");
+      const content = response.choices[0]?.message?.content?.trim();
+
+      if (!content) {
+        throw new Error("Aion returned no chapter prose.");
+      }
+
+      return content;
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+    }
   }
 
-  return content;
+  const message =
+    lastError instanceof Error ? lastError.message : "Unknown provider error";
+
+  throw new Error(`Aion failed twice: ${message}`);
 }
 
 function getRequestedWordCount(message: string): number | null {
@@ -59,6 +78,12 @@ function getRequestedWordCount(message: string): number | null {
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function getEndingExcerpt(text: string, maximumWords = 900): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+
+  return words.slice(-maximumWords).join(" ");
 }
 
 const EMPTY_STORY_BIBLE: StoryBible = {
@@ -1848,6 +1873,7 @@ Do not finish below ${minimumWordCount} words.
           1800,
           Math.max(800, wordsStillNeeded + 250),
         );
+        const chapterEnding = getEndingExcerpt(chapterText);
         const continuationPrompt = `
 
 You are continuing an incomplete commercial novel chapter.
@@ -1873,9 +1899,13 @@ CHAPTER BRIEF:
 
 ${chapterBrief}
 
-EXISTING INCOMPLETE CHAPTER:
+WORDS ALREADY WRITTEN:
 
-${chapterText}
+${generatedWordCount}
+
+END OF THE EXISTING INCOMPLETE CHAPTER:
+
+${chapterEnding}
 `;
 
         const continuation = await generateWithAion(continuationPrompt);
