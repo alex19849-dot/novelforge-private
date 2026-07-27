@@ -19,6 +19,24 @@ import type {
 
 const STORAGE_KEY = "novelforge-current-story";
 
+const PENDING_GENERATION_KEY = "novelforge-pending-chapter-generation";
+
+type PendingChapterGeneration = {
+  storyId: string;
+  generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
+  chapterBrief: string;
+  latestUserMessage: string;
+  draft: string;
+  minimumWordCount: number;
+  maximumWordCount: number;
+};
+
+type WriterResponse = {
+  prose: string;
+  totalWordCount: number;
+  isComplete: boolean;
+};
+
 const EMPTY_STORY_BIBLE: StoryBible = {
   premise: "",
 
@@ -107,6 +125,96 @@ function isStringArray(value: unknown): value is string[] {
   return (
     Array.isArray(value) && value.every((item) => typeof item === "string")
   );
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function getRequestedWordCount(message: string): number | null {
+  const match = message.match(/\b(\d{3,5})\s*words?\b/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const wordCount = Number(match[1]);
+
+  return Number.isFinite(wordCount) ? wordCount : null;
+}
+
+function isWriterResponse(value: unknown): value is WriterResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const response = value as Partial<WriterResponse>;
+
+  return (
+    typeof response.prose === "string" &&
+    Boolean(response.prose.trim()) &&
+    typeof response.totalWordCount === "number" &&
+    typeof response.isComplete === "boolean"
+  );
+}
+
+function isPendingGeneration(
+  value: unknown,
+): value is PendingChapterGeneration {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const pending = value as Partial<PendingChapterGeneration>;
+  const chapter = pending.generatedChapter;
+
+  return (
+    typeof pending.storyId === "string" &&
+    Boolean(chapter) &&
+    typeof chapter?.title === "string" &&
+    typeof chapter?.povCharacter === "string" &&
+    typeof chapter?.content === "string" &&
+    (chapter?.replaceChapterNumber === null ||
+      typeof chapter?.replaceChapterNumber === "number") &&
+    typeof pending.chapterBrief === "string" &&
+    typeof pending.latestUserMessage === "string" &&
+    typeof pending.draft === "string" &&
+    typeof pending.minimumWordCount === "number" &&
+    typeof pending.maximumWordCount === "number"
+  );
+}
+
+async function readApiJson(response: Response): Promise<unknown> {
+  const responseText = await response.text();
+  let data: unknown = null;
+
+  if (responseText) {
+    try {
+      data = JSON.parse(responseText) as unknown;
+    } catch {
+      const preview = responseText.replace(/\s+/g, " ").trim().slice(0, 120);
+
+      throw new Error(
+        `The server returned HTTP ${response.status} with a non-JSON response${
+          preview ? `: ${preview}` : "."
+        }`,
+      );
+    }
+  }
+
+  if (!response.ok) {
+    const errorMessage =
+      data &&
+      typeof data === "object" &&
+      "error" in data &&
+      typeof data.error === "string"
+        ? data.error
+        : `The server returned HTTP ${response.status}.`;
+
+    throw new Error(errorMessage);
+  }
+
+  return data;
 }
 
 function isStoryBible(value: unknown): value is StoryBible {
@@ -213,7 +321,6 @@ function isStoryChatResponse(value: unknown): value is StoryChatResponse {
       typeof response.generatedChapter?.title === "string" &&
       typeof response.generatedChapter?.povCharacter === "string" &&
       typeof response.generatedChapter?.content === "string" &&
-      Boolean(response.generatedChapter?.content.trim()) &&
       (response.generatedChapter?.replaceChapterNumber === null ||
         typeof response.generatedChapter?.replaceChapterNumber === "number"));
 
@@ -245,6 +352,68 @@ function hasStoryBibleContent(storyBible: StoryBible): boolean {
     storyBible.characters.length ||
     storyBible.notes.length,
   );
+}
+
+function applyGeneratedChapter(
+  story: StoryWorkspace,
+  pending: PendingChapterGeneration,
+  content: string,
+): StoryWorkspace {
+  const now = new Date().toISOString();
+  const chapterMetadata = pending.generatedChapter;
+  const replacementNumber = chapterMetadata.replaceChapterNumber;
+
+  if (replacementNumber !== null) {
+    const chapterExists = story.chapters.some(
+      (chapter) => chapter.number === replacementNumber,
+    );
+
+    if (!chapterExists) {
+      throw new Error(
+        `Chapter ${replacementNumber} could not be found for rewriting.`,
+      );
+    }
+
+    return {
+      ...story,
+      chapters: story.chapters.map((chapter) =>
+        chapter.number === replacementNumber
+          ? {
+              ...chapter,
+              title: chapterMetadata.title.trim() || chapter.title,
+              povCharacter:
+                chapterMetadata.povCharacter.trim() || chapter.povCharacter,
+              content: content.trim(),
+              updatedAt: now,
+            }
+          : chapter,
+      ),
+      updatedAt: now,
+    };
+  }
+
+  const nextChapterNumber =
+    story.chapters.length > 0
+      ? Math.max(...story.chapters.map((chapter) => chapter.number)) + 1
+      : 1;
+
+  return {
+    ...story,
+    chapters: [
+      ...story.chapters,
+      {
+        id: crypto.randomUUID(),
+        number: nextChapterNumber,
+        title:
+          chapterMetadata.title.trim() || `Chapter ${nextChapterNumber}`,
+        povCharacter: chapterMetadata.povCharacter.trim(),
+        content: content.trim(),
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    updatedAt: now,
+  };
 }
 
 export default function StoryChatPage() {
@@ -279,6 +448,9 @@ export default function StoryChatPage() {
   const [isExporting, setIsExporting] = useState(false);
 
   const [exportError, setExportError] = useState("");
+
+  const [pendingGeneration, setPendingGeneration] =
+    useState<PendingChapterGeneration | null>(null);
 
   const [stories, setStories] = useState<
     {
@@ -562,6 +734,26 @@ undone.`,
 
     await loadStoryList(userId);
   }
+
+  useEffect(() => {
+    const savedPending = localStorage.getItem(PENDING_GENERATION_KEY);
+
+    if (!savedPending) {
+      return;
+    }
+
+    try {
+      const parsedPending: unknown = JSON.parse(savedPending);
+
+      if (isPendingGeneration(parsedPending)) {
+        setPendingGeneration(parsedPending);
+      } else {
+        localStorage.removeItem(PENDING_GENERATION_KEY);
+      }
+    } catch {
+      localStorage.removeItem(PENDING_GENERATION_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("novelforge-reader");
@@ -992,12 +1184,143 @@ device.`,
     });
   }
 
+  function savePendingGeneration(pending: PendingChapterGeneration) {
+    setPendingGeneration(pending);
+    localStorage.setItem(PENDING_GENERATION_KEY, JSON.stringify(pending));
+  }
+
+  function clearPendingGeneration() {
+    setPendingGeneration(null);
+    localStorage.removeItem(PENDING_GENERATION_KEY);
+  }
+
+  async function persistStory(nextStory: StoryWorkspace) {
+    setStory(nextStory);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStory));
+
+    if (!userId) {
+      return;
+    }
+
+    const { error } = await supabase.from("stories").upsert({
+      id: nextStory.id,
+      user_id: userId,
+      title: nextStory.title,
+      form: nextStory.storyBible,
+      story_state: nextStory.storyState,
+      chapters: nextStory.chapters,
+      messages: nextStory.messages,
+      created_at: nextStory.createdAt,
+      updated_at: nextStory.updatedAt,
+    });
+
+    if (error) {
+      throw new Error(`The story could not be saved: ${error.message}`);
+    }
+
+    await loadStoryList(userId);
+  }
+
+  async function runPendingChapter(
+    initialPending: PendingChapterGeneration,
+    baseStory: StoryWorkspace,
+  ) {
+    setIsThinking(true);
+    let workingPending = initialPending;
+
+    try {
+      const replacementNumber =
+        workingPending.generatedChapter.replaceChapterNumber;
+      const recentChapters =
+        replacementNumber === null
+          ? baseStory.chapters.slice(-2)
+          : baseStory.chapters
+              .filter((chapter) => chapter.number < replacementNumber)
+              .slice(-2);
+
+      for (let segment = 0; segment < 4; segment += 1) {
+        const response = await fetch("/api/story-chat/write", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            storyBible: baseStory.storyBible,
+            storyState: baseStory.storyState,
+            recentChapters,
+            chapterBrief: workingPending.chapterBrief,
+            latestUserMessage: workingPending.latestUserMessage,
+            existingDraft: workingPending.draft,
+            minimumWordCount: workingPending.minimumWordCount,
+            maximumWordCount: workingPending.maximumWordCount,
+          }),
+        });
+
+        const data = await readApiJson(response);
+
+        if (!isWriterResponse(data)) {
+          throw new Error("The writing endpoint returned an invalid response.");
+        }
+
+        const combinedDraft = workingPending.draft
+          ? `${workingPending.draft.trim()}\n\n${data.prose.trim()}`
+          : data.prose.trim();
+
+        workingPending = {
+          ...workingPending,
+          draft: combinedDraft,
+        };
+
+        savePendingGeneration(workingPending);
+
+        if (data.isComplete) {
+          const completedStory = applyGeneratedChapter(
+            baseStory,
+            workingPending,
+            combinedDraft,
+          );
+
+          await persistStory(completedStory);
+          clearPendingGeneration();
+          return;
+        }
+      }
+
+      throw new Error(
+        `The chapter is still incomplete at ${countWords(
+          workingPending.draft,
+        )} words. Your progress has been saved, so you can resume it.`,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "The writing request failed.";
+      const failedStory: StoryWorkspace = {
+        ...baseStory,
+        messages: [
+          ...baseStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content: `I couldn't complete the chapter: ${message}`,
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+
+      setStory(failedStory);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(failedStory));
+    } finally {
+      setIsThinking(false);
+    }
+  }
+
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedMessage = input.trim();
+    const hasPendingChapter = pendingGeneration?.storyId === story?.id;
 
-    if (!story || !trimmedMessage || isThinking) {
+    if (!story || !trimmedMessage || isThinking || hasPendingChapter) {
       return;
     }
 
@@ -1009,65 +1332,37 @@ device.`,
       content: trimmedMessage,
     };
 
-    setStory((currentStory) => {
-      if (!currentStory) {
-        return currentStory;
-      }
+    const requestStory: StoryWorkspace = {
+      ...story,
+      messages: [...story.messages, userMessage],
+      updatedAt: new Date().toISOString(),
+    };
 
-      return {
-        ...currentStory,
-
-        messages: [...currentStory.messages, userMessage],
-
-        updatedAt: new Date().toISOString(),
-      };
-    });
+    setStory(requestStory);
 
     setInput("");
-
     setIsThinking(true);
 
     try {
-      const response = await fetch(
-        "/api/story-chat",
-
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify({
-            story: {
-              ...story,
-
-              messages: [...story.messages, userMessage],
-            },
-          }),
+      const response = await fetch("/api/story-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          stage: "plan",
+          story: requestStory,
+        }),
+      });
 
-      const data: unknown = await response.json();
-
-      if (!response.ok) {
-        const errorMessage =
-          data &&
-          typeof data === "object" &&
-          "error" in data &&
-          typeof data.error === "string"
-            ? data.error
-            : "Unknown error";
-
-        throw new Error(errorMessage);
-      }
+      const data = await readApiJson(response);
 
       if (!isStoryChatResponse(data)) {
-        throw new Error("The API returned an invalid story response.");
+        throw new Error("The planning endpoint returned an invalid response.");
       }
 
-      const mergedStory = {
-        ...story,
+      const plannedStory: StoryWorkspace = {
+        ...requestStory,
         ...data.story,
         messages: data.story.messages,
         chapters: data.story.chapters,
@@ -1076,32 +1371,29 @@ device.`,
         updatedAt: data.story.updatedAt,
       };
 
-      setStory(mergedStory);
+      await persistStory(plannedStory);
 
-      localStorage.setItem(
-        "novelforge-current-story",
-        JSON.stringify(mergedStory),
-      );
-
-      if (userId) {
-        const { error: saveError } = await supabase.from("stories").upsert({
-          id: mergedStory.id,
-          user_id: userId,
-          title: mergedStory.title,
-          form: mergedStory.storyBible,
-          story_state: mergedStory.storyState,
-          chapters: mergedStory.chapters,
-          messages: mergedStory.messages,
-          created_at: mergedStory.createdAt,
-          updated_at: mergedStory.updatedAt,
-        });
-
-        if (saveError) {
-          console.error("Could not save completed story:", saveError);
-        } else {
-          await loadStoryList(userId);
-        }
+      if (!data.generatedChapter) {
+        return;
       }
+
+      const requestedWordCount = getRequestedWordCount(trimmedMessage);
+      const pending: PendingChapterGeneration = {
+        storyId: plannedStory.id,
+        generatedChapter: data.generatedChapter,
+        chapterBrief: data.chapterBrief,
+        latestUserMessage: trimmedMessage,
+        draft: "",
+        minimumWordCount: requestedWordCount
+          ? Math.floor(requestedWordCount * 0.95)
+          : 3000,
+        maximumWordCount: requestedWordCount
+          ? Math.ceil(requestedWordCount * 1.1)
+          : 4000,
+      };
+
+      savePendingGeneration(pending);
+      await runPendingChapter(pending, plannedStory);
     } catch (error) {
       console.error(
         "Story chat request failed:",
@@ -1114,29 +1406,21 @@ device.`,
           ? `I couldn't complete that: ${error.message}`
           : "Something went wrong while I was thinking. Try sending that again.";
 
-      setStory((currentStory) => {
-        if (!currentStory) {
-          return currentStory;
-        }
+      const failedStory: StoryWorkspace = {
+        ...requestStory,
+        messages: [
+          ...requestStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content: errorMessage,
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
 
-        return {
-          ...currentStory,
-
-          messages: [
-            ...currentStory.messages,
-
-            {
-              id: Date.now(),
-
-              role: "assistant",
-
-              content: errorMessage,
-            },
-          ],
-
-          updatedAt: new Date().toISOString(),
-        };
-      });
+      setStory(failedStory);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(failedStory));
     } finally {
       setIsThinking(false);
     }
@@ -1219,6 +1503,8 @@ justify-center px-5"
   }
 
   const bibleHasContent = hasStoryBibleContent(storyBible);
+  const pendingForCurrentStory =
+    pendingGeneration?.storyId === story.id ? pendingGeneration : null;
 
   return (
     <main className="h-[100dvh] overflow-hidden bg-neutral-950 text-white">
@@ -1538,10 +1824,45 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
             className="shrink-0 border-t border-white/10
 bg-neutral-950/95 px-5 py-5 backdrop-blur"
           >
+            {pendingForCurrentStory && (
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-pink-500/30 bg-pink-500/10 p-3">
+                <p className="min-w-0 flex-1 text-sm text-pink-100">
+                  Chapter progress saved
+                  {pendingForCurrentStory.draft
+                    ? `, ${countWords(pendingForCurrentStory.draft)} words`
+                    : ""}
+                  .
+                </p>
+
+                <button
+                  type="button"
+                  disabled={isThinking}
+                  onClick={() =>
+                    void runPendingChapter(pendingForCurrentStory, story)
+                  }
+                  className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-semibold
+text-white transition hover:bg-pink-400 disabled:opacity-40"
+                >
+                  {isThinking ? "Writing..." : "Resume"}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isThinking}
+                  onClick={clearPendingGeneration}
+                  className="rounded-lg border border-white/10 px-4 py-2 text-sm
+font-semibold text-neutral-300 transition hover:bg-white/5
+disabled:opacity-40"
+                >
+                  Discard
+                </button>
+              </div>
+            )}
+
             <form onSubmit={sendMessage} className="flex items-end gap-3">
               <textarea
                 value={input}
-                disabled={isThinking}
+                disabled={isThinking || Boolean(pendingForCurrentStory)}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={(event) => {
                   if (
@@ -1564,7 +1885,9 @@ disabled:cursor-not-allowed disabled:opacity-60"
 
               <button
                 type="submit"
-                disabled={!input.trim() || isThinking}
+                disabled={
+                  !input.trim() || isThinking || Boolean(pendingForCurrentStory)
+                }
                 className="h-14 rounded-2xl bg-pink-500 px-6 font-semibold text-white
 transition hover:bg-pink-400 disabled:cursor-not-allowed
 disabled:opacity-40"
