@@ -1,3 +1,5 @@
+import { useLayoutEffect, useRef } from "react";
+
 import type { ChatMessage } from "../types";
 
 type ChatPanelProps = {
@@ -6,8 +8,23 @@ type ChatPanelProps = {
 };
 
 export default function ChatPanel({ messages, isThinking }: ChatPanelProps) {
+  const scrollContainerRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+
+    if (!scrollContainer) {
+      return;
+    }
+
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+  }, [messages.length, isThinking]);
+
   return (
-    <section className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-8">
+    <section
+      ref={scrollContainerRef}
+      className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-8"
+    >
       {messages.map((message) => {
         const isUser = message.role === "user";
 
