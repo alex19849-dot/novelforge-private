@@ -621,7 +621,9 @@ function mergeStoryBible(
   };
 }
 
-function parseRequestBody(value: unknown): { story: StoryWorkspace } | null {
+function parseRequestBody(
+  value: unknown,
+): { story: StoryWorkspace; stage: "complete" | "plan" } | null {
   function isStoryWorkspace(value: unknown): value is StoryWorkspace {
     return (
       !!value &&
@@ -639,6 +641,7 @@ function parseRequestBody(value: unknown): { story: StoryWorkspace } | null {
 
   const body = value as {
     story?: StoryWorkspace;
+    stage?: unknown;
   };
 
   if (!body.story) {
@@ -651,6 +654,7 @@ function parseRequestBody(value: unknown): { story: StoryWorkspace } | null {
 
   return {
     story: body.story,
+    stage: body.stage === "plan" ? "plan" : "complete",
   };
 }
 
@@ -1136,6 +1140,7 @@ export async function POST(request: Request) {
     const parsedBody = parseRequestBody(rawBody);
 
     const currentStory = parsedBody?.story;
+    const requestStage = parsedBody?.stage ?? "complete";
 
     if (!currentStory) {
       return NextResponse.json(
@@ -1860,6 +1865,33 @@ Write commercially publishable fiction.
     if (isWriterMode) {
       if (!parsedOutput.generatedChapter) {
         throw new Error("The model did not return chapter metadata.");
+      }
+
+      if (requestStage === "plan") {
+        const plannedAt = new Date().toISOString();
+        const plannedStory: StoryWorkspace = {
+          ...currentStory,
+          title: storyTitle,
+          messages: [
+            ...currentStory.messages,
+            {
+              id: Date.now(),
+              role: "assistant",
+              content: reply,
+            },
+          ],
+          storyBible: mergedStoryBible,
+          storyState: returnedStoryState,
+          updatedAt: plannedAt,
+        };
+
+        return NextResponse.json({
+          reply,
+          intent,
+          story: plannedStory,
+          generatedChapter: parsedOutput.generatedChapter,
+          chapterBrief,
+        });
       }
 
       const recentChapters = currentStory.chapters.slice(-3);
