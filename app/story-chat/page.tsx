@@ -1037,6 +1037,11 @@ device.`,
         error,
       );
 
+      const errorMessage =
+        error instanceof Error && error.message.trim()
+          ? `I couldn't complete that: ${error.message}`
+          : "Something went wrong while I was thinking. Try sending that again.";
+
       setStory((currentStory) => {
         if (!currentStory) {
           return currentStory;
@@ -1053,8 +1058,7 @@ device.`,
 
               role: "assistant",
 
-              content:
-                "Something went wrong while I was thinking. Try sending that again.",
+              content: errorMessage,
             },
           ],
 
