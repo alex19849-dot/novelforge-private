@@ -1673,7 +1673,7 @@ ${JSON.stringify(planningWorkspace, null, 2)}
         },
       },
 
-      max_output_tokens: 5000,
+      max_output_tokens: 10000,
     });
 
     let response = await createPlanningResponse(conversation);
