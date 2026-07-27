@@ -1101,7 +1101,7 @@ export async function POST(request: Request) {
 
     const conversation = currentStory.messages
 
-      .slice(-30)
+      .slice(-12)
 
       .map((message) => ({
         role: message.role,
@@ -1178,7 +1178,27 @@ workspace.`,
         latestMessage,
       );
 
-    const response = await openai.responses.create({
+    const planningWorkspace = {
+      id: currentStory.id,
+      title: currentStory.title,
+      seriesType: currentStory.seriesType,
+      seriesTitle: currentStory.seriesTitle,
+      bookNumber: currentStory.bookNumber,
+      chapters: currentStory.chapters.map((chapter) => ({
+        number: chapter.number,
+        title: chapter.title,
+        povCharacter: chapter.povCharacter,
+      })),
+      storyBible: currentStory.storyBible,
+      storyState: currentStory.storyState,
+      createdAt: currentStory.createdAt,
+      updatedAt: currentStory.updatedAt,
+    };
+
+    const createPlanningResponse = (
+      planningConversation: typeof conversation,
+    ) =>
+      openai.responses.create({
       model: "gpt-5.5",
 
       reasoning: {
@@ -1556,12 +1576,12 @@ ${intentInstruction[intent]}
 
 CURRENT STORY WORKSPACE:
 
-${JSON.stringify(currentStory, null, 2)}
+${JSON.stringify(planningWorkspace, null, 2)}
 
 `,
         },
 
-        ...conversation,
+        ...planningConversation,
       ],
 
       text: {
@@ -1580,6 +1600,8 @@ ${JSON.stringify(currentStory, null, 2)}
 
       max_output_tokens: 5000,
     });
+
+    let response = await createPlanningResponse(conversation);
 
     let chapterText = "";
 
@@ -1670,13 +1692,40 @@ Write commercially publishable fiction.
 
 `;
 
-    const outputText = response.output_text?.trim();
+    let parsedOutput: Partial<StoryModelOutput> | null = null;
+    let planningFailureReason = "";
 
-    if (!outputText) {
-      throw new Error("The model returned no output.");
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (attempt > 0) {
+        response = await createPlanningResponse(conversation.slice(-6));
+      }
+
+      if (response.status === "incomplete") {
+        planningFailureReason =
+          response.incomplete_details?.reason ?? "the response was truncated";
+        continue;
+      }
+
+      const outputText = response.output_text?.trim();
+
+      if (!outputText) {
+        planningFailureReason = "the model returned no output";
+        continue;
+      }
+
+      try {
+        parsedOutput = JSON.parse(outputText) as Partial<StoryModelOutput>;
+        break;
+      } catch {
+        planningFailureReason = "the model returned incomplete JSON";
+      }
     }
 
-    const parsedOutput = JSON.parse(outputText) as Partial<StoryModelOutput>;
+    if (!parsedOutput) {
+      throw new Error(
+        `The planning model failed twice because ${planningFailureReason}. No chapter was generated or saved.`,
+      );
+    }
 
     if (!parsedOutput.storyBible) {
       throw new Error("The model did not return a story bible.");
