@@ -272,6 +272,14 @@ export default function StoryChatPage() {
 
   const [readerOpen, setReaderOpen] = useState(false);
 
+  const [isExportOpen, setIsExportOpen] = useState(false);
+
+  const [exportWarnings, setExportWarnings] = useState("");
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const [exportError, setExportError] = useState("");
+
   const [stories, setStories] = useState<
     {
       id: string;
@@ -872,6 +880,70 @@ device.`,
     });
   }
 
+  async function exportWordDocument() {
+    if (!story || story.chapters.length === 0 || isExporting) {
+      return;
+    }
+
+    setIsExporting(true);
+    setExportError("");
+
+    try {
+      const contentWarnings = exportWarnings
+        .split(/\n|,/)
+        .map((warning) => warning.trim())
+        .filter(Boolean);
+
+      const response = await fetch("/api/export-docx", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: story.title,
+          author: "Marlow Quinn",
+          chapters: story.chapters,
+          contentWarnings,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData: unknown = await response.json().catch(() => null);
+        const message =
+          errorData &&
+          typeof errorData === "object" &&
+          "error" in errorData &&
+          typeof errorData.error === "string"
+            ? errorData.error
+            : "The Word export failed.";
+
+        throw new Error(message);
+      }
+
+      const documentBlob = await response.blob();
+      const downloadUrl = URL.createObjectURL(documentBlob);
+      const downloadLink = document.createElement("a");
+      const filename =
+        story.title.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") ||
+        "NovelForge_Book";
+
+      downloadLink.href = downloadUrl;
+      downloadLink.download = `${filename}.docx`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+
+      setIsExportOpen(false);
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error.message : "The Word export failed.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
   async function sendLoginLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1217,6 +1289,22 @@ font-semibold text-white"
                 + New Story
               </button>
 
+              <button
+                type="button"
+                disabled={chapters.length === 0}
+                onClick={() => {
+                  setExportError("");
+                  setIsExportOpen(true);
+                  setIsMenuOpen(false);
+                }}
+                className="mb-3 w-full rounded-xl border border-pink-500/40
+bg-pink-500/10 px-4 py-3 text-left font-semibold text-pink-300
+transition hover:bg-pink-500/20 disabled:cursor-not-allowed
+disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+              >
+                Export Book
+              </button>
+
               <div className="mb-6 space-y-2 border-b border-white/10 pb-6">
                 <button
                   type="button"
@@ -1337,6 +1425,75 @@ hover:text-red-300"
               </div>
             </aside>
           </>
+        )}
+
+        {isExportOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
+                    Export Book
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">
+                    KDP-ready Word document
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={() => setIsExportOpen(false)}
+                  aria-label="Close export"
+                  className="text-2xl text-neutral-400 transition hover:text-white disabled:opacity-40"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="mt-3 text-sm leading-6 text-neutral-400">
+                Enter one content warning per line. Leave this blank to use the
+                standard mature-content warning.
+              </p>
+
+              <textarea
+                value={exportWarnings}
+                disabled={isExporting}
+                onChange={(event) => setExportWarnings(event.target.value)}
+                placeholder={"Explicit adult content\nStrong language\nViolence"}
+                rows={6}
+                className="mt-4 w-full resize-none rounded-xl border border-white/10
+bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600
+focus:border-pink-500 disabled:opacity-60"
+              />
+
+              {exportError && (
+                <p className="mt-3 text-sm text-red-400">{exportError}</p>
+              )}
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={() => setIsExportOpen(false)}
+                  className="rounded-xl border border-white/10 px-4 py-3 font-semibold
+text-neutral-300 transition hover:bg-white/5 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={() => void exportWordDocument()}
+                  className="rounded-xl bg-pink-500 px-5 py-3 font-semibold text-white
+transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isExporting ? "Creating..." : "Download Word"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {activeTab === "chat" && (
