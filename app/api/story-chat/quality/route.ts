@@ -209,10 +209,11 @@ function assessmentPasses(
   const scores = Object.values(assessment.scores);
 
   return (
-    assessment.passed &&
     assessment.hardFailures.length === 0 &&
     mechanicalFailures.length === 0 &&
-    scores.every((score) => Number.isFinite(score) && score >= 7)
+    assessment.scores.continuity >= 7 &&
+    assessment.scores.povAndTense >= 7 &&
+    scores.every((score) => Number.isFinite(score) && score >= 6)
   );
 }
 
@@ -260,8 +261,19 @@ conclusions and hooks
 - end with a concrete, effective hook
 - contain no mechanical failures
 
-Set passed to false when any score is below 7 or when a hard continuity,
-POV, tense, formatting, completion or brief-compliance failure exists.
+The chapter brief is strong guidance, not a rigid checklist. Do not fail
+an otherwise cohesive, commercially effective chapter merely because it
+reaches the intended objective through different scene beats or omits a
+nonessential planned detail.
+
+Use hardFailures only for objective continuity contradictions, wrong
+POV, wrong tense, malformed prose, unsafe age or consent problems, or a
+chapter that is genuinely unfinished. Do not use hardFailures for
+subjective preferences or minor deviations from the planned beats.
+
+Set passed to false when continuity or POV and tense scores below 7,
+when any other score is below 6, or when an objective hard failure
+exists.
 
 Do not fail a chapter merely because it contains explicit consensual
 adult sexual content. Judge such content against the selected heat level
@@ -505,13 +517,13 @@ export async function POST(request: Request) {
     const chapterContent = cleanGeneratedProse(
       cleanString(body.chapterContent),
     );
-    const minimumWordCount = getWordCount(body.minimumWordCount, 3000);
+    const minimumWordCount = getWordCount(body.minimumWordCount, 2000);
     const maximumWordCount = Math.max(
       minimumWordCount,
       getWordCount(body.maximumWordCount, 4000),
     );
-    const acceptedMinimumWordCount = Math.floor(minimumWordCount * 0.95);
-    const allowedMaximumWordCount = Math.ceil(maximumWordCount * 1.1);
+    const acceptedMinimumWordCount = minimumWordCount;
+    const allowedMaximumWordCount = maximumWordCount;
 
     if (!chapterBrief || !povCharacter || !chapterContent) {
       return NextResponse.json(
