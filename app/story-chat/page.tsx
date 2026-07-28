@@ -12,6 +12,7 @@ import BiblePanel from "./components/BiblePanel";
 
 import type {
   ActiveTab,
+  GenerationDiagnostic,
   StoryBible,
   StoryChatResponse,
   StoryWorkspace,
@@ -29,16 +30,19 @@ type PendingChapterGeneration = {
   draft: string;
   minimumWordCount: number;
   maximumWordCount: number;
+  diagnostics?: GenerationDiagnostic[];
 };
 
 type WriterResponse = {
   prose: string;
   totalWordCount: number;
   isComplete: boolean;
+  diagnostics: GenerationDiagnostic[];
 };
 
 type LedgerResponse = {
   storyState: StoryWorkspace["storyState"];
+  diagnostics: GenerationDiagnostic[];
 };
 
 type QualityResponse = {
@@ -60,6 +64,7 @@ type QualityResponse = {
       hookStrength: number;
     };
   };
+  diagnostics: GenerationDiagnostic[];
 };
 
 const EMPTY_STORY_BIBLE: StoryBible = {
@@ -108,6 +113,8 @@ const EMPTY_STORY_STATE = {
   repetitionWarnings: [],
 
   voiceProfiles: [],
+
+  lastGenerationDiagnostics: [],
 };
 
 function createEmptyStory(): StoryWorkspace {
@@ -178,6 +185,63 @@ function getRequestedWordCount(message: string): number | null {
   return Number.isFinite(wordCount) ? wordCount : null;
 }
 
+function isGenerationDiagnostic(value: unknown): value is GenerationDiagnostic {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const diagnostic = value as Partial<GenerationDiagnostic>;
+
+  return (
+    typeof diagnostic.stage === "string" &&
+    (diagnostic.provider === "openai" ||
+      diagnostic.provider === "openrouter") &&
+    typeof diagnostic.model === "string" &&
+    typeof diagnostic.inputTokens === "number" &&
+    typeof diagnostic.outputTokens === "number" &&
+    typeof diagnostic.totalTokens === "number" &&
+    (diagnostic.costUsd === null || typeof diagnostic.costUsd === "number") &&
+    typeof diagnostic.durationMs === "number" &&
+    typeof diagnostic.attempt === "number"
+  );
+}
+
+function isDiagnosticArray(value: unknown): value is GenerationDiagnostic[] {
+  return Array.isArray(value) && value.every(isGenerationDiagnostic);
+}
+
+function formatGenerationDiagnostics(
+  diagnostics: GenerationDiagnostic[],
+): string {
+  const totalTokens = diagnostics.reduce(
+    (sum, diagnostic) => sum + diagnostic.totalTokens,
+    0,
+  );
+  const totalDurationMs = diagnostics.reduce(
+    (sum, diagnostic) => sum + diagnostic.durationMs,
+    0,
+  );
+  const knownCost = diagnostics.reduce(
+    (sum, diagnostic) => sum + (diagnostic.costUsd ?? 0),
+    0,
+  );
+  const unknownCostCalls = diagnostics.filter(
+    (diagnostic) => diagnostic.costUsd === null,
+  ).length;
+  const costText =
+    unknownCostCalls > 0
+      ? `$${knownCost.toFixed(4)} recorded, plus ${unknownCostCalls} provider ${
+          unknownCostCalls === 1 ? "call" : "calls"
+        } without reported cost`
+      : `$${knownCost.toFixed(4)}`;
+
+  return `Generation diagnostics: ${diagnostics.length} model ${
+    diagnostics.length === 1 ? "call" : "calls"
+  }, ${totalTokens.toLocaleString()} tokens, ${(totalDurationMs / 1000).toFixed(
+    1,
+  )} seconds, ${costText}.`;
+}
+
 function isWriterResponse(value: unknown): value is WriterResponse {
   if (!value || typeof value !== "object") {
     return false;
@@ -189,7 +253,8 @@ function isWriterResponse(value: unknown): value is WriterResponse {
     typeof response.prose === "string" &&
     Boolean(response.prose.trim()) &&
     typeof response.totalWordCount === "number" &&
-    typeof response.isComplete === "boolean"
+    typeof response.isComplete === "boolean" &&
+    isDiagnosticArray(response.diagnostics)
   );
 }
 
@@ -215,7 +280,9 @@ function isPendingGeneration(
     typeof pending.latestUserMessage === "string" &&
     typeof pending.draft === "string" &&
     typeof pending.minimumWordCount === "number" &&
-    typeof pending.maximumWordCount === "number"
+    typeof pending.maximumWordCount === "number" &&
+    (pending.diagnostics === undefined ||
+      isDiagnosticArray(pending.diagnostics))
   );
 }
 
@@ -334,7 +401,9 @@ function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
       isStringArray(state.characterKnowledge)) &&
     (state.repetitionWarnings === undefined ||
       isStringArray(state.repetitionWarnings)) &&
-    voiceProfilesAreValid
+    voiceProfilesAreValid &&
+    (state.lastGenerationDiagnostics === undefined ||
+      isDiagnosticArray(state.lastGenerationDiagnostics))
   );
 }
 
@@ -343,7 +412,11 @@ function isLedgerResponse(value: unknown): value is LedgerResponse {
     return false;
   }
 
-  return isStoryState((value as Partial<LedgerResponse>).storyState);
+  const response = value as Partial<LedgerResponse>;
+
+  return (
+    isStoryState(response.storyState) && isDiagnosticArray(response.diagnostics)
+  );
 }
 
 function isQualityResponse(value: unknown): value is QualityResponse {
@@ -372,7 +445,8 @@ function isQualityResponse(value: unknown): value is QualityResponse {
     typeof scores?.voiceDistinctiveness === "number" &&
     typeof scores?.povAndTense === "number" &&
     typeof scores?.repetitionControl === "number" &&
-    typeof scores?.hookStrength === "number"
+    typeof scores?.hookStrength === "number" &&
+    isDiagnosticArray(response.diagnostics)
   );
 }
 
@@ -455,7 +529,9 @@ function isStoryChatResponse(value: unknown): value is StoryChatResponse {
       response.intent === "general_chat") &&
     isStoryWorkspace(response.story) &&
     generatedChapterIsValid &&
-    typeof response.chapterBrief === "string"
+    typeof response.chapterBrief === "string" &&
+    (response.diagnostics === undefined ||
+      isDiagnosticArray(response.diagnostics))
   );
 }
 
@@ -1382,13 +1458,17 @@ device.`,
           );
         }
 
-        if (!qualityData.accepted) {
-          workingPending = {
-            ...workingPending,
-            draft: qualityData.chapterContent,
-          };
-          savePendingGeneration(workingPending);
+        workingPending = {
+          ...workingPending,
+          draft: qualityData.chapterContent,
+          diagnostics: [
+            ...(workingPending.diagnostics ?? []),
+            ...qualityData.diagnostics,
+          ],
+        };
+        savePendingGeneration(workingPending);
 
+        if (!qualityData.accepted) {
           throw new Error(
             `The repaired chapter still failed its quality check: ${qualityData.quality.summary} The repaired draft has been preserved.`,
           );
@@ -1434,9 +1514,24 @@ device.`,
           );
         }
 
+        const allDiagnostics = [
+          ...(workingPending.diagnostics ?? []),
+          ...ledgerData.diagnostics,
+        ];
         const completedStory: StoryWorkspace = {
           ...chapterStory,
-          storyState: ledgerData.storyState,
+          storyState: {
+            ...ledgerData.storyState,
+            lastGenerationDiagnostics: allDiagnostics,
+          },
+          messages: [
+            ...chapterStory.messages,
+            {
+              id: Date.now(),
+              role: "assistant",
+              content: formatGenerationDiagnostics(allDiagnostics),
+            },
+          ],
           updatedAt: new Date().toISOString(),
         };
 
@@ -1483,6 +1578,10 @@ device.`,
         workingPending = {
           ...workingPending,
           draft: combinedDraft,
+          diagnostics: [
+            ...(workingPending.diagnostics ?? []),
+            ...data.diagnostics,
+          ],
         };
 
         savePendingGeneration(workingPending);
@@ -1545,6 +1644,7 @@ device.`,
       updatedAt: new Date().toISOString(),
     };
     let planningStory = requestStory;
+    let preplanningDiagnostics: GenerationDiagnostic[] = [];
 
     setStory(requestStory);
 
@@ -1578,6 +1678,7 @@ device.`,
           );
         }
 
+        preplanningDiagnostics = ledgerData.diagnostics;
         planningStory = {
           ...planningStory,
           storyState: ledgerData.storyState,
@@ -1633,6 +1734,7 @@ device.`,
         maximumWordCount: requestedWordCount
           ? Math.ceil(requestedWordCount * 1.1)
           : 4000,
+        diagnostics: [...preplanningDiagnostics, ...(data.diagnostics ?? [])],
       };
 
       savePendingGeneration(pending);
