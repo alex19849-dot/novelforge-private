@@ -189,6 +189,13 @@ must not sound interchangeable with another POV character.
 Maintain first-person POV, tense, voice, continuity, pacing, heat level
 and burn pacing.
 
+Use natural contractions throughout contemporary narration, internal
+thought and dialogue. Write "I don't", "I've", "he's", "can't" and
+"it doesn't" where a natural speaker or narrator would use them. Do not
+systematically expand contractions into stiff phrases such as "I do
+not", "I have", "he is", "cannot" or "it does not". Use uncontracted
+wording only for deliberate emphasis or a genuinely formal character.
+
 Write immersive scenes with a developed beginning, middle and ending or
 the deliberate hook required by the chapter brief.
 
