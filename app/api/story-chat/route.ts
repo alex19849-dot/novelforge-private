@@ -1258,6 +1258,66 @@ workspace.`,
         latestMessage,
       );
 
+    const requestedChapterMatch = latestMessage.match(/\bchapter\s+(\d+)\b/i);
+    const requestedChapterNumber = requestedChapterMatch
+      ? Number(requestedChapterMatch[1])
+      : null;
+    const latestChapter = currentStory.chapters.at(-1) ?? null;
+    const chapterLedger = currentStory.storyState.chapterLedger ?? [];
+    const latestLedgerEntry = chapterLedger.at(-1) ?? null;
+    const rewriteTarget =
+      intent === "rewrite_chapter" && requestedChapterNumber !== null
+        ? (currentStory.chapters.find(
+            (chapter) => chapter.number === requestedChapterNumber,
+          ) ?? null)
+        : null;
+    const rewritePrecedingChapter = rewriteTarget
+      ? (currentStory.chapters.find(
+          (chapter) => chapter.number === rewriteTarget.number - 1,
+        ) ?? null)
+      : null;
+    const rewriteFollowingChapter = rewriteTarget
+      ? (currentStory.chapters.find(
+          (chapter) => chapter.number === rewriteTarget.number + 1,
+        ) ?? null)
+      : null;
+    const continuityHandoff = {
+      latestCompletedChapter: latestChapter
+        ? {
+            number: latestChapter.number,
+            title: latestChapter.title,
+            povCharacter: latestChapter.povCharacter,
+          }
+        : null,
+      exactLatestEnding:
+        currentStory.storyState.latestChapterEnding ||
+        latestLedgerEntry?.endingExcerpt ||
+        (latestChapter ? getEndingExcerpt(latestChapter.content, 500) : ""),
+      latestRelationshipState:
+        currentStory.storyState.relationshipStates.at(-1) ?? "",
+      latestIntimacyMilestone: latestLedgerEntry?.intimacyMilestone ?? "",
+      currentCharacterStates: currentStory.storyState.characterStates,
+      characterKnowledge: currentStory.storyState.characterKnowledge ?? [],
+      unresolvedThreads: currentStory.storyState.unresolvedThreads,
+      repetitionWarnings: currentStory.storyState.repetitionWarnings ?? [],
+      recentChapterLedger: chapterLedger.slice(-4),
+      rewriteContext: rewriteTarget
+        ? {
+            targetChapter: rewriteTarget,
+            precedingChapterEnding: rewritePrecedingChapter
+              ? getEndingExcerpt(rewritePrecedingChapter.content, 500)
+              : "",
+            followingChapterOpening: rewriteFollowingChapter
+              ? rewriteFollowingChapter.content
+                  .trim()
+                  .split(/\s+/)
+                  .slice(0, 500)
+                  .join(" ")
+              : "",
+          }
+        : null,
+    };
+
     const planningWorkspace = {
       id: currentStory.id,
       title: currentStory.title,
@@ -1271,6 +1331,7 @@ workspace.`,
       })),
       storyBible: currentStory.storyBible,
       storyState: currentStory.storyState,
+      continuityHandoff,
       createdAt: currentStory.createdAt,
       updatedAt: currentStory.updatedAt,
     };
@@ -1387,6 +1448,43 @@ or older
 
 - preserve the requested intensity while following all applicable model
 requirements
+
+CONTINUITY HANDOFF RULES
+
+When planning a new chapter:
+
+- Treat continuityHandoff as the authoritative account of what has
+actually happened.
+
+- Begin after exactLatestEnding. Do not restart, recap, paraphrase or
+contradict the final scene.
+
+- Respect currentCharacterStates, characterKnowledge,
+latestRelationshipState and latestIntimacyMilestone.
+
+- A character cannot act on information they do not know.
+
+- Do not move the relationship backwards merely to recreate earlier
+tension.
+
+- Advance the relationship by a meaningful new step appropriate to the
+selected burn pacing.
+
+- Do not reuse scene constructions, gestures, emotional conclusions or
+phrases listed in repetitionWarnings or recentChapterLedger repeatedBeats.
+
+- Carry at least one unresolved thread forward through action,
+consequence or escalation.
+
+When rewriting a chapter:
+
+- Use rewriteContext.targetChapter as the prose being replaced.
+
+- Preserve continuity with precedingChapterEnding and
+followingChapterOpening.
+
+- Do not alter facts required by later chapters unless the user
+explicitly requests that wider change.
 
 BURN PACING RULES
 
