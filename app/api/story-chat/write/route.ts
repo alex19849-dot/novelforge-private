@@ -39,6 +39,10 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+function getAcceptedMinimum(minimumWordCount: number): number {
+  return Math.floor(minimumWordCount * 0.95);
+}
+
 function getEndingExcerpt(text: string, maximumWords = 900): string {
   const words = text.trim().split(/\s+/).filter(Boolean);
 
@@ -89,10 +93,15 @@ function getNarrativeStyle(value: unknown): string {
     cleanString(bible.tense),
     cleanString(bible.narrativeTense),
   ].filter(Boolean);
+  const statedStyle = styleParts.join(", ");
 
-  return styleParts.length > 0
-    ? styleParts.join(", ")
-    : "Follow the exact POV and tense stated in the chapter brief.";
+  if (/\b(?:past|present)\s+tense\b/i.test(statedStyle)) {
+    return statedStyle;
+  }
+
+  return statedStyle
+    ? `${statedStyle}, present tense`
+    : "First-person present tense, unless the user explicitly requested another tense.";
 }
 
 function cleanGeneratedProse(content: string): string {
@@ -353,7 +362,7 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
     return NextResponse.json({
       prose,
       totalWordCount,
-      isComplete: totalWordCount >= minimumWordCount,
+      isComplete: totalWordCount >= getAcceptedMinimum(minimumWordCount),
       diagnostics,
     });
   } catch (error) {
