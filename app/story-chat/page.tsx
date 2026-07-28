@@ -176,7 +176,7 @@ function countWords(text: string): number {
 }
 
 function meetsAcceptedMinimum(text: string, minimumWordCount: number): boolean {
-  return countWords(text) >= Math.floor(minimumWordCount * 0.95);
+  return countWords(text) >= minimumWordCount;
 }
 
 function getRequestedWordCount(message: string): number | null {
@@ -1567,7 +1567,15 @@ device.`,
     baseStory: StoryWorkspace,
   ) {
     setIsThinking(true);
-    let workingPending = initialPending;
+    let workingPending =
+      initialPending.minimumWordCount === 3000 &&
+      initialPending.maximumWordCount === 4000
+        ? {
+            ...initialPending,
+            minimumWordCount: 2000,
+          }
+        : initialPending;
+    savePendingGeneration(workingPending);
 
     try {
       const replacementNumber =
@@ -1863,17 +1871,20 @@ device.`,
       }
 
       const requestedWordCount = getRequestedWordCount(trimmedMessage);
+      const requestedTarget = requestedWordCount
+        ? Math.min(4000, Math.max(2000, requestedWordCount))
+        : null;
       const pending: PendingChapterGeneration = {
         storyId: plannedStory.id,
         generatedChapter: data.generatedChapter,
         chapterBrief: data.chapterBrief,
         latestUserMessage: trimmedMessage,
         draft: "",
-        minimumWordCount: requestedWordCount
-          ? Math.floor(requestedWordCount * 0.95)
-          : 3000,
-        maximumWordCount: requestedWordCount
-          ? Math.ceil(requestedWordCount * 1.1)
+        minimumWordCount: requestedTarget
+          ? Math.max(2000, Math.floor(requestedTarget * 0.95))
+          : 2000,
+        maximumWordCount: requestedTarget
+          ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
           : 4000,
         diagnostics: [...preplanningDiagnostics, ...(data.diagnostics ?? [])],
       };
