@@ -403,6 +403,49 @@ const storyChatSchema = {
   },
 } as const;
 
+const compactChapterPlanSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reply", "storyTitle", "generatedChapter", "chapterBrief"],
+  properties: {
+    reply: {
+      type: "string",
+    },
+    storyTitle: {
+      type: "string",
+    },
+    chapterBrief: {
+      type: "string",
+    },
+    generatedChapter: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title", "povCharacter", "content", "replaceChapterNumber"],
+      properties: {
+        title: {
+          type: "string",
+        },
+        povCharacter: {
+          type: "string",
+        },
+        content: {
+          type: "string",
+        },
+        replaceChapterNumber: {
+          anyOf: [
+            {
+              type: "integer",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+      },
+    },
+  },
+} as const;
+
 type StoryModelOutput = {
   reply: string;
 
@@ -1257,6 +1300,8 @@ workspace.`,
       /\b(write|rewrite|rewriting|continue|generate|expand)\b/i.test(
         latestMessage,
       );
+    const usesCompactChapterPlan =
+      requestStage === "plan" && isWriterMode && intent !== "create_story";
 
     const requestedChapterMatch = latestMessage.match(/\bchapter\s+(\d+)\b/i);
     const requestedChapterNumber = requestedChapterMatch
@@ -1746,6 +1791,28 @@ Do not explain your reasoning or describe internal processing.
 Do not announce limitations unless directly necessary to answer the
 current request.
 
+${
+  usesCompactChapterPlan
+    ? `COMPACT CHAPTER PLANNING OVERRIDE
+
+For this existing-story chapter request, return only:
+
+- reply
+- storyTitle
+- generatedChapter
+- chapterBrief
+
+Do not return storyBible or storyState. The server will preserve them.
+
+generatedChapter must contain metadata only. Its content must be an empty
+string.
+
+Keep reply brief. Make chapterBrief detailed enough to guide the writing
+model, but do not repeat the complete Story Bible or continuity ledger
+inside it.`
+    : ""
+}
+
 USER INTENT: ${intent}
 
 INSTRUCTION:
@@ -1763,20 +1830,24 @@ ${JSON.stringify(planningWorkspace, null, 2)}
         ],
 
         text: {
-          verbosity: "medium",
+          verbosity: usesCompactChapterPlan ? "low" : "medium",
 
           format: {
             type: "json_schema",
 
-            name: "story_chat_response",
+            name: usesCompactChapterPlan
+              ? "compact_chapter_plan"
+              : "story_chat_response",
 
             strict: true,
 
-            schema: storyChatSchema,
+            schema: usesCompactChapterPlan
+              ? compactChapterPlanSchema
+              : storyChatSchema,
           },
         },
 
-        max_output_tokens: 10000,
+        max_output_tokens: usesCompactChapterPlan ? 3500 : 10000,
       });
 
     let response = await createPlanningResponse(conversation);
@@ -1903,6 +1974,11 @@ Write commercially publishable fiction.
       throw new Error(
         `The planning model failed twice because ${planningFailureReason}. No chapter was generated or saved.`,
       );
+    }
+
+    if (usesCompactChapterPlan) {
+      parsedOutput.storyBible = currentStory.storyBible;
+      parsedOutput.storyState = currentStory.storyState;
     }
 
     if (!parsedOutput.storyBible) {
