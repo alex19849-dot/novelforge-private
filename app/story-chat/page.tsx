@@ -251,6 +251,12 @@ function formatGenerationDiagnostics(
   }.`;
 }
 
+function stripGenerationDiagnostics(content: string): string {
+  return content
+    .replace(/\s*Generation diagnostics:[\s\S]*$/i, "")
+    .trim();
+}
+
 function isWriterResponse(value: unknown): value is WriterResponse {
   if (!value || typeof value !== "object") {
     return false;
@@ -1551,14 +1557,6 @@ device.`,
             ...ledgerData.storyState,
             lastGenerationDiagnostics: allDiagnostics,
           },
-          messages: [
-            ...chapterStory.messages,
-            {
-              id: Date.now(),
-              role: "assistant",
-              content: formatGenerationDiagnostics(allDiagnostics),
-            },
-          ],
           updatedAt: new Date().toISOString(),
         };
 
@@ -1650,11 +1648,7 @@ device.`,
           {
             id: Date.now(),
             role: "assistant",
-            content: `I couldn't complete the chapter: ${message}${
-              failedDiagnostics.length > 0
-                ? ` ${formatGenerationDiagnostics(failedDiagnostics)}`
-                : ""
-            }`,
+            content: `I couldn't complete the chapter: ${message}`,
           },
         ],
         updatedAt: new Date().toISOString(),
@@ -1813,11 +1807,7 @@ device.`,
           {
             id: Date.now(),
             role: "assistant",
-            content: `${errorMessage}${
-              failureDiagnostics.length > 0
-                ? ` ${formatGenerationDiagnostics(failureDiagnostics)}`
-                : ""
-            }`,
+            content: errorMessage,
           },
         ],
         updatedAt: new Date().toISOString(),
@@ -1909,6 +1899,16 @@ justify-center px-5"
   const bibleHasContent = hasStoryBibleContent(storyBible);
   const pendingForCurrentStory =
     pendingGeneration?.storyId === story.id ? pendingGeneration : null;
+  const visibleChatMessages = messages
+    .map((message) => ({
+      ...message,
+      content: stripGenerationDiagnostics(message.content),
+    }))
+    .filter((message) => Boolean(message.content));
+  const currentDiagnostics =
+    pendingForCurrentStory?.diagnostics ??
+    story.storyState.lastGenerationDiagnostics ??
+    [];
 
   return (
     <main className="h-[100dvh] overflow-hidden bg-neutral-950 text-white">
@@ -2189,7 +2189,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
         )}
 
         {activeTab === "chat" && (
-          <ChatPanel messages={messages} isThinking={isThinking} />
+          <ChatPanel messages={visibleChatMessages} isThinking={isThinking} />
         )}
 
         {activeTab === "chapters" && (
@@ -2230,6 +2230,33 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
             className="shrink-0 border-t border-white/10
 bg-neutral-950/95 px-5 py-5 backdrop-blur"
           >
+            {currentDiagnostics.length > 0 && (
+              <details className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
+                <summary className="cursor-pointer font-medium text-neutral-300">
+                  {formatGenerationDiagnostics(currentDiagnostics)}
+                </summary>
+
+                <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+                  {currentDiagnostics.map((diagnostic, index) => (
+                    <p
+                      key={`${diagnostic.stage}-${diagnostic.attempt}-${index}`}
+                      className={
+                        diagnostic.status === "failed"
+                          ? "text-red-300"
+                          : "text-neutral-400"
+                      }
+                    >
+                      {diagnostic.stage.replaceAll("_", " ")},{" "}
+                      {diagnostic.status ?? "succeeded"},{" "}
+                      {diagnostic.totalTokens.toLocaleString()} tokens,{" "}
+                      {(diagnostic.durationMs / 1000).toFixed(1)} seconds
+                      {diagnostic.error ? `, ${diagnostic.error}` : ""}
+                    </p>
+                  ))}
+                </div>
+              </details>
+            )}
+
             {pendingForCurrentStory && (
               <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-pink-500/30 bg-pink-500/10 p-3">
                 <p className="min-w-0 flex-1 text-sm text-pink-100">
