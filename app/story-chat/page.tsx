@@ -175,6 +175,10 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+function meetsAcceptedMinimum(text: string, minimumWordCount: number): boolean {
+  return countWords(text) >= Math.floor(minimumWordCount * 0.95);
+}
+
 function getRequestedWordCount(message: string): number | null {
   const match = message.match(/\b(\d{3,5})\s*words?\b/i);
 
@@ -236,6 +240,7 @@ function getDiagnosticCostType(
 
 function formatGenerationDiagnostics(
   diagnostics: GenerationDiagnostic[],
+  pipelineStatus: "succeeded" | "failed" | "in progress",
 ): string {
   const totalTokens = diagnostics.reduce(
     (sum, diagnostic) => sum + diagnostic.totalTokens,
@@ -290,8 +295,8 @@ function formatGenerationDiagnostics(
     diagnostics.length === 1 ? "call" : "calls"
   }, ${totalTokens.toLocaleString()} tokens, ${(totalDurationMs / 1000).toFixed(
     1,
-  )} seconds, ${costText}, ${failedCalls} failed ${
-    failedCalls === 1 ? "call" : "calls"
+  )} seconds, ${costText}, pipeline ${pipelineStatus}, ${failedCalls} ${
+    failedCalls === 1 ? "provider-call failure" : "provider-call failures"
   }.`;
 }
 
@@ -1670,7 +1675,10 @@ device.`,
 
       if (
         workingPending.draft.trim() &&
-        countWords(workingPending.draft) >= workingPending.minimumWordCount
+        meetsAcceptedMinimum(
+          workingPending.draft,
+          workingPending.minimumWordCount,
+        )
       ) {
         await finishCompletedChapter(workingPending.draft);
         return;
@@ -2325,7 +2333,14 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
             {currentDiagnostics.length > 0 && (
               <details className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
                 <summary className="cursor-pointer font-medium text-neutral-300">
-                  {formatGenerationDiagnostics(currentDiagnostics)}
+                  {formatGenerationDiagnostics(
+                    currentDiagnostics,
+                    pendingForCurrentStory
+                      ? isThinking
+                        ? "in progress"
+                        : "failed"
+                      : "succeeded",
+                  )}
                 </summary>
 
                 <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
