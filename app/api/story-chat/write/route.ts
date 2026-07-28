@@ -290,6 +290,7 @@ ${latestUserMessage}
 Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} words.
 `;
 
+    const startedAt = Date.now();
     const response = await openrouter.chat.completions.create({
       model: "aion-labs/aion-3.0-mini",
       messages: [
@@ -312,11 +313,40 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
     validateProse(prose);
 
     const totalWordCount = existingWordCount + countWords(prose);
+    const rawUsage = response.usage as unknown as
+      | Record<string, unknown>
+      | undefined;
+    const inputTokens =
+      typeof rawUsage?.prompt_tokens === "number" ? rawUsage.prompt_tokens : 0;
+    const outputTokens =
+      typeof rawUsage?.completion_tokens === "number"
+        ? rawUsage.completion_tokens
+        : 0;
+    const totalTokens =
+      typeof rawUsage?.total_tokens === "number"
+        ? rawUsage.total_tokens
+        : inputTokens + outputTokens;
+    const costUsd = typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
 
     return NextResponse.json({
       prose,
       totalWordCount,
       isComplete: totalWordCount >= minimumWordCount,
+      diagnostics: [
+        {
+          stage: existingDraft
+            ? "chapter_writing_continuation"
+            : "chapter_writing",
+          provider: "openrouter",
+          model: "aion-labs/aion-3.0-mini",
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          costUsd,
+          durationMs: Date.now() - startedAt,
+          attempt: 1,
+        },
+      ],
     });
   } catch (error) {
     console.error("STORY WRITER FAILED:", error);
