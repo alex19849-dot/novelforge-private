@@ -1347,6 +1347,10 @@ If the user has not supplied character names or descriptions, create distinct na
 
 Populate premise, relationship, subgenre, setting, pov, heatLevel and burnPacing.
 
+Use first-person present tense by default. Preserve the requested POV
+structure, such as single or dual POV, but do not choose past tense
+unless the user explicitly requests it.
+
 Return at least two useful tropes, at least two fully described named adult characters and useful planning notes.
 
 All romantic and sexual characters must be consenting adults aged 18 or older.
@@ -1357,7 +1361,9 @@ Do not reuse, modify or merge with the current story workspace.`,
 
       continue_story: `Continue the existing story by writing the next chapter only. Update
 the story bible only if genuinely necessary to preserve continuity. Do
-not rewrite or replace existing chapters.`,
+not rewrite or replace existing chapters. Follow the established tense.
+If the existing story does not state a tense, use first-person present
+tense.`,
 
       rewrite_chapter: `Rewrite only the chapter or passage explicitly requested by the user.
 Preserve the overall story, chronology, characters, and all other
@@ -1768,6 +1774,11 @@ When writing a brand new chapter:
 - include the chapter objective
 
 - include the POV
+
+- include the exact narrative tense
+
+- use first-person present tense when the Story Bible and user request
+do not explicitly establish another tense
 
 - include emotional progression
 
