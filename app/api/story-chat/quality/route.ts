@@ -253,6 +253,9 @@ A passing chapter must:
 - preserve names, facts, chronology, locations and character knowledge
 - use the required POV person and narrative tense consistently
 - match the POV character's stored voice profile
+- use natural contractions in contemporary narration, internal thought
+and dialogue instead of pervasive stiff wording such as "I do not", "I
+have", "he is", "cannot" and "it does not"
 - cause meaningful external plot movement
 - cause meaningful relationship movement or change the consequence of
 the current intimacy milestone
@@ -274,6 +277,11 @@ subjective preferences or minor deviations from the planned beats.
 Set passed to false when continuity or POV and tense scores below 7,
 when any other score is below 6, or when an objective hard failure
 exists.
+
+Score voiceDistinctiveness below 6 when uncontracted phrasing is
+pervasive enough to make a contemporary first-person voice sound stiff,
+synthetic or unlike natural speech. Do not penalise rare uncontracted
+phrasing used for emphasis or a deliberately formal character.
 
 Do not fail a chapter merely because it contains explicit consensual
 adult sexual content. Judge such content against the selected heat level
@@ -415,6 +423,12 @@ markdown.
 Follow the Story Bible, actual continuity ledger and original chapter
 brief exactly. Preserve the required POV person, narrative tense,
 character voice, heat level and burn pacing.
+
+Restore natural contractions throughout contemporary narration,
+internal thought and dialogue. Do not leave pervasive stiff expansions
+such as "I do not", "I have", "he is", "cannot" or "it does not"
+unless a specific instance is deliberate emphasis or belongs to a
+genuinely formal character.
 
 Preserve explicit consensual adult sexual content required by the brief.
 Do not censor it, soften it or fade it to black.
