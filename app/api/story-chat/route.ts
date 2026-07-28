@@ -1385,7 +1385,7 @@ workspace.`,
       planningConversation: typeof conversation,
     ) =>
       openai.responses.create({
-        model: "gpt-5.5",
+        model: "gpt-5.6-terra",
 
         reasoning: {
           effort: "low",
