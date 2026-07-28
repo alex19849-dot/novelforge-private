@@ -77,6 +77,46 @@ function cleanRecentChapters(value: unknown): RecentChapter[] {
     .slice(-2);
 }
 
+function getNarrativeStyle(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return "Follow the exact POV and tense stated in the chapter brief.";
+  }
+
+  const bible = value as Record<string, unknown>;
+  const styleParts = [
+    cleanString(bible.pov),
+    cleanString(bible.tense),
+    cleanString(bible.narrativeTense),
+  ].filter(Boolean);
+
+  return styleParts.length > 0
+    ? styleParts.join(", ")
+    : "Follow the exact POV and tense stated in the chapter brief.";
+}
+
+function cleanGeneratedProse(content: string): string {
+  let cleaned = content
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n?/g, "\n")
+    .trim();
+
+  const fencedResponse = cleaned.match(
+    /^```(?:text|markdown|md)?\s*\n([\s\S]*?)\n```\s*$/i,
+  );
+
+  if (fencedResponse) {
+    cleaned = fencedResponse[1].trim();
+  }
+
+  cleaned = cleaned
+    .replace(/\\"/g, '"')
+    .replace(/\\([“”‘’])/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s+[^\n]+\n+/u, "")
+    .trim();
+
+  return cleaned;
+}
+
 function validateProse(content: string): void {
   const opening = content.slice(0, 6000);
   const planningPatterns = [
@@ -87,11 +127,36 @@ function validateProse(content: string): void {
     /^\s*word count\s*:/im,
     /^\s*(?:analysis|chapter plan|outline)\s*:/im,
     /^\s*here(?:'s| is) (?:the|your) chapter\b/im,
+    /^\s*an error (?:occurred|happened)\b/im,
   ];
 
   if (planningPatterns.some((pattern) => pattern.test(opening))) {
     throw new Error(
       "Aion returned planning notes instead of publishable chapter prose.",
+    );
+  }
+
+  if (/^\s*chapter\s+\d+\b/im.test(content)) {
+    throw new Error(
+      "Aion included a chapter heading inside the prose. The chapter was not saved.",
+    );
+  }
+
+  if (/^\s{0,3}#{1,6}\s+\S+/mu.test(content) || /```/.test(content)) {
+    throw new Error(
+      "Aion returned markdown instead of clean novel prose. The chapter was not saved.",
+    );
+  }
+
+  if (/\\["“”‘’]/u.test(content)) {
+    throw new Error(
+      "Aion returned broken escaped quotation marks. The chapter was not saved.",
+    );
+  }
+
+  if (!/[.!?…"”’']$/u.test(content.trim())) {
+    throw new Error(
+      "Aion appears to have stopped mid-sentence. The incomplete prose was not saved.",
     );
   }
 }
@@ -135,6 +200,7 @@ export async function POST(request: Request) {
     const latestUserMessage = cleanString(body.latestUserMessage);
     const existingDraft = cleanString(body.existingDraft);
     const recentChapters = cleanRecentChapters(body.recentChapters);
+    const narrativeStyle = getNarrativeStyle(body.storyBible);
     const minimumWordCount = getWordCount(body.minimumWordCount, 3000);
     const maximumWordCount = Math.max(
       minimumWordCount,
@@ -162,6 +228,12 @@ Continue an incomplete chapter directly after its final sentence.
 
 Return only new prose. Do not repeat or rewrite existing prose.
 
+MANDATORY NARRATIVE STYLE:
+
+${narrativeStyle}
+
+Do not switch POV person or narrative tense.
+
 The existing draft contains ${existingWordCount} words.
 
 Write approximately ${Math.min(1800, Math.max(800, wordsStillNeeded + 250))} new words.
@@ -179,6 +251,12 @@ ${getEndingExcerpt(existingDraft)}
 `
       : `
 ${WRITER_PROMPT}
+
+MANDATORY NARRATIVE STYLE:
+
+${narrativeStyle}
+
+Do not switch POV person or narrative tense.
 
 STORY BIBLE:
 
@@ -214,11 +292,13 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
       max_tokens: 8000,
     });
 
-    const prose = response.choices[0]?.message?.content?.trim();
+    const rawProse = response.choices[0]?.message?.content;
 
-    if (!prose) {
+    if (!rawProse?.trim()) {
       throw new Error("Aion returned no chapter prose.");
     }
+
+    const prose = cleanGeneratedProse(rawProse);
 
     validateProse(prose);
 
