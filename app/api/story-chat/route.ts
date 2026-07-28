@@ -1240,6 +1240,9 @@ When Writer Mode is not active, return an empty string for chapterBrief.
 `.trim();
 
 export async function POST(request: Request) {
+  const planningDiagnostics: GenerationDiagnostic[] = [];
+  let planningAttempt = 0;
+
   try {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
@@ -1456,18 +1459,14 @@ workspace.`,
       createdAt: currentStory.createdAt,
       updatedAt: currentStory.updatedAt,
     };
-    const planningDiagnostics: GenerationDiagnostic[] = [];
-    let planningAttempt = 0;
-
-    const createPlanningResponse = (
+    const createPlanningResponse = async (
       planningConversation: typeof conversation,
     ) => {
       planningAttempt += 1;
       const attempt = planningAttempt;
       const startedAt = Date.now();
-
-      return openai.responses
-        .create({
+      try {
+        const planningResponse = await openai.responses.create({
           model: "gpt-5.6-terra",
 
           reasoning: {
@@ -1934,33 +1933,48 @@ ${JSON.stringify(planningWorkspace, null, 2)}
           },
 
           max_output_tokens: usesCompactChapterPlan ? 3500 : 10000,
-        })
-        .then((planningResponse) => {
-          const usage = planningResponse.usage;
-          const inputTokens = usage?.input_tokens ?? 0;
-          const outputTokens = usage?.output_tokens ?? 0;
-          const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
-          const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
-          const costUsd =
-            (uncachedTokens * 1.25 +
-              cachedTokens * 0.125 +
-              outputTokens * 7.5) /
-            1_000_000;
-
-          planningDiagnostics.push({
-            stage: "chapter_planning",
-            provider: "openai",
-            model: "gpt-5.6-terra",
-            inputTokens,
-            outputTokens,
-            totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
-            costUsd,
-            durationMs: Date.now() - startedAt,
-            attempt,
-          });
-
-          return planningResponse;
         });
+        const usage = planningResponse.usage;
+        const inputTokens = usage?.input_tokens ?? 0;
+        const outputTokens = usage?.output_tokens ?? 0;
+        const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+        const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+        const costUsd =
+          (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+          1_000_000;
+
+        planningDiagnostics.push({
+          stage: "chapter_planning",
+          provider: "openai",
+          model: "gpt-5.6-terra",
+          status: "succeeded",
+          inputTokens,
+          outputTokens,
+          totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+          costUsd,
+          durationMs: Date.now() - startedAt,
+          attempt,
+        });
+
+        return planningResponse;
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "The planning call failed.";
+        planningDiagnostics.push({
+          stage: "chapter_planning",
+          provider: "openai",
+          model: "gpt-5.6-terra",
+          status: "failed",
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          costUsd: null,
+          durationMs: Date.now() - startedAt,
+          attempt,
+          error: message,
+        });
+        throw error;
+      }
     };
 
     let response = await createPlanningResponse(conversation);
@@ -2065,6 +2079,11 @@ Write commercially publishable fiction.
       if (response.status === "incomplete") {
         planningFailureReason =
           response.incomplete_details?.reason ?? "the response was truncated";
+        planningDiagnostics[planningDiagnostics.length - 1] = {
+          ...planningDiagnostics[planningDiagnostics.length - 1],
+          status: "failed",
+          error: planningFailureReason,
+        };
         continue;
       }
 
@@ -2072,6 +2091,11 @@ Write commercially publishable fiction.
 
       if (!outputText) {
         planningFailureReason = "the model returned no output";
+        planningDiagnostics[planningDiagnostics.length - 1] = {
+          ...planningDiagnostics[planningDiagnostics.length - 1],
+          status: "failed",
+          error: planningFailureReason,
+        };
         continue;
       }
 
@@ -2080,6 +2104,11 @@ Write commercially publishable fiction.
         break;
       } catch {
         planningFailureReason = "the model returned incomplete JSON";
+        planningDiagnostics[planningDiagnostics.length - 1] = {
+          ...planningDiagnostics[planningDiagnostics.length - 1],
+          status: "failed",
+          error: planningFailureReason,
+        };
       }
     }
 
@@ -2418,13 +2447,24 @@ ${chapterEnding}
     return NextResponse.json(responseBody);
   } catch (error) {
     console.error("Story chat API failed:", error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "NovelForge could not process the message.";
+    const latestDiagnostic = planningDiagnostics.at(-1);
+
+    if (latestDiagnostic?.status === "succeeded") {
+      planningDiagnostics[planningDiagnostics.length - 1] = {
+        ...latestDiagnostic,
+        status: "failed",
+        error: message,
+      };
+    }
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "NovelForge could not process the message.",
+        error: message,
+        diagnostics: planningDiagnostics,
       },
 
       {
