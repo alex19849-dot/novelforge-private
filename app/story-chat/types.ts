@@ -98,6 +98,26 @@ export type StoryVoiceProfile = {
   forbiddenHabits: string[];
 };
 
+export type GenerationDiagnostic = {
+  stage: string;
+
+  provider: "openai" | "openrouter";
+
+  model: string;
+
+  inputTokens: number;
+
+  outputTokens: number;
+
+  totalTokens: number;
+
+  costUsd: number | null;
+
+  durationMs: number;
+
+  attempt: number;
+};
+
 export type StoryState = {
   importantFacts: string[];
 
@@ -122,6 +142,8 @@ export type StoryState = {
   repetitionWarnings?: string[];
 
   voiceProfiles?: StoryVoiceProfile[];
+
+  lastGenerationDiagnostics?: GenerationDiagnostic[];
 };
 
 export type StoryWorkspace = {
@@ -172,4 +194,6 @@ export type StoryChatResponse = {
   generatedChapter: GeneratedChapter | null;
 
   chapterBrief: string;
+
+  diagnostics?: GenerationDiagnostic[];
 };
