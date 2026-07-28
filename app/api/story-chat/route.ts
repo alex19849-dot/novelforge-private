@@ -1607,6 +1607,11 @@ latestRelationshipState and latestIntimacyMilestone.
 - Treat voiceProfiles as binding character-specific narration and
 dialogue guidance. Do not blend the POV voices together.
 
+- Contemporary narration, internal thought and dialogue must use
+natural contractions by default. Do not plan stiff, routinely
+uncontracted prose unless the user explicitly establishes a formal
+character voice.
+
 - A character cannot act on information they do not know.
 
 - Do not move the relationship backwards merely to recreate earlier
@@ -2071,6 +2076,11 @@ Avoid repetition.
 Avoid generic AI phrasing.
 
 Write naturally.
+
+Use natural contractions in contemporary narration, internal thought
+and dialogue. Avoid routinely expanded phrasing such as "I do not", "I
+have", "he is", "cannot" and "it does not" unless deliberate emphasis
+or a genuinely formal character requires it.
 
 Write cinematically.
 
