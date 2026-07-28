@@ -24,6 +24,7 @@ type LedgerRequest = {
   storyState?: unknown;
   chapters?: unknown;
   chapter?: ChapterInput;
+  rebuildMode?: unknown;
 };
 
 type LedgerModelOutput = {
@@ -246,6 +247,7 @@ function cleanChapters(value: unknown): Array<{
 export async function POST(request: Request) {
   let diagnostic: GenerationDiagnostic | null = null;
   let providerCallStartedAt = 0;
+  let diagnosticStage = "continuity_ledger_update";
 
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -261,6 +263,10 @@ export async function POST(request: Request) {
     const povCharacter = cleanString(body.chapter?.povCharacter);
     const chapterContent = cleanString(body.chapter?.content);
     const allChapters = cleanChapters(body.chapters);
+    const isBatchRebuild = body.rebuildMode === "batch";
+    diagnosticStage = isBatchRebuild
+      ? "continuity_ledger_backfill"
+      : "continuity_ledger_update";
 
     if (
       typeof chapterNumber !== "number" ||
@@ -280,18 +286,25 @@ export async function POST(request: Request) {
         ? Math.max(...allChapters.map((chapter) => chapter.number))
         : chapterNumber;
     const requiresFullRebuild =
-      existingLedger.length === 0 || chapterNumber < latestChapterNumber;
-    const chaptersToAnalyse = requiresFullRebuild
+      !isBatchRebuild &&
+      (existingLedger.length === 0 || chapterNumber < latestChapterNumber);
+    if (requiresFullRebuild) {
+      diagnosticStage = "continuity_ledger_backfill";
+    }
+    const chaptersToAnalyse = isBatchRebuild
       ? allChapters
-      : [
-          {
-            number: chapterNumber,
-            title: chapterTitle,
-            povCharacter,
-            content: chapterContent,
-          },
-        ];
-    const stateForAnalysis = requiresFullRebuild ? {} : (body.storyState ?? {});
+      : requiresFullRebuild
+        ? allChapters
+        : [
+            {
+              number: chapterNumber,
+              title: chapterTitle,
+              povCharacter,
+              content: chapterContent,
+            },
+          ];
+    const stateForAnalysis =
+      requiresFullRebuild && !isBatchRebuild ? {} : (body.storyState ?? {});
 
     if (chaptersToAnalyse.length === 0) {
       throw new Error("No chapters were available for continuity analysis.");
@@ -378,9 +391,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
     const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
     const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
     diagnostic = {
-      stage: requiresFullRebuild
-        ? "continuity_ledger_backfill"
-        : "continuity_ledger_update",
+      stage: diagnosticStage,
       provider: "openai",
       model: "gpt-5.6-terra",
       status: "succeeded",
@@ -507,7 +518,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
       };
     } else if (providerCallStartedAt > 0) {
       diagnostic = {
-        stage: "continuity_ledger_update",
+        stage: diagnosticStage,
         provider: "openai",
         model: "gpt-5.6-terra",
         status: "failed",
