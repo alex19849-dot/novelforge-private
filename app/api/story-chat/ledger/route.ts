@@ -34,6 +34,17 @@ type LedgerModelOutput = {
   activePOV: string;
   characterKnowledge: string[];
   repetitionWarnings: string[];
+  voiceProfiles: Array<{
+    characterName: string;
+    narrativeRhythm: string;
+    vocabulary: string;
+    humourStyle: string;
+    emotionalDeflection: string;
+    sensoryFocus: string;
+    dialoguePattern: string;
+    internalThoughtPattern: string;
+    forbiddenHabits: string[];
+  }>;
   chapterEntries: Array<{
     chapterNumber: number;
     summary: string;
@@ -61,6 +72,7 @@ const ledgerSchema = {
     "activePOV",
     "characterKnowledge",
     "repetitionWarnings",
+    "voiceProfiles",
     "chapterEntries",
   ],
   properties: {
@@ -98,6 +110,38 @@ const ledgerSchema = {
     repetitionWarnings: {
       type: "array",
       items: { type: "string" },
+    },
+    voiceProfiles: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "characterName",
+          "narrativeRhythm",
+          "vocabulary",
+          "humourStyle",
+          "emotionalDeflection",
+          "sensoryFocus",
+          "dialoguePattern",
+          "internalThoughtPattern",
+          "forbiddenHabits",
+        ],
+        properties: {
+          characterName: { type: "string" },
+          narrativeRhythm: { type: "string" },
+          vocabulary: { type: "string" },
+          humourStyle: { type: "string" },
+          emotionalDeflection: { type: "string" },
+          sensoryFocus: { type: "string" },
+          dialoguePattern: { type: "string" },
+          internalThoughtPattern: { type: "string" },
+          forbiddenHabits: {
+            type: "array",
+            items: { type: "string" },
+          },
+        },
+      },
     },
     chapterEntries: {
       type: "array",
@@ -275,6 +319,15 @@ Identify active unresolved threads. Keep the timeline chronological.
 Identify repeated scene constructions, emotional beats, gestures,
 internal conclusions or phrases that future chapters should avoid.
 
+Create one distinct voiceProfiles entry for every established main POV
+character. Each profile must describe concrete differences in narrative
+rhythm, vocabulary, humour, emotional deflection, sensory attention,
+dialogue and internal thought. The voices must not be interchangeable.
+
+Preserve existing voice profiles unless the actual prose supplies strong
+evidence of a deliberate change. Add specific forbidden habits that
+would make this character sound generic or too similar to another POV.
+
 Return one chapterEntries item for every supplied chapter, in chapter
 number order.
 
@@ -409,6 +462,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
             : getEndingExcerpt(chapterContent),
         characterKnowledge: output.characterKnowledge,
         repetitionWarnings: output.repetitionWarnings,
+        voiceProfiles: output.voiceProfiles,
       },
     });
   } catch (error) {
