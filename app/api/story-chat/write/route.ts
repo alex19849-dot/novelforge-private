@@ -39,10 +39,6 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function getAcceptedMinimum(minimumWordCount: number): number {
-  return Math.floor(minimumWordCount * 0.95);
-}
-
 function getEndingExcerpt(text: string, maximumWords = 900): string {
   const words = text.trim().split(/\s+/).filter(Boolean);
 
@@ -223,7 +219,7 @@ export async function POST(request: Request) {
       : "chapter_writing";
     const recentChapters = cleanRecentChapters(body.recentChapters);
     const narrativeStyle = getNarrativeStyle(body.storyBible);
-    const minimumWordCount = getWordCount(body.minimumWordCount, 3000);
+    const minimumWordCount = getWordCount(body.minimumWordCount, 2000);
     const maximumWordCount = Math.max(
       minimumWordCount,
       getWordCount(body.maximumWordCount, 4000),
@@ -362,7 +358,7 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
     return NextResponse.json({
       prose,
       totalWordCount,
-      isComplete: totalWordCount >= getAcceptedMinimum(minimumWordCount),
+      isComplete: totalWordCount >= minimumWordCount,
       diagnostics,
     });
   } catch (error) {
