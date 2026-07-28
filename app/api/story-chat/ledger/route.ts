@@ -347,6 +347,11 @@ Preserve existing voice profiles unless the actual prose supplies strong
 evidence of a deliberate change. Add specific forbidden habits that
 would make this character sound generic or too similar to another POV.
 
+Natural contractions are the default for contemporary narration,
+internal thought and dialogue. Do not preserve pervasive stiff
+uncontracted phrasing as a character trait unless the Story Bible
+clearly establishes that the character is deliberately formal.
+
 Return one chapterEntries item for every supplied chapter, in chapter
 number order.
 
