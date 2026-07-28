@@ -37,6 +37,10 @@ type WriterResponse = {
   isComplete: boolean;
 };
 
+type LedgerResponse = {
+  storyState: StoryWorkspace["storyState"];
+};
+
 const EMPTY_STORY_BIBLE: StoryBible = {
   premise: "",
 
@@ -73,6 +77,14 @@ const EMPTY_STORY_STATE = {
   locations: [],
 
   activePOV: "",
+
+  chapterLedger: [],
+
+  latestChapterEnding: "",
+
+  characterKnowledge: [],
+
+  repetitionWarnings: [],
 };
 
 function createEmptyStory(): StoryWorkspace {
@@ -245,6 +257,28 @@ function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
 
   const state = value as Partial<StoryWorkspace["storyState"]>;
 
+  const chapterLedgerIsValid =
+    state.chapterLedger === undefined ||
+    (Array.isArray(state.chapterLedger) &&
+      state.chapterLedger.every(
+        (entry) =>
+          Boolean(entry) &&
+          typeof entry === "object" &&
+          typeof entry.chapterNumber === "number" &&
+          typeof entry.title === "string" &&
+          typeof entry.povCharacter === "string" &&
+          typeof entry.summary === "string" &&
+          typeof entry.openingLocation === "string" &&
+          typeof entry.endingLocation === "string" &&
+          typeof entry.endingTime === "string" &&
+          typeof entry.endingExcerpt === "string" &&
+          typeof entry.relationshipShift === "string" &&
+          typeof entry.intimacyMilestone === "string" &&
+          isStringArray(entry.newFacts) &&
+          isStringArray(entry.unresolvedThreads) &&
+          isStringArray(entry.repeatedBeats),
+      ));
+
   return (
     isStringArray(state.importantFacts) &&
     isStringArray(state.characterStates) &&
@@ -252,8 +286,23 @@ function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
     isStringArray(state.unresolvedThreads) &&
     isStringArray(state.timeline) &&
     isStringArray(state.locations) &&
-    typeof state.activePOV === "string"
+    typeof state.activePOV === "string" &&
+    chapterLedgerIsValid &&
+    (state.latestChapterEnding === undefined ||
+      typeof state.latestChapterEnding === "string") &&
+    (state.characterKnowledge === undefined ||
+      isStringArray(state.characterKnowledge)) &&
+    (state.repetitionWarnings === undefined ||
+      isStringArray(state.repetitionWarnings))
   );
+}
+
+function isLedgerResponse(value: unknown): value is LedgerResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  return isStoryState((value as Partial<LedgerResponse>).storyState);
 }
 
 function isStoryChapter(
@@ -342,15 +391,15 @@ function isStoryChatResponse(value: unknown): value is StoryChatResponse {
 function hasStoryBibleContent(storyBible: StoryBible): boolean {
   return Boolean(
     storyBible.premise.trim() ||
-    storyBible.relationship.trim() ||
-    storyBible.subgenre.trim() ||
-    storyBible.setting.trim() ||
-    storyBible.pov.trim() ||
-    storyBible.heatLevel.trim() ||
-    storyBible.burnPacing.trim() ||
-    storyBible.tropes.length ||
-    storyBible.characters.length ||
-    storyBible.notes.length,
+      storyBible.relationship.trim() ||
+      storyBible.subgenre.trim() ||
+      storyBible.setting.trim() ||
+      storyBible.pov.trim() ||
+      storyBible.heatLevel.trim() ||
+      storyBible.burnPacing.trim() ||
+      storyBible.tropes.length ||
+      storyBible.characters.length ||
+      storyBible.notes.length,
   );
 }
 
@@ -404,8 +453,7 @@ function applyGeneratedChapter(
       {
         id: crypto.randomUUID(),
         number: nextChapterNumber,
-        title:
-          chapterMetadata.title.trim() || `Chapter ${nextChapterNumber}`,
+        title: chapterMetadata.title.trim() || `Chapter ${nextChapterNumber}`,
         povCharacter: chapterMetadata.povCharacter.trim(),
         content: content.trim(),
         createdAt: now,
@@ -1238,6 +1286,64 @@ device.`,
               .filter((chapter) => chapter.number < replacementNumber)
               .slice(-2);
 
+      const finishCompletedChapter = async (content: string) => {
+        const chapterStory = applyGeneratedChapter(
+          baseStory,
+          workingPending,
+          content,
+        );
+        const completedChapterNumber =
+          replacementNumber ??
+          Math.max(0, ...baseStory.chapters.map((chapter) => chapter.number)) +
+            1;
+        const completedChapter = chapterStory.chapters.find(
+          (chapter) => chapter.number === completedChapterNumber,
+        );
+
+        if (!completedChapter) {
+          throw new Error(
+            "The completed chapter could not be prepared for continuity.",
+          );
+        }
+
+        const ledgerResponse = await fetch("/api/story-chat/ledger", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            storyBible: chapterStory.storyBible,
+            storyState: baseStory.storyState,
+            chapters: chapterStory.chapters,
+            chapter: completedChapter,
+          }),
+        });
+        const ledgerData = await readApiJson(ledgerResponse);
+
+        if (!isLedgerResponse(ledgerData)) {
+          throw new Error(
+            "The continuity endpoint returned an invalid story ledger.",
+          );
+        }
+
+        const completedStory: StoryWorkspace = {
+          ...chapterStory,
+          storyState: ledgerData.storyState,
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(completedStory);
+        clearPendingGeneration();
+      };
+
+      if (
+        workingPending.draft.trim() &&
+        countWords(workingPending.draft) >= workingPending.minimumWordCount
+      ) {
+        await finishCompletedChapter(workingPending.draft);
+        return;
+      }
+
       for (let segment = 0; segment < 4; segment += 1) {
         const response = await fetch("/api/story-chat/write", {
           method: "POST",
@@ -1274,14 +1380,7 @@ device.`,
         savePendingGeneration(workingPending);
 
         if (data.isComplete) {
-          const completedStory = applyGeneratedChapter(
-            baseStory,
-            workingPending,
-            combinedDraft,
-          );
-
-          await persistStory(completedStory);
-          clearPendingGeneration();
+          await finishCompletedChapter(combinedDraft);
           return;
         }
       }
@@ -1746,7 +1845,9 @@ hover:text-red-300"
                 value={exportWarnings}
                 disabled={isExporting}
                 onChange={(event) => setExportWarnings(event.target.value)}
-                placeholder={"Explicit adult content\nStrong language\nViolence"}
+                placeholder={
+                  "Explicit adult content\nStrong language\nViolence"
+                }
                 rows={6}
                 className="mt-4 w-full resize-none rounded-xl border border-white/10
 bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600
