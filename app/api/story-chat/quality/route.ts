@@ -46,13 +46,29 @@ type GenerationDiagnostic = {
   stage: string;
   provider: "openai" | "openrouter";
   model: string;
+  status: "succeeded" | "failed";
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
   costUsd: number | null;
   durationMs: number;
   attempt: number;
+  error?: string;
 };
+
+class DiagnosticFailure extends Error {
+  diagnostic: GenerationDiagnostic;
+
+  constructor(message: string, diagnostic: GenerationDiagnostic) {
+    super(message);
+    this.name = "DiagnosticFailure";
+    this.diagnostic = {
+      ...diagnostic,
+      status: "failed",
+      error: message,
+    };
+  }
+}
 
 const qualitySchema = {
   type: "object",
@@ -296,42 +312,58 @@ ${input.chapterContent}
     },
     max_output_tokens: 2500,
   });
+  const usage = response.usage;
+  const inputTokens = usage?.input_tokens ?? 0;
+  const outputTokens = usage?.output_tokens ?? 0;
+  const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+  const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+  const diagnostic: GenerationDiagnostic = {
+    stage: "chapter_quality_assessment",
+    provider: "openai",
+    model: "gpt-5.6-terra",
+    status: "succeeded",
+    inputTokens,
+    outputTokens,
+    totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+    costUsd:
+      (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+      1_000_000,
+    durationMs: Date.now() - startedAt,
+    attempt: input.attempt,
+  };
 
   if (response.status === "incomplete") {
-    throw new Error(
+    throw new DiagnosticFailure(
       `The quality assessment was incomplete because ${
         response.incomplete_details?.reason ?? "the response was truncated"
       }.`,
+      diagnostic,
     );
   }
 
   const outputText = response.output_text?.trim();
 
   if (!outputText) {
-    throw new Error("The quality model returned no assessment.");
+    throw new DiagnosticFailure(
+      "The quality model returned no assessment.",
+      diagnostic,
+    );
   }
 
-  const usage = response.usage;
-  const inputTokens = usage?.input_tokens ?? 0;
-  const outputTokens = usage?.output_tokens ?? 0;
-  const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
-  const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+  let assessment: QualityAssessment;
+
+  try {
+    assessment = JSON.parse(outputText) as QualityAssessment;
+  } catch {
+    throw new DiagnosticFailure(
+      "The quality model returned invalid JSON.",
+      diagnostic,
+    );
+  }
 
   return {
-    assessment: JSON.parse(outputText) as QualityAssessment,
-    diagnostic: {
-      stage: "chapter_quality_assessment",
-      provider: "openai",
-      model: "gpt-5.6-terra",
-      inputTokens,
-      outputTokens,
-      totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
-      costUsd:
-        (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
-        1_000_000,
-      durationMs: Date.now() - startedAt,
-      attempt: input.attempt,
-    },
+    assessment,
+    diagnostic,
   };
 }
 
@@ -405,12 +437,6 @@ ${input.chapterContent}
     ],
     max_tokens: 8000,
   });
-  const repaired = response.choices[0]?.message?.content;
-
-  if (!repaired?.trim()) {
-    throw new Error("Aion returned no repaired chapter.");
-  }
-
   const rawUsage = response.usage as unknown as
     | Record<string, unknown>
     | undefined;
@@ -420,27 +446,40 @@ ${input.chapterContent}
     typeof rawUsage?.completion_tokens === "number"
       ? rawUsage.completion_tokens
       : 0;
+  const diagnostic: GenerationDiagnostic = {
+    stage: "chapter_quality_repair",
+    provider: "openrouter",
+    model: "aion-labs/aion-3.0-mini",
+    status: "succeeded",
+    inputTokens,
+    outputTokens,
+    totalTokens:
+      typeof rawUsage?.total_tokens === "number"
+        ? rawUsage.total_tokens
+        : inputTokens + outputTokens,
+    costUsd: typeof rawUsage?.cost === "number" ? rawUsage.cost : null,
+    durationMs: Date.now() - startedAt,
+    attempt: 1,
+  };
+  const repaired = response.choices[0]?.message?.content;
+
+  if (!repaired?.trim()) {
+    throw new DiagnosticFailure(
+      "Aion returned no repaired chapter.",
+      diagnostic,
+    );
+  }
 
   return {
     content: cleanGeneratedProse(repaired),
-    diagnostic: {
-      stage: "chapter_quality_repair",
-      provider: "openrouter",
-      model: "aion-labs/aion-3.0-mini",
-      inputTokens,
-      outputTokens,
-      totalTokens:
-        typeof rawUsage?.total_tokens === "number"
-          ? rawUsage.total_tokens
-          : inputTokens + outputTokens,
-      costUsd: typeof rawUsage?.cost === "number" ? rawUsage.cost : null,
-      durationMs: Date.now() - startedAt,
-      attempt: 1,
-    },
+    diagnostic,
   };
 }
 
 export async function POST(request: Request) {
+  const diagnostics: GenerationDiagnostic[] = [];
+  let pipelineStartedAt = 0;
+
   try {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
@@ -482,7 +521,7 @@ export async function POST(request: Request) {
       minimumWordCount,
       allowedMaximumWordCount,
     );
-    const diagnostics: GenerationDiagnostic[] = [];
+    pipelineStartedAt = Date.now();
     const firstQualityResult = await assessChapter({
       storyBible: body.storyBible ?? {},
       storyState: body.storyState ?? {},
@@ -550,13 +589,57 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("CHAPTER QUALITY GATE FAILED:", error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "The chapter quality gate failed.";
+
+    if (error instanceof DiagnosticFailure) {
+      diagnostics.push(error.diagnostic);
+    } else if (pipelineStartedAt > 0) {
+      const lastStage = diagnostics.at(-1)?.stage;
+      const stage =
+        diagnostics.length === 0 || lastStage === "chapter_quality_repair"
+          ? "chapter_quality_assessment"
+          : "chapter_quality_repair";
+      const provider =
+        stage === "chapter_quality_repair" ? "openrouter" : "openai";
+      const elapsedCompleted = diagnostics.reduce(
+        (total, diagnostic) => total + diagnostic.durationMs,
+        0,
+      );
+
+      diagnostics.push({
+        stage,
+        provider,
+        model:
+          provider === "openrouter"
+            ? "aion-labs/aion-3.0-mini"
+            : "gpt-5.6-terra",
+        status: "failed",
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        costUsd: null,
+        durationMs: Math.max(
+          0,
+          Date.now() - pipelineStartedAt - elapsedCompleted,
+        ),
+        attempt:
+          stage === "chapter_quality_assessment" &&
+          diagnostics.some(
+            (diagnostic) => diagnostic.stage === "chapter_quality_assessment",
+          )
+            ? 2
+            : 1,
+        error: message,
+      });
+    }
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "The chapter quality gate failed.",
+        error: message,
+        diagnostics,
       },
       { status: 502 },
     );
