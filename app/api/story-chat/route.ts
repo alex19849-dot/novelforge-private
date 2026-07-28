@@ -1202,7 +1202,7 @@ export async function POST(request: Request) {
     }
 
     const intentInstruction: Record<typeof intent, string> = {
-     create_story: `Create a brand new story from the user's request.
+      create_story: `Create a brand new story from the user's request.
 
 Generate:
 - a specific commercial story title
@@ -1279,17 +1279,17 @@ workspace.`,
       planningConversation: typeof conversation,
     ) =>
       openai.responses.create({
-      model: "gpt-5.5",
+        model: "gpt-5.5",
 
-      reasoning: {
-        effort: "low",
-      },
+        reasoning: {
+          effort: "low",
+        },
 
-      input: [
-        {
-          role: "system",
+        input: [
+          {
+            role: "system",
 
-          content: `${NOVELFORGE_PERSONALITY}
+            content: `${NOVELFORGE_PERSONALITY}
 
 ${SYSTEM_PROMPT}
 
@@ -1659,27 +1659,27 @@ CURRENT STORY WORKSPACE:
 ${JSON.stringify(planningWorkspace, null, 2)}
 
 `,
+          },
+
+          ...planningConversation,
+        ],
+
+        text: {
+          verbosity: "medium",
+
+          format: {
+            type: "json_schema",
+
+            name: "story_chat_response",
+
+            strict: true,
+
+            schema: storyChatSchema,
+          },
         },
 
-        ...planningConversation,
-      ],
-
-      text: {
-        verbosity: "medium",
-
-        format: {
-          type: "json_schema",
-
-          name: "story_chat_response",
-
-          strict: true,
-
-          schema: storyChatSchema,
-        },
-      },
-
-      max_output_tokens: 10000,
-    });
+        max_output_tokens: 10000,
+      });
 
     let response = await createPlanningResponse(conversation);
 
@@ -1836,10 +1836,10 @@ Write commercially publishable fiction.
       throw new Error("The model returned an incomplete story bible.");
     }
 
-  const mergedStoryBible = mergeStoryBible(
-  sanitiseStoryBible(currentStory.storyBible),
-  returnedBible,
-);
+    const mergedStoryBible = mergeStoryBible(
+      sanitiseStoryBible(currentStory.storyBible),
+      returnedBible,
+    );
 
     const storyTitle =
       returnedTitle || cleanString(currentStory.title) || "Untitled story";
@@ -1881,7 +1881,7 @@ Write commercially publishable fiction.
             },
           ],
           storyBible: mergedStoryBible,
-          storyState: returnedStoryState,
+          storyState: currentStory.storyState,
           updatedAt: plannedAt,
         };
 
@@ -1896,18 +1896,18 @@ Write commercially publishable fiction.
 
       const recentChapters = currentStory.chapters.slice(-3);
 
-    const explicitlyRequestedWordCount =
-  getRequestedWordCount(latestUserMessage);
+      const explicitlyRequestedWordCount =
+        getRequestedWordCount(latestUserMessage);
 
-const minimumWordCount = explicitlyRequestedWordCount
-  ? Math.floor(explicitlyRequestedWordCount * 0.95)
-  : 3000;
+      const minimumWordCount = explicitlyRequestedWordCount
+        ? Math.floor(explicitlyRequestedWordCount * 0.95)
+        : 3000;
 
-const maximumWordCount = explicitlyRequestedWordCount
-  ? Math.ceil(explicitlyRequestedWordCount * 1.1)
-  : 4000;
+      const maximumWordCount = explicitlyRequestedWordCount
+        ? Math.ceil(explicitlyRequestedWordCount * 1.1)
+        : 4000;
 
-const writingPrompt = `
+      const writingPrompt = `
 
 ${AION_WRITER_PROMPT}
 
