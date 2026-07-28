@@ -115,6 +115,8 @@ export type GenerationDiagnostic = {
 
   costUsd: number | null;
 
+  costType?: "reported" | "estimated" | "unavailable";
+
   durationMs: number;
 
   attempt: number;
