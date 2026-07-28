@@ -41,6 +41,27 @@ type LedgerResponse = {
   storyState: StoryWorkspace["storyState"];
 };
 
+type QualityResponse = {
+  accepted: boolean;
+  chapterContent: string;
+  repaired: boolean;
+  quality: {
+    passed: boolean;
+    hardFailures: string[];
+    repairInstructions: string[];
+    summary: string;
+    scores: {
+      continuity: number;
+      plotMovement: number;
+      relationshipProgression: number;
+      voiceDistinctiveness: number;
+      povAndTense: number;
+      repetitionControl: number;
+      hookStrength: number;
+    };
+  };
+};
+
 const EMPTY_STORY_BIBLE: StoryBible = {
   premise: "",
 
@@ -323,6 +344,36 @@ function isLedgerResponse(value: unknown): value is LedgerResponse {
   }
 
   return isStoryState((value as Partial<LedgerResponse>).storyState);
+}
+
+function isQualityResponse(value: unknown): value is QualityResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const response = value as Partial<QualityResponse>;
+  const quality = response.quality;
+  const scores = quality?.scores;
+
+  return (
+    typeof response.accepted === "boolean" &&
+    typeof response.chapterContent === "string" &&
+    Boolean(response.chapterContent.trim()) &&
+    typeof response.repaired === "boolean" &&
+    Boolean(quality) &&
+    typeof quality?.passed === "boolean" &&
+    isStringArray(quality?.hardFailures) &&
+    isStringArray(quality?.repairInstructions) &&
+    typeof quality?.summary === "string" &&
+    Boolean(scores) &&
+    typeof scores?.continuity === "number" &&
+    typeof scores?.plotMovement === "number" &&
+    typeof scores?.relationshipProgression === "number" &&
+    typeof scores?.voiceDistinctiveness === "number" &&
+    typeof scores?.povAndTense === "number" &&
+    typeof scores?.repetitionControl === "number" &&
+    typeof scores?.hookStrength === "number"
+  );
 }
 
 function isStoryChapter(
@@ -1307,10 +1358,47 @@ device.`,
               .slice(-2);
 
       const finishCompletedChapter = async (content: string) => {
+        const qualityResponse = await fetch("/api/story-chat/quality", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            storyBible: baseStory.storyBible,
+            storyState: baseStory.storyState,
+            chapterBrief: workingPending.chapterBrief,
+            chapterTitle: workingPending.generatedChapter.title,
+            povCharacter: workingPending.generatedChapter.povCharacter,
+            chapterContent: content,
+            minimumWordCount: workingPending.minimumWordCount,
+            maximumWordCount: workingPending.maximumWordCount,
+          }),
+        });
+        const qualityData = await readApiJson(qualityResponse);
+
+        if (!isQualityResponse(qualityData)) {
+          throw new Error(
+            "The quality endpoint returned an invalid assessment.",
+          );
+        }
+
+        if (!qualityData.accepted) {
+          workingPending = {
+            ...workingPending,
+            draft: qualityData.chapterContent,
+          };
+          savePendingGeneration(workingPending);
+
+          throw new Error(
+            `The repaired chapter still failed its quality check: ${qualityData.quality.summary} The repaired draft has been preserved.`,
+          );
+        }
+
+        const approvedContent = qualityData.chapterContent;
         const chapterStory = applyGeneratedChapter(
           baseStory,
           workingPending,
-          content,
+          approvedContent,
         );
         const completedChapterNumber =
           replacementNumber ??
