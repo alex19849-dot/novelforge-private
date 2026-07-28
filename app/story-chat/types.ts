@@ -78,6 +78,26 @@ export type ChapterLedgerEntry = {
   repeatedBeats: string[];
 };
 
+export type StoryVoiceProfile = {
+  characterName: string;
+
+  narrativeRhythm: string;
+
+  vocabulary: string;
+
+  humourStyle: string;
+
+  emotionalDeflection: string;
+
+  sensoryFocus: string;
+
+  dialoguePattern: string;
+
+  internalThoughtPattern: string;
+
+  forbiddenHabits: string[];
+};
+
 export type StoryState = {
   importantFacts: string[];
 
@@ -100,6 +120,8 @@ export type StoryState = {
   characterKnowledge?: string[];
 
   repetitionWarnings?: string[];
+
+  voiceProfiles?: StoryVoiceProfile[];
 };
 
 export type StoryWorkspace = {
