@@ -1289,6 +1289,15 @@ export async function POST(request: Request) {
 
     const conversation = currentStory.messages
 
+      .map((message) => ({
+        ...message,
+        content: message.content
+          .replace(/\s*Generation diagnostics:.*$/is, "")
+          .trim(),
+      }))
+
+      .filter((message) => Boolean(message.content))
+
       .slice(-12)
 
       .map((message) => ({
