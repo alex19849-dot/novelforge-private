@@ -510,6 +510,7 @@ export async function POST(request: Request) {
       minimumWordCount,
       getWordCount(body.maximumWordCount, 4000),
     );
+    const acceptedMinimumWordCount = Math.floor(minimumWordCount * 0.95);
     const allowedMaximumWordCount = Math.ceil(maximumWordCount * 1.1);
 
     if (!chapterBrief || !povCharacter || !chapterContent) {
@@ -521,7 +522,7 @@ export async function POST(request: Request) {
 
     const mechanicalFailures = validateMechanicalQuality(
       chapterContent,
-      minimumWordCount,
+      acceptedMinimumWordCount,
       allowedMaximumWordCount,
     );
     pipelineStartedAt = Date.now();
@@ -563,7 +564,7 @@ export async function POST(request: Request) {
     diagnostics.push(repairResult.diagnostic);
     const repairedMechanicalFailures = validateMechanicalQuality(
       repairedContent,
-      minimumWordCount,
+      acceptedMinimumWordCount,
       allowedMaximumWordCount,
     );
     const secondQualityResult = await assessChapter({
