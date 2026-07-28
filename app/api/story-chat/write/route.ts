@@ -2,6 +2,8 @@ import OpenAI from "openai";
 
 import { NextResponse } from "next/server";
 
+import type { GenerationDiagnostic } from "../../../story-chat/types";
+
 export const runtime = "nodejs";
 
 export const maxDuration = 180;
@@ -191,6 +193,10 @@ Never use em dashes or en dashes.
 `.trim();
 
 export async function POST(request: Request) {
+  const diagnostics: GenerationDiagnostic[] = [];
+  let providerCallStartedAt = 0;
+  let providerStage = "chapter_writing";
+
   try {
     if (!process.env.OPENROUTER_API_KEY) {
       return NextResponse.json(
@@ -203,6 +209,9 @@ export async function POST(request: Request) {
     const chapterBrief = cleanString(body.chapterBrief);
     const latestUserMessage = cleanString(body.latestUserMessage);
     const existingDraft = cleanString(body.existingDraft);
+    providerStage = existingDraft
+      ? "chapter_writing_continuation"
+      : "chapter_writing";
     const recentChapters = cleanRecentChapters(body.recentChapters);
     const narrativeStyle = getNarrativeStyle(body.storyBible);
     const minimumWordCount = getWordCount(body.minimumWordCount, 3000);
@@ -290,7 +299,7 @@ ${latestUserMessage}
 Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} words.
 `;
 
-    const startedAt = Date.now();
+    providerCallStartedAt = Date.now();
     const response = await openrouter.chat.completions.create({
       model: "aion-labs/aion-3.0-mini",
       messages: [
@@ -301,18 +310,6 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
       ],
       max_tokens: 8000,
     });
-
-    const rawProse = response.choices[0]?.message?.content;
-
-    if (!rawProse?.trim()) {
-      throw new Error("Aion returned no chapter prose.");
-    }
-
-    const prose = cleanGeneratedProse(rawProse);
-
-    validateProse(prose);
-
-    const totalWordCount = existingWordCount + countWords(prose);
     const rawUsage = response.usage as unknown as
       | Record<string, unknown>
       | undefined;
@@ -327,34 +324,68 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
         ? rawUsage.total_tokens
         : inputTokens + outputTokens;
     const costUsd = typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
+    diagnostics.push({
+      stage: providerStage,
+      provider: "openrouter",
+      model: "aion-labs/aion-3.0-mini",
+      status: "succeeded",
+      inputTokens,
+      outputTokens,
+      totalTokens,
+      costUsd,
+      durationMs: Date.now() - providerCallStartedAt,
+      attempt: 1,
+    });
+
+    const rawProse = response.choices[0]?.message?.content;
+
+    if (!rawProse?.trim()) {
+      throw new Error("Aion returned no chapter prose.");
+    }
+
+    const prose = cleanGeneratedProse(rawProse);
+
+    validateProse(prose);
+
+    const totalWordCount = existingWordCount + countWords(prose);
 
     return NextResponse.json({
       prose,
       totalWordCount,
       isComplete: totalWordCount >= minimumWordCount,
-      diagnostics: [
-        {
-          stage: existingDraft
-            ? "chapter_writing_continuation"
-            : "chapter_writing",
-          provider: "openrouter",
-          model: "aion-labs/aion-3.0-mini",
-          inputTokens,
-          outputTokens,
-          totalTokens,
-          costUsd,
-          durationMs: Date.now() - startedAt,
-          attempt: 1,
-        },
-      ],
+      diagnostics,
     });
   } catch (error) {
     console.error("STORY WRITER FAILED:", error);
+    const message =
+      error instanceof Error ? error.message : "The writing model failed.";
+
+    if (diagnostics.length > 0) {
+      diagnostics[diagnostics.length - 1] = {
+        ...diagnostics[diagnostics.length - 1],
+        status: "failed",
+        error: message,
+      };
+    } else if (providerCallStartedAt > 0) {
+      diagnostics.push({
+        stage: providerStage,
+        provider: "openrouter",
+        model: "aion-labs/aion-3.0-mini",
+        status: "failed",
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        costUsd: null,
+        durationMs: Date.now() - providerCallStartedAt,
+        attempt: 1,
+        error: message,
+      });
+    }
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "The writing model failed.",
+        error: message,
+        diagnostics,
       },
       { status: 502 },
     );
