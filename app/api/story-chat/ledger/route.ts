@@ -401,6 +401,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
       costUsd:
         (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
         1_000_000,
+      costType: "estimated",
       durationMs: Date.now() - providerCallStartedAt,
       attempt: 1,
     };
@@ -526,6 +527,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
         outputTokens: 0,
         totalTokens: 0,
         costUsd: null,
+        costType: "unavailable",
         durationMs: Date.now() - providerCallStartedAt,
         attempt: 1,
         error: message,
