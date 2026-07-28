@@ -85,6 +85,8 @@ const EMPTY_STORY_STATE = {
   characterKnowledge: [],
 
   repetitionWarnings: [],
+
+  voiceProfiles: [],
 };
 
 function createEmptyStory(): StoryWorkspace {
@@ -278,6 +280,23 @@ function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
           isStringArray(entry.unresolvedThreads) &&
           isStringArray(entry.repeatedBeats),
       ));
+  const voiceProfilesAreValid =
+    state.voiceProfiles === undefined ||
+    (Array.isArray(state.voiceProfiles) &&
+      state.voiceProfiles.every(
+        (profile) =>
+          Boolean(profile) &&
+          typeof profile === "object" &&
+          typeof profile.characterName === "string" &&
+          typeof profile.narrativeRhythm === "string" &&
+          typeof profile.vocabulary === "string" &&
+          typeof profile.humourStyle === "string" &&
+          typeof profile.emotionalDeflection === "string" &&
+          typeof profile.sensoryFocus === "string" &&
+          typeof profile.dialoguePattern === "string" &&
+          typeof profile.internalThoughtPattern === "string" &&
+          isStringArray(profile.forbiddenHabits),
+      ));
 
   return (
     isStringArray(state.importantFacts) &&
@@ -293,7 +312,8 @@ function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
     (state.characterKnowledge === undefined ||
       isStringArray(state.characterKnowledge)) &&
     (state.repetitionWarnings === undefined ||
-      isStringArray(state.repetitionWarnings))
+      isStringArray(state.repetitionWarnings)) &&
+    voiceProfilesAreValid
   );
 }
 
@@ -1436,6 +1456,7 @@ device.`,
       messages: [...story.messages, userMessage],
       updatedAt: new Date().toISOString(),
     };
+    let planningStory = requestStory;
 
     setStory(requestStory);
 
@@ -1443,6 +1464,41 @@ device.`,
     setIsThinking(true);
 
     try {
+      if (
+        planningStory.chapters.length > 0 &&
+        !planningStory.storyState.chapterLedger?.length
+      ) {
+        const latestExistingChapter =
+          planningStory.chapters[planningStory.chapters.length - 1];
+        const ledgerResponse = await fetch("/api/story-chat/ledger", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            storyBible: planningStory.storyBible,
+            storyState: planningStory.storyState,
+            chapters: planningStory.chapters,
+            chapter: latestExistingChapter,
+          }),
+        });
+        const ledgerData = await readApiJson(ledgerResponse);
+
+        if (!isLedgerResponse(ledgerData)) {
+          throw new Error(
+            "The continuity endpoint returned an invalid story ledger.",
+          );
+        }
+
+        planningStory = {
+          ...planningStory,
+          storyState: ledgerData.storyState,
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(planningStory);
+      }
+
       const response = await fetch("/api/story-chat", {
         method: "POST",
         headers: {
@@ -1450,7 +1506,7 @@ device.`,
         },
         body: JSON.stringify({
           stage: "plan",
-          story: requestStory,
+          story: planningStory,
         }),
       });
 
@@ -1461,7 +1517,7 @@ device.`,
       }
 
       const plannedStory: StoryWorkspace = {
-        ...requestStory,
+        ...planningStory,
         ...data.story,
         messages: data.story.messages,
         chapters: data.story.chapters,
@@ -1506,9 +1562,9 @@ device.`,
           : "Something went wrong while I was thinking. Try sending that again.";
 
       const failedStory: StoryWorkspace = {
-        ...requestStory,
+        ...planningStory,
         messages: [
-          ...requestStory.messages,
+          ...planningStory.messages,
           {
             id: Date.now(),
             role: "assistant",
