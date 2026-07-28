@@ -1292,7 +1292,7 @@ export async function POST(request: Request) {
       .map((message) => ({
         ...message,
         content: message.content
-          .replace(/\s*Generation diagnostics:.*$/is, "")
+          .replace(/\s*Generation diagnostics:[\s\S]*$/i, "")
           .trim(),
       }))
 
