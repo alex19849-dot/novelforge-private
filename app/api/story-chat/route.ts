@@ -1128,33 +1128,107 @@ CHAPTER BRIEF
 When Writer Mode is active, create a detailed chapterBrief for the
 writing model.
 
-The chapterBrief must include:
+Write chapterBrief using these exact labelled sections:
 
-- The exact chapter or passage to write.
+CHAPTER:
 
-- The POV character.
+- Chapter number, title, POV character, POV person and narrative tense.
 
-- The chapter objective.
+EXACT HANDOFF:
 
-- The emotional progression.
+- State precisely where, when and how the previous chapter ended.
 
-- The required plot developments.
+- Identify the immediate action, decision, interruption or consequence
+that opens this chapter.
 
-- The relationship progression.
+- Do not restart, recap or paraphrase the previous ending.
 
-- Important continuity from previous chapters.
+EXTERNAL STORY MOVEMENT:
 
-- Character voice reminders.
+- Give the POV character a concrete immediate goal outside merely
+thinking about the romance.
 
-- The intended opening.
+- Specify the obstacle, opposition or complication.
 
-- The key scenes or beats.
+- Specify the reversal, revelation or consequence that changes the
+external situation before the chapter ends.
 
-- The intended ending or hook.
+RELATIONSHIP MOVEMENT:
 
-- The target word count.
+- State the relationship position at the beginning.
 
-- Any relevant heat and burn-pacing restrictions.
+- State the materially different relationship position at the end.
+
+- Identify the existing intimacy milestone and the new milestone,
+changed meaning or consequence reached here.
+
+- Never move the relationship backwards merely to replay denial,
+jealousy, almost-touching, retreat or private rumination.
+
+CHARACTER KNOWLEDGE AND VOICE:
+
+- State what the POV character knows, suspects, misunderstands and
+conceals.
+
+- Give concise voice reminders specific to this POV character.
+
+- State what the other important characters know and cannot yet know.
+
+SCENE DESIGN:
+
+- Plan two to four purposeful scenes or continuous scene movements.
+
+- For each, specify the location, active goal, conflict and resulting
+change.
+
+- Every scene must cause a decision, discovery, consequence or changed
+relationship dynamic.
+
+- Do not use filler scenes whose only function is attraction,
+description, travel, waking, showering, staring at a phone or replaying
+the previous encounter.
+
+ANTI-REPETITION:
+
+- List the recent scene structures, gestures, phrases, emotional
+conclusions and attraction beats that are forbidden in this chapter.
+
+- Do not repeat a setting or hook construction merely because it worked
+before.
+
+HEAT AND BURN:
+
+- State the selected heat level and burn pacing.
+
+- State exactly what on-page intimacy is appropriate in this chapter.
+
+- If the planned milestone calls for explicit consensual adult
+intimacy, require it at the selected heat level without fading to black.
+
+- Do not force intimacy before the story has earned it and do not avoid
+it after the planned progression reaches it.
+
+ENDING HOOK:
+
+- Choose a concrete hook based on an event, reveal, decision, threat,
+interruption, public risk, irreversible action or new consequence.
+
+- Do not end with another vague internal summary such as being in
+trouble, something changing, not knowing what to do or being unable to
+stop wanting someone.
+
+- Do not repeat the hook type used by either of the previous two
+chapters.
+
+TARGET:
+
+- State the target word count.
+
+- State the two or more meaningful story conditions that must be
+different by the final paragraph.
+
+The chapterBrief must make firm creative decisions. Do not give the
+writing model alternative paths or ask it to choose.
 
 The chapterBrief must contain instructions and story facts only.
 
