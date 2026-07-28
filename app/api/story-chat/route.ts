@@ -1419,6 +1419,7 @@ workspace.`,
       characterKnowledge: currentStory.storyState.characterKnowledge ?? [],
       unresolvedThreads: currentStory.storyState.unresolvedThreads,
       repetitionWarnings: currentStory.storyState.repetitionWarnings ?? [],
+      voiceProfiles: currentStory.storyState.voiceProfiles ?? [],
       recentChapterLedger: chapterLedger.slice(-4),
       rewriteContext: rewriteTarget
         ? {
@@ -1580,6 +1581,9 @@ contradict the final scene.
 
 - Respect currentCharacterStates, characterKnowledge,
 latestRelationshipState and latestIntimacyMilestone.
+
+- Treat voiceProfiles as binding character-specific narration and
+dialogue guidance. Do not blend the POV voices together.
 
 - A character cannot act on information they do not know.
 
