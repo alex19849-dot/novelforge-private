@@ -105,6 +105,8 @@ export type GenerationDiagnostic = {
 
   model: string;
 
+  status: "succeeded" | "failed";
+
   inputTokens: number;
 
   outputTokens: number;
@@ -116,6 +118,8 @@ export type GenerationDiagnostic = {
   durationMs: number;
 
   attempt: number;
+
+  error?: string;
 };
 
 export type StoryState = {
