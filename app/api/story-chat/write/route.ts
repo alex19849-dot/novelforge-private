@@ -174,6 +174,11 @@ Do not include a chapter number, chapter title, POV heading or markdown.
 
 Follow the supplied Story Bible, story state and chapter brief exactly.
 
+Treat storyState.voiceProfiles as binding. The POV character's
+narrative rhythm, vocabulary, humour, emotional deflection, sensory
+focus, dialogue and internal thought must match their own profile and
+must not sound interchangeable with another POV character.
+
 Maintain first-person POV, tense, voice, continuity, pacing, heat level
 and burn pacing.
 
