@@ -206,6 +206,10 @@ function isGenerationDiagnostic(value: unknown): value is GenerationDiagnostic {
     typeof diagnostic.outputTokens === "number" &&
     typeof diagnostic.totalTokens === "number" &&
     (diagnostic.costUsd === null || typeof diagnostic.costUsd === "number") &&
+    (diagnostic.costType === undefined ||
+      diagnostic.costType === "reported" ||
+      diagnostic.costType === "estimated" ||
+      diagnostic.costType === "unavailable") &&
     typeof diagnostic.durationMs === "number" &&
     typeof diagnostic.attempt === "number" &&
     (diagnostic.error === undefined || typeof diagnostic.error === "string")
@@ -214,6 +218,20 @@ function isGenerationDiagnostic(value: unknown): value is GenerationDiagnostic {
 
 function isDiagnosticArray(value: unknown): value is GenerationDiagnostic[] {
   return Array.isArray(value) && value.every(isGenerationDiagnostic);
+}
+
+function getDiagnosticCostType(
+  diagnostic: GenerationDiagnostic,
+): "reported" | "estimated" | "unavailable" {
+  if (diagnostic.costType) {
+    return diagnostic.costType;
+  }
+
+  if (diagnostic.costUsd === null) {
+    return "unavailable";
+  }
+
+  return diagnostic.provider === "openai" ? "estimated" : "reported";
 }
 
 function formatGenerationDiagnostics(
@@ -227,22 +245,46 @@ function formatGenerationDiagnostics(
     (sum, diagnostic) => sum + diagnostic.durationMs,
     0,
   );
-  const knownCost = diagnostics.reduce(
-    (sum, diagnostic) => sum + (diagnostic.costUsd ?? 0),
+  const reportedCost = diagnostics.reduce(
+    (sum, diagnostic) =>
+      getDiagnosticCostType(diagnostic) === "reported"
+        ? sum + (diagnostic.costUsd ?? 0)
+        : sum,
     0,
   );
-  const unknownCostCalls = diagnostics.filter(
-    (diagnostic) => diagnostic.costUsd === null,
+  const estimatedCost = diagnostics.reduce(
+    (sum, diagnostic) =>
+      getDiagnosticCostType(diagnostic) === "estimated"
+        ? sum + (diagnostic.costUsd ?? 0)
+        : sum,
+    0,
+  );
+  const unavailableCostCalls = diagnostics.filter(
+    (diagnostic) => getDiagnosticCostType(diagnostic) === "unavailable",
   ).length;
   const failedCalls = diagnostics.filter(
     (diagnostic) => diagnostic.status === "failed",
   ).length;
+  const costParts = [];
+
+  if (reportedCost > 0) {
+    costParts.push(`$${reportedCost.toFixed(4)} provider-reported`);
+  }
+
+  if (estimatedCost > 0) {
+    costParts.push(`$${estimatedCost.toFixed(4)} estimated`);
+  }
+
+  if (unavailableCostCalls > 0) {
+    costParts.push(
+      `${unavailableCostCalls} ${
+        unavailableCostCalls === 1 ? "call" : "calls"
+      } with unavailable cost`,
+    );
+  }
+
   const costText =
-    unknownCostCalls > 0
-      ? `$${knownCost.toFixed(4)} recorded, plus ${unknownCostCalls} provider ${
-          unknownCostCalls === 1 ? "call" : "calls"
-        } without reported cost`
-      : `$${knownCost.toFixed(4)}`;
+    costParts.length > 0 ? costParts.join(", ") : "$0.0000 recorded";
 
   return `Generation diagnostics: ${diagnostics.length} model ${
     diagnostics.length === 1 ? "call" : "calls"
@@ -2299,7 +2341,12 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
                       {diagnostic.stage.replaceAll("_", " ")},{" "}
                       {diagnostic.status ?? "succeeded"},{" "}
                       {diagnostic.totalTokens.toLocaleString()} tokens,{" "}
-                      {(diagnostic.durationMs / 1000).toFixed(1)} seconds
+                      {(diagnostic.durationMs / 1000).toFixed(1)} seconds,{" "}
+                      {diagnostic.costUsd === null
+                        ? "cost unavailable"
+                        : `$${diagnostic.costUsd.toFixed(4)} ${getDiagnosticCostType(
+                            diagnostic,
+                          )}`}
                       {diagnostic.error ? `, ${diagnostic.error}` : ""}
                     </p>
                   ))}
