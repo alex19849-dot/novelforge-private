@@ -1961,6 +1961,7 @@ ${JSON.stringify(planningWorkspace, null, 2)}
           outputTokens,
           totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
           costUsd,
+          costType: "estimated",
           durationMs: Date.now() - startedAt,
           attempt,
         });
@@ -1978,6 +1979,7 @@ ${JSON.stringify(planningWorkspace, null, 2)}
           outputTokens: 0,
           totalTokens: 0,
           costUsd: null,
+          costType: "unavailable",
           durationMs: Date.now() - startedAt,
           attempt,
           error: message,
