@@ -333,6 +333,7 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
       outputTokens,
       totalTokens,
       costUsd,
+      costType: costUsd === null ? "unavailable" : "reported",
       durationMs: Date.now() - providerCallStartedAt,
       attempt: 1,
     });
@@ -376,6 +377,7 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
         outputTokens: 0,
         totalTokens: 0,
         costUsd: null,
+        costType: "unavailable",
         durationMs: Date.now() - providerCallStartedAt,
         attempt: 1,
         error: message,
