@@ -197,12 +197,16 @@ function isGenerationDiagnostic(value: unknown): value is GenerationDiagnostic {
     (diagnostic.provider === "openai" ||
       diagnostic.provider === "openrouter") &&
     typeof diagnostic.model === "string" &&
+    (diagnostic.status === undefined ||
+      diagnostic.status === "succeeded" ||
+      diagnostic.status === "failed") &&
     typeof diagnostic.inputTokens === "number" &&
     typeof diagnostic.outputTokens === "number" &&
     typeof diagnostic.totalTokens === "number" &&
     (diagnostic.costUsd === null || typeof diagnostic.costUsd === "number") &&
     typeof diagnostic.durationMs === "number" &&
-    typeof diagnostic.attempt === "number"
+    typeof diagnostic.attempt === "number" &&
+    (diagnostic.error === undefined || typeof diagnostic.error === "string")
   );
 }
 
@@ -228,6 +232,9 @@ function formatGenerationDiagnostics(
   const unknownCostCalls = diagnostics.filter(
     (diagnostic) => diagnostic.costUsd === null,
   ).length;
+  const failedCalls = diagnostics.filter(
+    (diagnostic) => diagnostic.status === "failed",
+  ).length;
   const costText =
     unknownCostCalls > 0
       ? `$${knownCost.toFixed(4)} recorded, plus ${unknownCostCalls} provider ${
@@ -239,7 +246,9 @@ function formatGenerationDiagnostics(
     diagnostics.length === 1 ? "call" : "calls"
   }, ${totalTokens.toLocaleString()} tokens, ${(totalDurationMs / 1000).toFixed(
     1,
-  )} seconds, ${costText}.`;
+  )} seconds, ${costText}, ${failedCalls} failed ${
+    failedCalls === 1 ? "call" : "calls"
+  }.`;
 }
 
 function isWriterResponse(value: unknown): value is WriterResponse {
@@ -286,6 +295,16 @@ function isPendingGeneration(
   );
 }
 
+class ApiRequestError extends Error {
+  diagnostics: GenerationDiagnostic[];
+
+  constructor(message: string, diagnostics: GenerationDiagnostic[] = []) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.diagnostics = diagnostics;
+  }
+}
+
 async function readApiJson(response: Response): Promise<unknown> {
   const responseText = await response.text();
   let data: unknown = null;
@@ -313,7 +332,15 @@ async function readApiJson(response: Response): Promise<unknown> {
         ? data.error
         : `The server returned HTTP ${response.status}.`;
 
-    throw new Error(errorMessage);
+    const diagnostics =
+      data &&
+      typeof data === "object" &&
+      "diagnostics" in data &&
+      isDiagnosticArray(data.diagnostics)
+        ? data.diagnostics
+        : [];
+
+    throw new ApiRequestError(errorMessage, diagnostics);
   }
 
   return data;
@@ -1598,16 +1625,36 @@ device.`,
         )} words. Your progress has been saved, so you can resume it.`,
       );
     } catch (error) {
+      if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
+        workingPending = {
+          ...workingPending,
+          diagnostics: [
+            ...(workingPending.diagnostics ?? []),
+            ...error.diagnostics,
+          ],
+        };
+        savePendingGeneration(workingPending);
+      }
+
       const message =
         error instanceof Error ? error.message : "The writing request failed.";
+      const failedDiagnostics = workingPending.diagnostics ?? [];
       const failedStory: StoryWorkspace = {
         ...baseStory,
+        storyState: {
+          ...baseStory.storyState,
+          lastGenerationDiagnostics: failedDiagnostics,
+        },
         messages: [
           ...baseStory.messages,
           {
             id: Date.now(),
             role: "assistant",
-            content: `I couldn't complete the chapter: ${message}`,
+            content: `I couldn't complete the chapter: ${message}${
+              failedDiagnostics.length > 0
+                ? ` ${formatGenerationDiagnostics(failedDiagnostics)}`
+                : ""
+            }`,
           },
         ],
         updatedAt: new Date().toISOString(),
@@ -1750,15 +1797,27 @@ device.`,
         error instanceof Error && error.message.trim()
           ? `I couldn't complete that: ${error.message}`
           : "Something went wrong while I was thinking. Try sending that again.";
+      const failureDiagnostics = [
+        ...preplanningDiagnostics,
+        ...(error instanceof ApiRequestError ? error.diagnostics : []),
+      ];
 
       const failedStory: StoryWorkspace = {
         ...planningStory,
+        storyState: {
+          ...planningStory.storyState,
+          lastGenerationDiagnostics: failureDiagnostics,
+        },
         messages: [
           ...planningStory.messages,
           {
             id: Date.now(),
             role: "assistant",
-            content: errorMessage,
+            content: `${errorMessage}${
+              failureDiagnostics.length > 0
+                ? ` ${formatGenerationDiagnostics(failureDiagnostics)}`
+                : ""
+            }`,
           },
         ],
         updatedAt: new Date().toISOString(),
