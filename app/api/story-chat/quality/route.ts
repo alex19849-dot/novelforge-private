@@ -51,6 +51,7 @@ type GenerationDiagnostic = {
   outputTokens: number;
   totalTokens: number;
   costUsd: number | null;
+  costType?: "reported" | "estimated" | "unavailable";
   durationMs: number;
   attempt: number;
   error?: string;
@@ -328,6 +329,7 @@ ${input.chapterContent}
     costUsd:
       (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
       1_000_000,
+    costType: "estimated",
     durationMs: Date.now() - startedAt,
     attempt: input.attempt,
   };
@@ -458,6 +460,7 @@ ${input.chapterContent}
         ? rawUsage.total_tokens
         : inputTokens + outputTokens,
     costUsd: typeof rawUsage?.cost === "number" ? rawUsage.cost : null,
+    costType: typeof rawUsage?.cost === "number" ? "reported" : "unavailable",
     durationMs: Date.now() - startedAt,
     attempt: 1,
   };
@@ -621,6 +624,7 @@ export async function POST(request: Request) {
         outputTokens: 0,
         totalTokens: 0,
         costUsd: null,
+        costType: "unavailable",
         durationMs: Math.max(
           0,
           Date.now() - pipelineStartedAt - elapsedCompleted,
