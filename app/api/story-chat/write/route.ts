@@ -67,8 +67,7 @@ function cleanRecentChapters(value: unknown): RecentChapter[] {
         Boolean(chapter) && typeof chapter === "object",
     )
     .map((chapter, index) => ({
-      number:
-        typeof chapter.number === "number" ? chapter.number : index + 1,
+      number: typeof chapter.number === "number" ? chapter.number : index + 1,
       title: cleanString(chapter.title),
       povCharacter: cleanString(chapter.povCharacter),
       content: cleanString(chapter.content),
@@ -215,10 +214,7 @@ export async function POST(request: Request) {
     }
 
     const existingWordCount = countWords(existingDraft);
-    const wordsStillNeeded = Math.max(
-      0,
-      minimumWordCount - existingWordCount,
-    );
+    const wordsStillNeeded = Math.max(0, minimumWordCount - existingWordCount);
 
     const prompt = existingDraft
       ? `
@@ -233,6 +229,14 @@ MANDATORY NARRATIVE STYLE:
 ${narrativeStyle}
 
 Do not switch POV person or narrative tense.
+
+STORY BIBLE:
+
+${JSON.stringify(body.storyBible ?? {}, null, 2)}
+
+ACTUAL CONTINUITY LEDGER:
+
+${JSON.stringify(body.storyState ?? {}, null, 2)}
 
 The existing draft contains ${existingWordCount} words.
 
@@ -315,9 +319,7 @@ Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} w
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? error.message
-            : "The writing model failed.",
+          error instanceof Error ? error.message : "The writing model failed.",
       },
       { status: 502 },
     );
