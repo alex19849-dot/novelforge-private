@@ -50,6 +50,34 @@ export type StoryChapter = {
   updatedAt: string;
 };
 
+export type ChapterLedgerEntry = {
+  chapterNumber: number;
+
+  title: string;
+
+  povCharacter: string;
+
+  summary: string;
+
+  openingLocation: string;
+
+  endingLocation: string;
+
+  endingTime: string;
+
+  endingExcerpt: string;
+
+  relationshipShift: string;
+
+  intimacyMilestone: string;
+
+  newFacts: string[];
+
+  unresolvedThreads: string[];
+
+  repeatedBeats: string[];
+};
+
 export type StoryState = {
   importantFacts: string[];
 
@@ -64,6 +92,14 @@ export type StoryState = {
   locations: string[];
 
   activePOV: string;
+
+  chapterLedger?: ChapterLedgerEntry[];
+
+  latestChapterEnding?: string;
+
+  characterKnowledge?: string[];
+
+  repetitionWarnings?: string[];
 };
 
 export type StoryWorkspace = {
