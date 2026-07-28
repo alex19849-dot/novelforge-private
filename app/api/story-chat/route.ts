@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { detectStoryIntent } from "../../../src/lib/detect-story-intent";
 
 import type {
+  GenerationDiagnostic,
   StoryBible,
   StoryWorkspace,
   StoryChatResponse,
@@ -1455,22 +1456,29 @@ workspace.`,
       createdAt: currentStory.createdAt,
       updatedAt: currentStory.updatedAt,
     };
+    const planningDiagnostics: GenerationDiagnostic[] = [];
+    let planningAttempt = 0;
 
     const createPlanningResponse = (
       planningConversation: typeof conversation,
-    ) =>
-      openai.responses.create({
-        model: "gpt-5.6-terra",
+    ) => {
+      planningAttempt += 1;
+      const attempt = planningAttempt;
+      const startedAt = Date.now();
 
-        reasoning: {
-          effort: "low",
-        },
+      return openai.responses
+        .create({
+          model: "gpt-5.6-terra",
 
-        input: [
-          {
-            role: "system",
+          reasoning: {
+            effort: "low",
+          },
 
-            content: `${NOVELFORGE_PERSONALITY}
+          input: [
+            {
+              role: "system",
+
+              content: `${NOVELFORGE_PERSONALITY}
 
 ${SYSTEM_PROMPT}
 
@@ -1902,31 +1910,58 @@ CURRENT STORY WORKSPACE:
 ${JSON.stringify(planningWorkspace, null, 2)}
 
 `,
+            },
+
+            ...planningConversation,
+          ],
+
+          text: {
+            verbosity: usesCompactChapterPlan ? "low" : "medium",
+
+            format: {
+              type: "json_schema",
+
+              name: usesCompactChapterPlan
+                ? "compact_chapter_plan"
+                : "story_chat_response",
+
+              strict: true,
+
+              schema: usesCompactChapterPlan
+                ? compactChapterPlanSchema
+                : storyChatSchema,
+            },
           },
 
-          ...planningConversation,
-        ],
+          max_output_tokens: usesCompactChapterPlan ? 3500 : 10000,
+        })
+        .then((planningResponse) => {
+          const usage = planningResponse.usage;
+          const inputTokens = usage?.input_tokens ?? 0;
+          const outputTokens = usage?.output_tokens ?? 0;
+          const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+          const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+          const costUsd =
+            (uncachedTokens * 1.25 +
+              cachedTokens * 0.125 +
+              outputTokens * 7.5) /
+            1_000_000;
 
-        text: {
-          verbosity: usesCompactChapterPlan ? "low" : "medium",
+          planningDiagnostics.push({
+            stage: "chapter_planning",
+            provider: "openai",
+            model: "gpt-5.6-terra",
+            inputTokens,
+            outputTokens,
+            totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+            costUsd,
+            durationMs: Date.now() - startedAt,
+            attempt,
+          });
 
-          format: {
-            type: "json_schema",
-
-            name: usesCompactChapterPlan
-              ? "compact_chapter_plan"
-              : "story_chat_response",
-
-            strict: true,
-
-            schema: usesCompactChapterPlan
-              ? compactChapterPlanSchema
-              : storyChatSchema,
-          },
-        },
-
-        max_output_tokens: usesCompactChapterPlan ? 3500 : 10000,
-      });
+          return planningResponse;
+        });
+    };
 
     let response = await createPlanningResponse(conversation);
 
@@ -2143,6 +2178,7 @@ Write commercially publishable fiction.
           story: plannedStory,
           generatedChapter: parsedOutput.generatedChapter,
           chapterBrief,
+          diagnostics: planningDiagnostics,
         });
       }
 
@@ -2375,6 +2411,8 @@ ${chapterEnding}
       generatedChapter,
 
       chapterBrief,
+
+      diagnostics: planningDiagnostics,
     };
 
     return NextResponse.json(responseBody);
