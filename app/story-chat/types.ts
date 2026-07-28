@@ -105,7 +105,7 @@ export type GenerationDiagnostic = {
 
   model: string;
 
-  status: "succeeded" | "failed";
+  status?: "succeeded" | "failed";
 
   inputTokens: number;
 
