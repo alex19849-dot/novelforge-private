@@ -2240,7 +2240,7 @@ Write commercially publishable fiction.
 
       const minimumWordCount = explicitlyRequestedWordCount
         ? Math.floor(explicitlyRequestedWordCount * 0.95)
-        : 3000;
+        : 2000;
 
       const maximumWordCount = explicitlyRequestedWordCount
         ? Math.ceil(explicitlyRequestedWordCount * 1.1)
