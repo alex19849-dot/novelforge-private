@@ -2,6 +2,8 @@ import OpenAI from "openai";
 
 import { NextResponse } from "next/server";
 
+import type { GenerationDiagnostic } from "../../../story-chat/types";
+
 export const runtime = "nodejs";
 
 export const maxDuration = 120;
@@ -242,6 +244,9 @@ function cleanChapters(value: unknown): Array<{
 }
 
 export async function POST(request: Request) {
+  let diagnostic: GenerationDiagnostic | null = null;
+  let providerCallStartedAt = 0;
+
   try {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
@@ -292,7 +297,7 @@ export async function POST(request: Request) {
       throw new Error("No chapters were available for continuity analysis.");
     }
 
-    const startedAt = Date.now();
+    providerCallStartedAt = Date.now();
     const response = await openai.responses.create({
       model: "gpt-5.6-terra",
       reasoning: {
@@ -367,6 +372,27 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
       },
       max_output_tokens: 7000,
     });
+    const usage = response.usage;
+    const inputTokens = usage?.input_tokens ?? 0;
+    const outputTokens = usage?.output_tokens ?? 0;
+    const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+    const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+    diagnostic = {
+      stage: requiresFullRebuild
+        ? "continuity_ledger_backfill"
+        : "continuity_ledger_update",
+      provider: "openai",
+      model: "gpt-5.6-terra",
+      status: "succeeded",
+      inputTokens,
+      outputTokens,
+      totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+      costUsd:
+        (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+        1_000_000,
+      durationMs: Date.now() - providerCallStartedAt,
+      attempt: 1,
+    };
 
     if (response.status === "incomplete") {
       throw new Error(
@@ -443,12 +469,6 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
       return leftNumber - rightNumber;
     });
     const latestLedgerEntry = chapterLedger.at(-1);
-    const usage = response.usage;
-    const inputTokens = usage?.input_tokens ?? 0;
-    const outputTokens = usage?.output_tokens ?? 0;
-    const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
-    const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
-
     return NextResponse.json({
       storyState: {
         importantFacts: output.importantFacts,
@@ -470,35 +490,41 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
         repetitionWarnings: output.repetitionWarnings,
         voiceProfiles: output.voiceProfiles,
       },
-      diagnostics: [
-        {
-          stage: requiresFullRebuild
-            ? "continuity_ledger_backfill"
-            : "continuity_ledger_update",
-          provider: "openai",
-          model: "gpt-5.6-terra",
-          inputTokens,
-          outputTokens,
-          totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
-          costUsd:
-            (uncachedTokens * 1.25 +
-              cachedTokens * 0.125 +
-              outputTokens * 7.5) /
-            1_000_000,
-          durationMs: Date.now() - startedAt,
-          attempt: 1,
-        },
-      ],
+      diagnostics: [diagnostic],
     });
   } catch (error) {
     console.error("CONTINUITY LEDGER FAILED:", error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "The continuity ledger could not be created.";
+
+    if (diagnostic) {
+      diagnostic = {
+        ...diagnostic,
+        status: "failed",
+        error: message,
+      };
+    } else if (providerCallStartedAt > 0) {
+      diagnostic = {
+        stage: "continuity_ledger_update",
+        provider: "openai",
+        model: "gpt-5.6-terra",
+        status: "failed",
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        costUsd: null,
+        durationMs: Date.now() - providerCallStartedAt,
+        attempt: 1,
+        error: message,
+      };
+    }
 
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "The continuity ledger could not be created.",
+        error: message,
+        diagnostics: diagnostic ? [diagnostic] : [],
       },
       { status: 502 },
     );
