@@ -42,6 +42,18 @@ type QualityAssessment = {
   };
 };
 
+type GenerationDiagnostic = {
+  stage: string;
+  provider: "openai" | "openrouter";
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number | null;
+  durationMs: number;
+  attempt: number;
+};
+
 const qualitySchema = {
   type: "object",
   additionalProperties: false,
@@ -195,7 +207,12 @@ async function assessChapter(input: {
   povCharacter: string;
   chapterContent: string;
   mechanicalFailures: string[];
-}): Promise<QualityAssessment> {
+  attempt: number;
+}): Promise<{
+  assessment: QualityAssessment;
+  diagnostic: GenerationDiagnostic;
+}> {
+  const startedAt = Date.now();
   const response = await openai.responses.create({
     model: "gpt-5.6-terra",
     reasoning: {
@@ -294,7 +311,28 @@ ${input.chapterContent}
     throw new Error("The quality model returned no assessment.");
   }
 
-  return JSON.parse(outputText) as QualityAssessment;
+  const usage = response.usage;
+  const inputTokens = usage?.input_tokens ?? 0;
+  const outputTokens = usage?.output_tokens ?? 0;
+  const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+  const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+
+  return {
+    assessment: JSON.parse(outputText) as QualityAssessment,
+    diagnostic: {
+      stage: "chapter_quality_assessment",
+      provider: "openai",
+      model: "gpt-5.6-terra",
+      inputTokens,
+      outputTokens,
+      totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+      costUsd:
+        (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+        1_000_000,
+      durationMs: Date.now() - startedAt,
+      attempt: input.attempt,
+    },
+  };
 }
 
 async function repairChapter(input: {
@@ -307,7 +345,11 @@ async function repairChapter(input: {
   assessment: QualityAssessment;
   minimumWordCount: number;
   maximumWordCount: number;
-}): Promise<string> {
+}): Promise<{
+  content: string;
+  diagnostic: GenerationDiagnostic;
+}> {
+  const startedAt = Date.now();
   const response = await openrouter.chat.completions.create({
     model: "aion-labs/aion-3.0-mini",
     messages: [
@@ -369,7 +411,33 @@ ${input.chapterContent}
     throw new Error("Aion returned no repaired chapter.");
   }
 
-  return cleanGeneratedProse(repaired);
+  const rawUsage = response.usage as unknown as
+    | Record<string, unknown>
+    | undefined;
+  const inputTokens =
+    typeof rawUsage?.prompt_tokens === "number" ? rawUsage.prompt_tokens : 0;
+  const outputTokens =
+    typeof rawUsage?.completion_tokens === "number"
+      ? rawUsage.completion_tokens
+      : 0;
+
+  return {
+    content: cleanGeneratedProse(repaired),
+    diagnostic: {
+      stage: "chapter_quality_repair",
+      provider: "openrouter",
+      model: "aion-labs/aion-3.0-mini",
+      inputTokens,
+      outputTokens,
+      totalTokens:
+        typeof rawUsage?.total_tokens === "number"
+          ? rawUsage.total_tokens
+          : inputTokens + outputTokens,
+      costUsd: typeof rawUsage?.cost === "number" ? rawUsage.cost : null,
+      durationMs: Date.now() - startedAt,
+      attempt: 1,
+    },
+  };
 }
 
 export async function POST(request: Request) {
@@ -414,7 +482,8 @@ export async function POST(request: Request) {
       minimumWordCount,
       allowedMaximumWordCount,
     );
-    const firstAssessment = await assessChapter({
+    const diagnostics: GenerationDiagnostic[] = [];
+    const firstQualityResult = await assessChapter({
       storyBible: body.storyBible ?? {},
       storyState: body.storyState ?? {},
       chapterBrief,
@@ -422,7 +491,10 @@ export async function POST(request: Request) {
       povCharacter,
       chapterContent,
       mechanicalFailures,
+      attempt: 1,
     });
+    const firstAssessment = firstQualityResult.assessment;
+    diagnostics.push(firstQualityResult.diagnostic);
 
     if (assessmentPasses(firstAssessment, mechanicalFailures)) {
       return NextResponse.json({
@@ -430,10 +502,11 @@ export async function POST(request: Request) {
         chapterContent,
         quality: firstAssessment,
         repaired: false,
+        diagnostics,
       });
     }
 
-    const repairedContent = await repairChapter({
+    const repairResult = await repairChapter({
       storyBible: body.storyBible ?? {},
       storyState: body.storyState ?? {},
       chapterBrief,
@@ -444,12 +517,14 @@ export async function POST(request: Request) {
       minimumWordCount,
       maximumWordCount: allowedMaximumWordCount,
     });
+    const repairedContent = repairResult.content;
+    diagnostics.push(repairResult.diagnostic);
     const repairedMechanicalFailures = validateMechanicalQuality(
       repairedContent,
       minimumWordCount,
       allowedMaximumWordCount,
     );
-    const secondAssessment = await assessChapter({
+    const secondQualityResult = await assessChapter({
       storyBible: body.storyBible ?? {},
       storyState: body.storyState ?? {},
       chapterBrief,
@@ -457,7 +532,10 @@ export async function POST(request: Request) {
       povCharacter,
       chapterContent: repairedContent,
       mechanicalFailures: repairedMechanicalFailures,
+      attempt: 2,
     });
+    const secondAssessment = secondQualityResult.assessment;
+    diagnostics.push(secondQualityResult.diagnostic);
     const accepted = assessmentPasses(
       secondAssessment,
       repairedMechanicalFailures,
@@ -468,6 +546,7 @@ export async function POST(request: Request) {
       chapterContent: repairedContent,
       quality: secondAssessment,
       repaired: true,
+      diagnostics,
     });
   } catch (error) {
     console.error("CHAPTER QUALITY GATE FAILED:", error);
