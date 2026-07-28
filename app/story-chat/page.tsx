@@ -14,7 +14,9 @@ import type {
   ActiveTab,
   GenerationDiagnostic,
   StoryBible,
+  StoryChapter,
   StoryChatResponse,
+  StoryState,
   StoryWorkspace,
 } from "./types";
 
@@ -252,9 +254,7 @@ function formatGenerationDiagnostics(
 }
 
 function stripGenerationDiagnostics(content: string): string {
-  return content
-    .replace(/\s*Generation diagnostics:[\s\S]*$/i, "")
-    .trim();
+  return content.replace(/\s*Generation diagnostics:[\s\S]*$/i, "").trim();
 }
 
 function isWriterResponse(value: unknown): value is WriterResponse {
@@ -450,6 +450,72 @@ function isLedgerResponse(value: unknown): value is LedgerResponse {
   return (
     isStoryState(response.storyState) && isDiagnosticArray(response.diagnostics)
   );
+}
+
+async function updateContinuityLedger(input: {
+  storyBible: StoryBible;
+  storyState: StoryState;
+  chapters: StoryChapter[];
+  chapter: StoryChapter;
+  rebuild: boolean;
+}): Promise<LedgerResponse> {
+  const batches = input.rebuild
+    ? Array.from({ length: Math.ceil(input.chapters.length / 3) }, (_, index) =>
+        input.chapters.slice(index * 3, index * 3 + 3),
+      )
+    : [[input.chapter]];
+  let workingState: StoryState = input.rebuild
+    ? { ...EMPTY_STORY_STATE }
+    : input.storyState;
+  const diagnostics: GenerationDiagnostic[] = [];
+
+  for (const batch of batches) {
+    const latestBatchChapter = batch[batch.length - 1];
+
+    if (!latestBatchChapter) {
+      continue;
+    }
+
+    try {
+      const response = await fetch("/api/story-chat/ledger", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          storyBible: input.storyBible,
+          storyState: workingState,
+          chapters: batch,
+          chapter: latestBatchChapter,
+          rebuildMode: input.rebuild ? "batch" : "incremental",
+        }),
+      });
+      const data = await readApiJson(response);
+
+      if (!isLedgerResponse(data)) {
+        throw new Error(
+          "The continuity endpoint returned an invalid story ledger.",
+        );
+      }
+
+      workingState = data.storyState;
+      diagnostics.push(...data.diagnostics);
+    } catch (error) {
+      if (error instanceof ApiRequestError) {
+        throw new ApiRequestError(error.message, [
+          ...diagnostics,
+          ...error.diagnostics,
+        ]);
+      }
+
+      throw error;
+    }
+  }
+
+  return {
+    storyState: workingState,
+    diagnostics,
+  };
 }
 
 function isQualityResponse(value: unknown): value is QualityResponse {
@@ -1527,25 +1593,21 @@ device.`,
           );
         }
 
-        const ledgerResponse = await fetch("/api/story-chat/ledger", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            storyBible: chapterStory.storyBible,
-            storyState: baseStory.storyState,
-            chapters: chapterStory.chapters,
-            chapter: completedChapter,
-          }),
+        const latestExistingChapterNumber = Math.max(
+          0,
+          ...baseStory.chapters.map((chapter) => chapter.number),
+        );
+        const needsLedgerRebuild =
+          !baseStory.storyState.chapterLedger?.length ||
+          (replacementNumber !== null &&
+            replacementNumber < latestExistingChapterNumber);
+        const ledgerData = await updateContinuityLedger({
+          storyBible: chapterStory.storyBible,
+          storyState: baseStory.storyState,
+          chapters: chapterStory.chapters,
+          chapter: completedChapter,
+          rebuild: needsLedgerRebuild,
         });
-        const ledgerData = await readApiJson(ledgerResponse);
-
-        if (!isLedgerResponse(ledgerData)) {
-          throw new Error(
-            "The continuity endpoint returned an invalid story ledger.",
-          );
-        }
 
         const allDiagnostics = [
           ...(workingPending.diagnostics ?? []),
@@ -1699,25 +1761,13 @@ device.`,
       ) {
         const latestExistingChapter =
           planningStory.chapters[planningStory.chapters.length - 1];
-        const ledgerResponse = await fetch("/api/story-chat/ledger", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            storyBible: planningStory.storyBible,
-            storyState: planningStory.storyState,
-            chapters: planningStory.chapters,
-            chapter: latestExistingChapter,
-          }),
+        const ledgerData = await updateContinuityLedger({
+          storyBible: planningStory.storyBible,
+          storyState: planningStory.storyState,
+          chapters: planningStory.chapters,
+          chapter: latestExistingChapter,
+          rebuild: true,
         });
-        const ledgerData = await readApiJson(ledgerResponse);
-
-        if (!isLedgerResponse(ledgerData)) {
-          throw new Error(
-            "The continuity endpoint returned an invalid story ledger.",
-          );
-        }
 
         preplanningDiagnostics = ledgerData.diagnostics;
         planningStory = {
