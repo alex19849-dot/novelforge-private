@@ -33,6 +33,7 @@ type QualityAssessment = {
   summary: string;
   scores: {
     continuity: number;
+    factualAuthenticity: number;
     plotMovement: number;
     relationshipProgression: number;
     voiceDistinctiveness: number;
@@ -101,6 +102,7 @@ const qualitySchema = {
       additionalProperties: false,
       required: [
         "continuity",
+        "factualAuthenticity",
         "plotMovement",
         "relationshipProgression",
         "voiceDistinctiveness",
@@ -110,6 +112,7 @@ const qualitySchema = {
       ],
       properties: {
         continuity: { type: "number", minimum: 1, maximum: 10 },
+        factualAuthenticity: { type: "number", minimum: 1, maximum: 10 },
         plotMovement: { type: "number", minimum: 1, maximum: 10 },
         relationshipProgression: { type: "number", minimum: 1, maximum: 10 },
         voiceDistinctiveness: { type: "number", minimum: 1, maximum: 10 },
@@ -251,6 +254,8 @@ Score each category from 1 to 10.
 A passing chapter must:
 
 - preserve names, facts, chronology, locations and character knowledge
+- use credible terminology, procedures and professional behaviour for
+the Story Bible's exact country, region, time period and occupation
 - use the required POV person and narrative tense consistently
 - match the POV character's stored voice profile
 - use natural contractions in contemporary narration, internal thought
@@ -284,12 +289,25 @@ when those would be premature. Do lower it when the relationship ends in
 substantially the same position and meaning as it began, especially when
 the chapter merely repeats an earlier attraction or conflict beat.
 
+Judge factualAuthenticity only on material that appears in the chapter.
+Check professional terminology and behaviour, jurisdiction-specific law
+and procedure, medicine, sport, technology, geography, travel time and
+the established time period. Distinguish deliberately fictional
+organisations or worldbuilding from accidental real-world errors.
+
+Score factualAuthenticity below 6 only when there is a clear,
+high-confidence error that could damage reader trust. Do not invent
+nitpicks, demand unnecessary technical detail or penalise a sensible
+general description merely because a more specialised version exists.
+When uncertain, do not treat the detail as wrong.
+
 The chapter brief is strong guidance, not a rigid checklist. Do not fail
 an otherwise cohesive, commercially effective chapter merely because it
 reaches the intended objective through different scene beats or omits a
 nonessential planned detail.
 
-Use hardFailures only for objective continuity contradictions, wrong
+Use hardFailures only for objective continuity contradictions,
+high-confidence factual errors central to the scene or premise, wrong
 POV, wrong tense, malformed prose, unsafe age or consent problems, or a
 chapter that is genuinely unfinished. Do not use hardFailures for
 subjective preferences or minor deviations from the planned beats.
@@ -459,6 +477,12 @@ or changed interpretation. Do not bolt on a kiss, sex scene, declaration
 or artificial confrontation. Respect the selected burn pacing and make
 the smallest change that leaves the relationship in a materially
 different position or meaning.
+
+If factual authenticity is the failing category, correct only the
+identified high-confidence errors. Preserve the scene's purpose,
+character dynamics and fictional organisations. Prefer accurate,
+natural wording over adding a technical lecture or replacing one
+unverified precise claim with another.
 
 The corrected chapter must remain between ${input.minimumWordCount} and
 ${input.maximumWordCount} words.
