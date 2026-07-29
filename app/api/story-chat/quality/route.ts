@@ -427,6 +427,73 @@ ${input.chapterContent}
   };
 }
 
+type TargetedRepairPatch = {
+  find: string;
+  replace: string;
+};
+
+function parseTargetedRepairPatches(response: string): TargetedRepairPatch[] {
+  const cleaned = response
+    .replace(/^\`\`\`(?:text|markdown|md)?\s*/i, "")
+    .replace(/\s*\`\`\`$/, "")
+    .trim();
+  const pattern =
+    /<<<PATCH>>>\s*<<<FIND>>>([\s\S]*?)<<<END_FIND>>>\s*<<<REPLACE>>>([\s\S]*?)<<<END_REPLACE>>>\s*<<<END_PATCH>>>/g;
+  const patches: TargetedRepairPatch[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(cleaned)) !== null) {
+    const find = match[1].trim();
+    const replace = match[2].trim();
+
+    if (!find) {
+      throw new Error("A targeted repair patch contained no original text.");
+    }
+
+    patches.push({ find, replace });
+  }
+
+  if (patches.length === 0) {
+    throw new Error("Aion returned no usable targeted repair patches.");
+  }
+
+  if (patches.length > 8) {
+    throw new Error("Aion returned too many targeted repair patches.");
+  }
+
+  return patches;
+}
+
+function applyTargetedRepairPatches(
+  chapterContent: string,
+  patches: TargetedRepairPatch[],
+): string {
+  let repaired = chapterContent;
+
+  for (const patch of patches) {
+    const firstMatch = repaired.indexOf(patch.find);
+
+    if (firstMatch < 0) {
+      throw new Error(
+        "A targeted repair patch did not match the preserved chapter.",
+      );
+    }
+
+    if (repaired.indexOf(patch.find, firstMatch + patch.find.length) >= 0) {
+      throw new Error(
+        "A targeted repair patch was ambiguous and was not applied.",
+      );
+    }
+
+    repaired =
+      repaired.slice(0, firstMatch) +
+      patch.replace +
+      repaired.slice(firstMatch + patch.find.length);
+  }
+
+  return repaired.trim();
+}
+
 async function repairChapter(input: {
   storyBible: unknown;
   storyState: unknown;
@@ -448,43 +515,45 @@ async function repairChapter(input: {
       {
         role: "user",
         content: `
-You are repairing a completed commercial romance chapter that failed a
-quality check.
+You are making targeted repairs to a completed commercial romance
+chapter. Preserve the chapter and return only exact replacement patches
+for the specific failures identified by the quality assessment.
 
-Return only the complete corrected chapter prose.
+Do not return the complete chapter. Do not explain, analyse, outline,
+summarise or use JSON. Do not add a chapter heading or markdown.
 
-Preserve every strong section and make only the changes required by the
-repair instructions. Do not explain, analyse, outline or mention the
-quality check. Do not add a chapter heading, title, POV heading or
-markdown.
+Use this exact format for every patch:
 
-Follow the Story Bible, actual continuity ledger and original chapter
-brief exactly. Preserve the required POV person, narrative tense,
-character voice, heat level and burn pacing.
+<<<PATCH>>>
+<<<FIND>>>Copy one exact, unique passage from the original chapter here<<<END_FIND>>>
+<<<REPLACE>>>Put the corrected version of that passage here<<<END_REPLACE>>>
+<<<END_PATCH>>>
 
-Restore natural contractions throughout contemporary narration,
-internal thought and dialogue. Do not leave pervasive stiff expansions
-such as "I do not", "I have", "he is", "cannot" or "it does not"
-unless a specific instance is deliberate emphasis or belongs to a
-genuinely formal character.
+The FIND passage must be copied character-for-character from the
+original chapter and must be long enough to occur exactly once. Include
+enough surrounding context to make it unique. Return no text outside the
+patch blocks.
 
-Preserve explicit consensual adult sexual content required by the brief.
-Do not censor it, soften it or fade it to black.
+Use no more than eight patches. Repair only passages required by
+repairInstructions or objective hardFailures. Preserve every strong
+section unchanged. Never rewrite the whole chapter through one enormous
+patch.
 
-If relationship progression is the failing category, repair it through
-the existing scene's choices, dialogue, subtext, vulnerability, conflict
-or changed interpretation. Do not bolt on a kiss, sex scene, declaration
-or artificial confrontation. Respect the selected burn pacing and make
-the smallest change that leaves the relationship in a materially
-different position or meaning.
+Preserve the required POV person, narrative tense, character voice,
+continuity, heat level and burn pacing. Preserve explicit consensual
+adult sexual content required by the brief. Do not censor it, soften it
+or fade it to black.
 
-If factual authenticity is the failing category, correct only the
-identified high-confidence errors. Preserve the scene's purpose,
-character dynamics and fictional organisations. Prefer accurate,
-natural wording over adding a technical lecture or replacing one
-unverified precise claim with another.
+If relationship progression failed, alter the smallest existing
+interaction, decision, subtext or interpretation that can create a
+material shift. Do not bolt on a kiss, sex scene, declaration or
+artificial confrontation.
 
-The corrected chapter must remain between ${input.minimumWordCount} and
+If factual authenticity failed, correct only the identified
+high-confidence error. Do not add a technical lecture or replace it with
+another unverified precise claim.
+
+The patched chapter must remain between ${input.minimumWordCount} and
 ${input.maximumWordCount} words.
 
 STORY BIBLE:
@@ -514,7 +583,7 @@ ${input.chapterContent}
         `.trim(),
       },
     ],
-    max_tokens: 8000,
+    max_tokens: 3500,
   });
   const rawUsage = response.usage as unknown as
     | Record<string, unknown>
@@ -526,7 +595,7 @@ ${input.chapterContent}
       ? rawUsage.completion_tokens
       : 0;
   const diagnostic: GenerationDiagnostic = {
-    stage: "chapter_quality_repair",
+    stage: "chapter_quality_targeted_repair",
     provider: "openrouter",
     model: "aion-labs/aion-3.0-mini",
     status: "succeeded",
@@ -541,19 +610,31 @@ ${input.chapterContent}
     durationMs: Date.now() - startedAt,
     attempt: 1,
   };
-  const repaired = response.choices[0]?.message?.content;
+  const repairResponse = response.choices[0]?.message?.content;
 
-  if (!repaired?.trim()) {
+  if (!repairResponse?.trim()) {
     throw new DiagnosticFailure(
-      "Aion returned no repaired chapter.",
+      "Aion returned no targeted chapter repairs.",
       diagnostic,
     );
   }
 
-  return {
-    content: cleanGeneratedProse(repaired),
-    diagnostic,
-  };
+  try {
+    const patches = parseTargetedRepairPatches(repairResponse);
+    const repaired = applyTargetedRepairPatches(input.chapterContent, patches);
+
+    return {
+      content: cleanGeneratedProse(repaired),
+      diagnostic,
+    };
+  } catch (error) {
+    throw new DiagnosticFailure(
+      error instanceof Error
+        ? error.message
+        : "The targeted chapter repairs could not be applied.",
+      diagnostic,
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -680,11 +761,14 @@ export async function POST(request: Request) {
     } else if (pipelineStartedAt > 0) {
       const lastStage = diagnostics.at(-1)?.stage;
       const stage =
-        diagnostics.length === 0 || lastStage === "chapter_quality_repair"
+        diagnostics.length === 0 ||
+        lastStage === "chapter_quality_targeted_repair"
           ? "chapter_quality_assessment"
-          : "chapter_quality_repair";
+          : "chapter_quality_targeted_repair";
       const provider =
-        stage === "chapter_quality_repair" ? "openrouter" : "openai";
+        stage === "chapter_quality_targeted_repair"
+          ? "openrouter"
+          : "openai";
       const elapsedCompleted = diagnostics.reduce(
         (total, diagnostic) => total + diagnostic.durationMs,
         0,
