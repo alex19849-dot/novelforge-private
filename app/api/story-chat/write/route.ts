@@ -250,6 +250,57 @@ Write only the finished chapter prose now.
   `.trim();
 }
 
+function getContinuationPrompt(input: {
+  existingDraft: string;
+  latestUserMessage: string;
+  minimumWordCount: number;
+  maximumWordCount: number;
+}): string {
+  const currentWordCount = countWords(input.existingDraft);
+  const missingWords = Math.max(
+    0,
+    input.minimumWordCount - currentWordCount,
+  );
+  const requestedAdditionalWords = Math.min(
+    900,
+    Math.max(400, missingWords + 200),
+  );
+
+  return `
+Continue the unfinished novel chapter below.
+
+Return only the new prose that comes after the draft. Do not repeat,
+rewrite, summarise or quote any existing prose. Do not include a chapter
+heading, title, POV label, note, analysis, outline, markdown or commentary.
+
+Write approximately ${requestedAdditionalWords} additional words. Complete
+the chapter's existing dramatic movement naturally and end once, on a
+concrete event, choice, reveal, complication, interruption or changed
+relationship consequence.
+
+Do not introduce a new subplot merely to add length. Do not pad with routine
+travel, repeated attraction denial, repeated objects, repeated messages,
+bedtime reflection or a second version of an ending already present.
+
+Maintain the exact POV, tense, voice, continuity and formatting established
+by the draft. Use natural contractions. Never use em dashes or en dashes.
+
+The combined chapter must finish between ${input.minimumWordCount} and
+${input.maximumWordCount} words.
+
+USER'S ORIGINAL REQUEST
+
+${input.latestUserMessage || "Continue the chapter naturally."}
+
+EXISTING DRAFT
+
+${input.existingDraft}
+
+Continue immediately after the final sentence. Return only the additional
+finished prose.
+  `.trim();
+}
+
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
   let providerCallStartedAt = 0;
@@ -274,26 +325,51 @@ export async function POST(request: Request) {
       getWordCount(body.maximumWordCount, 4000),
     );
 
-    if (existingDraft) {
+    const existingWordCount = countWords(existingDraft);
+    const isManualContinuation =
+      Boolean(existingDraft) && existingWordCount < minimumWordCount;
+
+    if (existingDraft && existingWordCount > maximumWordCount) {
       return NextResponse.json(
         {
-          error:
-            "Automatic continuation is disabled. Discard the incomplete draft and generate the chapter again.",
+          error: `The preserved draft already exceeds ${maximumWordCount} words.`,
         },
         { status: 409 },
       );
     }
 
-    const prompt = getPrompt({
-      storyBible: body.storyBible ?? {},
-      storyState: body.storyState ?? {},
-      recentChapters,
-      chapterDirection,
-      latestUserMessage,
-      narrativeStyle,
-      minimumWordCount,
-      maximumWordCount,
-    });
+    if (
+      existingDraft &&
+      existingWordCount >= minimumWordCount &&
+      existingWordCount <= maximumWordCount
+    ) {
+      validateProse(existingDraft);
+
+      return NextResponse.json({
+        prose: existingDraft,
+        totalWordCount: existingWordCount,
+        isComplete: true,
+        diagnostics,
+      });
+    }
+
+    const prompt = isManualContinuation
+      ? getContinuationPrompt({
+          existingDraft,
+          latestUserMessage,
+          minimumWordCount,
+          maximumWordCount,
+        })
+      : getPrompt({
+          storyBible: body.storyBible ?? {},
+          storyState: body.storyState ?? {},
+          recentChapters,
+          chapterDirection,
+          latestUserMessage,
+          narrativeStyle,
+          minimumWordCount,
+          maximumWordCount,
+        });
 
     providerCallStartedAt = Date.now();
     const response = await openrouter.chat.completions.create({
@@ -304,7 +380,7 @@ export async function POST(request: Request) {
           content: prompt,
         },
       ],
-      max_tokens: 12000,
+      max_tokens: isManualContinuation ? 2500 : 12000,
     });
     const rawUsage = response.usage as unknown as
       | Record<string, unknown>
@@ -322,7 +398,9 @@ export async function POST(request: Request) {
     const costUsd = typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
 
     diagnostics.push({
-      stage: "chapter_writing",
+      stage: isManualContinuation
+        ? "chapter_writing_continuation"
+        : "chapter_writing",
       provider: "openrouter",
       model: WRITING_MODEL,
       status: "succeeded",
@@ -341,10 +419,13 @@ export async function POST(request: Request) {
       throw new Error("Aion returned no chapter prose.");
     }
 
-    const prose = cleanGeneratedProse(rawProse);
+    const returnedProse = cleanGeneratedProse(rawProse);
 
-    validateProse(prose);
+    validateProse(returnedProse);
 
+    const prose = isManualContinuation
+      ? `${existingDraft}\n\n${returnedProse}`.trim()
+      : returnedProse;
     const totalWordCount = countWords(prose);
 
     return NextResponse.json({
