@@ -1583,7 +1583,7 @@ device.`,
     baseStory: StoryWorkspace,
   ) {
     setIsThinking(true);
-    let workingPending =
+    let workingPending: PendingChapterGeneration =
       initialPending.minimumWordCount === 3000 &&
       initialPending.maximumWordCount === 4000
         ? {
@@ -1591,21 +1591,6 @@ device.`,
             minimumWordCount: 2000,
           }
         : initialPending;
-    const previousDiagnostics = workingPending.diagnostics ?? [];
-    const previousFinalDiagnostic = previousDiagnostics.at(-1);
-    const qualityPassedBeforeLedgerFailure =
-      previousFinalDiagnostic?.status === "failed" &&
-      previousFinalDiagnostic.stage.startsWith("continuity_ledger_") &&
-      previousDiagnostics.some(
-        (diagnostic) =>
-          diagnostic.stage === "chapter_quality_assessment" &&
-          diagnostic.status !== "failed",
-      );
-    workingPending = {
-      ...workingPending,
-      qualityAccepted:
-        workingPending.qualityAccepted || qualityPassedBeforeLedgerFailure,
-    };
     savePendingGeneration(workingPending);
 
     try {
@@ -1613,63 +1598,16 @@ device.`,
         workingPending.generatedChapter.replaceChapterNumber;
       const recentChapters =
         replacementNumber === null
-          ? baseStory.chapters.slice(-2)
+          ? baseStory.chapters.slice(-1)
           : baseStory.chapters
               .filter((chapter) => chapter.number < replacementNumber)
-              .slice(-2);
+              .slice(-1);
 
       const finishCompletedChapter = async (content: string) => {
-        let approvedContent = content;
-
-        if (!workingPending.qualityAccepted) {
-          const qualityResponse = await fetch("/api/story-chat/quality", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              storyBible: baseStory.storyBible,
-              storyState: baseStory.storyState,
-              chapterBrief: workingPending.chapterBrief,
-              chapterTitle: workingPending.generatedChapter.title,
-              povCharacter: workingPending.generatedChapter.povCharacter,
-              chapterContent: content,
-              minimumWordCount: workingPending.minimumWordCount,
-              maximumWordCount: workingPending.maximumWordCount,
-            }),
-          });
-          const qualityData = await readApiJson(qualityResponse);
-
-          if (!isQualityResponse(qualityData)) {
-            throw new Error(
-              "The quality endpoint returned an invalid assessment.",
-            );
-          }
-
-          workingPending = {
-            ...workingPending,
-            draft: qualityData.chapterContent,
-            diagnostics: [
-              ...(workingPending.diagnostics ?? []),
-              ...qualityData.diagnostics,
-            ],
-            qualityAccepted: qualityData.accepted,
-          };
-          savePendingGeneration(workingPending);
-
-          if (!qualityData.accepted) {
-            throw new Error(
-              `The repaired chapter still failed its quality check: ${qualityData.quality.summary} The repaired draft has been preserved.`,
-            );
-          }
-
-          approvedContent = qualityData.chapterContent;
-        }
-
         const chapterStory = applyGeneratedChapter(
           baseStory,
           workingPending,
-          approvedContent,
+          content,
         );
         const completedChapterNumber =
           replacementNumber ??
@@ -1718,67 +1656,62 @@ device.`,
         clearPendingGeneration();
       };
 
-      if (
-        workingPending.draft.trim() &&
-        meetsAcceptedMinimum(
-          workingPending.draft,
-          workingPending.minimumWordCount,
-        )
-      ) {
+      if (workingPending.draft.trim()) {
+        if (
+          !meetsAcceptedMinimum(
+            workingPending.draft,
+            workingPending.minimumWordCount,
+          )
+        ) {
+          throw new Error(
+            "Automatic continuation is disabled. Discard this incomplete draft and generate the chapter again.",
+          );
+        }
+
         await finishCompletedChapter(workingPending.draft);
         return;
       }
 
-      for (let segment = 0; segment < 4; segment += 1) {
-        const response = await fetch("/api/story-chat/write", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            storyBible: baseStory.storyBible,
-            storyState: baseStory.storyState,
-            recentChapters,
-            chapterBrief: workingPending.chapterBrief,
-            latestUserMessage: workingPending.latestUserMessage,
-            existingDraft: workingPending.draft,
-            minimumWordCount: workingPending.minimumWordCount,
-            maximumWordCount: workingPending.maximumWordCount,
-          }),
-        });
+      const response = await fetch("/api/story-chat/write", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          storyBible: baseStory.storyBible,
+          storyState: baseStory.storyState,
+          recentChapters,
+          chapterBrief: "",
+          latestUserMessage: workingPending.latestUserMessage,
+          existingDraft: "",
+          minimumWordCount: workingPending.minimumWordCount,
+          maximumWordCount: workingPending.maximumWordCount,
+        }),
+      });
 
-        const data = await readApiJson(response);
+      const data = await readApiJson(response);
 
-        if (!isWriterResponse(data)) {
-          throw new Error("The writing endpoint returned an invalid response.");
-        }
-
-        const combinedDraft = workingPending.draft
-          ? `${workingPending.draft.trim()}\n\n${data.prose.trim()}`
-          : data.prose.trim();
-
-        workingPending = {
-          ...workingPending,
-          draft: combinedDraft,
-          diagnostics: [
-            ...(workingPending.diagnostics ?? []),
-            ...data.diagnostics,
-          ],
-        };
-
-        savePendingGeneration(workingPending);
-
-        if (data.isComplete) {
-          await finishCompletedChapter(combinedDraft);
-          return;
-        }
+      if (!isWriterResponse(data)) {
+        throw new Error("The writing endpoint returned an invalid response.");
       }
 
-      throw new Error(
-        `The chapter is still incomplete at ${countWords(
-          workingPending.draft,
-        )} words. Your progress has been saved, so you can resume it.`,
-      );
+      workingPending = {
+        ...workingPending,
+        draft: data.prose.trim(),
+        diagnostics: [
+          ...(workingPending.diagnostics ?? []),
+          ...data.diagnostics,
+        ],
+      };
+      savePendingGeneration(workingPending);
+
+      if (!data.isComplete) {
+        throw new Error(
+          `Aion Full returned ${data.totalWordCount} words, outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The draft has been preserved for review.`,
+        );
+      }
+
+      await finishCompletedChapter(data.prose.trim());
     } catch (error) {
       if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
         workingPending = {
@@ -1914,7 +1847,7 @@ device.`,
       const pending: PendingChapterGeneration = {
         storyId: plannedStory.id,
         generatedChapter: data.generatedChapter,
-        chapterBrief: data.chapterBrief,
+        chapterBrief: "",
         latestUserMessage: trimmedMessage,
         draft: "",
         minimumWordCount: requestedTarget
