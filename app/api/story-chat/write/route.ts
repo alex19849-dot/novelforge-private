@@ -229,6 +229,21 @@ voice and impact, but must not become the chapter's default rhythm.
 Prefer precise character-specific observation over generic dramatic
 reactions.
 
+Do not use stock generated-fiction reactions or phrasing, including:
+"almost smiled", "mouth twitched", "jaw tightened", "expression
+unreadable", "something flickered in his eyes", "words landed like a
+punch", "words hung in the air", "my breath caught", "I hated that I
+noticed", "for a second neither of us spoke", or repeated descriptions
+built around "the kind of confidence that". Do not merely substitute a
+synonym while preserving the same cliché. Replace it with behaviour,
+dialogue, thought or physical detail that only this particular character
+would produce in this particular situation.
+
+Treat the supplied recent chapters as a repetition reference. Do not
+reuse their distinctive jokes, comparisons, emotional reactions,
+sentence patterns or closing-hook formula. Ordinary connective language
+may repeat naturally.
+
 Write an immersive chapter with a developed beginning, escalating
 middle and satisfying scene-level turn. End on an earned emotional,
 romantic or plot hook that creates a specific unanswered pressure, not a
