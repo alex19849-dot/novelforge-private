@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 export const maxDuration = 300;
 
-const WRITING_MODEL = "aion-labs/aion-3.0";
+const WRITING_MODEL = "sao10k/l3.3-euryale-70b";
 
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -148,31 +148,31 @@ function validateProse(content: string): void {
 
   if (planningPatterns.some((pattern) => pattern.test(opening))) {
     throw new Error(
-      "Aion returned planning notes instead of publishable chapter prose.",
+      "The writing model returned planning notes instead of publishable chapter prose.",
     );
   }
 
   if (/^\s*chapter\s+\d+\b/im.test(content)) {
     throw new Error(
-      "Aion included a chapter heading inside the prose. The chapter was not saved.",
+      "The writing model included a chapter heading inside the prose. The chapter was not saved.",
     );
   }
 
   if (/^\s{0,3}#{1,6}\s+\S+/mu.test(content) || /```/.test(content)) {
     throw new Error(
-      "Aion returned markdown instead of clean novel prose. The chapter was not saved.",
+      "The writing model returned markdown instead of clean novel prose. The chapter was not saved.",
     );
   }
 
   if (/\\["“”‘’]/u.test(content)) {
     throw new Error(
-      "Aion returned broken escaped quotation marks. The chapter was not saved.",
+      "The writing model returned broken escaped quotation marks. The chapter was not saved.",
     );
   }
 
   if (!/[.!?…"”’']$/u.test(content.trim())) {
     throw new Error(
-      "Aion appears to have stopped mid-sentence. The incomplete prose was not saved.",
+      "The writing model appears to have stopped mid-sentence. The incomplete prose was not saved.",
     );
   }
 }
@@ -451,7 +451,7 @@ export async function POST(request: Request) {
     const rawProse = response.choices[0]?.message?.content;
 
     if (!rawProse?.trim()) {
-      throw new Error("Aion returned no chapter prose.");
+      throw new Error("The writing model returned no chapter prose.");
     }
 
     const returnedProse = cleanGeneratedProse(rawProse);
