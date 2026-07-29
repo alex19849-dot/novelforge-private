@@ -24,6 +24,23 @@ type RecentChapter = {
 
 type GenerationStage = "opening" | "middle" | "final";
 
+type SceneCard = {
+  location: string;
+  objective: string;
+  conflict: string;
+  newInformation: string;
+  exitBeat: string;
+};
+
+type ChapterScenePlan = {
+  chapterGoal: string;
+  relationshipChange: string;
+  scene1: SceneCard;
+  scene2: SceneCard;
+  scene3: SceneCard;
+  completedBeatsToAvoid: string[];
+};
+
 type WriterRequest = {
   storyBible?: unknown;
   storyState?: unknown;
@@ -59,6 +76,87 @@ function getWordCount(value: unknown, fallback: number): number {
 
 function getGenerationStage(value: unknown): GenerationStage {
   return value === "middle" || value === "final" ? value : "opening";
+}
+
+function parseChapterScenePlan(value: unknown): ChapterScenePlan {
+  const rawPlan = cleanString(value);
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(rawPlan);
+  } catch {
+    throw new Error(
+      "The chapter is missing its validated three-scene plan.",
+    );
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("The chapter scene plan is invalid.");
+  }
+
+  const plan = parsed as Record<string, unknown>;
+  const sceneKeys = ["scene1", "scene2", "scene3"] as const;
+  const sceneFieldKeys = [
+    "location",
+    "objective",
+    "conflict",
+    "newInformation",
+    "exitBeat",
+  ] as const;
+  const scenes = {} as Pick<
+    ChapterScenePlan,
+    "scene1" | "scene2" | "scene3"
+  >;
+
+  for (const sceneKey of sceneKeys) {
+    const rawScene = plan[sceneKey];
+
+    if (
+      !rawScene ||
+      typeof rawScene !== "object" ||
+      Array.isArray(rawScene)
+    ) {
+      throw new Error(`The chapter scene plan is missing ${sceneKey}.`);
+    }
+
+    const sceneRecord = rawScene as Record<string, unknown>;
+    const scene = {} as SceneCard;
+
+    for (const fieldKey of sceneFieldKeys) {
+      const fieldValue = cleanString(sceneRecord[fieldKey]);
+
+      if (!fieldValue) {
+        throw new Error(`${sceneKey} is missing ${fieldKey}.`);
+      }
+
+      scene[fieldKey] = fieldValue;
+    }
+
+    scenes[sceneKey] = scene;
+  }
+
+  const chapterGoal = cleanString(plan.chapterGoal);
+  const relationshipChange = cleanString(plan.relationshipChange);
+  const completedBeatsToAvoid = Array.isArray(plan.completedBeatsToAvoid)
+    ? plan.completedBeatsToAvoid.map(cleanString).filter(Boolean)
+    : [];
+
+  if (!chapterGoal || !relationshipChange) {
+    throw new Error("The chapter scene plan is missing its narrative goal.");
+  }
+
+  return {
+    chapterGoal,
+    relationshipChange,
+    ...scenes,
+    completedBeatsToAvoid,
+  };
+}
+
+function getDraftTail(text: string, maximumWords = 600): string {
+  const words = text.trim().split(/\s+/);
+
+  return words.slice(-maximumWords).join(" ");
 }
 
 function getWritingContinuityState(value: unknown): unknown {
@@ -136,6 +234,7 @@ function cleanGeneratedProse(content: string): string {
   return cleaned
     .replace(/\\"/g, '"')
     .replace(/\\([“”‘’])/g, "$1")
+    .replace(/\s*[—–]\s*/g, ", ")
     .replace(/^\s{0,3}#{1,6}\s+[^\n]+\n+/u, "")
     .trim();
 }
@@ -183,68 +282,40 @@ function getOpeningPrompt(input: {
   storyBible: unknown;
   storyState: unknown;
   recentChapters: RecentChapter[];
-  chapterDirection: string;
+  scenePlan: ChapterScenePlan;
   latestUserMessage: string;
   narrativeStyle: string;
-  minimumWordCount: number;
-  maximumWordCount: number;
 }): string {
   return `
 You are NovelForge, a skilled commercial romance novelist.
 
-Write the OPENING MOVEMENT of one immersive commercial romance chapter.
-Write approximately 800 to 1000 words. Return only finished novel prose.
+Write SCENE ONE of one immersive commercial romance chapter.
+Write approximately 800 to 950 words. Return only finished novel prose.
 Do not include a chapter number, title, POV heading, notes, analysis,
 outline, markdown or commentary.
 
-NARRATIVE
-
 Use ${input.narrativeStyle}
 
-The Story Bible and established continuity are binding. Characters must
-remember what has happened and must not know information they have not
-learned. Continue from the previous chapter's exact ending when one is
-provided. Do not reset attraction, conflict, trust, intimacy or character
-development.
+Write only the assigned scene card. Do not borrow actions, conflict,
+information or the exit beat from Scene Two or Scene Three. Reach Scene One's
+exit beat once, then stop. Do not create a chapter ending or closing reflection.
 
-Write in a fluent contemporary voice with natural contractions. Give the
-POV character a distinct rhythm, vocabulary, humour, observations and
-emotional habits. Dialogue must sound like these particular characters,
-not interchangeable romance leads.
+The Story Bible, continuity and plan are binding. Characters must not know
+information they have not learned. Do not reset attraction, conflict, trust or
+intimacy. Use natural contractions and a distinct character voice.
 
-CHAPTER SHAPE
+Never repeat any completed beat listed below. Every paragraph must move the
+scene's action, decision, knowledge, risk or relationship. Avoid generic
+attraction shorthand, repetitive internal summary, therapy-speak, purple prose,
+stock reactions and interchangeable banter.
 
-Use two or three purposeful scenes, or one sustained scene with meaningful
-turns. Begin at the most interesting credible point. Every scene must change
-the plot, relationship, knowledge, risk or a character's decision.
-
-Plot developments and forced proximity must arise credibly from the
-established world and from decisions made by established characters. Never
-invent a convenient stranger, administrative rule, document, message,
-credential, scheduling requirement or coincidence solely to put characters
-together or manufacture an ending.
-
-Do not invent institutional, sporting, legal, workplace or academic procedures
-without support from the Story Bible or previous chapters. Avoid contradictions
-in year groups, roles, authority, schedules, locations and character knowledge.
-
-This is not the whole chapter. Establish its immediate dramatic movement and
-finish at a natural point of forward motion. Do not resolve the chapter, provide
-a climax, create a chapter hook, summarise what the character has learned, send
-the character home, put them to bed or write any closing reflection. Another
-movement will continue immediately after your final sentence.
-
-CONTENT
+Do not invent an unsupported stranger, rule, procedure, document, message,
+schedule, credential or coincidence. Never use em dashes or en dashes.
 
 Follow the Story Bible's heat level and burn pacing. All romantic and sexual
-characters are consenting adults aged eighteen or older. When the established
-progression calls for explicit consensual adult intimacy, write it fully,
-directly and without censorship or fade to black. Do not insert intimacy before
-it is earned.
-
-Use varied sentence and paragraph lengths. Avoid generic attraction shorthand,
-stock dramatic reactions, therapy-speak, purple prose and repetitive internal
-summary. Never use em dashes or en dashes.
+characters are consenting adults aged eighteen or older. When established
+progression calls for explicit consensual adult intimacy, write it directly
+without censorship or fade to black. Do not insert intimacy before it is earned.
 
 STORY BIBLE
 
@@ -258,15 +329,27 @@ PREVIOUS CHAPTER
 
 ${JSON.stringify(input.recentChapters.at(-1) ?? null, null, 2)}
 
+CHAPTER GOAL
+
+${input.scenePlan.chapterGoal}
+
+RELATIONSHIP CHANGE
+
+${input.scenePlan.relationshipChange}
+
+SCENE ONE CARD
+
+${JSON.stringify(input.scenePlan.scene1, null, 2)}
+
+COMPLETED BEATS THAT MUST NOT BE REPEATED
+
+${JSON.stringify(input.scenePlan.completedBeatsToAvoid, null, 2)}
+
 USER'S CURRENT CHAPTER REQUEST
 
 ${input.latestUserMessage || "Write the next chapter naturally."}
 
-CHAPTER DIRECTION
-
-${input.chapterDirection || "Continue the story naturally from the established position."}
-
-Write only the opening movement prose now.
+Write only Scene One prose now.
   `.trim();
 }
 
@@ -275,58 +358,59 @@ function getLaterMovementPrompt(input: {
   storyBible: unknown;
   storyState: unknown;
   recentChapters: RecentChapter[];
-  chapterDirection: string;
+  scenePlan: ChapterScenePlan;
   existingDraft: string;
   latestUserMessage: string;
   narrativeStyle: string;
-  minimumWordCount: number;
-  maximumWordCount: number;
 }): string {
-  const currentWordCount = countWords(input.existingDraft);
-  const finalTarget = Math.min(
-    input.maximumWordCount,
-    Math.max(input.minimumWordCount, 2600),
-  );
-  const requestedAdditionalWords =
+  const sceneNumber = input.stage === "middle" ? "TWO" : "THREE";
+  const sceneCard =
     input.stage === "middle"
-      ? 950
-      : Math.min(1100, Math.max(700, finalTarget - currentWordCount));
-  const movementName =
-    input.stage === "middle" ? "MIDDLE MOVEMENT" : "FINAL MOVEMENT";
+      ? input.scenePlan.scene2
+      : input.scenePlan.scene3;
+  const requestedAdditionalWords =
+    input.stage === "middle" ? "850 to 1000" : "750 to 950";
   const endingInstruction =
     input.stage === "middle"
-      ? `This is not the end of the chapter. Escalate or turn the existing
-dramatic movement, then stop on forward motion. Do not resolve the chapter,
-create a climax, add a hook, send the character home, put them to bed or write
-a closing reflection. The final movement will continue immediately.`
-      : `Complete the chapter's existing dramatic movement. Deliver its only
-climax or decisive turn, then end once on the strongest concrete consequence,
-choice, reveal, complication or relationship shift. Stop immediately after
-that hook. Do not add travel, bedtime reflection, attraction summary or a
-second ending.`;
+      ? `Reach Scene Two's exit beat once, then stop. Do not create the chapter
+ending, summarise the relationship or add a closing reflection.`
+      : `Reach Scene Three's exit beat once. That exit beat is the chapter's
+only ending hook. Stop immediately afterward. Do not add an aftermath,
+attraction summary, travel, bedtime reflection or second ending.`;
 
   return `
-Write the ${movementName} of the unfinished commercial romance chapter below.
+Write SCENE ${sceneNumber} of the unfinished commercial romance chapter.
 
-Return only the new prose that comes after the draft. Do not repeat,
-rewrite, summarise or quote any existing prose. Do not include a chapter
-heading, title, POV label, note, analysis, outline, markdown or commentary.
+Return only the new scene prose. Do not repeat, rewrite, summarise or quote
+the earlier scenes. Do not include a chapter heading, title, POV label, note,
+analysis, outline, markdown or commentary.
 
-Write approximately ${requestedAdditionalWords} additional words.
+Write approximately ${requestedAdditionalWords} words.
 
 ${endingInstruction}
 
-Maintain the exact POV, tense, voice, continuity and formatting established
-by the draft. Use natural contractions. Never use em dashes or en dashes.
+Write only the assigned scene card. Do not reuse an objective, argument,
+action, physical business, internal conclusion or attraction observation from
+an earlier scene. Do not borrow the final scene's exit beat early.
 
-Do not restart a scene or repeat information, dialogue, attraction, thoughts,
-objects, gestures or events already present in the draft. Do not introduce a
-new subplot or convenient stranger, rule, document, message, credential,
-schedule or coincidence merely to extend the chapter.
+The excerpt below contains only the end of the previous scene. Continue from
+its exact physical and emotional position. Maintain its POV, tense, voice and
+formatting. Use natural contractions.
 
 Use ${input.narrativeStyle}
 
-The Story Bible and established continuity remain binding.
+The Story Bible, continuity and scene plan are binding. Never repeat the
+completed beats listed below. Do not invent an unsupported stranger, rule,
+procedure, document, message, schedule, credential or coincidence.
+
+Avoid generic attraction shorthand, repetitive internal summary, therapy-speak,
+purple prose, stock reactions and interchangeable banter. Never use em dashes
+or en dashes.
+
+Follow the Story Bible's heat level and burn pacing. All romantic and sexual
+characters are consenting adults aged eighteen or older. When established
+progression calls for explicit consensual adult intimacy, write it directly
+without censorship or fade to black. Do not insert intimacy before it is earned.
 
 STORY BIBLE
 
@@ -340,20 +424,32 @@ PREVIOUS CHAPTER
 
 ${JSON.stringify(input.recentChapters.at(-1) ?? null, null, 2)}
 
+CHAPTER GOAL
+
+${input.scenePlan.chapterGoal}
+
+RELATIONSHIP CHANGE
+
+${input.scenePlan.relationshipChange}
+
+SCENE ${sceneNumber} CARD
+
+${JSON.stringify(sceneCard, null, 2)}
+
+COMPLETED BEATS THAT MUST NOT BE REPEATED
+
+${JSON.stringify(input.scenePlan.completedBeatsToAvoid, null, 2)}
+
+END OF PREVIOUS SCENE
+
+${getDraftTail(input.existingDraft)}
+
 USER'S ORIGINAL REQUEST
 
 ${input.latestUserMessage || "Continue the chapter naturally."}
 
-CHAPTER DIRECTION
-
-${input.chapterDirection || "Continue the story naturally from the established position."}
-
-EXISTING DRAFT
-
-${input.existingDraft}
-
-Continue immediately after the draft's final sentence. Return only the new
-movement prose.
+Continue immediately after the excerpt's final sentence. Return only Scene
+${sceneNumber} prose.
   `.trim();
 }
 
@@ -370,7 +466,7 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as WriterRequest;
-    const chapterDirection = cleanString(body.chapterBrief);
+    const scenePlan = parseChapterScenePlan(body.chapterBrief);
     const latestUserMessage = cleanString(body.latestUserMessage);
     const existingDraft = cleanString(body.existingDraft);
     const recentChapters = cleanRecentChapters(body.recentChapters);
@@ -412,24 +508,20 @@ export async function POST(request: Request) {
             storyBible: body.storyBible ?? {},
             storyState: body.storyState ?? {},
             recentChapters,
-            chapterDirection,
+            scenePlan,
             latestUserMessage,
             narrativeStyle,
-            minimumWordCount,
-            maximumWordCount,
           })
         : getLaterMovementPrompt({
-          stage: generationStage,
-          storyBible: body.storyBible ?? {},
-          storyState: body.storyState ?? {},
-          recentChapters,
-          chapterDirection,
-          existingDraft,
-          latestUserMessage,
-          narrativeStyle,
-          minimumWordCount,
-          maximumWordCount,
-        });
+            stage: generationStage,
+            storyBible: body.storyBible ?? {},
+            storyState: body.storyState ?? {},
+            recentChapters,
+            scenePlan,
+            existingDraft,
+            latestUserMessage,
+            narrativeStyle,
+          });
 
     const maximumAttempts = 3;
     let lastError: Error | null = null;
