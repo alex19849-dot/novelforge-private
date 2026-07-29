@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   AlignmentType,
+  Bookmark,
   Document,
   ExternalHyperlink,
   HeadingLevel,
@@ -105,6 +106,65 @@ function cleanChapterParagraphs(chapter: ExportChapter): string[] {
   }
 
   return paragraphs;
+}
+
+function buildInlineRuns(text: string): TextRun[] {
+  const runs: TextRun[] = [];
+  const pattern = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|_[^_\n]+_)/g;
+  let previousIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > previousIndex) {
+      runs.push(
+        new TextRun({
+          text: text.slice(previousIndex, match.index),
+          color: "000000",
+          size: 24,
+          font: "Garamond",
+        }),
+      );
+    }
+
+    const token = match[0];
+    const isBold = token.startsWith("**");
+    const markerLength = isBold ? 2 : 1;
+
+    runs.push(
+      new TextRun({
+        text: token.slice(markerLength, -markerLength),
+        bold: isBold,
+        italics: !isBold,
+        color: "000000",
+        size: 24,
+        font: "Garamond",
+      }),
+    );
+
+    previousIndex = pattern.lastIndex;
+  }
+
+  if (previousIndex < text.length) {
+    runs.push(
+      new TextRun({
+        text: text.slice(previousIndex),
+        color: "000000",
+        size: 24,
+        font: "Garamond",
+      }),
+    );
+  }
+
+  return runs.length > 0
+    ? runs
+    : [
+        new TextRun({
+          text,
+          color: "000000",
+          size: 24,
+          font: "Garamond",
+        }),
+      ];
 }
 
 function pageBreak(): Paragraph {
@@ -246,7 +306,7 @@ function buildContentWarningsPage(contentWarnings: string[]) {
   ];
 }
 
-function buildContentsPage() {
+function buildContentsPage(chapters: ExportChapter[]) {
   return [
     new Paragraph({
       alignment: AlignmentType.CENTER,
@@ -264,6 +324,11 @@ function buildContentsPage() {
     new TableOfContents("Table of Contents", {
       hyperlink: true,
       headingStyleRange: "1-1",
+      cachedEntries: chapters.map((chapter) => ({
+        title: `Chapter ${chapter.number}`,
+        level: 1,
+        href: `chapter_${chapter.number}`,
+      })),
     }),
     pageBreak(),
   ];
@@ -280,12 +345,17 @@ function buildChapter(chapter: ExportChapter, index: number) {
       alignment: AlignmentType.CENTER,
       spacing: { before: 720, after: 240 },
       children: [
-        new TextRun({
-          text: `Chapter ${chapter.number}`,
-          bold: true,
-          color: "000000",
-          size: 32,
-          font: "Garamond",
+        new Bookmark({
+          id: `chapter_${chapter.number}`,
+          children: [
+            new TextRun({
+              text: `Chapter ${chapter.number}`,
+              bold: true,
+              color: "000000",
+              size: 32,
+              font: "Garamond",
+            }),
+          ],
         }),
       ],
     }),
@@ -316,14 +386,16 @@ function buildChapter(chapter: ExportChapter, index: number) {
           line: 276,
         },
         indent: isSceneBreak ? undefined : { firstLine: 360 },
-        children: [
-          new TextRun({
-            text: isSceneBreak ? "***" : paragraph,
-            color: "000000",
-            size: 24,
-            font: "Garamond",
-          }),
-        ],
+        children: isSceneBreak
+          ? [
+              new TextRun({
+                text: "***",
+                color: "000000",
+                size: 24,
+                font: "Garamond",
+              }),
+            ]
+          : buildInlineRuns(paragraph),
       });
     }),
   ];
@@ -406,6 +478,9 @@ export async function POST(request: Request) {
     }
 
     const document = new Document({
+      features: {
+        updateFields: true,
+      },
       styles: {
         default: {
           document: {
@@ -448,7 +523,7 @@ export async function POST(request: Request) {
           children: [
             ...buildTitleAndCopyrightPages(title, author),
             ...buildContentWarningsPage(contentWarnings),
-            ...buildContentsPage(),
+            ...buildContentsPage(chapters),
             ...chapters.flatMap((chapter, index) =>
               buildChapter(chapter, index),
             ),
