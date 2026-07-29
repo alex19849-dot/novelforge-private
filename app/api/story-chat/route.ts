@@ -1396,7 +1396,11 @@ export async function POST(request: Request) {
 
       .filter((message) => Boolean(message.content))
 
-      .slice(-12)
+      // Keep enough recent discussion to complete a full Story Bible
+      // without forgetting choices made only a few setup steps earlier.
+      // Full chapter prose is not stored in messages, so this remains a
+      // compact planning context rather than an expensive manuscript dump.
+      .slice(-40)
 
       .map((message) => ({
         role: message.role,
@@ -2221,7 +2225,7 @@ Write commercially publishable fiction.
 
     for (let attempt = 0; attempt < 2; attempt += 1) {
       if (attempt > 0) {
-        response = await createPlanningResponse(conversation.slice(-6));
+        response = await createPlanningResponse(conversation.slice(-20));
       }
 
       if (response.status === "incomplete") {
