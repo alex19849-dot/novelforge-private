@@ -2,127 +2,34 @@ import OpenAI from "openai";
 
 import { NextResponse } from "next/server";
 
+import type { GenerationDiagnostic } from "../../../story-chat/types";
+
 export const runtime = "nodejs";
 
-export const maxDuration = 300;
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+export const maxDuration = 180;
 
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
 });
 
-type QualityRequest = {
+type RecentChapter = {
+  number: number;
+  title: string;
+  povCharacter: string;
+  content: string;
+};
+
+type WriterRequest = {
   storyBible?: unknown;
   storyState?: unknown;
+  recentChapters?: unknown;
   chapterBrief?: unknown;
-  chapterTitle?: unknown;
-  povCharacter?: unknown;
-  chapterContent?: unknown;
+  latestUserMessage?: unknown;
+  existingDraft?: unknown;
   minimumWordCount?: unknown;
   maximumWordCount?: unknown;
 };
-
-type QualityAssessment = {
-  passed: boolean;
-  hardFailures: string[];
-  repairInstructions: string[];
-  summary: string;
-  scores: {
-    continuity: number;
-    factualAuthenticity: number;
-    plotMovement: number;
-    relationshipProgression: number;
-    voiceDistinctiveness: number;
-    povAndTense: number;
-    repetitionControl: number;
-    hookStrength: number;
-  };
-};
-
-type GenerationDiagnostic = {
-  stage: string;
-  provider: "openai" | "openrouter";
-  model: string;
-  status: "succeeded" | "failed";
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  costUsd: number | null;
-  costType?: "reported" | "estimated" | "unavailable";
-  durationMs: number;
-  attempt: number;
-  error?: string;
-};
-
-class DiagnosticFailure extends Error {
-  diagnostic: GenerationDiagnostic;
-
-  constructor(message: string, diagnostic: GenerationDiagnostic) {
-    super(message);
-    this.name = "DiagnosticFailure";
-    this.diagnostic = {
-      ...diagnostic,
-      status: "failed",
-      error: message,
-    };
-  }
-}
-
-const qualitySchema = {
-  type: "object",
-  additionalProperties: false,
-  required: [
-    "passed",
-    "hardFailures",
-    "repairInstructions",
-    "summary",
-    "scores",
-  ],
-  properties: {
-    passed: {
-      type: "boolean",
-    },
-    hardFailures: {
-      type: "array",
-      items: { type: "string" },
-    },
-    repairInstructions: {
-      type: "array",
-      items: { type: "string" },
-    },
-    summary: {
-      type: "string",
-    },
-    scores: {
-      type: "object",
-      additionalProperties: false,
-      required: [
-        "continuity",
-        "factualAuthenticity",
-        "plotMovement",
-        "relationshipProgression",
-        "voiceDistinctiveness",
-        "povAndTense",
-        "repetitionControl",
-        "hookStrength",
-      ],
-      properties: {
-        continuity: { type: "number", minimum: 1, maximum: 10 },
-        factualAuthenticity: { type: "number", minimum: 1, maximum: 10 },
-        plotMovement: { type: "number", minimum: 1, maximum: 10 },
-        relationshipProgression: { type: "number", minimum: 1, maximum: 10 },
-        voiceDistinctiveness: { type: "number", minimum: 1, maximum: 10 },
-        povAndTense: { type: "number", minimum: 1, maximum: 10 },
-        repetitionControl: { type: "number", minimum: 1, maximum: 10 },
-        hookStrength: { type: "number", minimum: 1, maximum: 10 },
-      },
-    },
-  },
-} as const;
 
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
@@ -130,6 +37,12 @@ function cleanString(value: unknown): string {
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function getEndingExcerpt(text: string, maximumWords = 900): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+
+  return words.slice(-maximumWords).join(" ");
 }
 
 function getWordCount(value: unknown, fallback: number): number {
@@ -143,6 +56,48 @@ function getWordCount(value: unknown, fallback: number): number {
   }
 
   return Math.round(value);
+}
+
+function cleanRecentChapters(value: unknown): RecentChapter[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (chapter): chapter is Partial<RecentChapter> =>
+        Boolean(chapter) && typeof chapter === "object",
+    )
+    .map((chapter, index) => ({
+      number: typeof chapter.number === "number" ? chapter.number : index + 1,
+      title: cleanString(chapter.title),
+      povCharacter: cleanString(chapter.povCharacter),
+      content: cleanString(chapter.content),
+    }))
+    .filter((chapter) => chapter.content)
+    .slice(-2);
+}
+
+function getNarrativeStyle(value: unknown): string {
+  if (!value || typeof value !== "object") {
+    return "Follow the exact POV and tense stated in the chapter brief.";
+  }
+
+  const bible = value as Record<string, unknown>;
+  const styleParts = [
+    cleanString(bible.pov),
+    cleanString(bible.tense),
+    cleanString(bible.narrativeTense),
+  ].filter(Boolean);
+  const statedStyle = styleParts.join(", ");
+
+  if (/\b(?:past|present)\s+tense\b/i.test(statedStyle)) {
+    return statedStyle;
+  }
+
+  return statedStyle
+    ? `${statedStyle}, present tense`
+    : "First-person present tense, unless the user explicitly requested another tense.";
 }
 
 function cleanGeneratedProse(content: string): string {
@@ -159,496 +114,205 @@ function cleanGeneratedProse(content: string): string {
     cleaned = fencedResponse[1].trim();
   }
 
-  return cleaned
+  cleaned = cleaned
     .replace(/\\"/g, '"')
     .replace(/\\([“”‘’])/g, "$1")
     .replace(/^\s{0,3}#{1,6}\s+[^\n]+\n+/u, "")
     .trim();
+
+  return cleaned;
 }
 
-function validateMechanicalQuality(
-  content: string,
-  minimumWordCount: number,
-  maximumWordCount: number,
-): string[] {
-  const failures: string[] = [];
-  const wordCount = countWords(content);
+function validateProse(content: string): void {
+  const opening = content.slice(0, 6000);
+  const planningPatterns = [
+    /^\s*i need to (?:write|create|generate|continue)\b/im,
+    /^\s*let me analy[sz]e\b/im,
+    /^\s*(?:key requirements|important continuity points)\s*:/im,
+    /^\s*structure i need to hit\s*:/im,
+    /^\s*word count\s*:/im,
+    /^\s*(?:analysis|chapter plan|outline)\s*:/im,
+    /^\s*here(?:'s| is) (?:the|your) chapter\b/im,
+    /^\s*an error (?:occurred|happened)\b/im,
+  ];
 
-  if (wordCount < minimumWordCount) {
-    failures.push(
-      `The chapter has ${wordCount} words, below the ${minimumWordCount}-word minimum.`,
-    );
-  }
-
-  if (wordCount > maximumWordCount) {
-    failures.push(
-      `The chapter has ${wordCount} words, above the ${maximumWordCount}-word maximum.`,
+  if (planningPatterns.some((pattern) => pattern.test(opening))) {
+    throw new Error(
+      "Aion returned planning notes instead of publishable chapter prose.",
     );
   }
 
   if (/^\s*chapter\s+\d+\b/im.test(content)) {
-    failures.push("The prose contains an unwanted chapter heading.");
+    throw new Error(
+      "Aion included a chapter heading inside the prose. The chapter was not saved.",
+    );
   }
 
   if (/^\s{0,3}#{1,6}\s+\S+/mu.test(content) || /```/.test(content)) {
-    failures.push("The prose contains markdown.");
+    throw new Error(
+      "Aion returned markdown instead of clean novel prose. The chapter was not saved.",
+    );
   }
 
   if (/\\["“”‘’]/u.test(content)) {
-    failures.push("The prose contains broken escaped quotation marks.");
+    throw new Error(
+      "Aion returned broken escaped quotation marks. The chapter was not saved.",
+    );
   }
 
   if (!/[.!?…"”’']$/u.test(content.trim())) {
-    failures.push("The prose appears to stop mid-sentence.");
-  }
-
-  return failures;
-}
-
-function assessmentPasses(
-  assessment: QualityAssessment,
-  mechanicalFailures: string[],
-): boolean {
-  const scores = Object.values(assessment.scores);
-
-  return (
-    assessment.hardFailures.length === 0 &&
-    mechanicalFailures.length === 0 &&
-    assessment.scores.continuity >= 7 &&
-    assessment.scores.povAndTense >= 7 &&
-    scores.every((score) => Number.isFinite(score) && score >= 6)
-  );
-}
-
-async function assessChapter(input: {
-  storyBible: unknown;
-  storyState: unknown;
-  chapterBrief: string;
-  chapterTitle: string;
-  povCharacter: string;
-  chapterContent: string;
-  mechanicalFailures: string[];
-  attempt: number;
-}): Promise<{
-  assessment: QualityAssessment;
-  diagnostic: GenerationDiagnostic;
-}> {
-  const startedAt = Date.now();
-  const response = await openai.responses.create({
-    model: "gpt-5.6-terra",
-    reasoning: {
-      effort: "low",
-    },
-    input: [
-      {
-        role: "system",
-        content: `
-You are the final quality controller for a commercially published
-romance novel.
-
-Judge the completed chapter against the supplied chapter brief, Story
-Bible and actual continuity ledger. Assess only what is on the page.
-
-Score each category from 1 to 10.
-
-A passing chapter must:
-
-- preserve names, facts, chronology, locations and character knowledge
-- use credible terminology, procedures and professional behaviour for
-the Story Bible's exact country, region, time period and occupation
-- use the required POV person and narrative tense consistently
-- match the POV character's stored voice profile
-- use natural contractions in contemporary narration, internal thought
-and dialogue instead of pervasive stiff wording such as "I do not", "I
-have", "he is", "cannot" and "it does not"
-- cause meaningful external plot movement
-- cause meaningful relationship movement or change the consequence of
-the current intimacy milestone
-- avoid replaying recent scenes, gestures, attraction beats, internal
-conclusions and hooks
-- end with a concrete, effective hook
-- contain no mechanical failures
-
-Judge relationshipProgression by comparing the central relationship at
-the opening and ending of the chapter. Identify whether at least one of
-these has materially changed: attraction, trust, vulnerability,
-conflict, physical intimacy, emotional intimacy, power balance, mutual
-knowledge, mistaken belief or the consequence of an existing intimacy
-milestone.
-
-Progression may be positive, negative or destabilising. A new argument,
-boundary, suspicion, private realisation, act of care, shift in leverage
-or changed interpretation can count when it will affect later behaviour.
-Mere physical description, repeated attraction, banter without
-consequence, an almost-touch, private denial or thinking about the love
-interest does not count by itself.
-
-Respect the selected burn pacing. Do not lower the score because a
-chapter contains no kiss, sex, declaration or new physical milestone
-when those would be premature. Do lower it when the relationship ends in
-substantially the same position and meaning as it began, especially when
-the chapter merely repeats an earlier attraction or conflict beat.
-
-Judge factualAuthenticity only on material that appears in the chapter.
-Check professional terminology and behaviour, jurisdiction-specific law
-and procedure, medicine, sport, technology, geography, travel time and
-the established time period. Distinguish deliberately fictional
-organisations or worldbuilding from accidental real-world errors.
-
-Score factualAuthenticity below 6 only when there is a clear,
-high-confidence error that could damage reader trust. Do not invent
-nitpicks, demand unnecessary technical detail or penalise a sensible
-general description merely because a more specialised version exists.
-When uncertain, do not treat the detail as wrong.
-
-The chapter brief is strong guidance, not a rigid checklist. Do not fail
-an otherwise cohesive, commercially effective chapter merely because it
-reaches the intended objective through different scene beats or omits a
-nonessential planned detail.
-
-Use hardFailures only for objective continuity contradictions,
-high-confidence factual errors central to the scene or premise, wrong
-POV, wrong tense, malformed prose, unsafe age or consent problems, or a
-chapter that is genuinely unfinished. Do not use hardFailures for
-subjective preferences or minor deviations from the planned beats.
-
-Set passed to false when continuity or POV and tense scores below 7,
-when any other score is below 6, or when an objective hard failure
-exists.
-
-Score voiceDistinctiveness below 6 when uncontracted phrasing is
-pervasive enough to make a contemporary first-person voice sound stiff,
-synthetic or unlike natural speech. Do not penalise rare uncontracted
-phrasing used for emphasis or a deliberately formal character.
-
-Do not fail a chapter merely because it contains explicit consensual
-adult sexual content. Judge such content against the selected heat level
-and burn pacing. Never recommend censoring, softening or fading out an
-explicit scene that the brief requires.
-
-repairInstructions must be concrete, local and actionable. Identify the
-specific material that must change. Do not request a different story.
-        `.trim(),
-      },
-      {
-        role: "user",
-        content: `
-STORY BIBLE:
-
-${JSON.stringify(input.storyBible, null, 2)}
-
-ACTUAL CONTINUITY LEDGER:
-
-${JSON.stringify(input.storyState, null, 2)}
-
-CHAPTER BRIEF:
-
-${input.chapterBrief}
-
-CHAPTER METADATA:
-
-Title: ${input.chapterTitle}
-POV: ${input.povCharacter}
-
-MECHANICAL FAILURES:
-
-${JSON.stringify(input.mechanicalFailures, null, 2)}
-
-COMPLETED CHAPTER:
-
-${input.chapterContent}
-        `.trim(),
-      },
-    ],
-    text: {
-      verbosity: "low",
-      format: {
-        type: "json_schema",
-        name: "commercial_chapter_quality",
-        strict: true,
-        schema: qualitySchema,
-      },
-    },
-    max_output_tokens: 2500,
-  });
-  const usage = response.usage;
-  const inputTokens = usage?.input_tokens ?? 0;
-  const outputTokens = usage?.output_tokens ?? 0;
-  const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
-  const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
-  const diagnostic: GenerationDiagnostic = {
-    stage: "chapter_quality_assessment",
-    provider: "openai",
-    model: "gpt-5.6-terra",
-    status: "succeeded",
-    inputTokens,
-    outputTokens,
-    totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
-    costUsd:
-      (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
-      1_000_000,
-    costType: "estimated",
-    durationMs: Date.now() - startedAt,
-    attempt: input.attempt,
-  };
-
-  if (response.status === "incomplete") {
-    throw new DiagnosticFailure(
-      `The quality assessment was incomplete because ${
-        response.incomplete_details?.reason ?? "the response was truncated"
-      }.`,
-      diagnostic,
-    );
-  }
-
-  const outputText = response.output_text?.trim();
-
-  if (!outputText) {
-    throw new DiagnosticFailure(
-      "The quality model returned no assessment.",
-      diagnostic,
-    );
-  }
-
-  let assessment: QualityAssessment;
-
-  try {
-    assessment = JSON.parse(outputText) as QualityAssessment;
-  } catch {
-    throw new DiagnosticFailure(
-      "The quality model returned invalid JSON.",
-      diagnostic,
-    );
-  }
-
-  return {
-    assessment,
-    diagnostic,
-  };
-}
-
-type TargetedRepairPatch = {
-  find: string;
-  replace: string;
-};
-
-function parseTargetedRepairPatches(response: string): TargetedRepairPatch[] {
-  const cleaned = response
-    .replace(/^\`\`\`(?:text|markdown|md)?\s*/i, "")
-    .replace(/\s*\`\`\`$/, "")
-    .trim();
-  const pattern =
-    /<<<PATCH>>>\s*<<<FIND>>>([\s\S]*?)<<<END_FIND>>>\s*<<<REPLACE>>>([\s\S]*?)<<<END_REPLACE>>>\s*<<<END_PATCH>>>/g;
-  const patches: TargetedRepairPatch[] = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(cleaned)) !== null) {
-    const find = match[1].trim();
-    const replace = match[2].trim();
-
-    if (!find) {
-      throw new Error("A targeted repair patch contained no original text.");
-    }
-
-    patches.push({ find, replace });
-  }
-
-  if (patches.length === 0) {
-    throw new Error("Aion returned no usable targeted repair patches.");
-  }
-
-  if (patches.length > 8) {
-    throw new Error("Aion returned too many targeted repair patches.");
-  }
-
-  return patches;
-}
-
-function applyTargetedRepairPatches(
-  chapterContent: string,
-  patches: TargetedRepairPatch[],
-): string {
-  let repaired = chapterContent;
-
-  for (const patch of patches) {
-    const firstMatch = repaired.indexOf(patch.find);
-
-    if (firstMatch < 0) {
-      throw new Error(
-        "A targeted repair patch did not match the preserved chapter.",
-      );
-    }
-
-    if (repaired.indexOf(patch.find, firstMatch + patch.find.length) >= 0) {
-      throw new Error(
-        "A targeted repair patch was ambiguous and was not applied.",
-      );
-    }
-
-    repaired =
-      repaired.slice(0, firstMatch) +
-      patch.replace +
-      repaired.slice(firstMatch + patch.find.length);
-  }
-
-  return repaired.trim();
-}
-
-async function repairChapter(input: {
-  storyBible: unknown;
-  storyState: unknown;
-  chapterBrief: string;
-  chapterTitle: string;
-  povCharacter: string;
-  chapterContent: string;
-  assessment: QualityAssessment;
-  minimumWordCount: number;
-  maximumWordCount: number;
-}): Promise<{
-  content: string;
-  diagnostic: GenerationDiagnostic;
-}> {
-  const startedAt = Date.now();
-  const response = await openrouter.chat.completions.create({
-    model: "aion-labs/aion-3.0-mini",
-    messages: [
-      {
-        role: "user",
-        content: `
-You are making targeted repairs to a completed commercial romance
-chapter. Preserve the chapter and return only exact replacement patches
-for the specific failures identified by the quality assessment.
-
-Do not return the complete chapter. Do not explain, analyse, outline,
-summarise or use JSON. Do not add a chapter heading or markdown.
-
-Use this exact format for every patch:
-
-<<<PATCH>>>
-<<<FIND>>>Copy one exact, unique passage from the original chapter here<<<END_FIND>>>
-<<<REPLACE>>>Put the corrected version of that passage here<<<END_REPLACE>>>
-<<<END_PATCH>>>
-
-The FIND passage must be copied character-for-character from the
-original chapter and must be long enough to occur exactly once. Include
-enough surrounding context to make it unique. Return no text outside the
-patch blocks.
-
-Use no more than eight patches. Repair only passages required by
-repairInstructions or objective hardFailures. Preserve every strong
-section unchanged. Never rewrite the whole chapter through one enormous
-patch.
-
-Preserve the required POV person, narrative tense, character voice,
-continuity, heat level and burn pacing. Preserve explicit consensual
-adult sexual content required by the brief. Do not censor it, soften it
-or fade it to black.
-
-If relationship progression failed, alter the smallest existing
-interaction, decision, subtext or interpretation that can create a
-material shift. Do not bolt on a kiss, sex scene, declaration or
-artificial confrontation.
-
-If factual authenticity failed, correct only the identified
-high-confidence error. Do not add a technical lecture or replace it with
-another unverified precise claim.
-
-The patched chapter must remain between ${input.minimumWordCount} and
-${input.maximumWordCount} words.
-
-STORY BIBLE:
-
-${JSON.stringify(input.storyBible, null, 2)}
-
-ACTUAL CONTINUITY LEDGER:
-
-${JSON.stringify(input.storyState, null, 2)}
-
-CHAPTER BRIEF:
-
-${input.chapterBrief}
-
-CHAPTER METADATA:
-
-Title: ${input.chapterTitle}
-POV: ${input.povCharacter}
-
-FAILED QUALITY ASSESSMENT:
-
-${JSON.stringify(input.assessment, null, 2)}
-
-ORIGINAL CHAPTER:
-
-${input.chapterContent}
-        `.trim(),
-      },
-    ],
-    max_tokens: 3500,
-  });
-  const rawUsage = response.usage as unknown as
-    | Record<string, unknown>
-    | undefined;
-  const inputTokens =
-    typeof rawUsage?.prompt_tokens === "number" ? rawUsage.prompt_tokens : 0;
-  const outputTokens =
-    typeof rawUsage?.completion_tokens === "number"
-      ? rawUsage.completion_tokens
-      : 0;
-  const diagnostic: GenerationDiagnostic = {
-    stage: "chapter_quality_targeted_repair",
-    provider: "openrouter",
-    model: "aion-labs/aion-3.0-mini",
-    status: "succeeded",
-    inputTokens,
-    outputTokens,
-    totalTokens:
-      typeof rawUsage?.total_tokens === "number"
-        ? rawUsage.total_tokens
-        : inputTokens + outputTokens,
-    costUsd: typeof rawUsage?.cost === "number" ? rawUsage.cost : null,
-    costType: typeof rawUsage?.cost === "number" ? "reported" : "unavailable",
-    durationMs: Date.now() - startedAt,
-    attempt: 1,
-  };
-  const repairResponse = response.choices[0]?.message?.content;
-
-  if (!repairResponse?.trim()) {
-    throw new DiagnosticFailure(
-      "Aion returned no targeted chapter repairs.",
-      diagnostic,
-    );
-  }
-
-  try {
-    const patches = parseTargetedRepairPatches(repairResponse);
-    const repaired = applyTargetedRepairPatches(input.chapterContent, patches);
-
-    return {
-      content: cleanGeneratedProse(repaired),
-      diagnostic,
-    };
-  } catch (error) {
-    throw new DiagnosticFailure(
-      error instanceof Error
-        ? error.message
-        : "The targeted chapter repairs could not be applied.",
-      diagnostic,
+    throw new Error(
+      "Aion appears to have stopped mid-sentence. The incomplete prose was not saved.",
     );
   }
 }
+
+const WRITER_PROMPT = `
+You are an elite commercial romance ghostwriter writing compulsive,
+emotionally specific, publication-ready fiction.
+
+Return only publishable novel prose.
+
+Never explain, analyse, outline, summarise, list requirements, discuss
+word count, mention the prompt, or describe what you are about to write.
+
+Start immediately with the POV character's narration, dialogue or action.
+
+Do not include a chapter number, chapter title, POV heading or markdown.
+
+Follow the supplied Story Bible, story state and chapter brief exactly.
+Treat established facts as binding, but dramatise them through a living
+scene instead of mechanically ticking through planner beats.
+
+Treat storyState.voiceProfiles as binding. The POV character's sentence
+rhythm, vocabulary, humour, swearing, emotional deflection, professional
+knowledge, sensory focus, dialogue and internal thought must match their
+own profile. The POV character and love interest must never sound
+interchangeable or react in generic romance-character shorthand.
+
+Maintain first-person POV, tense, voice, continuity, pacing, heat level
+and burn pacing. Never soften, censor or fade out consensual adult sexual
+content when the Story Bible or chapter brief requires it.
+
+Use natural contractions throughout contemporary narration, internal
+thought and dialogue. Write "I don't", "I've", "he's", "can't" and
+"it doesn't" where a natural speaker or narrator would use them. Do not
+systematically expand contractions into stiff phrases such as "I do
+not", "I have", "he is", "cannot" or "it does not". Use uncontracted
+wording only for deliberate emphasis or a genuinely formal character.
+
+Build every major scene around:
+1. the POV character's immediate goal;
+2. a concrete obstacle or opposing agenda;
+3. relationship pressure between the central romantic characters;
+4. new information, discovery or changed understanding;
+5. an emotional turn that alters the scene;
+6. a consequence that drives the reader into what follows.
+
+Every chapter in a romance must create meaningful relationship movement.
+Change at least one relevant axis such as attraction, trust,
+vulnerability, conflict, physical intimacy, emotional intimacy, power
+balance or what the characters know about each other. Do not force a
+kiss, sex scene or declaration before the chosen burn pace requires it.
+Even a plot-heavy chapter must make the central relationship more
+charged, complicated, intimate, dangerous or consequential than it was
+at the chapter's opening.
+
+Balance dialogue, action, interiority, physical awareness and setting.
+Do not let characters stand in one place exchanging an extended briefing
+or reciting facts for the reader. Reveal necessary exposition through
+conflict, discovery, interruption, disagreement, choice and consequence.
+Summarise routine information rather than turning it into a speech.
+
+Use varied sentence and paragraph lengths. Fragments are allowed for
+voice and impact, but must not become the chapter's default rhythm.
+Prefer precise character-specific observation over generic dramatic
+reactions.
+
+Do not use stock generated-fiction reactions or phrasing, including:
+"almost smiled", "mouth twitched", "jaw tightened", "expression
+unreadable", "something flickered in his eyes", "words landed like a
+punch", "words hung in the air", "my breath caught", "I hated that I
+noticed", "for a second neither of us spoke", or repeated descriptions
+built around "the kind of confidence that". Do not merely substitute a
+synonym while preserving the same cliché. Replace it with behaviour,
+dialogue, thought or physical detail that only this particular character
+would produce in this particular situation.
+
+Treat the supplied recent chapters as a repetition reference. Do not
+reuse their distinctive jokes, comparisons, emotional reactions,
+sentence patterns or closing-hook formula. Ordinary connective language
+may repeat naturally.
+
+Write an immersive chapter with a developed beginning, escalating
+middle and satisfying scene-level turn. End on an earned emotional,
+romantic or plot hook that creates a specific unanswered pressure, not a
+generic statement that the POV character will find out what happens.
+
+All romantic or sexual characters are consenting adults aged 18 or older.
+
+Never use em dashes or en dashes.
+`.trim();
+
+const FINAL_PROSE_CHECKS = `
+NON-NEGOTIABLE OUTPUT CHECKS
+
+Apply these checks to the prose itself, not merely to your private plan:
+
+- The Story Bible and established continuity outrank an inconsistent
+  detail in the chapter brief. Silently correct contradictions instead
+  of reproducing them.
+
+- Do not invent implausible institutional rules, professional
+  procedures, coincidences or staff behaviour merely to force the
+  romantic characters together. Forced proximity must follow credibly
+  from the established world.
+
+- When the chapter brief says the love interest, conflict or inciting
+  encounter happens early, put it on the page within roughly the first
+  twenty percent of the chapter. Do not spend the opening third on
+  routine practice, work, travel, waking, showering or exposition.
+
+- Make most narrative paragraphs two to five sentences long. Reserve
+  one-sentence paragraphs and fragments for genuine emphasis. Do not
+  produce long sequences of one-line narration or dialogue surrounded by
+  unnecessary paragraph breaks.
+
+- Vary paragraph openings. Do not repeatedly begin consecutive
+  paragraphs with "I", "He", a character name or the same grammatical
+  construction.
+
+- Do not use or closely imitate these stock romance patterns:
+  "before I can stop myself", "longer than necessary", "I've never
+  noticed that before", "or maybe I have", "I look away", "like an
+  idiot", "I should leave, instead I stay", "his expression doesn't
+  change", "not hostile, not warm", "I don't believe it for a second",
+  or a closing claim that something will be easy when the narrator knows
+  it will not.
+
+- Do not build attraction from generic eye colour, damp hair, broad
+  shoulders, staring, looking away or noticing how someone moves.
+  Ground attraction in character-specific history, friction, humour,
+  competence, vulnerability, choice or changed understanding.
+
+- The final paragraph must contain or directly respond to a concrete
+  event, decision, reveal, interruption, threat, invitation, discovery
+  or irreversible consequence. Do not end with a vague prediction,
+  denial, private vow or summary of how difficult tomorrow will be.
+
+- Before returning the chapter, silently verify that names, ages,
+  academic year, job or team role, location, chronology, family
+  relationships and established knowledge agree with the Story Bible.
+
+Return only the finished novel prose.
+`.trim();
 
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
-  let pipelineStartedAt = 0;
+  let providerCallStartedAt = 0;
+  let providerStage = "chapter_writing";
 
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENAI_API_KEY is not configured." },
-        { status: 500 },
-      );
-    }
-
     if (!process.env.OPENROUTER_API_KEY) {
       return NextResponse.json(
         { error: "OPENROUTER_API_KEY is not configured." },
@@ -656,111 +320,185 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = (await request.json()) as QualityRequest;
+    const body = (await request.json()) as WriterRequest;
     const chapterBrief = cleanString(body.chapterBrief);
-    const chapterTitle = cleanString(body.chapterTitle);
-    const povCharacter = cleanString(body.povCharacter);
-    const chapterContent = cleanGeneratedProse(
-      cleanString(body.chapterContent),
-    );
+    const latestUserMessage = cleanString(body.latestUserMessage);
+    const existingDraft = cleanString(body.existingDraft);
+    providerStage = existingDraft
+      ? "chapter_writing_continuation"
+      : "chapter_writing";
+    const recentChapters = cleanRecentChapters(body.recentChapters);
+    const narrativeStyle = getNarrativeStyle(body.storyBible);
     const minimumWordCount = getWordCount(body.minimumWordCount, 2000);
     const maximumWordCount = Math.max(
       minimumWordCount,
       getWordCount(body.maximumWordCount, 4000),
     );
-    const acceptedMinimumWordCount = minimumWordCount;
-    const allowedMaximumWordCount = maximumWordCount;
 
-    if (!chapterBrief || !povCharacter || !chapterContent) {
+    if (!chapterBrief) {
       return NextResponse.json(
-        { error: "A complete chapter and chapter brief are required." },
+        { error: "A chapter brief is required before writing can begin." },
         { status: 400 },
       );
     }
 
-    const mechanicalFailures = validateMechanicalQuality(
-      chapterContent,
-      acceptedMinimumWordCount,
-      allowedMaximumWordCount,
-    );
-    pipelineStartedAt = Date.now();
-    const firstQualityResult = await assessChapter({
-      storyBible: body.storyBible ?? {},
-      storyState: body.storyState ?? {},
-      chapterBrief,
-      chapterTitle,
-      povCharacter,
-      chapterContent,
-      mechanicalFailures,
+    const existingWordCount = countWords(existingDraft);
+    const wordsStillNeeded = Math.max(0, minimumWordCount - existingWordCount);
+
+    const prompt = existingDraft
+      ? `
+${WRITER_PROMPT}
+
+Continue an incomplete chapter directly after its final sentence.
+
+Return only new prose. Do not repeat or rewrite existing prose.
+
+MANDATORY NARRATIVE STYLE:
+
+${narrativeStyle}
+
+Do not switch POV person or narrative tense.
+
+STORY BIBLE:
+
+${JSON.stringify(body.storyBible ?? {}, null, 2)}
+
+ACTUAL CONTINUITY LEDGER:
+
+${JSON.stringify(body.storyState ?? {}, null, 2)}
+
+The existing draft contains ${existingWordCount} words.
+
+Write approximately ${Math.min(1800, Math.max(800, wordsStillNeeded + 250))} new words.
+
+Complete the remaining chapter arc and finish at the hook required by
+the chapter brief.
+
+CHAPTER BRIEF:
+
+${chapterBrief}
+
+END OF THE EXISTING DRAFT:
+
+${getEndingExcerpt(existingDraft)}
+
+${FINAL_PROSE_CHECKS}
+`
+      : `
+${WRITER_PROMPT}
+
+MANDATORY NARRATIVE STYLE:
+
+${narrativeStyle}
+
+Do not switch POV person or narrative tense.
+
+STORY BIBLE:
+
+${JSON.stringify(body.storyBible ?? {}, null, 2)}
+
+STORY STATE:
+
+${JSON.stringify(body.storyState ?? {}, null, 2)}
+
+RECENT CHAPTERS:
+
+${JSON.stringify(recentChapters, null, 2)}
+
+CHAPTER BRIEF:
+
+${chapterBrief}
+
+LATEST USER REQUEST:
+
+${latestUserMessage}
+
+Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} words.
+
+${FINAL_PROSE_CHECKS}
+`;
+
+    providerCallStartedAt = Date.now();
+    const response = await openrouter.chat.completions.create({
+      model: "aion-labs/aion-3.0-mini",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+      max_tokens: 8000,
+    });
+    const rawUsage = response.usage as unknown as
+      | Record<string, unknown>
+      | undefined;
+    const inputTokens =
+      typeof rawUsage?.prompt_tokens === "number" ? rawUsage.prompt_tokens : 0;
+    const outputTokens =
+      typeof rawUsage?.completion_tokens === "number"
+        ? rawUsage.completion_tokens
+        : 0;
+    const totalTokens =
+      typeof rawUsage?.total_tokens === "number"
+        ? rawUsage.total_tokens
+        : inputTokens + outputTokens;
+    const costUsd = typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
+    diagnostics.push({
+      stage: providerStage,
+      provider: "openrouter",
+      model: "aion-labs/aion-3.0-mini",
+      status: "succeeded",
+      inputTokens,
+      outputTokens,
+      totalTokens,
+      costUsd,
+      costType: costUsd === null ? "unavailable" : "reported",
+      durationMs: Date.now() - providerCallStartedAt,
       attempt: 1,
     });
-    const firstAssessment = firstQualityResult.assessment;
-    diagnostics.push(firstQualityResult.diagnostic);
 
-    // The quality model may identify useful subjective improvements, but
-    // it must never rewrite or shorten an otherwise valid completed
-    // chapter. Only objective hard failures and mechanical failures block
-    // the chapter from being saved.
-    const accepted =
-      mechanicalFailures.length === 0 &&
-      firstAssessment.hardFailures.length === 0;
+    const rawProse = response.choices[0]?.message?.content;
+
+    if (!rawProse?.trim()) {
+      throw new Error("Aion returned no chapter prose.");
+    }
+
+    const prose = cleanGeneratedProse(rawProse);
+
+    validateProse(prose);
+
+    const totalWordCount = existingWordCount + countWords(prose);
 
     return NextResponse.json({
-      accepted,
-      chapterContent,
-      quality: firstAssessment,
-      repaired: false,
+      prose,
+      totalWordCount,
+      isComplete: totalWordCount >= minimumWordCount,
       diagnostics,
     });
   } catch (error) {
-    console.error("CHAPTER QUALITY GATE FAILED:", error);
+    console.error("STORY WRITER FAILED:", error);
     const message =
-      error instanceof Error
-        ? error.message
-        : "The chapter quality gate failed.";
+      error instanceof Error ? error.message : "The writing model failed.";
 
-    if (error instanceof DiagnosticFailure) {
-      diagnostics.push(error.diagnostic);
-    } else if (pipelineStartedAt > 0) {
-      const lastStage = diagnostics.at(-1)?.stage;
-      const stage =
-        diagnostics.length === 0 ||
-        lastStage === "chapter_quality_targeted_repair"
-          ? "chapter_quality_assessment"
-          : "chapter_quality_targeted_repair";
-      const provider =
-        stage === "chapter_quality_targeted_repair"
-          ? "openrouter"
-          : "openai";
-      const elapsedCompleted = diagnostics.reduce(
-        (total, diagnostic) => total + diagnostic.durationMs,
-        0,
-      );
-
+    if (diagnostics.length > 0) {
+      diagnostics[diagnostics.length - 1] = {
+        ...diagnostics[diagnostics.length - 1],
+        status: "failed",
+        error: message,
+      };
+    } else if (providerCallStartedAt > 0) {
       diagnostics.push({
-        stage,
-        provider,
-        model:
-          provider === "openrouter"
-            ? "aion-labs/aion-3.0-mini"
-            : "gpt-5.6-terra",
+        stage: providerStage,
+        provider: "openrouter",
+        model: "aion-labs/aion-3.0-mini",
         status: "failed",
         inputTokens: 0,
         outputTokens: 0,
         totalTokens: 0,
         costUsd: null,
         costType: "unavailable",
-        durationMs: Math.max(
-          0,
-          Date.now() - pipelineStartedAt - elapsedCompleted,
-        ),
-        attempt:
-          stage === "chapter_quality_assessment" &&
-          diagnostics.some(
-            (diagnostic) => diagnostic.stage === "chapter_quality_assessment",
-          )
-            ? 2
-            : 1,
+        durationMs: Date.now() - providerCallStartedAt,
+        attempt: 1,
         error: message,
       });
     }
