@@ -697,81 +697,19 @@ export async function POST(request: Request) {
     const firstAssessment = firstQualityResult.assessment;
     diagnostics.push(firstQualityResult.diagnostic);
 
-    if (assessmentPasses(firstAssessment, mechanicalFailures)) {
-      return NextResponse.json({
-        accepted: true,
-        chapterContent,
-        quality: firstAssessment,
-        repaired: false,
-        diagnostics,
-      });
-    }
-
-    let repairResult: Awaited<ReturnType<typeof repairChapter>>;
-
-    try {
-      repairResult = await repairChapter({
-        storyBible: body.storyBible ?? {},
-        storyState: body.storyState ?? {},
-        chapterBrief,
-        chapterTitle,
-        povCharacter,
-        chapterContent,
-        assessment: firstAssessment,
-        minimumWordCount,
-        maximumWordCount: allowedMaximumWordCount,
-      });
-    } catch (error) {
-      if (error instanceof DiagnosticFailure) {
-        diagnostics.push(error.diagnostic);
-
-        const originalChapterIsSafeToPreserve =
-          mechanicalFailures.length === 0 &&
-          firstAssessment.hardFailures.length === 0;
-
-        if (originalChapterIsSafeToPreserve) {
-          return NextResponse.json({
-            accepted: true,
-            chapterContent,
-            quality: firstAssessment,
-            repaired: false,
-            diagnostics,
-          });
-        }
-      }
-
-      throw error;
-    }
-
-    const repairedContent = repairResult.content;
-    diagnostics.push(repairResult.diagnostic);
-    const repairedMechanicalFailures = validateMechanicalQuality(
-      repairedContent,
-      acceptedMinimumWordCount,
-      allowedMaximumWordCount,
-    );
-    const secondQualityResult = await assessChapter({
-      storyBible: body.storyBible ?? {},
-      storyState: body.storyState ?? {},
-      chapterBrief,
-      chapterTitle,
-      povCharacter,
-      chapterContent: repairedContent,
-      mechanicalFailures: repairedMechanicalFailures,
-      attempt: 2,
-    });
-    const secondAssessment = secondQualityResult.assessment;
-    diagnostics.push(secondQualityResult.diagnostic);
-    const accepted = assessmentPasses(
-      secondAssessment,
-      repairedMechanicalFailures,
-    );
+    // The quality model may identify useful subjective improvements, but
+    // it must never rewrite or shorten an otherwise valid completed
+    // chapter. Only objective hard failures and mechanical failures block
+    // the chapter from being saved.
+    const accepted =
+      mechanicalFailures.length === 0 &&
+      firstAssessment.hardFailures.length === 0;
 
     return NextResponse.json({
       accepted,
-      chapterContent: repairedContent,
-      quality: secondAssessment,
-      repaired: true,
+      chapterContent,
+      quality: firstAssessment,
+      repaired: false,
       diagnostics,
     });
   } catch (error) {
