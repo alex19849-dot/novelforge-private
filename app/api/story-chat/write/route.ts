@@ -22,6 +22,8 @@ type RecentChapter = {
   content: string;
 };
 
+type GenerationStage = "opening" | "middle" | "final";
+
 type WriterRequest = {
   storyBible?: unknown;
   storyState?: unknown;
@@ -31,6 +33,7 @@ type WriterRequest = {
   existingDraft?: unknown;
   minimumWordCount?: unknown;
   maximumWordCount?: unknown;
+  generationStage?: unknown;
 };
 
 function cleanString(value: unknown): string {
@@ -52,6 +55,10 @@ function getWordCount(value: unknown, fallback: number): number {
   }
 
   return Math.round(value);
+}
+
+function getGenerationStage(value: unknown): GenerationStage {
+  return value === "middle" || value === "final" ? value : "opening";
 }
 
 function getWritingContinuityState(value: unknown): unknown {
@@ -177,7 +184,7 @@ function validateProse(content: string): void {
   }
 }
 
-function getPrompt(input: {
+function getOpeningPrompt(input: {
   storyBible: unknown;
   storyState: unknown;
   recentChapters: RecentChapter[];
@@ -187,19 +194,11 @@ function getPrompt(input: {
   minimumWordCount: number;
   maximumWordCount: number;
 }): string {
-  const preferredMinimum = Math.min(
-    input.maximumWordCount,
-    Math.max(input.minimumWordCount, 2600),
-  );
-  const preferredMaximum = Math.min(
-    input.maximumWordCount,
-    Math.max(preferredMinimum, 3000),
-  );
-
   return `
 You are NovelForge, a skilled commercial romance novelist.
 
-Write one complete, immersive chapter. Return only finished novel prose.
+Write the OPENING MOVEMENT of one immersive commercial romance chapter.
+Write approximately 800 to 1000 words. Return only finished novel prose.
 Do not include a chapter number, title, POV heading, notes, analysis,
 outline, markdown or commentary.
 
@@ -234,20 +233,11 @@ Do not invent institutional, sporting, legal, workplace or academic procedures
 without support from the Story Bible or previous chapters. Avoid contradictions
 in year groups, roles, authority, schedules, locations and character knowledge.
 
-Keep the chapter between ${input.minimumWordCount} and ${input.maximumWordCount} words.
-Aim for approximately ${preferredMinimum} to ${preferredMaximum} words so the
-chapter clears the hard minimum without requiring continuation. The accepted
-range is a boundary, not permission to pad. Once the chapter has cleared the
-minimum and completed its natural dramatic arc, stop. Never extend the chapter
-with repeated messages, repeated objects, repeated attraction denial, routine
-travel, bedtime reflection or several versions of the same ending.
-
-End once, on a concrete event, choice, reveal, complication, interruption or
-changed relationship consequence. Do not end with a vague prediction, private
-vow or summary about how difficult tomorrow will be. After the strongest final
-turn or hook, stop immediately. Do not add another encounter, logistical
-instruction, observation from a distance, attraction summary or second closing
-beat.
+This is not the whole chapter. Establish its immediate dramatic movement and
+finish at a natural point of forward motion. Do not resolve the chapter, provide
+a climax, create a chapter hook, summarise what the character has learned, send
+the character home, put them to bed or write any closing reflection. Another
+movement will continue immediately after your final sentence.
 
 CONTENT
 
@@ -281,58 +271,94 @@ CHAPTER DIRECTION
 
 ${input.chapterDirection || "Continue the story naturally from the established position."}
 
-Write only the finished chapter prose now.
+Write only the opening movement prose now.
   `.trim();
 }
 
-function getContinuationPrompt(input: {
+function getLaterMovementPrompt(input: {
+  stage: "middle" | "final";
+  storyBible: unknown;
+  storyState: unknown;
+  recentChapters: RecentChapter[];
+  chapterDirection: string;
   existingDraft: string;
   latestUserMessage: string;
+  narrativeStyle: string;
   minimumWordCount: number;
   maximumWordCount: number;
 }): string {
   const currentWordCount = countWords(input.existingDraft);
-  const missingWords = Math.max(
-    0,
-    input.minimumWordCount - currentWordCount,
+  const finalTarget = Math.min(
+    input.maximumWordCount,
+    Math.max(input.minimumWordCount, 2600),
   );
-  const requestedAdditionalWords = Math.min(
-    900,
-    Math.max(400, missingWords + 200),
-  );
+  const requestedAdditionalWords =
+    input.stage === "middle"
+      ? 950
+      : Math.min(1100, Math.max(700, finalTarget - currentWordCount));
+  const movementName =
+    input.stage === "middle" ? "MIDDLE MOVEMENT" : "FINAL MOVEMENT";
+  const endingInstruction =
+    input.stage === "middle"
+      ? `This is not the end of the chapter. Escalate or turn the existing
+dramatic movement, then stop on forward motion. Do not resolve the chapter,
+create a climax, add a hook, send the character home, put them to bed or write
+a closing reflection. The final movement will continue immediately.`
+      : `Complete the chapter's existing dramatic movement. Deliver its only
+climax or decisive turn, then end once on the strongest concrete consequence,
+choice, reveal, complication or relationship shift. Stop immediately after
+that hook. Do not add travel, bedtime reflection, attraction summary or a
+second ending.`;
 
   return `
-Continue the unfinished novel chapter below.
+Write the ${movementName} of the unfinished commercial romance chapter below.
 
 Return only the new prose that comes after the draft. Do not repeat,
 rewrite, summarise or quote any existing prose. Do not include a chapter
 heading, title, POV label, note, analysis, outline, markdown or commentary.
 
-Write approximately ${requestedAdditionalWords} additional words. Complete
-the chapter's existing dramatic movement naturally and end once, on a
-concrete event, choice, reveal, complication, interruption or changed
-relationship consequence.
+Write approximately ${requestedAdditionalWords} additional words.
 
-Do not introduce a new subplot merely to add length. Do not pad with routine
-travel, repeated attraction denial, repeated objects, repeated messages,
-bedtime reflection or a second version of an ending already present.
+${endingInstruction}
 
 Maintain the exact POV, tense, voice, continuity and formatting established
 by the draft. Use natural contractions. Never use em dashes or en dashes.
 
-The combined chapter must finish between ${input.minimumWordCount} and
-${input.maximumWordCount} words.
+Do not restart a scene or repeat information, dialogue, attraction, thoughts,
+objects, gestures or events already present in the draft. Do not introduce a
+new subplot or convenient stranger, rule, document, message, credential,
+schedule or coincidence merely to extend the chapter.
+
+Use ${input.narrativeStyle}
+
+The Story Bible and established continuity remain binding.
+
+STORY BIBLE
+
+${JSON.stringify(input.storyBible, null, 2)}
+
+CONTINUITY STATE
+
+${JSON.stringify(getWritingContinuityState(input.storyState), null, 2)}
+
+PREVIOUS CHAPTER
+
+${JSON.stringify(input.recentChapters.at(-1) ?? null, null, 2)}
 
 USER'S ORIGINAL REQUEST
 
 ${input.latestUserMessage || "Continue the chapter naturally."}
 
+CHAPTER DIRECTION
+
+${input.chapterDirection || "Continue the story naturally from the established position."}
+
 EXISTING DRAFT
 
 ${input.existingDraft}
 
-Continue immediately after the final sentence. Return only the additional
-finished prose.
+Continue immediately after the draft's final sentence. Return only the new
+movement prose.
   `.trim();
 }
 
@@ -359,10 +385,8 @@ export async function POST(request: Request) {
       minimumWordCount,
       getWordCount(body.maximumWordCount, 4000),
     );
-
+    const generationStage = getGenerationStage(body.generationStage);
     const existingWordCount = countWords(existingDraft);
-    const isManualContinuation =
-      Boolean(existingDraft) && existingWordCount < minimumWordCount;
 
     if (existingDraft && existingWordCount > maximumWordCount) {
       return NextResponse.json(
@@ -373,33 +397,39 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      existingDraft &&
-      existingWordCount >= minimumWordCount &&
-      existingWordCount <= maximumWordCount
-    ) {
-      validateProse(existingDraft);
-
-      return NextResponse.json({
-        prose: existingDraft,
-        totalWordCount: existingWordCount,
-        isComplete: true,
-        diagnostics,
-      });
+    if (generationStage === "opening" && existingDraft) {
+      return NextResponse.json(
+        { error: "The opening movement cannot include an existing draft." },
+        { status: 409 },
+      );
     }
 
-    const prompt = isManualContinuation
-      ? getContinuationPrompt({
-          existingDraft,
-          latestUserMessage,
-          minimumWordCount,
-          maximumWordCount,
-        })
-      : getPrompt({
+    if (generationStage !== "opening" && !existingDraft) {
+      return NextResponse.json(
+        { error: "A middle or final movement requires an existing draft." },
+        { status: 409 },
+      );
+    }
+
+    const prompt =
+      generationStage === "opening"
+        ? getOpeningPrompt({
+            storyBible: body.storyBible ?? {},
+            storyState: body.storyState ?? {},
+            recentChapters,
+            chapterDirection,
+            latestUserMessage,
+            narrativeStyle,
+            minimumWordCount,
+            maximumWordCount,
+          })
+        : getLaterMovementPrompt({
+          stage: generationStage,
           storyBible: body.storyBible ?? {},
           storyState: body.storyState ?? {},
           recentChapters,
           chapterDirection,
+          existingDraft,
           latestUserMessage,
           narrativeStyle,
           minimumWordCount,
@@ -415,7 +445,7 @@ export async function POST(request: Request) {
           content: prompt,
         },
       ],
-      max_tokens: isManualContinuation ? 2500 : 12000,
+      max_tokens: 4500,
     });
     const rawUsage = response.usage as unknown as
       | Record<string, unknown>
@@ -433,9 +463,7 @@ export async function POST(request: Request) {
     const costUsd = typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
 
     diagnostics.push({
-      stage: isManualContinuation
-        ? "chapter_writing_continuation"
-        : "chapter_writing",
+      stage: `chapter_writing_${generationStage}`,
       provider: "openrouter",
       model: WRITING_MODEL,
       status: "succeeded",
@@ -458,17 +486,19 @@ export async function POST(request: Request) {
 
     validateProse(returnedProse);
 
-    const prose = isManualContinuation
-      ? `${existingDraft}\n\n${returnedProse}`.trim()
-      : returnedProse;
+    const prose = generationStage === "opening"
+      ? returnedProse
+      : `${existingDraft}\n\n${returnedProse}`.trim();
     const totalWordCount = countWords(prose);
 
     return NextResponse.json({
       prose,
       totalWordCount,
       isComplete:
+        generationStage === "final" &&
         totalWordCount >= minimumWordCount &&
         totalWordCount <= maximumWordCount,
+      generationStage,
       diagnostics,
     });
   } catch (error) {
