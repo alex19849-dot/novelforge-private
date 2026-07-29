@@ -1175,6 +1175,32 @@ conceals.
 
 - State what the other important characters know and cannot yet know.
 
+FACTUAL AUTHENTICITY:
+
+- Check every profession, institution, legal process, medical detail,
+sporting rule, technology, geography and cultural practice against the
+Story Bible's exact country, region and time period before placing it in
+the chapter brief.
+
+- Do not transplant terminology, laws, procedures, ranks, qualifications
+or organisations from another jurisdiction. Use the correct regional
+language and professional process for the established setting.
+
+- Do not invent a precise statute, charge, diagnosis, drug effect,
+forensic method, competition rule or workplace procedure merely because
+it sounds convincing. When a precise detail is not confidently
+supported, plan the scene around an accurate broader fact rather than
+fabricated specificity.
+
+- Distinguish deliberately fictional organisations and speculative
+worldbuilding from accidental real-world errors. Preserve intentional
+departures that the Story Bible establishes, but keep their internal
+rules consistent.
+
+- Make professional characters behave like people with their stated
+experience. Their decisions, authority, access, terminology and likely
+consequences must be credible for their role.
+
 SCENE DESIGN:
 
 - Plan two to four purposeful scenes or continuous scene movements.
@@ -2525,3 +2551,4 @@ ${chapterEnding}
     );
   }
 }
+
