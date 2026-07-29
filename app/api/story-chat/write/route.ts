@@ -177,11 +177,6 @@ function validateProse(content: string): void {
     );
   }
 
-  if (!/[.!?…"”’']$/u.test(content.trim())) {
-    throw new Error(
-      "The writing model appears to have stopped mid-sentence. The incomplete prose was not saved.",
-    );
-  }
 }
 
 function getOpeningPrompt(input: {
@@ -470,7 +465,21 @@ export async function POST(request: Request) {
             : inputTokens + outputTokens;
         const costUsd =
           typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
-        const rawProse = response.choices[0]?.message?.content;
+        const choice = response.choices[0];
+        const finishReason = choice?.finish_reason;
+        const rawProse = choice?.message?.content;
+
+        if (finishReason === "length") {
+          throw new Error(
+            "The writing model reached its token limit before completing the movement.",
+          );
+        }
+
+        if (finishReason === "content_filter") {
+          throw new Error(
+            "The writing provider stopped the movement because of its content filter.",
+          );
+        }
 
         if (!rawProse?.trim()) {
           throw new Error("The writing model returned no chapter prose.");
