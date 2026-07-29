@@ -1695,13 +1695,9 @@ device.`,
 
       let generationStage: GenerationStage =
         workingPending.nextGenerationStage ??
-        (!workingPending.draft.trim()
-          ? "opening"
-          : countWords(workingPending.draft) < 1700
-            ? "middle"
-            : "final");
+        (!workingPending.draft.trim() ? "opening" : "final");
 
-      for (let movementAttempt = 0; movementAttempt < 5; movementAttempt += 1) {
+      for (let sceneAttempt = 0; sceneAttempt < 3; sceneAttempt += 1) {
         const response = await fetch("/api/story-chat/write", {
           method: "POST",
           headers: {
@@ -1711,7 +1707,7 @@ device.`,
             storyBible: baseStory.storyBible,
             storyState: writingStoryState,
             recentChapters,
-            chapterBrief: "",
+            chapterBrief: workingPending.chapterBrief,
             latestUserMessage: workingPending.latestUserMessage,
             existingDraft:
               generationStage === "opening" ? "" : workingPending.draft,
@@ -1725,7 +1721,7 @@ device.`,
 
         if (!isWriterResponse(data) || data.generationStage !== generationStage) {
           throw new Error(
-            "The writing endpoint returned an invalid chapter movement.",
+            "The writing endpoint returned an invalid chapter scene.",
           );
         }
 
@@ -1733,9 +1729,7 @@ device.`,
           generationStage === "opening"
             ? "middle"
             : generationStage === "middle"
-              ? data.totalWordCount >= 1700
-                ? "final"
-                : "middle"
+              ? "final"
               : undefined;
 
         workingPending = {
@@ -1752,7 +1746,7 @@ device.`,
         if (generationStage === "final") {
           if (!data.isComplete) {
             throw new Error(
-              `The segmented writer finished at ${data.totalWordCount} words, outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The complete draft has been preserved for review.`,
+              `The three-scene writer finished at ${data.totalWordCount} words, outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The complete draft has been preserved for review.`,
             );
           }
 
@@ -1764,7 +1758,7 @@ device.`,
       }
 
       throw new Error(
-        "The segmented writer exceeded its movement limit. The draft has been preserved.",
+        "The three-scene writer exceeded its scene limit. The draft has been preserved.",
       );
     } catch (error) {
       if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
@@ -1901,7 +1895,7 @@ device.`,
       const pending: PendingChapterGeneration = {
         storyId: plannedStory.id,
         generatedChapter: data.generatedChapter,
-        chapterBrief: "",
+        chapterBrief: data.chapterBrief,
         latestUserMessage: trimmedMessage,
         draft: "",
         minimumWordCount: requestedTarget
