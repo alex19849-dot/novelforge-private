@@ -6,7 +6,9 @@ import type { GenerationDiagnostic } from "../../../story-chat/types";
 
 export const runtime = "nodejs";
 
-export const maxDuration = 180;
+export const maxDuration = 300;
+
+const WRITING_MODEL = "aion-labs/aion-3.0";
 
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -39,12 +41,6 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function getEndingExcerpt(text: string, maximumWords = 900): string {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-
-  return words.slice(-maximumWords).join(" ");
-}
-
 function getWordCount(value: unknown, fallback: number): number {
   if (
     typeof value !== "number" ||
@@ -75,12 +71,12 @@ function cleanRecentChapters(value: unknown): RecentChapter[] {
       content: cleanString(chapter.content),
     }))
     .filter((chapter) => chapter.content)
-    .slice(-2);
+    .slice(-1);
 }
 
 function getNarrativeStyle(value: unknown): string {
   if (!value || typeof value !== "object") {
-    return "Follow the exact POV and tense stated in the chapter brief.";
+    return "First-person present tense.";
   }
 
   const bible = value as Record<string, unknown>;
@@ -97,7 +93,7 @@ function getNarrativeStyle(value: unknown): string {
 
   return statedStyle
     ? `${statedStyle}, present tense`
-    : "First-person present tense, unless the user explicitly requested another tense.";
+    : "First-person present tense.";
 }
 
 function cleanGeneratedProse(content: string): string {
@@ -114,13 +110,11 @@ function cleanGeneratedProse(content: string): string {
     cleaned = fencedResponse[1].trim();
   }
 
-  cleaned = cleaned
+  return cleaned
     .replace(/\\"/g, '"')
     .replace(/\\([“”‘’])/g, "$1")
     .replace(/^\s{0,3}#{1,6}\s+[^\n]+\n+/u, "")
     .trim();
-
-  return cleaned;
 }
 
 function validateProse(content: string): void {
@@ -167,150 +161,98 @@ function validateProse(content: string): void {
   }
 }
 
-const WRITER_PROMPT = `
-You are an elite commercial romance ghostwriter writing compulsive,
-emotionally specific, publication-ready fiction.
+function getPrompt(input: {
+  storyBible: unknown;
+  storyState: unknown;
+  recentChapters: RecentChapter[];
+  chapterDirection: string;
+  latestUserMessage: string;
+  narrativeStyle: string;
+  minimumWordCount: number;
+  maximumWordCount: number;
+}): string {
+  return `
+You are NovelForge, a skilled commercial romance novelist.
 
-Return only publishable novel prose.
+Write one complete, immersive chapter. Return only finished novel prose.
+Do not include a chapter number, title, POV heading, notes, analysis,
+outline, markdown or commentary.
 
-Never explain, analyse, outline, summarise, list requirements, discuss
-word count, mention the prompt, or describe what you are about to write.
+NARRATIVE
 
-Start immediately with the POV character's narration, dialogue or action.
+Use ${input.narrativeStyle}
 
-Do not include a chapter number, chapter title, POV heading or markdown.
+The Story Bible and established continuity are binding. Characters must
+remember what has happened and must not know information they have not
+learned. Continue from the previous chapter's exact ending when one is
+provided. Do not reset attraction, conflict, trust, intimacy or character
+development.
 
-Follow the supplied Story Bible, story state and chapter brief exactly.
-Treat established facts as binding, but dramatise them through a living
-scene instead of mechanically ticking through planner beats.
+Write in a fluent contemporary voice with natural contractions. Give the
+POV character a distinct rhythm, vocabulary, humour, observations and
+emotional habits. Dialogue must sound like these particular characters,
+not interchangeable romance leads.
 
-Treat storyState.voiceProfiles as binding. The POV character's sentence
-rhythm, vocabulary, humour, swearing, emotional deflection, professional
-knowledge, sensory focus, dialogue and internal thought must match their
-own profile. The POV character and love interest must never sound
-interchangeable or react in generic romance-character shorthand.
+CHAPTER SHAPE
 
-Maintain first-person POV, tense, voice, continuity, pacing, heat level
-and burn pacing. Never soften, censor or fade out consensual adult sexual
-content when the Story Bible or chapter brief requires it.
+Use two or three purposeful scenes, or one sustained scene with meaningful
+turns. Begin at the most interesting credible point. Every scene must change
+the plot, relationship, knowledge, risk or a character's decision.
 
-Use natural contractions throughout contemporary narration, internal
-thought and dialogue. Write "I don't", "I've", "he's", "can't" and
-"it doesn't" where a natural speaker or narrator would use them. Do not
-systematically expand contractions into stiff phrases such as "I do
-not", "I have", "he is", "cannot" or "it does not". Use uncontracted
-wording only for deliberate emphasis or a genuinely formal character.
+The romantic lead should appear early when the requested chapter is centred
+on the relationship. Forced proximity must arise credibly from the
+established world, not from an implausible rule, coincidence or stranger
+manufactured solely to push the characters together.
 
-Build every major scene around:
-1. the POV character's immediate goal;
-2. a concrete obstacle or opposing agenda;
-3. relationship pressure between the central romantic characters;
-4. new information, discovery or changed understanding;
-5. an emotional turn that alters the scene;
-6. a consequence that drives the reader into what follows.
+Keep the chapter between ${input.minimumWordCount} and ${input.maximumWordCount} words.
+This range is a boundary, not permission to pad. Once the chapter has passed
+the minimum, end when its natural dramatic arc is complete. Never extend the
+chapter with repeated messages, repeated objects, repeated attraction denial,
+routine travel, bedtime reflection or several versions of the same ending.
 
-Every chapter in a romance must create meaningful relationship movement.
-Change at least one relevant axis such as attraction, trust,
-vulnerability, conflict, physical intimacy, emotional intimacy, power
-balance or what the characters know about each other. Do not force a
-kiss, sex scene or declaration before the chosen burn pace requires it.
-Even a plot-heavy chapter must make the central relationship more
-charged, complicated, intimate, dangerous or consequential than it was
-at the chapter's opening.
+End once, on a concrete event, choice, reveal, complication, interruption or
+changed relationship consequence. Do not end with a vague prediction, private
+vow or summary about how difficult tomorrow will be.
 
-Balance dialogue, action, interiority, physical awareness and setting.
-Do not let characters stand in one place exchanging an extended briefing
-or reciting facts for the reader. Reveal necessary exposition through
-conflict, discovery, interruption, disagreement, choice and consequence.
-Summarise routine information rather than turning it into a speech.
+CONTENT
 
-Use varied sentence and paragraph lengths. Fragments are allowed for
-voice and impact, but must not become the chapter's default rhythm.
-Prefer precise character-specific observation over generic dramatic
-reactions.
+Follow the Story Bible's heat level and burn pacing. All romantic and sexual
+characters are consenting adults aged eighteen or older. When the established
+progression calls for explicit consensual adult intimacy, write it fully,
+directly and without censorship or fade to black. Do not insert intimacy before
+it is earned.
 
-Do not use stock generated-fiction reactions or phrasing, including:
-"almost smiled", "mouth twitched", "jaw tightened", "expression
-unreadable", "something flickered in his eyes", "words landed like a
-punch", "words hung in the air", "my breath caught", "I hated that I
-noticed", "for a second neither of us spoke", or repeated descriptions
-built around "the kind of confidence that". Do not merely substitute a
-synonym while preserving the same cliché. Replace it with behaviour,
-dialogue, thought or physical detail that only this particular character
-would produce in this particular situation.
+Use varied sentence and paragraph lengths. Avoid generic attraction shorthand,
+stock dramatic reactions, therapy-speak, purple prose and repetitive internal
+summary. Never use em dashes or en dashes.
 
-Treat the supplied recent chapters as a repetition reference. Do not
-reuse their distinctive jokes, comparisons, emotional reactions,
-sentence patterns or closing-hook formula. Ordinary connective language
-may repeat naturally.
+STORY BIBLE
 
-Write an immersive chapter with a developed beginning, escalating
-middle and satisfying scene-level turn. End on an earned emotional,
-romantic or plot hook that creates a specific unanswered pressure, not a
-generic statement that the POV character will find out what happens.
+${JSON.stringify(input.storyBible, null, 2)}
 
-All romantic or sexual characters are consenting adults aged 18 or older.
+CONTINUITY STATE
 
-Never use em dashes or en dashes.
-`.trim();
+${JSON.stringify(input.storyState, null, 2)}
 
-const FINAL_PROSE_CHECKS = `
-NON-NEGOTIABLE OUTPUT CHECKS
+PREVIOUS CHAPTER
 
-Apply these checks to the prose itself, not merely to your private plan:
+${JSON.stringify(input.recentChapters.at(-1) ?? null, null, 2)}
 
-- The Story Bible and established continuity outrank an inconsistent
-  detail in the chapter brief. Silently correct contradictions instead
-  of reproducing them.
+USER'S CURRENT CHAPTER REQUEST
 
-- Do not invent implausible institutional rules, professional
-  procedures, coincidences or staff behaviour merely to force the
-  romantic characters together. Forced proximity must follow credibly
-  from the established world.
+${input.latestUserMessage || "Write the next chapter naturally."}
 
-- When the chapter brief says the love interest, conflict or inciting
-  encounter happens early, put it on the page within roughly the first
-  twenty percent of the chapter. Do not spend the opening third on
-  routine practice, work, travel, waking, showering or exposition.
+CHAPTER DIRECTION
 
-- Make most narrative paragraphs two to five sentences long. Reserve
-  one-sentence paragraphs and fragments for genuine emphasis. Do not
-  produce long sequences of one-line narration or dialogue surrounded by
-  unnecessary paragraph breaks.
+${input.chapterDirection || "Continue the story naturally from the established position."}
 
-- Vary paragraph openings. Do not repeatedly begin consecutive
-  paragraphs with "I", "He", a character name or the same grammatical
-  construction.
-
-- Do not use or closely imitate these stock romance patterns:
-  "before I can stop myself", "longer than necessary", "I've never
-  noticed that before", "or maybe I have", "I look away", "like an
-  idiot", "I should leave, instead I stay", "his expression doesn't
-  change", "not hostile, not warm", "I don't believe it for a second",
-  or a closing claim that something will be easy when the narrator knows
-  it will not.
-
-- Do not build attraction from generic eye colour, damp hair, broad
-  shoulders, staring, looking away or noticing how someone moves.
-  Ground attraction in character-specific history, friction, humour,
-  competence, vulnerability, choice or changed understanding.
-
-- The final paragraph must contain or directly respond to a concrete
-  event, decision, reveal, interruption, threat, invitation, discovery
-  or irreversible consequence. Do not end with a vague prediction,
-  denial, private vow or summary of how difficult tomorrow will be.
-
-- Before returning the chapter, silently verify that names, ages,
-  academic year, job or team role, location, chronology, family
-  relationships and established knowledge agree with the Story Bible.
-
-Return only the finished novel prose.
-`.trim();
+Write only the finished chapter prose now.
+  `.trim();
+}
 
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
   let providerCallStartedAt = 0;
-  let providerStage = "chapter_writing";
 
   try {
     if (!process.env.OPENROUTER_API_KEY) {
@@ -321,12 +263,9 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as WriterRequest;
-    const chapterBrief = cleanString(body.chapterBrief);
+    const chapterDirection = cleanString(body.chapterBrief);
     const latestUserMessage = cleanString(body.latestUserMessage);
     const existingDraft = cleanString(body.existingDraft);
-    providerStage = existingDraft
-      ? "chapter_writing_continuation"
-      : "chapter_writing";
     const recentChapters = cleanRecentChapters(body.recentChapters);
     const narrativeStyle = getNarrativeStyle(body.storyBible);
     const minimumWordCount = getWordCount(body.minimumWordCount, 2000);
@@ -335,99 +274,37 @@ export async function POST(request: Request) {
       getWordCount(body.maximumWordCount, 4000),
     );
 
-    if (!chapterBrief) {
+    if (existingDraft) {
       return NextResponse.json(
-        { error: "A chapter brief is required before writing can begin." },
-        { status: 400 },
+        {
+          error:
+            "Automatic continuation is disabled. Discard the incomplete draft and generate the chapter again.",
+        },
+        { status: 409 },
       );
     }
 
-    const existingWordCount = countWords(existingDraft);
-    const wordsStillNeeded = Math.max(0, minimumWordCount - existingWordCount);
-
-    const prompt = existingDraft
-      ? `
-${WRITER_PROMPT}
-
-Continue an incomplete chapter directly after its final sentence.
-
-Return only new prose. Do not repeat or rewrite existing prose.
-
-MANDATORY NARRATIVE STYLE:
-
-${narrativeStyle}
-
-Do not switch POV person or narrative tense.
-
-STORY BIBLE:
-
-${JSON.stringify(body.storyBible ?? {}, null, 2)}
-
-ACTUAL CONTINUITY LEDGER:
-
-${JSON.stringify(body.storyState ?? {}, null, 2)}
-
-The existing draft contains ${existingWordCount} words.
-
-Write approximately ${Math.min(1800, Math.max(800, wordsStillNeeded + 250))} new words.
-
-Complete the remaining chapter arc and finish at the hook required by
-the chapter brief.
-
-CHAPTER BRIEF:
-
-${chapterBrief}
-
-END OF THE EXISTING DRAFT:
-
-${getEndingExcerpt(existingDraft)}
-
-${FINAL_PROSE_CHECKS}
-`
-      : `
-${WRITER_PROMPT}
-
-MANDATORY NARRATIVE STYLE:
-
-${narrativeStyle}
-
-Do not switch POV person or narrative tense.
-
-STORY BIBLE:
-
-${JSON.stringify(body.storyBible ?? {}, null, 2)}
-
-STORY STATE:
-
-${JSON.stringify(body.storyState ?? {}, null, 2)}
-
-RECENT CHAPTERS:
-
-${JSON.stringify(recentChapters, null, 2)}
-
-CHAPTER BRIEF:
-
-${chapterBrief}
-
-LATEST USER REQUEST:
-
-${latestUserMessage}
-
-Write the complete chapter between ${minimumWordCount} and ${maximumWordCount} words.
-
-${FINAL_PROSE_CHECKS}
-`;
+    const prompt = getPrompt({
+      storyBible: body.storyBible ?? {},
+      storyState: body.storyState ?? {},
+      recentChapters,
+      chapterDirection,
+      latestUserMessage,
+      narrativeStyle,
+      minimumWordCount,
+      maximumWordCount,
+    });
 
     providerCallStartedAt = Date.now();
     const response = await openrouter.chat.completions.create({
-      model: "aion-labs/aion-3.0-mini",
+      model: WRITING_MODEL,
       messages: [
         {
           role: "user",
           content: prompt,
         },
       ],
-      max_tokens: 8000,
+      max_tokens: 12000,
     });
     const rawUsage = response.usage as unknown as
       | Record<string, unknown>
@@ -443,10 +320,11 @@ ${FINAL_PROSE_CHECKS}
         ? rawUsage.total_tokens
         : inputTokens + outputTokens;
     const costUsd = typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
+
     diagnostics.push({
-      stage: providerStage,
+      stage: "chapter_writing",
       provider: "openrouter",
-      model: "aion-labs/aion-3.0-mini",
+      model: WRITING_MODEL,
       status: "succeeded",
       inputTokens,
       outputTokens,
@@ -467,12 +345,14 @@ ${FINAL_PROSE_CHECKS}
 
     validateProse(prose);
 
-    const totalWordCount = existingWordCount + countWords(prose);
+    const totalWordCount = countWords(prose);
 
     return NextResponse.json({
       prose,
       totalWordCount,
-      isComplete: totalWordCount >= minimumWordCount,
+      isComplete:
+        totalWordCount >= minimumWordCount &&
+        totalWordCount <= maximumWordCount,
       diagnostics,
     });
   } catch (error) {
@@ -488,9 +368,9 @@ ${FINAL_PROSE_CHECKS}
       };
     } else if (providerCallStartedAt > 0) {
       diagnostics.push({
-        stage: providerStage,
+        stage: "chapter_writing",
         provider: "openrouter",
-        model: "aion-labs/aion-3.0-mini",
+        model: WRITING_MODEL,
         status: "failed",
         inputTokens: 0,
         outputTokens: 0,
