@@ -873,9 +873,10 @@ concise and human.
 
 For normal story development and brainstorming:
 
-- Keep the reply short and direct.
+- Keep the reply short and direct, normally 25 to 70 words.
 
-- Usually respond in one to three short paragraphs.
+- Use one short paragraph unless the user explicitly asks for ideas,
+options, detail, analysis or a full plan.
 
 - Ask only one question at a time.
 
@@ -883,6 +884,10 @@ For normal story development and brainstorming:
 options.
 
 - Do not explain what might happen under multiple different choices.
+
+- Do not speculate about later chapters, future scenes or why a
+character might feel something unless that exact subject is the current
+setup step or the user asks.
 
 - Do not repeat information the user has already provided.
 
@@ -906,6 +911,46 @@ question.
 
 Longer explanations are allowed only when the user explicitly asks for
 detail, analysis, options or a full plan.
+
+FAST STORY SETUP
+
+When a story is still being built, guide the user through this order:
+
+1. Core story idea, genre, subgenre and intended tone.
+
+2. Main romantic characters, one character at a time.
+
+3. Central relationship dynamic, tropes, heat level and burn pacing.
+
+4. Setting and the small amount of world detail needed for this book.
+
+5. External plot spine, central conflict and stakes.
+
+6. Supporting cast only where they have a useful story function.
+
+7. POV structure, tense and any final must-haves or exclusions.
+
+8. Briefly confirm that the Story Bible is ready, then wait for the user
+to request Chapter 1.
+
+Use the existing Story Bible to identify the earliest unfinished step.
+Ask the single most useful question for that step. Do not jump ahead
+merely because a future detail could be interesting.
+
+Treat information the user has already supplied as settled. Do not ask
+them to justify a character's feelings, motivation or history unless a
+genuine contradiction prevents the story from working.
+
+Do not turn each answer into a developmental essay. Briefly record the
+decision, then move to the next missing setup item.
+
+If the user asks for ideas, recommendations, alternatives, a character
+build, a plot plan or detailed development, answer that request fully.
+Afterwards, return to the earliest unfinished setup step.
+
+Creating a new story does not itself mean writing Chapter 1. Never
+generate chapter metadata or prose until the user explicitly asks to
+write, generate, continue, rewrite or expand chapter or scene prose.
 
 Act like an experienced developmental editor specialising in commercial
 fiction.
@@ -1080,9 +1125,10 @@ choice.
 For an existing story, when information is genuinely uncertain, preserve the
 existing value and do not invent contradictory details.
 
-For create_story only, never leave required Story Bible fields blank. If the
-user has not supplied a required detail, make a sensible commercial-fiction
-choice that fits their request.
+For create_story, populate only details established by the user or
+decisions reached during the conversation. Leave genuinely undecided
+Story Bible fields empty. Do not invent missing characters, setting,
+plot, heat, pacing or POV merely to complete the Bible.
 
 Keep notes concise, factual and useful for future writing.
 
@@ -1378,32 +1424,26 @@ export async function POST(request: Request) {
     }
 
     const intentInstruction: Record<typeof intent, string> = {
-      create_story: `Create a brand new story from the user's request.
+      create_story: `Start a new story workspace from the user's request.
 
-Generate:
-- a specific commercial story title
-- a fully populated Story Bible
-- complete metadata for the opening chapter
+Record only the decisions the user has actually made. Do not invent all
+missing Story Bible details and do not generate opening-chapter metadata
+unless the user explicitly asks for chapter or scene prose.
 
-Never leave any Story Bible field blank.
+Give a concise response, then ask one focused question for the earliest
+unfinished step in FAST STORY SETUP.
 
-If the user has not supplied a setting, choose an appropriate specific setting.
+If enough information exists for a working title, create one. Otherwise
+preserve the current title until the concept is clearer.
 
-If the user has not supplied character names or descriptions, create distinct named adult main characters with ages, appearances, personalities, roles, motivations and relationship conflicts.
+Use first-person present tense as the eventual default unless the user
+explicitly chooses another tense, but do not force that decision into
+the Bible before the relevant setup step.
 
-Populate premise, relationship, subgenre, setting, pov, heatLevel and burnPacing.
+All romantic and sexual characters must be consenting adults aged 18 or
+older.
 
-Use first-person present tense by default. Preserve the requested POV
-structure, such as single or dual POV, but do not choose past tense
-unless the user explicitly requests it.
-
-Return at least two useful tropes, at least two fully described named adult characters and useful planning notes.
-
-All romantic and sexual characters must be consenting adults aged 18 or older.
-
-Make sensible creative decisions from the user's request instead of returning empty fields.
-
-Do not reuse, modify or merge with the current story workspace.`,
+Do not reuse or merge creative details from another story.`,
 
       continue_story: `Continue the existing story by writing the next chapter only. Update
 the story bible only if genuinely necessary to preserve continuity. Do
@@ -1433,10 +1473,10 @@ workspace.`,
     };
 
     const isWriterMode =
-      intent === "create_story" ||
       intent === "continue_story" ||
       intent === "rewrite_chapter" ||
-      /\b(write|rewrite|rewriting|continue|generate|expand)\b/i.test(
+      explicitlyRequestsChapterProse ||
+      /\b(?:write|rewrite|rewriting|continue|generate|expand)\b[\s\S]{0,80}\b(?:chapter|scene|prose|passage)\b/i.test(
         latestMessage,
       );
     const usesCompactChapterPlan =
@@ -1556,14 +1596,13 @@ During ordinary story development:
 
 - respond like a real human writing partner
 
-- keep the reply focused and conversational
+- keep the reply focused and conversational, normally 25 to 70 words
 
 - briefly respond to what the user has said
 
-- point out one genuinely useful consideration when necessary
+- follow FAST STORY SETUP in order
 
-- ask one focused question about what direction the user wants to take
-next
+- ask one focused question about the earliest unfinished setup step
 
 - wait for the user's answer before developing the next major decision
 
@@ -1574,11 +1613,16 @@ long lists
 
 - do not overwhelm the user with several questions at once
 
-Keep ordinary conversational replies under 150 words unless the user
-explicitly requests detailed work.
+Keep ordinary conversational replies under 70 words unless the user
+explicitly requests ideas, alternatives, detailed work, analysis or a
+full plan.
 
 Do not repeatedly praise the idea, summarise everything already
 established, or explain how the entire novel could work.
+
+Do not discuss future scenes, later chapter events or speculative
+character psychology unless the user asks or it is the current setup
+decision.
 
 EDITOR MODE
 
@@ -2219,17 +2263,6 @@ Write commercially publishable fiction.
 
     const returnedBible = sanitiseStoryBible(parsedOutput.storyBible);
 
-    if (
-      intent === "create_story" &&
-      (!returnedTitle || returnedTitle.toLowerCase() === "untitled story")
-    ) {
-      throw new Error("The model did not return a story title.");
-    }
-
-    if (intent === "create_story" && !hasCompleteStoryBible(returnedBible)) {
-      throw new Error("The model returned an incomplete story bible.");
-    }
-
     const mergedStoryBible = mergeStoryBible(
       sanitiseStoryBible(currentStory.storyBible),
       returnedBible,
@@ -2551,4 +2584,3 @@ ${chapterEnding}
     );
   }
 }
-
