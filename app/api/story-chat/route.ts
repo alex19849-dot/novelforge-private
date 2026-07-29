@@ -1176,164 +1176,32 @@ the user asks for it.
 
 Return only the required structured response.
 
-CHAPTER BRIEF
+CHAPTER METADATA
 
-When Writer Mode is active, create a detailed chapterBrief for the
-writing model.
+When Writer Mode is active, choose only the metadata needed to identify
+the requested chapter:
 
-Write chapterBrief using these exact labelled sections:
+- chapter number
 
-CHAPTER:
+- chapter title
 
-- Chapter number, title, POV character, POV person and narrative tense.
+- POV character
 
-EXACT HANDOFF:
+- whether an existing chapter is being replaced
 
-- State precisely where, when and how the previous chapter ended.
+Return that metadata in generatedChapter. Set generatedChapter.content
+to an empty string.
 
-- Identify the immediate action, decision, interruption or consequence
-that opens this chapter.
+Always return an empty string for chapterBrief.
 
-- Do not restart, recap or paraphrase the previous ending.
+Do not plan scenes, plot beats, emotional progression, relationship
+progression, intimacy, opening action, ending hooks, voice instructions,
+continuity reminders or prose. The dedicated writing model will make
+those creative decisions using the Story Bible, continuity state, recent
+chapters and the user's request.
 
-EXTERNAL STORY MOVEMENT:
-
-- Give the POV character a concrete immediate goal outside merely
-thinking about the romance.
-
-- Specify the obstacle, opposition or complication.
-
-- Specify the reversal, revelation or consequence that changes the
-external situation before the chapter ends.
-
-RELATIONSHIP MOVEMENT:
-
-- State the relationship position at the beginning.
-
-- State the materially different relationship position at the end.
-
-- Identify the existing intimacy milestone and the new milestone,
-changed meaning or consequence reached here.
-
-- Never move the relationship backwards merely to replay denial,
-jealousy, almost-touching, retreat or private rumination.
-
-CHARACTER KNOWLEDGE AND VOICE:
-
-- State what the POV character knows, suspects, misunderstands and
-conceals.
-
-- Give concise voice reminders specific to this POV character.
-
-- State what the other important characters know and cannot yet know.
-
-FACTUAL AUTHENTICITY:
-
-- Check every profession, institution, legal process, medical detail,
-sporting rule, technology, geography and cultural practice against the
-Story Bible's exact country, region and time period before placing it in
-the chapter brief.
-
-- Do not transplant terminology, laws, procedures, ranks, qualifications
-or organisations from another jurisdiction. Use the correct regional
-language and professional process for the established setting.
-
-- Do not invent a precise statute, charge, diagnosis, drug effect,
-forensic method, competition rule or workplace procedure merely because
-it sounds convincing. When a precise detail is not confidently
-supported, plan the scene around an accurate broader fact rather than
-fabricated specificity.
-
-- Distinguish deliberately fictional organisations and speculative
-worldbuilding from accidental real-world errors. Preserve intentional
-departures that the Story Bible establishes, but keep their internal
-rules consistent.
-
-- Make professional characters behave like people with their stated
-experience. Their decisions, authority, access, terminology and likely
-consequences must be credible for their role.
-
-SCENE DESIGN:
-
-- Plan two to four purposeful scenes or continuous scene movements.
-
-- For every scene or movement, specify the POV character's immediate
-goal, the opposing agenda or concrete obstacle, the relationship
-pressure, the new information or changed understanding, the emotional
-turn and the consequence that pushes the chapter forward.
-
-- Interlock the plot and romance. A plot scene should also alter how the
-central characters see, trust, challenge, need or affect each other. A
-romantic scene should also create a decision, complication, discovery or
-external consequence.
-
-- Decide which background facts must be dramatized and which routine
-facts should be compressed into one or two natural sentences. Do not
-plan a meeting, interview, briefing or conversation whose main purpose
-is for one character to explain the plot to the others.
-
-- Deliver necessary information through discovery, disagreement,
-interruption, evidence, physical action, competing goals, strategic
-withholding or a decision made under pressure. When dialogue carries
-information, every speaker must want something beyond informing the
-reader.
-
-- Every scene must end in a materially different condition from where
-it began. Remove any scene that could be deleted without changing a
-decision, relationship, fact, risk or consequence.
-
-- Do not use filler scenes whose only function is attraction,
-description, travel, waking, showering, staring at a phone, reviewing
-information the reader already knows or replaying the previous
-encounter.
-
-ANTI-REPETITION:
-
-- List the recent scene structures, gestures, phrases, emotional
-conclusions and attraction beats that are forbidden in this chapter.
-
-- Do not repeat a setting or hook construction merely because it worked
-before.
-
-HEAT AND BURN:
-
-- State the selected heat level and burn pacing.
-
-- State exactly what on-page intimacy is appropriate in this chapter.
-
-- If the planned milestone calls for explicit consensual adult
-intimacy, require it at the selected heat level without fading to black.
-
-- Do not force intimacy before the story has earned it and do not avoid
-it after the planned progression reaches it.
-
-ENDING HOOK:
-
-- Choose a concrete hook based on an event, reveal, decision, threat,
-interruption, public risk, irreversible action or new consequence.
-
-- Do not end with another vague internal summary such as being in
-trouble, something changing, not knowing what to do or being unable to
-stop wanting someone.
-
-- Do not repeat the hook type used by either of the previous two
-chapters.
-
-TARGET:
-
-- State the target word count.
-
-- State the two or more meaningful story conditions that must be
-different by the final paragraph.
-
-The chapterBrief must make firm creative decisions. Do not give the
-writing model alternative paths or ask it to choose.
-
-The chapterBrief must contain instructions and story facts only.
-
-Do not write chapter prose inside chapterBrief.
-
-When Writer Mode is not active, return an empty string for chapterBrief.
+When Writer Mode is not active, return generatedChapter as null and
+chapterBrief as an empty string.
 
 `.trim();
 
@@ -1910,36 +1778,9 @@ When writing a brand new chapter:
 
 - use reply only for a brief confirmation
 
-- generate a detailed chapterBrief for the writing model
+- return chapterBrief as an empty string
 
-- chapterBrief must contain the writing instructions only
-
-- include the chapter objective
-
-- include the POV
-
-- include the exact narrative tense
-
-- use first-person present tense when the Story Bible and user request
-do not explicitly establish another tense
-
-- include emotional progression
-
-- include relationship progression
-
-- include continuity reminders
-
-- include important character voice reminders
-
-- include the intended opening
-
-- include the major scene beats
-
-- include the intended ending or hook
-
-- include the target word count
-
-- do not include any chapter prose inside chapterBrief
+- do not plan or instruct the chapter prose
 
 Return storyState in exactly this structure:
 
@@ -1988,7 +1829,9 @@ When rewriting an existing chapter:
 
 - do not include rewritten prose in reply
 
-- generate a detailed chapterBrief for the writing model
+- return chapterBrief as an empty string
+
+- do not plan or instruct the rewritten chapter prose
 
 Return storyState in exactly this structure:
 
@@ -2041,7 +1884,7 @@ current request.
 
 ${
   usesCompactChapterPlan
-    ? `COMPACT CHAPTER PLANNING OVERRIDE
+    ? `CHAPTER METADATA ONLY OVERRIDE
 
 For this existing-story chapter request, return only:
 
@@ -2055,9 +1898,12 @@ Do not return storyBible or storyState. The server will preserve them.
 generatedChapter must contain metadata only. Its content must be an empty
 string.
 
-Keep reply brief. Make chapterBrief detailed enough to guide the writing
-model, but do not repeat the complete Story Bible or continuity ledger
-inside it.`
+Keep reply brief. chapterBrief must be an empty string.
+
+Do not design or describe scenes, plot beats, character arcs, emotional
+progression, relationship progression, intimacy, openings, endings or
+hooks. The writing model will make all prose decisions from the saved
+workspace and the user's request.`
     : ""
 }
 
@@ -2095,7 +1941,7 @@ ${JSON.stringify(planningWorkspace, null, 2)}
             },
           },
 
-          max_output_tokens: usesCompactChapterPlan ? 3500 : 10000,
+          max_output_tokens: usesCompactChapterPlan ? 1200 : 10000,
         });
         const usage = planningResponse.usage;
         const inputTokens = usage?.input_tokens ?? 0;
