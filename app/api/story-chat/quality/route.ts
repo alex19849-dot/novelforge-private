@@ -264,6 +264,26 @@ conclusions and hooks
 - end with a concrete, effective hook
 - contain no mechanical failures
 
+Judge relationshipProgression by comparing the central relationship at
+the opening and ending of the chapter. Identify whether at least one of
+these has materially changed: attraction, trust, vulnerability,
+conflict, physical intimacy, emotional intimacy, power balance, mutual
+knowledge, mistaken belief or the consequence of an existing intimacy
+milestone.
+
+Progression may be positive, negative or destabilising. A new argument,
+boundary, suspicion, private realisation, act of care, shift in leverage
+or changed interpretation can count when it will affect later behaviour.
+Mere physical description, repeated attraction, banter without
+consequence, an almost-touch, private denial or thinking about the love
+interest does not count by itself.
+
+Respect the selected burn pacing. Do not lower the score because a
+chapter contains no kiss, sex, declaration or new physical milestone
+when those would be premature. Do lower it when the relationship ends in
+substantially the same position and meaning as it began, especially when
+the chapter merely repeats an earlier attraction or conflict beat.
+
 The chapter brief is strong guidance, not a rigid checklist. Do not fail
 an otherwise cohesive, commercially effective chapter merely because it
 reaches the intended objective through different scene beats or omits a
@@ -432,6 +452,13 @@ genuinely formal character.
 
 Preserve explicit consensual adult sexual content required by the brief.
 Do not censor it, soften it or fade it to black.
+
+If relationship progression is the failing category, repair it through
+the existing scene's choices, dialogue, subtext, vulnerability, conflict
+or changed interpretation. Do not bolt on a kiss, sex scene, declaration
+or artificial confrontation. Respect the selected burn pacing and make
+the smallest change that leaves the relationship in a materially
+different position or meaning.
 
 The corrected chapter must remain between ${input.minimumWordCount} and
 ${input.maximumWordCount} words.
