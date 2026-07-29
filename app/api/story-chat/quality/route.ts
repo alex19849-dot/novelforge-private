@@ -10,11 +10,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const openrouter = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
-});
-
 type QualityRequest = {
   storyBible?: unknown;
   storyState?: unknown;
@@ -203,21 +198,6 @@ function validateMechanicalQuality(
   }
 
   return failures;
-}
-
-function assessmentPasses(
-  assessment: QualityAssessment,
-  mechanicalFailures: string[],
-): boolean {
-  const scores = Object.values(assessment.scores);
-
-  return (
-    assessment.hardFailures.length === 0 &&
-    mechanicalFailures.length === 0 &&
-    assessment.scores.continuity >= 7 &&
-    assessment.scores.povAndTense >= 7 &&
-    scores.every((score) => Number.isFinite(score) && score >= 6)
-  );
 }
 
 async function assessChapter(input: {
@@ -427,216 +407,6 @@ ${input.chapterContent}
   };
 }
 
-type TargetedRepairPatch = {
-  find: string;
-  replace: string;
-};
-
-function parseTargetedRepairPatches(response: string): TargetedRepairPatch[] {
-  const cleaned = response
-    .replace(/^\`\`\`(?:text|markdown|md)?\s*/i, "")
-    .replace(/\s*\`\`\`$/, "")
-    .trim();
-  const pattern =
-    /<<<PATCH>>>\s*<<<FIND>>>([\s\S]*?)<<<END_FIND>>>\s*<<<REPLACE>>>([\s\S]*?)<<<END_REPLACE>>>\s*<<<END_PATCH>>>/g;
-  const patches: TargetedRepairPatch[] = [];
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(cleaned)) !== null) {
-    const find = match[1].trim();
-    const replace = match[2].trim();
-
-    if (!find) {
-      throw new Error("A targeted repair patch contained no original text.");
-    }
-
-    patches.push({ find, replace });
-  }
-
-  if (patches.length === 0) {
-    throw new Error("Aion returned no usable targeted repair patches.");
-  }
-
-  if (patches.length > 8) {
-    throw new Error("Aion returned too many targeted repair patches.");
-  }
-
-  return patches;
-}
-
-function applyTargetedRepairPatches(
-  chapterContent: string,
-  patches: TargetedRepairPatch[],
-): string {
-  let repaired = chapterContent;
-
-  for (const patch of patches) {
-    const firstMatch = repaired.indexOf(patch.find);
-
-    if (firstMatch < 0) {
-      throw new Error(
-        "A targeted repair patch did not match the preserved chapter.",
-      );
-    }
-
-    if (repaired.indexOf(patch.find, firstMatch + patch.find.length) >= 0) {
-      throw new Error(
-        "A targeted repair patch was ambiguous and was not applied.",
-      );
-    }
-
-    repaired =
-      repaired.slice(0, firstMatch) +
-      patch.replace +
-      repaired.slice(firstMatch + patch.find.length);
-  }
-
-  return repaired.trim();
-}
-
-async function repairChapter(input: {
-  storyBible: unknown;
-  storyState: unknown;
-  chapterBrief: string;
-  chapterTitle: string;
-  povCharacter: string;
-  chapterContent: string;
-  assessment: QualityAssessment;
-  minimumWordCount: number;
-  maximumWordCount: number;
-}): Promise<{
-  content: string;
-  diagnostic: GenerationDiagnostic;
-}> {
-  const startedAt = Date.now();
-  const response = await openrouter.chat.completions.create({
-    model: "aion-labs/aion-3.0-mini",
-    messages: [
-      {
-        role: "user",
-        content: `
-You are making targeted repairs to a completed commercial romance
-chapter. Preserve the chapter and return only exact replacement patches
-for the specific failures identified by the quality assessment.
-
-Do not return the complete chapter. Do not explain, analyse, outline,
-summarise or use JSON. Do not add a chapter heading or markdown.
-
-Use this exact format for every patch:
-
-<<<PATCH>>>
-<<<FIND>>>Copy one exact, unique passage from the original chapter here<<<END_FIND>>>
-<<<REPLACE>>>Put the corrected version of that passage here<<<END_REPLACE>>>
-<<<END_PATCH>>>
-
-The FIND passage must be copied character-for-character from the
-original chapter and must be long enough to occur exactly once. Include
-enough surrounding context to make it unique. Return no text outside the
-patch blocks.
-
-Use no more than eight patches. Repair only passages required by
-repairInstructions or objective hardFailures. Preserve every strong
-section unchanged. Never rewrite the whole chapter through one enormous
-patch.
-
-Preserve the required POV person, narrative tense, character voice,
-continuity, heat level and burn pacing. Preserve explicit consensual
-adult sexual content required by the brief. Do not censor it, soften it
-or fade it to black.
-
-If relationship progression failed, alter the smallest existing
-interaction, decision, subtext or interpretation that can create a
-material shift. Do not bolt on a kiss, sex scene, declaration or
-artificial confrontation.
-
-If factual authenticity failed, correct only the identified
-high-confidence error. Do not add a technical lecture or replace it with
-another unverified precise claim.
-
-The patched chapter must remain between ${input.minimumWordCount} and
-${input.maximumWordCount} words.
-
-STORY BIBLE:
-
-${JSON.stringify(input.storyBible, null, 2)}
-
-ACTUAL CONTINUITY LEDGER:
-
-${JSON.stringify(input.storyState, null, 2)}
-
-CHAPTER BRIEF:
-
-${input.chapterBrief}
-
-CHAPTER METADATA:
-
-Title: ${input.chapterTitle}
-POV: ${input.povCharacter}
-
-FAILED QUALITY ASSESSMENT:
-
-${JSON.stringify(input.assessment, null, 2)}
-
-ORIGINAL CHAPTER:
-
-${input.chapterContent}
-        `.trim(),
-      },
-    ],
-    max_tokens: 3500,
-  });
-  const rawUsage = response.usage as unknown as
-    | Record<string, unknown>
-    | undefined;
-  const inputTokens =
-    typeof rawUsage?.prompt_tokens === "number" ? rawUsage.prompt_tokens : 0;
-  const outputTokens =
-    typeof rawUsage?.completion_tokens === "number"
-      ? rawUsage.completion_tokens
-      : 0;
-  const diagnostic: GenerationDiagnostic = {
-    stage: "chapter_quality_targeted_repair",
-    provider: "openrouter",
-    model: "aion-labs/aion-3.0-mini",
-    status: "succeeded",
-    inputTokens,
-    outputTokens,
-    totalTokens:
-      typeof rawUsage?.total_tokens === "number"
-        ? rawUsage.total_tokens
-        : inputTokens + outputTokens,
-    costUsd: typeof rawUsage?.cost === "number" ? rawUsage.cost : null,
-    costType: typeof rawUsage?.cost === "number" ? "reported" : "unavailable",
-    durationMs: Date.now() - startedAt,
-    attempt: 1,
-  };
-  const repairResponse = response.choices[0]?.message?.content;
-
-  if (!repairResponse?.trim()) {
-    throw new DiagnosticFailure(
-      "Aion returned no targeted chapter repairs.",
-      diagnostic,
-    );
-  }
-
-  try {
-    const patches = parseTargetedRepairPatches(repairResponse);
-    const repaired = applyTargetedRepairPatches(input.chapterContent, patches);
-
-    return {
-      content: cleanGeneratedProse(repaired),
-      diagnostic,
-    };
-  } catch (error) {
-    throw new DiagnosticFailure(
-      error instanceof Error
-        ? error.message
-        : "The targeted chapter repairs could not be applied.",
-      diagnostic,
-    );
-  }
-}
-
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
   let pipelineStartedAt = 0;
@@ -645,13 +415,6 @@ export async function POST(request: Request) {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: "OPENAI_API_KEY is not configured." },
-        { status: 500 },
-      );
-    }
-
-    if (!process.env.OPENROUTER_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENROUTER_API_KEY is not configured." },
         { status: 500 },
       );
     }
@@ -697,18 +460,22 @@ export async function POST(request: Request) {
     const firstAssessment = firstQualityResult.assessment;
     diagnostics.push(firstQualityResult.diagnostic);
 
-    // The quality model may identify useful subjective improvements, but
-    // it must never rewrite or shorten an otherwise valid completed
-    // chapter. Only objective hard failures and mechanical failures block
-    // the chapter from being saved.
-    const accepted =
-      mechanicalFailures.length === 0 &&
-      firstAssessment.hardFailures.length === 0;
+    // The model's editorial judgement is advisory. Language models can
+    // incorrectly promote subjective story criticism to a hard failure,
+    // which previously trapped complete chapters in an expensive
+    // repair/rejection loop. Only deterministic mechanical validation may
+    // block a completed chapter here. Continuity, voice, pacing and hook
+    // concerns are returned to the UI as warnings for the author to review.
+    const accepted = mechanicalFailures.length === 0;
 
     return NextResponse.json({
       accepted,
       chapterContent,
       quality: firstAssessment,
+      qualityWarnings: [
+        ...firstAssessment.hardFailures,
+        ...firstAssessment.repairInstructions,
+      ],
       repaired: false,
       diagnostics,
     });
@@ -722,28 +489,15 @@ export async function POST(request: Request) {
     if (error instanceof DiagnosticFailure) {
       diagnostics.push(error.diagnostic);
     } else if (pipelineStartedAt > 0) {
-      const lastStage = diagnostics.at(-1)?.stage;
-      const stage =
-        diagnostics.length === 0 ||
-        lastStage === "chapter_quality_targeted_repair"
-          ? "chapter_quality_assessment"
-          : "chapter_quality_targeted_repair";
-      const provider =
-        stage === "chapter_quality_targeted_repair"
-          ? "openrouter"
-          : "openai";
       const elapsedCompleted = diagnostics.reduce(
         (total, diagnostic) => total + diagnostic.durationMs,
         0,
       );
 
       diagnostics.push({
-        stage,
-        provider,
-        model:
-          provider === "openrouter"
-            ? "aion-labs/aion-3.0-mini"
-            : "gpt-5.6-terra",
+        stage: "chapter_quality_assessment",
+        provider: "openai",
+        model: "gpt-5.6-terra",
         status: "failed",
         inputTokens: 0,
         outputTokens: 0,
@@ -754,13 +508,7 @@ export async function POST(request: Request) {
           0,
           Date.now() - pipelineStartedAt - elapsedCompleted,
         ),
-        attempt:
-          stage === "chapter_quality_assessment" &&
-          diagnostics.some(
-            (diagnostic) => diagnostic.stage === "chapter_quality_assessment",
-          )
-            ? 2
-            : 1,
+        attempt: 1,
         error: message,
       });
     }
