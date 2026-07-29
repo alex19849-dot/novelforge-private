@@ -176,6 +176,32 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
+function getStoryStateBeforeChapter(
+  state: StoryState,
+  replacementNumber: number | null,
+): StoryState {
+  if (replacementNumber === null) {
+    return state;
+  }
+
+  const earlierLedger = (state.chapterLedger ?? []).filter(
+    (entry) => entry.chapterNumber < replacementNumber,
+  );
+  const previousChapter = earlierLedger.at(-1);
+
+  return {
+    ...EMPTY_STORY_STATE,
+    chapterLedger: earlierLedger,
+    latestChapterEnding: previousChapter?.endingExcerpt ?? "",
+    repetitionWarnings: earlierLedger
+      .flatMap((entry) => entry.repeatedBeats)
+      .filter(Boolean)
+      .slice(-30),
+    voiceProfiles: state.voiceProfiles ?? [],
+    activePOV: previousChapter?.povCharacter ?? "",
+  };
+}
+
 function meetsAcceptedMinimum(text: string, minimumWordCount: number): boolean {
   return countWords(text) >= minimumWordCount;
 }
@@ -1596,6 +1622,10 @@ device.`,
     try {
       const replacementNumber =
         workingPending.generatedChapter.replaceChapterNumber;
+      const writingStoryState = getStoryStateBeforeChapter(
+        baseStory.storyState,
+        replacementNumber,
+      );
       const recentChapters =
         replacementNumber === null
           ? baseStory.chapters.slice(-1)
@@ -1674,7 +1704,7 @@ device.`,
           },
           body: JSON.stringify({
             storyBible: baseStory.storyBible,
-            storyState: baseStory.storyState,
+            storyState: writingStoryState,
             recentChapters,
             chapterBrief: "",
             latestUserMessage: workingPending.latestUserMessage,
@@ -1719,7 +1749,7 @@ device.`,
         },
         body: JSON.stringify({
           storyBible: baseStory.storyBible,
-          storyState: baseStory.storyState,
+          storyState: writingStoryState,
           recentChapters,
           chapterBrief: "",
           latestUserMessage: workingPending.latestUserMessage,
