@@ -24,6 +24,8 @@ const STORAGE_KEY = "novelforge-current-story";
 
 const PENDING_GENERATION_KEY = "novelforge-pending-chapter-generation";
 
+type GenerationStage = "opening" | "middle" | "final";
+
 type PendingChapterGeneration = {
   storyId: string;
   generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
@@ -34,12 +36,14 @@ type PendingChapterGeneration = {
   maximumWordCount: number;
   diagnostics?: GenerationDiagnostic[];
   qualityAccepted?: boolean;
+  nextGenerationStage?: GenerationStage;
 };
 
 type WriterResponse = {
   prose: string;
   totalWordCount: number;
   isComplete: boolean;
+  generationStage: GenerationStage;
   diagnostics: GenerationDiagnostic[];
 };
 
@@ -202,10 +206,6 @@ function getStoryStateBeforeChapter(
   };
 }
 
-function meetsAcceptedMinimum(text: string, minimumWordCount: number): boolean {
-  return countWords(text) >= minimumWordCount;
-}
-
 function getRequestedWordCount(message: string): number | null {
   const match = message.match(/\b(\d{3,5})\s*words?\b/i);
 
@@ -343,6 +343,9 @@ function isWriterResponse(value: unknown): value is WriterResponse {
     Boolean(response.prose.trim()) &&
     typeof response.totalWordCount === "number" &&
     typeof response.isComplete === "boolean" &&
+    (response.generationStage === "opening" ||
+      response.generationStage === "middle" ||
+      response.generationStage === "final") &&
     isDiagnosticArray(response.diagnostics)
   );
 }
@@ -373,7 +376,11 @@ function isPendingGeneration(
     (pending.diagnostics === undefined ||
       isDiagnosticArray(pending.diagnostics)) &&
     (pending.qualityAccepted === undefined ||
-      typeof pending.qualityAccepted === "boolean")
+      typeof pending.qualityAccepted === "boolean") &&
+    (pending.nextGenerationStage === undefined ||
+      pending.nextGenerationStage === "opening" ||
+      pending.nextGenerationStage === "middle" ||
+      pending.nextGenerationStage === "final")
   );
 }
 
@@ -1686,18 +1693,16 @@ device.`,
         clearPendingGeneration();
       };
 
-      if (workingPending.draft.trim()) {
-        if (
-          meetsAcceptedMinimum(
-            workingPending.draft,
-            workingPending.minimumWordCount,
-          )
-        ) {
-          await finishCompletedChapter(workingPending.draft);
-          return;
-        }
+      let generationStage: GenerationStage =
+        workingPending.nextGenerationStage ??
+        (!workingPending.draft.trim()
+          ? "opening"
+          : countWords(workingPending.draft) < 1700
+            ? "middle"
+            : "final");
 
-        const continuationResponse = await fetch("/api/story-chat/write", {
+      for (let movementAttempt = 0; movementAttempt < 5; movementAttempt += 1) {
+        const response = await fetch("/api/story-chat/write", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1708,80 +1713,59 @@ device.`,
             recentChapters,
             chapterBrief: "",
             latestUserMessage: workingPending.latestUserMessage,
-            existingDraft: workingPending.draft,
+            existingDraft:
+              generationStage === "opening" ? "" : workingPending.draft,
             minimumWordCount: workingPending.minimumWordCount,
             maximumWordCount: workingPending.maximumWordCount,
+            generationStage,
           }),
         });
 
-        const continuationData = await readApiJson(continuationResponse);
+        const data = await readApiJson(response);
 
-        if (!isWriterResponse(continuationData)) {
+        if (!isWriterResponse(data) || data.generationStage !== generationStage) {
           throw new Error(
-            "The writing endpoint returned an invalid continuation response.",
+            "The writing endpoint returned an invalid chapter movement.",
           );
         }
+
+        const nextGenerationStage: GenerationStage | undefined =
+          generationStage === "opening"
+            ? "middle"
+            : generationStage === "middle"
+              ? data.totalWordCount >= 1700
+                ? "final"
+                : "middle"
+              : undefined;
 
         workingPending = {
           ...workingPending,
-          draft: continuationData.prose.trim(),
+          draft: data.prose.trim(),
           diagnostics: [
             ...(workingPending.diagnostics ?? []),
-            ...continuationData.diagnostics,
+            ...data.diagnostics,
           ],
+          nextGenerationStage,
         };
         savePendingGeneration(workingPending);
 
-        if (!continuationData.isComplete) {
-          throw new Error(
-            `Aion Full resumed the chapter to ${continuationData.totalWordCount} words, still outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The combined draft has been preserved.`,
-          );
+        if (generationStage === "final") {
+          if (!data.isComplete) {
+            throw new Error(
+              `The segmented writer finished at ${data.totalWordCount} words, outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The complete draft has been preserved for review.`,
+            );
+          }
+
+          await finishCompletedChapter(data.prose.trim());
+          return;
         }
 
-        await finishCompletedChapter(continuationData.prose.trim());
-        return;
+        generationStage = nextGenerationStage ?? "final";
       }
 
-      const response = await fetch("/api/story-chat/write", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          storyBible: baseStory.storyBible,
-          storyState: writingStoryState,
-          recentChapters,
-          chapterBrief: "",
-          latestUserMessage: workingPending.latestUserMessage,
-          existingDraft: "",
-          minimumWordCount: workingPending.minimumWordCount,
-          maximumWordCount: workingPending.maximumWordCount,
-        }),
-      });
-
-      const data = await readApiJson(response);
-
-      if (!isWriterResponse(data)) {
-        throw new Error("The writing endpoint returned an invalid response.");
-      }
-
-      workingPending = {
-        ...workingPending,
-        draft: data.prose.trim(),
-        diagnostics: [
-          ...(workingPending.diagnostics ?? []),
-          ...data.diagnostics,
-        ],
-      };
-      savePendingGeneration(workingPending);
-
-      if (!data.isComplete) {
-        throw new Error(
-          `Aion Full returned ${data.totalWordCount} words, outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The draft has been preserved for review.`,
-        );
-      }
-
-      await finishCompletedChapter(data.prose.trim());
+      throw new Error(
+        "The segmented writer exceeded its movement limit. The draft has been preserved.",
+      );
     } catch (error) {
       if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
         workingPending = {
