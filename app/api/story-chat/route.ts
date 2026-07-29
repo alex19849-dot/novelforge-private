@@ -507,6 +507,69 @@ function cleanStringArray(value: unknown): string[] {
   return cleaned;
 }
 
+function validateThreeScenePlan(value: string): void {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("The model did not return a valid three-scene plan.");
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("The model returned an invalid three-scene plan.");
+  }
+
+  const plan = parsed as Record<string, unknown>;
+  const requiredPlanStrings = ["chapterGoal", "relationshipChange"];
+
+  if (
+    requiredPlanStrings.some(
+      (key) => typeof plan[key] !== "string" || !plan[key].trim(),
+    )
+  ) {
+    throw new Error("The chapter plan is missing its narrative goal.");
+  }
+
+  const requiredSceneStrings = [
+    "location",
+    "objective",
+    "conflict",
+    "newInformation",
+    "exitBeat",
+  ];
+
+  for (const sceneKey of ["scene1", "scene2", "scene3"]) {
+    const scene = plan[sceneKey];
+
+    if (!scene || typeof scene !== "object" || Array.isArray(scene)) {
+      throw new Error(`The chapter plan is missing ${sceneKey}.`);
+    }
+
+    const sceneCard = scene as Record<string, unknown>;
+
+    if (
+      requiredSceneStrings.some(
+        (key) =>
+          typeof sceneCard[key] !== "string" || !sceneCard[key].trim(),
+      )
+    ) {
+      throw new Error(`${sceneKey} is incomplete.`);
+    }
+  }
+
+  if (
+    !Array.isArray(plan.completedBeatsToAvoid) ||
+    plan.completedBeatsToAvoid.some(
+      (beat) => typeof beat !== "string" || !beat.trim(),
+    )
+  ) {
+    throw new Error(
+      "The chapter plan is missing its completed-beats guardrail.",
+    );
+  }
+}
+
 function sanitiseStoryBible(value: unknown): StoryBible {
   if (!value || typeof value !== "object") {
     return { ...EMPTY_STORY_BIBLE };
@@ -1176,10 +1239,10 @@ the user asks for it.
 
 Return only the required structured response.
 
-CHAPTER METADATA
+CHAPTER METADATA AND SCENE PLAN
 
-When Writer Mode is active, choose only the metadata needed to identify
-the requested chapter:
+When Writer Mode is active, choose the metadata needed to identify the
+requested chapter:
 
 - chapter number
 
@@ -1192,13 +1255,51 @@ the requested chapter:
 Return that metadata in generatedChapter. Set generatedChapter.content
 to an empty string.
 
-Always return an empty string for chapterBrief.
+Also return a compact three-scene plan in chapterBrief. chapterBrief
+must be a JSON string using exactly this structure:
 
-Do not plan scenes, plot beats, emotional progression, relationship
-progression, intimacy, opening action, ending hooks, voice instructions,
-continuity reminders or prose. The dedicated writing model will make
-those creative decisions using the Story Bible, continuity state, recent
-chapters and the user's request.
+{
+  "chapterGoal": "the concrete story change this chapter delivers",
+  "relationshipChange": "the specific relationship movement earned here",
+  "scene1": {
+    "location": "an established or clearly supported location",
+    "objective": "what the POV character actively tries to achieve",
+    "conflict": "the immediate obstacle or opposing pressure",
+    "newInformation": "what changes, is discovered or is decided",
+    "exitBeat": "the concrete turn that forces the next scene"
+  },
+  "scene2": {
+    "location": "location",
+    "objective": "a new active objective",
+    "conflict": "a developing obstacle",
+    "newInformation": "a new development",
+    "exitBeat": "the turn that forces the final scene"
+  },
+  "scene3": {
+    "location": "location",
+    "objective": "the final active objective",
+    "conflict": "the chapter's strongest pressure",
+    "newInformation": "the decisive consequence, choice or shift",
+    "exitBeat": "the single chapter-ending hook"
+  },
+  "completedBeatsToAvoid": [
+    "specific action, conversation, thought or reveal that must not be repeated"
+  ]
+}
+
+Every scene must perform a different narrative job. It must introduce a
+new action, decision, discovery, complication or relationship change.
+Never pad three scenes with the same conversation, internal conflict,
+physical action or attraction observation.
+
+Base every scene on the saved Story Bible, continuity state, previous
+chapters and the user's request. Do not contradict established knowledge,
+roles, chronology, locations or relationship progression. Do not invent
+a convenient stranger, rule, document, schedule, message, credential or
+coincidence merely to force proximity or manufacture a hook.
+
+The plan must identify what has already happened and explicitly prohibit
+those beats from being repeated. Do not write prose in chapterBrief.
 
 When Writer Mode is not active, return generatedChapter as null and
 chapterBrief as an empty string.
@@ -1778,9 +1879,14 @@ When writing a brand new chapter:
 
 - use reply only for a brief confirmation
 
-- return chapterBrief as an empty string
+- return chapterBrief as the compact JSON three-scene plan required by
+the system instructions
 
-- do not plan or instruct the chapter prose
+- make every scene perform a different narrative job
+
+- identify completed beats that must not be repeated
+
+- do not write chapter prose
 
 Return storyState in exactly this structure:
 
@@ -1829,9 +1935,14 @@ When rewriting an existing chapter:
 
 - do not include rewritten prose in reply
 
-- return chapterBrief as an empty string
+- return chapterBrief as a fresh compact JSON three-scene plan based on
+the story position before the chapter being replaced
 
-- do not plan or instruct the rewritten chapter prose
+- make every scene perform a different narrative job
+
+- identify completed beats that must not be repeated
+
+- do not write rewritten chapter prose
 
 Return storyState in exactly this structure:
 
@@ -1898,12 +2009,13 @@ Do not return storyBible or storyState. The server will preserve them.
 generatedChapter must contain metadata only. Its content must be an empty
 string.
 
-Keep reply brief. chapterBrief must be an empty string.
+Keep reply brief. Return chapterBrief as the compact JSON three-scene
+plan required by the system instructions. Each scene must have a distinct
+objective, conflict, new development and exit beat. Include specific
+completed beats that the prose writer must not repeat.
 
-Do not design or describe scenes, plot beats, character arcs, emotional
-progression, relationship progression, intimacy, openings, endings or
-hooks. The writing model will make all prose decisions from the saved
-workspace and the user's request.`
+Do not write chapter prose. Do not invent unsupported facts, procedures,
+characters, rules, messages, documents, schedules or coincidences.`
     : ""
 }
 
@@ -2117,9 +2229,18 @@ Write commercially publishable fiction.
 
       try {
         parsedOutput = JSON.parse(outputText) as Partial<StoryModelOutput>;
+
+        if (isWriterMode) {
+          validateThreeScenePlan(cleanString(parsedOutput.chapterBrief));
+        }
+
         break;
-      } catch {
-        planningFailureReason = "the model returned incomplete JSON";
+      } catch (planningError) {
+        parsedOutput = null;
+        planningFailureReason =
+          planningError instanceof Error
+            ? planningError.message
+            : "the model returned incomplete JSON";
         planningDiagnostics[planningDiagnostics.length - 1] = {
           ...planningDiagnostics[planningDiagnostics.length - 1],
           status: "failed",
@@ -2177,6 +2298,10 @@ Write commercially publishable fiction.
     }
 
     const chapterBrief = cleanString(parsedOutput.chapterBrief);
+
+    if (isWriterMode) {
+      validateThreeScenePlan(chapterBrief);
+    }
 
     const returnedStoryState = {
       ...EMPTY_STORY_STATE,
