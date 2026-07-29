@@ -436,71 +436,107 @@ export async function POST(request: Request) {
           maximumWordCount,
         });
 
-    providerCallStartedAt = Date.now();
-    const response = await openrouter.chat.completions.create({
-      model: WRITING_MODEL,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-      max_tokens: 4500,
-    });
-    const rawUsage = response.usage as unknown as
-      | Record<string, unknown>
-      | undefined;
-    const inputTokens =
-      typeof rawUsage?.prompt_tokens === "number" ? rawUsage.prompt_tokens : 0;
-    const outputTokens =
-      typeof rawUsage?.completion_tokens === "number"
-        ? rawUsage.completion_tokens
-        : 0;
-    const totalTokens =
-      typeof rawUsage?.total_tokens === "number"
-        ? rawUsage.total_tokens
-        : inputTokens + outputTokens;
-    const costUsd = typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
+    const maximumAttempts = 3;
+    let lastError: Error | null = null;
 
-    diagnostics.push({
-      stage: `chapter_writing_${generationStage}`,
-      provider: "openrouter",
-      model: WRITING_MODEL,
-      status: "succeeded",
-      inputTokens,
-      outputTokens,
-      totalTokens,
-      costUsd,
-      costType: costUsd === null ? "unavailable" : "reported",
-      durationMs: Date.now() - providerCallStartedAt,
-      attempt: 1,
-    });
+    for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
+      providerCallStartedAt = Date.now();
 
-    const rawProse = response.choices[0]?.message?.content;
+      try {
+        const response = await openrouter.chat.completions.create({
+          model: WRITING_MODEL,
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          max_tokens: 4500,
+        });
+        const rawUsage = response.usage as unknown as
+          | Record<string, unknown>
+          | undefined;
+        const inputTokens =
+          typeof rawUsage?.prompt_tokens === "number"
+            ? rawUsage.prompt_tokens
+            : 0;
+        const outputTokens =
+          typeof rawUsage?.completion_tokens === "number"
+            ? rawUsage.completion_tokens
+            : 0;
+        const totalTokens =
+          typeof rawUsage?.total_tokens === "number"
+            ? rawUsage.total_tokens
+            : inputTokens + outputTokens;
+        const costUsd =
+          typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
+        const rawProse = response.choices[0]?.message?.content;
 
-    if (!rawProse?.trim()) {
-      throw new Error("The writing model returned no chapter prose.");
+        if (!rawProse?.trim()) {
+          throw new Error("The writing model returned no chapter prose.");
+        }
+
+        const returnedProse = cleanGeneratedProse(rawProse);
+
+        validateProse(returnedProse);
+
+        diagnostics.push({
+          stage: `chapter_writing_${generationStage}`,
+          provider: "openrouter",
+          model: WRITING_MODEL,
+          status: "succeeded",
+          inputTokens,
+          outputTokens,
+          totalTokens,
+          costUsd,
+          costType: costUsd === null ? "unavailable" : "reported",
+          durationMs: Date.now() - providerCallStartedAt,
+          attempt,
+        });
+
+        const prose =
+          generationStage === "opening"
+            ? returnedProse
+            : `${existingDraft}\n\n${returnedProse}`.trim();
+        const totalWordCount = countWords(prose);
+
+        return NextResponse.json({
+          prose,
+          totalWordCount,
+          isComplete:
+            generationStage === "final" &&
+            totalWordCount >= minimumWordCount &&
+            totalWordCount <= maximumWordCount,
+          generationStage,
+          diagnostics,
+        });
+      } catch (attemptError) {
+        lastError =
+          attemptError instanceof Error
+            ? attemptError
+            : new Error("The writing model failed.");
+
+        diagnostics.push({
+          stage: `chapter_writing_${generationStage}`,
+          provider: "openrouter",
+          model: WRITING_MODEL,
+          status: "failed",
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          costUsd: null,
+          costType: "unavailable",
+          durationMs: Date.now() - providerCallStartedAt,
+          attempt,
+          error: lastError.message,
+        });
+      }
     }
 
-    const returnedProse = cleanGeneratedProse(rawProse);
-
-    validateProse(returnedProse);
-
-    const prose = generationStage === "opening"
-      ? returnedProse
-      : `${existingDraft}\n\n${returnedProse}`.trim();
-    const totalWordCount = countWords(prose);
-
-    return NextResponse.json({
-      prose,
-      totalWordCount,
-      isComplete:
-        generationStage === "final" &&
-        totalWordCount >= minimumWordCount &&
-        totalWordCount <= maximumWordCount,
-      generationStage,
-      diagnostics,
-    });
+    throw (
+      lastError ??
+      new Error("The writing model failed after three automatic attempts.")
+    );
   } catch (error) {
     console.error("STORY WRITER FAILED:", error);
     const message =
