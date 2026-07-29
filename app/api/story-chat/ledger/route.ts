@@ -339,13 +339,43 @@ Identify repeated scene constructions, emotional beats, gestures,
 internal conclusions or phrases that future chapters should avoid.
 
 Create one distinct voiceProfiles entry for every established main POV
-character. Each profile must describe concrete differences in narrative
-rhythm, vocabulary, humour, emotional deflection, sensory attention,
-dialogue and internal thought. The voices must not be interchangeable.
+character. Build each profile from the Story Bible, the user's stated
+characterisation and the completed prose. Preserve the user's intended
+personality even when a generated chapter has slipped into generic prose.
 
-Preserve existing voice profiles unless the actual prose supplies strong
-evidence of a deliberate change. Add specific forbidden habits that
-would make this character sound generic or too similar to another POV.
+Every voice profile must be operational enough for another writer to
+imitate that character without seeing the source chapter:
+
+- narrativeRhythm must describe typical sentence length, pace, fragment
+use and how the rhythm changes under pressure;
+- vocabulary must identify preferred register, recurring word types,
+professional or regional language, swearing habits and language this
+character would never naturally use;
+- humourStyle must state what the character finds funny, how they deliver
+humour and whether humour hides fear, attraction, anger or vulnerability;
+- emotionalDeflection must state the character's specific defence
+mechanism and the observable behaviour it produces;
+- sensoryFocus must state what this character notices first in rooms,
+people, conflict and attraction;
+- dialoguePattern must describe directness, interruptions, questions,
+evasions, pet names, formality and how speech changes with the love
+interest;
+- internalThoughtPattern must describe what the character admits
+privately, what they rationalise and what they refuse to name;
+- forbiddenHabits must contain concrete phrases, reactions, jokes and
+sentence habits that would make this voice generic or too similar to
+another POV.
+
+Do not use empty labels such as sharp, witty, confident, guarded, dry,
+sarcastic, observant or emotionally unavailable without explaining
+exactly how that quality appears on the page. Contrast the main POV
+profiles against each other explicitly. Give each character at least
+three differences that the other main POV character must not inherit.
+
+Preserve an existing voice profile when it remains consistent with the
+Story Bible. Refine it when new prose reveals a genuine additional trait,
+but never flatten distinct voices toward the same generated-fiction
+style.
 
 Natural contractions are the default for contemporary narration,
 internal thought and dialogue. Do not preserve pervasive stiff
