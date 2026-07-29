@@ -54,6 +54,22 @@ function getWordCount(value: unknown, fallback: number): number {
   return Math.round(value);
 }
 
+function getWritingContinuityState(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const writingState = {
+    ...(value as Record<string, unknown>),
+  };
+
+  delete writingState.lastGenerationDiagnostics;
+  delete writingState.diagnostics;
+  delete writingState.generationDiagnostics;
+
+  return writingState;
+}
+
 function cleanRecentChapters(value: unknown): RecentChapter[] {
   if (!Array.isArray(value)) {
     return [];
@@ -171,6 +187,15 @@ function getPrompt(input: {
   minimumWordCount: number;
   maximumWordCount: number;
 }): string {
+  const preferredMinimum = Math.min(
+    input.maximumWordCount,
+    Math.max(input.minimumWordCount, 2600),
+  );
+  const preferredMaximum = Math.min(
+    input.maximumWordCount,
+    Math.max(preferredMinimum, 3000),
+  );
+
   return `
 You are NovelForge, a skilled commercial romance novelist.
 
@@ -199,20 +224,30 @@ Use two or three purposeful scenes, or one sustained scene with meaningful
 turns. Begin at the most interesting credible point. Every scene must change
 the plot, relationship, knowledge, risk or a character's decision.
 
-The romantic lead should appear early when the requested chapter is centred
-on the relationship. Forced proximity must arise credibly from the
-established world, not from an implausible rule, coincidence or stranger
-manufactured solely to push the characters together.
+Plot developments and forced proximity must arise credibly from the
+established world and from decisions made by established characters. Never
+invent a convenient stranger, administrative rule, document, message,
+credential, scheduling requirement or coincidence solely to put characters
+together or manufacture an ending.
+
+Do not invent institutional, sporting, legal, workplace or academic procedures
+without support from the Story Bible or previous chapters. Avoid contradictions
+in year groups, roles, authority, schedules, locations and character knowledge.
 
 Keep the chapter between ${input.minimumWordCount} and ${input.maximumWordCount} words.
-This range is a boundary, not permission to pad. Once the chapter has passed
-the minimum, end when its natural dramatic arc is complete. Never extend the
-chapter with repeated messages, repeated objects, repeated attraction denial,
-routine travel, bedtime reflection or several versions of the same ending.
+Aim for approximately ${preferredMinimum} to ${preferredMaximum} words so the
+chapter clears the hard minimum without requiring continuation. The accepted
+range is a boundary, not permission to pad. Once the chapter has cleared the
+minimum and completed its natural dramatic arc, stop. Never extend the chapter
+with repeated messages, repeated objects, repeated attraction denial, routine
+travel, bedtime reflection or several versions of the same ending.
 
 End once, on a concrete event, choice, reveal, complication, interruption or
 changed relationship consequence. Do not end with a vague prediction, private
-vow or summary about how difficult tomorrow will be.
+vow or summary about how difficult tomorrow will be. After the strongest final
+turn or hook, stop immediately. Do not add another encounter, logistical
+instruction, observation from a distance, attraction summary or second closing
+beat.
 
 CONTENT
 
@@ -232,7 +267,7 @@ ${JSON.stringify(input.storyBible, null, 2)}
 
 CONTINUITY STATE
 
-${JSON.stringify(input.storyState, null, 2)}
+${JSON.stringify(getWritingContinuityState(input.storyState), null, 2)}
 
 PREVIOUS CHAPTER
 
