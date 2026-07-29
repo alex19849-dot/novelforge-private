@@ -707,17 +707,42 @@ export async function POST(request: Request) {
       });
     }
 
-    const repairResult = await repairChapter({
-      storyBible: body.storyBible ?? {},
-      storyState: body.storyState ?? {},
-      chapterBrief,
-      chapterTitle,
-      povCharacter,
-      chapterContent,
-      assessment: firstAssessment,
-      minimumWordCount,
-      maximumWordCount: allowedMaximumWordCount,
-    });
+    let repairResult: Awaited<ReturnType<typeof repairChapter>>;
+
+    try {
+      repairResult = await repairChapter({
+        storyBible: body.storyBible ?? {},
+        storyState: body.storyState ?? {},
+        chapterBrief,
+        chapterTitle,
+        povCharacter,
+        chapterContent,
+        assessment: firstAssessment,
+        minimumWordCount,
+        maximumWordCount: allowedMaximumWordCount,
+      });
+    } catch (error) {
+      if (error instanceof DiagnosticFailure) {
+        diagnostics.push(error.diagnostic);
+
+        const originalChapterIsSafeToPreserve =
+          mechanicalFailures.length === 0 &&
+          firstAssessment.hardFailures.length === 0;
+
+        if (originalChapterIsSafeToPreserve) {
+          return NextResponse.json({
+            accepted: true,
+            chapterContent,
+            quality: firstAssessment,
+            repaired: false,
+            diagnostics,
+          });
+        }
+      }
+
+      throw error;
+    }
+
     const repairedContent = repairResult.content;
     diagnostics.push(repairResult.diagnostic);
     const repairedMechanicalFailures = validateMechanicalQuality(
