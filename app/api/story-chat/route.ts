@@ -1432,6 +1432,16 @@ export async function POST(request: Request) {
       intent = "update_story";
     }
 
+    const isBuildingStory = currentStory.chapters.length === 0;
+
+    // During pre-chapter setup, a normal answer to NovelForge's latest
+    // question is a Story Bible decision, not disposable small talk.
+    // Explicit brainstorming remains brainstorm mode until the user
+    // accepts one of the proposed ideas.
+    if (isBuildingStory && intent === "general_chat") {
+      intent = "update_story";
+    }
+
     const explicitlyRequestsChapterProse =
       /\b(?:write|generate|continue|create)\b[\s\S]{0,100}\bchapter(?:\s+\d+|\s+(?:one|two|three|four|five|six|seven|eight|nine|ten))?\b/i.test(
         latestMessage,
@@ -1488,6 +1498,14 @@ unrelated edits or invent additional changes.
 If the user confirms, accepts or asks to save characters or other
 details proposed in the immediately preceding conversation, recover
 those details from the supplied recent messages and add them now.
+
+Return the complete Story Bible exactly as it should exist after the
+edit. Include every retained entry, add accepted entries, replace
+corrected entries, and completely omit anything the user removed.
+
+Do not leave an old version beside a corrected or renamed character.
+Do not preserve a placeholder when the user has supplied the completed
+entry.
 
 Never claim that the workspace is locked, chat-only or in the wrong
 mode. Never ask the user to resend an update command elsewhere. The
@@ -2293,10 +2311,13 @@ Write commercially publishable fiction.
 
     const returnedBible = sanitiseStoryBible(parsedOutput.storyBible);
 
-    const mergedStoryBible = mergeStoryBible(
-      sanitiseStoryBible(currentStory.storyBible),
-      returnedBible,
-    );
+    const mergedStoryBible =
+      intent === "update_story"
+        ? returnedBible
+        : mergeStoryBible(
+            sanitiseStoryBible(currentStory.storyBible),
+            returnedBible,
+          );
 
     const storyTitle =
       returnedTitle || cleanString(currentStory.title) || "Untitled story";
