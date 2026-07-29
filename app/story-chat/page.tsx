@@ -1658,17 +1658,57 @@ device.`,
 
       if (workingPending.draft.trim()) {
         if (
-          !meetsAcceptedMinimum(
+          meetsAcceptedMinimum(
             workingPending.draft,
             workingPending.minimumWordCount,
           )
         ) {
+          await finishCompletedChapter(workingPending.draft);
+          return;
+        }
+
+        const continuationResponse = await fetch("/api/story-chat/write", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            storyBible: baseStory.storyBible,
+            storyState: baseStory.storyState,
+            recentChapters,
+            chapterBrief: "",
+            latestUserMessage: workingPending.latestUserMessage,
+            existingDraft: workingPending.draft,
+            minimumWordCount: workingPending.minimumWordCount,
+            maximumWordCount: workingPending.maximumWordCount,
+          }),
+        });
+
+        const continuationData = await readApiJson(continuationResponse);
+
+        if (!isWriterResponse(continuationData)) {
           throw new Error(
-            "Automatic continuation is disabled. Discard this incomplete draft and generate the chapter again.",
+            "The writing endpoint returned an invalid continuation response.",
           );
         }
 
-        await finishCompletedChapter(workingPending.draft);
+        workingPending = {
+          ...workingPending,
+          draft: continuationData.prose.trim(),
+          diagnostics: [
+            ...(workingPending.diagnostics ?? []),
+            ...continuationData.diagnostics,
+          ],
+        };
+        savePendingGeneration(workingPending);
+
+        if (!continuationData.isComplete) {
+          throw new Error(
+            `Aion Full resumed the chapter to ${continuationData.totalWordCount} words, still outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The combined draft has been preserved.`,
+          );
+        }
+
+        await finishCompletedChapter(continuationData.prose.trim());
         return;
       }
 
