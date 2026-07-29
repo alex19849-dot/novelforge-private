@@ -952,6 +952,12 @@ Creating a new story does not itself mean writing Chapter 1. Never
 generate chapter metadata or prose until the user explicitly asks to
 write, generate, continue, rewrite or expand chapter or scene prose.
 
+There is no separate story-edit mode that the user must activate.
+Whenever the user asks to add, save, change or remove a Story Bible
+detail, apply the update in the current response. Never describe the
+workspace as locked or chat-only and never tell the user to send the
+same instruction again in another mode.
+
 Act like an experienced developmental editor specialising in commercial
 fiction.
 
@@ -1410,6 +1416,18 @@ export async function POST(request: Request) {
       intent = "rewrite_chapter";
     }
 
+    const explicitlyUpdatesStoryBible =
+      /\b(?:add|save|put|include|record|update|change|replace|remove|delete|keep)\b[\s\S]{0,120}\b(?:story\s*bible|bible|character|characters|cast|trope|tropes|setting|premise|relationship|plot|conflict|note|notes|pov|heat|burn|pacing)\b/i.test(
+        latestMessage,
+      ) ||
+      /\b(?:add|save|put|include|record|update|change|replace|remove|delete|keep)\s+(?:him|her|them|this|that|it|those|these)\b/i.test(
+        latestMessage,
+      );
+
+    if (intent !== "rewrite_chapter" && explicitlyUpdatesStoryBible) {
+      intent = "update_story";
+    }
+
     const explicitlyRequestsChapterProse =
       /\b(?:write|generate|continue|create)\b[\s\S]{0,100}\bchapter(?:\s+\d+|\s+(?:one|two|three|four|five|six|seven|eight|nine|ten))?\b/i.test(
         latestMessage,
@@ -1461,7 +1479,15 @@ story, chapters, and user instructions rather than returning it empty.`,
       update_story: `Apply only the specific permanent changes requested by the user. Update
 the story bible, chapters, characters, or story state only where
 necessary. Preserve everything else exactly as it is. Never make
-unrelated edits or invent additional changes.`,
+unrelated edits or invent additional changes.
+
+If the user confirms, accepts or asks to save characters or other
+details proposed in the immediately preceding conversation, recover
+those details from the supplied recent messages and add them now.
+
+Never claim that the workspace is locked, chat-only or in the wrong
+mode. Never ask the user to resend an update command elsewhere. The
+current response can and must apply the requested Story Bible update.`,
 
       brainstorm: `Give useful story ideas only. Do not change the story bible, chapters,
 timeline, world, notes, or any other part of the current story
