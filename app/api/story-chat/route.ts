@@ -1179,15 +1179,35 @@ SCENE DESIGN:
 
 - Plan two to four purposeful scenes or continuous scene movements.
 
-- For each, specify the location, active goal, conflict and resulting
-change.
+- For every scene or movement, specify the POV character's immediate
+goal, the opposing agenda or concrete obstacle, the relationship
+pressure, the new information or changed understanding, the emotional
+turn and the consequence that pushes the chapter forward.
 
-- Every scene must cause a decision, discovery, consequence or changed
-relationship dynamic.
+- Interlock the plot and romance. A plot scene should also alter how the
+central characters see, trust, challenge, need or affect each other. A
+romantic scene should also create a decision, complication, discovery or
+external consequence.
+
+- Decide which background facts must be dramatized and which routine
+facts should be compressed into one or two natural sentences. Do not
+plan a meeting, interview, briefing or conversation whose main purpose
+is for one character to explain the plot to the others.
+
+- Deliver necessary information through discovery, disagreement,
+interruption, evidence, physical action, competing goals, strategic
+withholding or a decision made under pressure. When dialogue carries
+information, every speaker must want something beyond informing the
+reader.
+
+- Every scene must end in a materially different condition from where
+it began. Remove any scene that could be deleted without changing a
+decision, relationship, fact, risk or consequence.
 
 - Do not use filler scenes whose only function is attraction,
-description, travel, waking, showering, staring at a phone or replaying
-the previous encounter.
+description, travel, waking, showering, staring at a phone, reviewing
+information the reader already knows or replaying the previous
+encounter.
 
 ANTI-REPETITION:
 
