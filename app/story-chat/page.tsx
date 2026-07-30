@@ -1906,6 +1906,17 @@ device.`,
         clearPendingGeneration();
       };
 
+      const hasCompletedDraftAwaitingQualityOrLedger =
+        Boolean(workingPending.draft.trim()) &&
+        workingPending.qualityAccepted !== undefined &&
+        workingPending.nextSceneIndex === undefined &&
+        workingPending.nextGenerationStage === undefined;
+
+      if (hasCompletedDraftAwaitingQualityOrLedger) {
+        await finishCompletedChapter(workingPending.draft.trim());
+        return;
+      }
+
       const plannedSceneCount = getPlannedSceneCount(
         workingPending.chapterBrief,
       );
