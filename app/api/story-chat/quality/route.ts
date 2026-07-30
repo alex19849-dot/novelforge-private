@@ -203,10 +203,14 @@ function assessmentPasses(
   mechanicalFailures: string[],
 ): boolean {
   return (
+    assessment.passed &&
     mechanicalFailures.length === 0 &&
     assessment.hardFailures.length === 0 &&
     assessment.scores.continuity >= 7 &&
+    assessment.scores.factualAuthenticity >= 6 &&
+    assessment.scores.plotMovement >= 6 &&
     assessment.scores.relationshipProgression >= 6 &&
+    assessment.scores.voiceDistinctiveness >= 6 &&
     assessment.scores.povAndTense >= 7 &&
     assessment.scores.repetitionControl >= 6 &&
     assessment.scores.hookStrength >= 6
