@@ -10,6 +10,13 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const openrouter = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+});
+
+const REPAIR_MODEL = "sao10k/l3.3-euryale-70b";
+
 type QualityRequest = {
   storyBible?: unknown;
   storyState?: unknown;
@@ -51,6 +58,11 @@ type GenerationDiagnostic = {
   durationMs: number;
   attempt: number;
   error?: string;
+};
+
+type LocalRepairPatch = {
+  oldText: string;
+  newText: string;
 };
 
 class DiagnosticFailure extends Error {
@@ -196,6 +208,106 @@ function cleanGeneratedProse(content: string): string {
     .replace(/\\([“”‘’])/g, "$1")
     .replace(/^\s{0,3}#{1,6}\s+[^\n]+\n+/u, "")
     .trim();
+}
+
+function extractJsonObject(content: string): string {
+  const cleaned = content
+    .replace(/^\uFEFF/, "")
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/```\s*$/i, "")
+    .trim();
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+
+  if (start < 0 || end <= start) {
+    throw new Error("The local repair model returned no JSON object.");
+  }
+
+  return cleaned.slice(start, end + 1);
+}
+
+function countOccurrences(content: string, target: string): number {
+  if (!target) {
+    return 0;
+  }
+
+  return content.split(target).length - 1;
+}
+
+function applyValidatedLocalPatches(
+  chapterContent: string,
+  value: unknown,
+): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("The local repair response was invalid.");
+  }
+
+  const rawPatches = (value as Record<string, unknown>).patches;
+
+  if (!Array.isArray(rawPatches) || rawPatches.length < 1) {
+    throw new Error("The local repair model returned no usable patches.");
+  }
+
+  if (rawPatches.length > 8) {
+    throw new Error("The local repair attempted too many changes.");
+  }
+
+  const patches: LocalRepairPatch[] = rawPatches.map((rawPatch, index) => {
+    if (
+      !rawPatch ||
+      typeof rawPatch !== "object" ||
+      Array.isArray(rawPatch)
+    ) {
+      throw new Error(`Local repair patch ${index + 1} was invalid.`);
+    }
+
+    const patch = rawPatch as Record<string, unknown>;
+    const oldText = cleanString(patch.oldText);
+    const newText = cleanString(patch.newText);
+
+    if (!oldText || !newText || oldText === newText) {
+      throw new Error(`Local repair patch ${index + 1} was empty.`);
+    }
+
+    if (countOccurrences(chapterContent, oldText) !== 1) {
+      throw new Error(
+        `Local repair patch ${index + 1} did not identify one exact passage.`,
+      );
+    }
+
+    return {
+      oldText,
+      newText,
+    };
+  });
+  const changedCharacterCount = patches.reduce(
+    (total, patch) => total + patch.oldText.length,
+    0,
+  );
+  const maximumLocalChange = Math.max(
+    2000,
+    Math.floor(chapterContent.length * 0.35),
+  );
+
+  if (changedCharacterCount > maximumLocalChange) {
+    throw new Error(
+      "The local repair attempted to replace too much of the chapter.",
+    );
+  }
+
+  let repairedContent = chapterContent;
+
+  for (const patch of patches) {
+    if (countOccurrences(repairedContent, patch.oldText) !== 1) {
+      throw new Error(
+        "Two local repair patches overlapped or invalidated one another.",
+      );
+    }
+
+    repairedContent = repairedContent.replace(patch.oldText, patch.newText);
+  }
+
+  return cleanGeneratedProse(repairedContent);
 }
 
 function assessmentPasses(
@@ -520,6 +632,162 @@ ${input.chapterContent}
   };
 }
 
+async function repairChapterLocally(input: {
+  storyBible: unknown;
+  storyState: unknown;
+  chapterBrief: string;
+  chapterTitle: string;
+  povCharacter: string;
+  chapterContent: string;
+  assessment: QualityAssessment;
+  attempt: number;
+}): Promise<{
+  chapterContent: string;
+  diagnostic: GenerationDiagnostic;
+}> {
+  const startedAt = Date.now();
+  const response = await openrouter.chat.completions.create({
+    model: REPAIR_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: `You are a precise commercial-romance line editor. Repair only
+the passages responsible for the supplied quality failures. Return one JSON
+object and no other text. Never rewrite the complete chapter.`,
+      },
+      {
+        role: "user",
+        content: `
+Return exactly:
+
+{
+  "patches": [
+    {
+      "oldText": "one exact, contiguous passage copied character-for-character from the original chapter",
+      "newText": "the complete replacement passage"
+    }
+  ]
+}
+
+Use between one and eight patches. oldText must be copied exactly from the
+chapter, including punctuation, quotation marks and paragraph breaks. Each
+oldText passage must occur exactly once. Include enough surrounding prose to
+make it unique, but replace only the material that genuinely needs correction.
+
+Do not alter unaffected prose. Do not modernise, summarise, censor, soften or
+restyle the chapter. Preserve first-person POV, present tense, character voice,
+natural contractions, heat level and explicit consensual adult content.
+
+Fix every objective hard failure and the concrete repair instructions. When a
+score failure concerns plot movement, relationship progression, voice,
+repetition or hook strength, repair the smallest passage capable of solving it.
+Do not introduce a new subplot or contradict the Story Bible, continuity or
+chapter plan.
+
+STORY BIBLE
+
+${JSON.stringify(input.storyBible, null, 2)}
+
+CONTINUITY BEFORE THIS CHAPTER
+
+${JSON.stringify(cleanQualityStoryState(input.storyState), null, 2)}
+
+CHAPTER PLAN
+
+${input.chapterBrief}
+
+CHAPTER METADATA
+
+Title: ${input.chapterTitle}
+POV: ${input.povCharacter}
+
+HARD FAILURES
+
+${JSON.stringify(input.assessment.hardFailures, null, 2)}
+
+REPAIR INSTRUCTIONS
+
+${JSON.stringify(input.assessment.repairInstructions, null, 2)}
+
+QUALITY SUMMARY
+
+${input.assessment.summary}
+
+ORIGINAL CHAPTER
+
+${input.chapterContent}
+        `.trim(),
+      },
+    ],
+    max_tokens: 3500,
+    temperature: 0.2,
+  });
+  const usage = response.usage as unknown as
+    | Record<string, unknown>
+    | undefined;
+  const inputTokens =
+    typeof usage?.prompt_tokens === "number" ? usage.prompt_tokens : 0;
+  const outputTokens =
+    typeof usage?.completion_tokens === "number"
+      ? usage.completion_tokens
+      : 0;
+  const totalTokens =
+    typeof usage?.total_tokens === "number"
+      ? usage.total_tokens
+      : inputTokens + outputTokens;
+  const costUsd = typeof usage?.cost === "number" ? usage.cost : null;
+  const diagnostic: GenerationDiagnostic = {
+    stage: "chapter_quality_local_repair",
+    provider: "openrouter",
+    model: REPAIR_MODEL,
+    status: "succeeded",
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    costUsd,
+    costType: costUsd === null ? "unavailable" : "reported",
+    durationMs: Date.now() - startedAt,
+    attempt: input.attempt,
+  };
+  const choice = response.choices[0];
+
+  if (choice?.finish_reason === "length") {
+    throw new DiagnosticFailure(
+      "The local repair reached its token limit before returning its patches.",
+      diagnostic,
+    );
+  }
+
+  if (choice?.finish_reason === "content_filter") {
+    throw new DiagnosticFailure(
+      "The provider stopped the local repair because of its content filter.",
+      diagnostic,
+    );
+  }
+
+  try {
+    const output = JSON.parse(
+      extractJsonObject(cleanString(choice?.message?.content)),
+    ) as unknown;
+    const chapterContent = applyValidatedLocalPatches(
+      input.chapterContent,
+      output,
+    );
+
+    return {
+      chapterContent,
+      diagnostic,
+    };
+  } catch (error) {
+    throw new DiagnosticFailure(
+      error instanceof Error
+        ? error.message
+        : "The local repair returned invalid patches.",
+      diagnostic,
+    );
+  }
+}
+
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
   let pipelineStartedAt = 0;
@@ -528,6 +796,13 @@ export async function POST(request: Request) {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: "OPENAI_API_KEY is not configured." },
+        { status: 500 },
+      );
+    }
+
+    if (!process.env.OPENROUTER_API_KEY) {
+      return NextResponse.json(
+        { error: "OPENROUTER_API_KEY is not configured." },
         { status: 500 },
       );
     }
@@ -573,23 +848,92 @@ export async function POST(request: Request) {
     const firstAssessment = firstQualityResult.assessment;
     diagnostics.push(firstQualityResult.diagnostic);
 
-    const accepted = assessmentPasses(
+    const initiallyAccepted = assessmentPasses(
       firstAssessment,
       mechanicalFailures,
     );
 
+    if (initiallyAccepted) {
+      return NextResponse.json({
+        accepted: true,
+        chapterContent,
+        quality: firstAssessment,
+        qualityWarnings: [],
+        repaired: false,
+        diagnostics,
+      });
+    }
+
+    let repairResult: Awaited<ReturnType<typeof repairChapterLocally>>;
+
+    try {
+      repairResult = await repairChapterLocally({
+        storyBible: body.storyBible ?? {},
+        storyState: body.storyState ?? {},
+        chapterBrief,
+        chapterTitle,
+        povCharacter,
+        chapterContent,
+        assessment: firstAssessment,
+        attempt: 1,
+      });
+      diagnostics.push(repairResult.diagnostic);
+    } catch (repairError) {
+      if (repairError instanceof DiagnosticFailure) {
+        diagnostics.push(repairError.diagnostic);
+      }
+
+      return NextResponse.json({
+        accepted: false,
+        chapterContent,
+        quality: firstAssessment,
+        qualityWarnings: [
+          ...mechanicalFailures,
+          ...firstAssessment.hardFailures,
+          ...firstAssessment.repairInstructions,
+          repairError instanceof Error
+            ? `Automatic local repair stopped: ${repairError.message}`
+            : "Automatic local repair stopped.",
+        ],
+        repaired: false,
+        diagnostics,
+      });
+    }
+
+    const repairedContent = repairResult.chapterContent;
+    const repairedMechanicalFailures = validateMechanicalQuality(
+      repairedContent,
+      acceptedMinimumWordCount,
+      allowedMaximumWordCount,
+    );
+    const secondQualityResult = await assessChapter({
+      storyBible: body.storyBible ?? {},
+      storyState: body.storyState ?? {},
+      chapterBrief,
+      chapterTitle,
+      povCharacter,
+      chapterContent: repairedContent,
+      mechanicalFailures: repairedMechanicalFailures,
+      attempt: 2,
+    });
+    diagnostics.push(secondQualityResult.diagnostic);
+    const accepted = assessmentPasses(
+      secondQualityResult.assessment,
+      repairedMechanicalFailures,
+    );
+
     return NextResponse.json({
       accepted,
-      chapterContent,
-      quality: firstAssessment,
+      chapterContent: repairedContent,
+      quality: secondQualityResult.assessment,
       qualityWarnings: accepted
         ? []
         : [
-            ...mechanicalFailures,
-            ...firstAssessment.hardFailures,
-            ...firstAssessment.repairInstructions,
+            ...repairedMechanicalFailures,
+            ...secondQualityResult.assessment.hardFailures,
+            ...secondQualityResult.assessment.repairInstructions,
           ],
-      repaired: false,
+      repaired: true,
       diagnostics,
     });
   } catch (error) {
