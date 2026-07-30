@@ -1927,14 +1927,18 @@ device.`,
           : workingPending.nextGenerationStage === "middle"
             ? 1
             : plannedSceneCount - 1);
+      const maximumMovementCalls = plannedSceneCount + 8;
 
       for (
-        let sceneAttempt = 0;
-        sceneAttempt < plannedSceneCount;
-        sceneAttempt += 1
+        let movementCall = 0;
+        movementCall < maximumMovementCalls;
+        movementCall += 1
       ) {
+        const hasDraftToContinue = Boolean(workingPending.draft.trim());
         const generationStage: GenerationStage =
-          sceneIndex === 0
+          hasDraftToContinue && sceneIndex === plannedSceneCount - 1
+            ? "final"
+            : sceneIndex === 0
             ? "opening"
             : sceneIndex === plannedSceneCount - 1
               ? "final"
@@ -1975,9 +1979,16 @@ device.`,
 
         const isFinalScene =
           data.isFinalScene ?? sceneIndex === plannedSceneCount - 1;
-        const nextSceneIndex = isFinalScene ? undefined : sceneIndex + 1;
+        const needsFinalContinuation = isFinalScene && !data.isComplete;
+        const nextSceneIndex = needsFinalContinuation
+          ? sceneIndex
+          : isFinalScene
+            ? undefined
+            : sceneIndex + 1;
         const nextGenerationStage: GenerationStage | undefined =
-          nextSceneIndex === undefined
+          needsFinalContinuation
+            ? "final"
+            : nextSceneIndex === undefined
             ? undefined
             : nextSceneIndex === 0
               ? "opening"
@@ -1999,9 +2010,8 @@ device.`,
 
         if (isFinalScene) {
           if (!data.isComplete) {
-            throw new Error(
-              `The planned chapter finished at ${data.totalWordCount} words, outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The complete draft has been preserved for review.`,
-            );
+            sceneIndex = nextSceneIndex ?? plannedSceneCount - 1;
+            continue;
           }
 
           await finishCompletedChapter(data.prose.trim());
@@ -2012,7 +2022,7 @@ device.`,
       }
 
       throw new Error(
-        "The writer exceeded the saved plan's scene limit. The draft has been preserved.",
+        `The writer could not reach ${workingPending.minimumWordCount} words after ${maximumMovementCalls} movements. The draft has been preserved and can be resumed.`,
       );
     } catch (error) {
       if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
