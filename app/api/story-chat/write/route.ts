@@ -28,10 +28,14 @@ type GenerationStage = "opening" | "middle" | "final";
 
 type SceneCard = {
   location: string;
+  entryState: string;
   objective: string;
   conflict: string;
   newInformation: string;
   exitBeat: string;
+  endingState: string;
+  wordTarget: number;
+  mustNotHappen: string[];
 };
 
 type ChapterScenePlan = {
@@ -40,6 +44,11 @@ type ChapterScenePlan = {
   povCharacter: string;
   chapterGoal: string;
   relationshipChange: string;
+  startingState: string;
+  endingState: string;
+  knowledgeLimits: string[];
+  premiseLocks: string[];
+  mustNotHappen: string[];
   scenes: SceneCard[];
   completedBeatsToAvoid: string[];
 };
@@ -55,6 +64,7 @@ type WriterRequest = {
   maximumWordCount?: unknown;
   generationStage?: unknown;
   sceneIndex?: unknown;
+  continueCurrentMovement?: unknown;
 };
 
 function cleanString(value: unknown): string {
@@ -97,6 +107,7 @@ function getSceneWordBudget(input: {
   existingWordCount: number;
   sceneIndex: number;
   sceneCount: number;
+  plannedWordTarget: number;
 }): SceneWordBudget {
   const remainingScenes = Math.max(1, input.sceneCount - input.sceneIndex);
   const futureScenes = remainingScenes - 1;
@@ -124,7 +135,13 @@ function getSceneWordBudget(input: {
         : Math.min(700, Math.max(450, remainingToMinimum));
     const maximum = Math.min(
       remainingToMaximum,
-      Math.max(minimum, Math.min(950, remainingToTarget)),
+      Math.max(
+        minimum,
+        Math.min(
+          1100,
+          Math.max(input.plannedWordTarget, remainingToTarget),
+        ),
+      ),
     );
 
     return {
@@ -133,9 +150,10 @@ function getSceneWordBudget(input: {
     };
   }
 
-  const idealSceneWords = Math.max(
-    300,
-    Math.round(remainingToTarget / remainingScenes),
+  const idealSceneWords = clamp(
+    input.plannedWordTarget,
+    450,
+    Math.max(450, Math.round(remainingToTarget / remainingScenes)),
   );
   const reservedForFutureScenes = futureScenes * 250;
   const maximumAvailableNow = Math.max(
@@ -176,10 +194,12 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
   const plan = parsed as Record<string, unknown>;
   const sceneFieldKeys = [
     "location",
+    "entryState",
     "objective",
     "conflict",
     "newInformation",
     "exitBeat",
+    "endingState",
   ] as const;
   const rawScenes = Array.isArray(plan.scenes)
     ? plan.scenes.slice(0, 5)
@@ -208,11 +228,28 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
       scene[fieldKey] = fieldValue;
     }
 
+    scene.wordTarget =
+      typeof sceneRecord.wordTarget === "number" &&
+      Number.isInteger(sceneRecord.wordTarget)
+        ? clamp(sceneRecord.wordTarget, 450, 1100)
+        : 750;
+    scene.mustNotHappen = Array.isArray(sceneRecord.mustNotHappen)
+      ? sceneRecord.mustNotHappen.map(cleanString).filter(Boolean)
+      : [];
+
+    if (scene.mustNotHappen.length === 0) {
+      throw new Error(
+        `Scene ${index + 1} is missing its forbidden-development guardrail.`,
+      );
+    }
+
     scenes.push(scene);
   }
 
   const chapterGoal = cleanString(plan.chapterGoal);
   const relationshipChange = cleanString(plan.relationshipChange);
+  const startingState = cleanString(plan.startingState);
+  const endingState = cleanString(plan.endingState);
   const chapterNumber =
     typeof plan.chapterNumber === "number" &&
     Number.isInteger(plan.chapterNumber) &&
@@ -224,8 +261,26 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
   const completedBeatsToAvoid = Array.isArray(plan.completedBeatsToAvoid)
     ? plan.completedBeatsToAvoid.map(cleanString).filter(Boolean)
     : [];
+  const knowledgeLimits = Array.isArray(plan.knowledgeLimits)
+    ? plan.knowledgeLimits.map(cleanString).filter(Boolean)
+    : [];
+  const premiseLocks = Array.isArray(plan.premiseLocks)
+    ? plan.premiseLocks.map(cleanString).filter(Boolean)
+    : [];
+  const mustNotHappen = Array.isArray(plan.mustNotHappen)
+    ? plan.mustNotHappen.map(cleanString).filter(Boolean)
+    : [];
 
-  if (!chapterGoal || !relationshipChange || scenes.length === 0) {
+  if (
+    !chapterGoal ||
+    !relationshipChange ||
+    !startingState ||
+    !endingState ||
+    knowledgeLimits.length === 0 ||
+    premiseLocks.length === 0 ||
+    mustNotHappen.length === 0 ||
+    scenes.length < 3
+  ) {
     throw new Error("The chapter scene plan is missing its narrative goal.");
   }
 
@@ -235,6 +290,11 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
     povCharacter,
     chapterGoal,
     relationshipChange,
+    startingState,
+    endingState,
+    knowledgeLimits,
+    premiseLocks,
+    mustNotHappen,
     scenes,
     completedBeatsToAvoid,
   };
@@ -410,6 +470,10 @@ function validateProse(content: string): void {
     /\bCONTINUITY STATE\b/i,
     /\bCHAPTER GOAL\b/i,
     /\bRELATIONSHIP CHANGE\b/i,
+    /\bBINDING CHAPTER CONTRACT\b/i,
+    /\bPOV KNOWLEDGE LIMITS\b/i,
+    /\bPREMISE LOCKS\b/i,
+    /\bDEVELOPMENTS FORBIDDEN\b/i,
     /\bSCENE \d+ CARD\b/i,
     /\bCOMPLETED BEATS THAT MUST NOT BE REPEATED\b/i,
     /\bCOMPLETE CHAPTER DRAFT SO FAR\b/i,
@@ -545,6 +609,54 @@ function validateNoDraftOverlap(
   }
 }
 
+function getBindingChapterContract(
+  scenePlan: ChapterScenePlan,
+  scene: SceneCard,
+  continueCurrentMovement = false,
+): string {
+  return `
+BINDING CHAPTER CONTRACT
+
+Chapter starting state:
+${scenePlan.startingState}
+
+Required chapter ending state:
+${scenePlan.endingState}
+
+POV knowledge limits:
+${JSON.stringify(scenePlan.knowledgeLimits, null, 2)}
+
+Premise locks that cannot be bypassed or contradicted:
+${JSON.stringify(scenePlan.premiseLocks, null, 2)}
+
+Developments forbidden anywhere in this chapter:
+${JSON.stringify(scenePlan.mustNotHappen, null, 2)}
+
+This movement's planned entry state:
+${scene.entryState}
+
+${
+  continueCurrentMovement
+    ? "Because this movement has already begun, the supplied draft's exact final state is the binding current state. Do not restore the planned entry state."
+    : "Begin from this planned entry state without replaying the previous movement."
+}
+
+This movement must end at:
+${scene.endingState}
+
+Developments forbidden in this movement:
+${JSON.stringify(scene.mustNotHappen, null, 2)}
+
+These constraints override generic romance conventions and any tempting
+shortcut. Never upgrade friendship, rivalry, family history or emotional
+closeness into former romance, sex or acknowledged desire unless the contract
+explicitly establishes it. Never let the POV recognise, label, imagine or
+admit attraction beyond the stated knowledge limit. Never invent housing,
+money, transport, employment, evidence or another convenient alternative that
+removes a premise lock.
+  `.trim();
+}
+
 function getOpeningPrompt(input: {
   storyBible: unknown;
   storyState: unknown;
@@ -581,6 +693,8 @@ ${input.minimumWordCount} and ${input.maximumWordCount} words.
 Return only finished novel prose.
 Do not include a chapter number, title, POV heading, notes, analysis,
 outline, markdown or commentary.
+
+${getBindingChapterContract(input.scenePlan, input.scenePlan.scenes[0])}
 
 Use ${input.narrativeStyle}
 
@@ -619,7 +733,9 @@ dashes.
 Follow the Story Bible's heat level and burn pacing. All romantic and sexual
 characters are consenting adults aged eighteen or older. When established
 progression calls for explicit consensual adult intimacy, write it directly
-without censorship or fade to black. Do not insert intimacy before it is earned.
+and graphically when the saved heat level requires it, without censorship,
+euphemistic summary or fade to black. Do not insert intimacy before the
+approved milestone earns it.
 
 STORY BIBLE
 
@@ -670,6 +786,7 @@ function getLaterMovementPrompt(input: {
   wordBudget: SceneWordBudget;
   minimumWordCount: number;
   maximumWordCount: number;
+  continueCurrentMovement: boolean;
 }): string {
   const sceneNumber = input.sceneIndex + 1;
   const sceneCard = input.scenePlan.scenes[input.sceneIndex];
@@ -698,15 +815,26 @@ Stop at a natural active beat that can be continued directly.`;
       .filter(Boolean)
       .at(-1) ?? "";
 
+  const movementInstruction = input.continueCurrentMovement
+    ? `Continue MOVEMENT ${sceneNumber}. This movement has already begun.
+The draft's exact final state now overrides the movement card's original entry
+state. Advance only the unfinished objective or consequence.`
+    : `Write MOVEMENT ${sceneNumber}. Begin from its binding entry state,
+which must inherit the previous movement's ending state without replaying it.`;
+
   return `
-Continue SCENE ${sceneNumber} of the unfinished commercial romance chapter.
-This is an additional movement inside a scene that has already begun. Some
-or all of the scene card may already exist in the draft. Never restart the
-scene card, location, arrival, conversation or confrontation.
+${movementInstruction}
+Never restart the location, arrival, conversation or confrontation.
 
 Return only the new scene prose. Do not repeat, rewrite, summarise or quote
 the earlier scenes. Do not include a chapter heading, title, POV label, note,
 analysis, outline, markdown or commentary.
+
+${getBindingChapterContract(
+  input.scenePlan,
+  sceneCard,
+  input.continueCurrentMovement,
+)}
 
 Write between ${input.wordBudget.minimum} and ${input.wordBudget.maximum} new
 words for this scene. The complete chapter must finish between
@@ -758,7 +886,9 @@ or en dashes.
 Follow the Story Bible's heat level and burn pacing. All romantic and sexual
 characters are consenting adults aged eighteen or older. When established
 progression calls for explicit consensual adult intimacy, write it directly
-without censorship or fade to black. Do not insert intimacy before it is earned.
+and graphically when the saved heat level requires it, without censorship,
+euphemistic summary or fade to black. Do not insert intimacy before the
+approved milestone earns it.
 
 STORY BIBLE
 
@@ -829,6 +959,7 @@ export async function POST(request: Request) {
       getWordCount(body.maximumWordCount, 4000),
     );
     const generationStage = getGenerationStage(body.generationStage);
+    const continueCurrentMovement = body.continueCurrentMovement === true;
     const requestedSceneIndex =
       typeof body.sceneIndex === "number" &&
       Number.isInteger(body.sceneIndex)
@@ -849,6 +980,7 @@ export async function POST(request: Request) {
       existingWordCount,
       sceneIndex,
       sceneCount: scenePlan.scenes.length,
+      plannedWordTarget: scenePlan.scenes[sceneIndex]?.wordTarget ?? 750,
     });
 
     if (sceneIndex < 0 || sceneIndex >= scenePlan.scenes.length) {
@@ -931,9 +1063,10 @@ export async function POST(request: Request) {
             wordBudget,
             minimumWordCount,
             maximumWordCount,
+            continueCurrentMovement,
           });
 
-    const maximumAttempts = 3;
+    const maximumAttempts = 2;
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
@@ -953,10 +1086,16 @@ export async function POST(request: Request) {
 
 CRITICAL RETRY
 
-The previous attempt did not produce a usable scene. Write a fresh version of
-this assigned scene. It must contain between ${wordBudget.minimum} and
-${wordBudget.maximum} new words and obey the same ending boundary. Return only
-the replacement scene prose.`;
+The previous attempt failed for this exact reason:
+
+${lastError?.message ?? "The movement was unusable."}
+
+Write a fresh replacement for this movement only. Correct that exact failure.
+Do not restart an arrival, location, conversation, confrontation, action,
+memory, attraction observation or conclusion already present in the read-only
+draft excerpt. Begin from the movement's stated entry state and finish at its
+stated ending state. It must contain between ${wordBudget.minimum} and
+${wordBudget.maximum} new words. Return only replacement novel prose.`;
         const response = await openrouter.chat.completions.create({
           model: writingModel,
           messages: [
@@ -973,8 +1112,8 @@ analysis, planning, headings, markdown or commentary.`,
               content: attemptPrompt,
             },
           ],
-          max_tokens: 6000,
-          temperature: attempt === 1 ? 0.9 : 0.75,
+          max_tokens: 2800,
+          temperature: attempt === 1 ? 0.82 : 0.65,
           top_p: 0.95,
         });
         const rawUsage = response.usage as unknown as
@@ -1025,11 +1164,33 @@ analysis, planning, headings, markdown or commentary.`,
             : `${existingDraft}\n\n${returnedProse}`.trim();
         const totalWordCount = countWords(prose);
         const movementWordCount = countWords(returnedProse);
+        const minimumAcceptedMovementWords = Math.max(
+          300,
+          Math.floor(wordBudget.minimum * 0.8),
+        );
+        const maximumAcceptedMovementWords = Math.ceil(
+          wordBudget.maximum * 1.2,
+        );
         const finalLengthIsValid =
           totalWordCount >= minimumWordCount &&
           totalWordCount <= maximumWordCount;
         const nonFinalExceededChapterMaximum =
           !isFinalScene && totalWordCount >= maximumWordCount;
+
+        if (movementWordCount < minimumAcceptedMovementWords) {
+          throw new Error(
+            `The movement returned only ${movementWordCount} words and did not develop its assigned dramatic job.`,
+          );
+        }
+
+        if (
+          movementWordCount > maximumAcceptedMovementWords ||
+          totalWordCount > maximumWordCount
+        ) {
+          throw new Error(
+            "The movement exceeded its safe boundary and would overrun the chapter.",
+          );
+        }
 
         if (attempt < maximumAttempts && nonFinalExceededChapterMaximum) {
           throw new Error(
@@ -1089,7 +1250,7 @@ analysis, planning, headings, markdown or commentary.`,
 
     throw (
       lastError ??
-      new Error("The writing model failed after three automatic attempts.")
+      new Error("The writing model failed after two focused attempts.")
     );
   } catch (error) {
     console.error("STORY WRITER FAILED:", error);
