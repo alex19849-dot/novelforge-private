@@ -138,7 +138,7 @@ function getSceneWordBudget(input: {
       Math.max(
         minimum,
         Math.min(
-          1100,
+          800,
           Math.max(input.plannedWordTarget, remainingToTarget),
         ),
       ),
@@ -151,9 +151,12 @@ function getSceneWordBudget(input: {
   }
 
   const idealSceneWords = clamp(
-    input.plannedWordTarget,
-    450,
-    Math.max(450, Math.round(remainingToTarget / remainingScenes)),
+      input.plannedWordTarget,
+      400,
+      Math.min(
+        750,
+        Math.max(400, Math.round(remainingToTarget / remainingScenes)),
+      ),
   );
   const reservedForFutureScenes = futureScenes * 250;
   const maximumAvailableNow = Math.max(
@@ -231,8 +234,8 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
     scene.wordTarget =
       typeof sceneRecord.wordTarget === "number" &&
       Number.isInteger(sceneRecord.wordTarget)
-        ? clamp(sceneRecord.wordTarget, 450, 1100)
-        : 750;
+        ? clamp(sceneRecord.wordTarget, 400, 750)
+        : 650;
     scene.mustNotHappen = Array.isArray(sceneRecord.mustNotHappen)
       ? sceneRecord.mustNotHappen.map(cleanString).filter(Boolean)
       : [];
@@ -421,6 +424,7 @@ function cleanGeneratedProse(content: string): string {
   }
 
   return cleaned
+    .replace(/(?:\n\s*)?<END_MOVEMENT>\s*$/i, "")
     .replace(/\\"/g, '"')
     .replace(/\\([“”‘’])/g, "$1")
     .replace(/\s*[—–]\s*/g, ", ")
@@ -769,7 +773,8 @@ USER'S CURRENT CHAPTER REQUEST
 
 ${input.latestUserMessage || "Write the next chapter naturally."}
 
-Write only Scene One prose now.
+Write only Scene One prose now. After the final prose sentence, output
+<END_MOVEMENT> on its own line. Do not continue after that marker.
   `.trim();
 }
 
@@ -931,7 +936,8 @@ USER'S ORIGINAL REQUEST
 ${input.latestUserMessage || "Continue the chapter naturally."}
 
 Continue immediately after the draft's final sentence. Return only Scene
-${sceneNumber} prose.
+${sceneNumber} prose. After the final prose sentence, output <END_MOVEMENT>
+on its own line. Do not continue after that marker.
   `.trim();
 }
 
@@ -1112,9 +1118,14 @@ analysis, planning, headings, markdown or commentary.`,
               content: attemptPrompt,
             },
           ],
-          max_tokens: 2800,
-          temperature: attempt === 1 ? 0.82 : 0.65,
-          top_p: 0.95,
+          // OpenRouter exposes roughly a 2K-token output ceiling for Magnum
+          // v4 72B. Keep each bounded movement safely below that hard limit.
+          max_tokens: 1900,
+          temperature: attempt === 1 ? 0.72 : 0.5,
+          top_p: 0.9,
+          frequency_penalty: 0.18,
+          presence_penalty: 0.08,
+          stop: ["<END_MOVEMENT>"],
         });
         const rawUsage = response.usage as unknown as
           | Record<string, unknown>
