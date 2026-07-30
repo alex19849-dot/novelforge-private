@@ -421,10 +421,16 @@ function getOpeningPrompt(input: {
   maximumWordCount: number;
 }): string {
   const isOnlyScene = input.scenePlan.scenes.length === 1;
+  const mayReachChapterHook = input.wordBudget.minimum <= 500;
   const endingInstruction = isOnlyScene
-    ? `This is the chapter's only scene. Reach its exit beat once, use that
+    ? mayReachChapterHook
+      ? `This is the chapter's only scene. Reach its exit beat once, use that
 as the chapter's single ending hook, then stop immediately. Do not add an
 aftermath, closing reflection or second ending.`
+      : `This is the opening movement of the chapter's only sustained scene.
+Develop the assigned objective and conflict, but do not resolve the scene or
+reach its exit beat yet. Stop at a natural active beat that can be continued
+directly. Do not write a chapter ending or closing reflection.`
     : `Write only the assigned scene card. Do not borrow actions, conflict,
 information or exit beats from later planned scenes. Reach Scene One's exit
 beat once, then stop. Do not create a chapter ending or closing reflection.`;
@@ -533,13 +539,18 @@ function getLaterMovementPrompt(input: {
   const sceneCard = input.scenePlan.scenes[input.sceneIndex];
   const isFinalScene =
     input.sceneIndex === input.scenePlan.scenes.length - 1;
+  const mayReachChapterHook = input.wordBudget.minimum <= 500;
   const endingInstruction =
     !isFinalScene
       ? `Reach Scene ${sceneNumber}'s exit beat once, then stop. Do not create the chapter
 ending, summarise the relationship or add a closing reflection.`
-      : `Reach this scene's exit beat once. That exit beat is the chapter's
+      : mayReachChapterHook
+        ? `Reach this scene's exit beat once. That exit beat is the chapter's
 only ending hook. Stop immediately afterward. Do not add an aftermath,
-attraction summary, travel, bedtime reflection or second ending.`;
+attraction summary, travel, bedtime reflection or second ending.`
+        : `Continue developing this final scene without resolving it yet.
+Do not reach the planned exit beat or chapter-ending hook in this movement.
+Stop at a natural active beat that can be continued directly.`;
   const sceneBoundaryInstruction = !isFinalScene
     ? "Do not borrow the final scene's exit beat early."
     : "Do not repeat objectives, arguments, actions or conclusions from earlier scenes.";
@@ -861,15 +872,9 @@ analysis, planning, headings, markdown or commentary.`,
         const nonFinalExceededChapterMaximum =
           !isFinalScene && totalWordCount >= maximumWordCount;
 
-        if (
-          attempt < maximumAttempts &&
-          ((isFinalScene && !finalLengthIsValid) ||
-            nonFinalExceededChapterMaximum)
-        ) {
+        if (attempt < maximumAttempts && nonFinalExceededChapterMaximum) {
           throw new Error(
-            isFinalScene
-              ? `The scene produced ${movementWordCount} words and left the chapter at ${totalWordCount}. The complete chapter must finish between ${minimumWordCount} and ${maximumWordCount} words.`
-              : `The scene left no safe word budget for the remaining planned scenes.`,
+            "The scene left no safe word budget for the remaining planned scenes.",
           );
         }
 
