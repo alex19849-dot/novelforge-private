@@ -411,49 +411,6 @@ const storyChatSchema = {
   },
 } as const;
 
-const compactChapterPlanSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["reply", "storyTitle", "generatedChapter", "chapterBrief"],
-  properties: {
-    reply: {
-      type: "string",
-    },
-    storyTitle: {
-      type: "string",
-    },
-    chapterBrief: {
-      type: "string",
-    },
-    generatedChapter: {
-      type: "object",
-      additionalProperties: false,
-      required: ["title", "povCharacter", "content", "replaceChapterNumber"],
-      properties: {
-        title: {
-          type: "string",
-        },
-        povCharacter: {
-          type: "string",
-        },
-        content: {
-          type: "string",
-        },
-        replaceChapterNumber: {
-          anyOf: [
-            {
-              type: "integer",
-            },
-            {
-              type: "null",
-            },
-          ],
-        },
-      },
-    },
-  },
-} as const;
-
 const editableChapterPlanSchema = {
   type: "object",
   additionalProperties: false,
@@ -595,9 +552,57 @@ const editableChapterPlanSchema = {
   },
 } as const;
 
+const directChapterPlanSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reply", "storyTitle", "generatedChapter", "chapterPlan"],
+  properties: {
+    reply: {
+      type: "string",
+    },
+    storyTitle: {
+      type: "string",
+    },
+    generatedChapter: {
+      type: "object",
+      additionalProperties: false,
+      required: ["title", "povCharacter", "content", "replaceChapterNumber"],
+      properties: {
+        title: {
+          type: "string",
+        },
+        povCharacter: {
+          type: "string",
+        },
+        content: {
+          type: "string",
+        },
+        replaceChapterNumber: {
+          anyOf: [
+            {
+              type: "integer",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+      },
+    },
+    chapterPlan: editableChapterPlanSchema.properties.chapterPlan,
+  },
+} as const;
+
 type EditableChapterPlanOutput = {
   reply: string;
   storyTitle: string;
+  chapterPlan: Omit<ChapterPlan, "status" | "updatedAt">;
+};
+
+type DirectChapterPlanOutput = {
+  reply: string;
+  storyTitle: string;
+  generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
   chapterPlan: Omit<ChapterPlan, "status" | "updatedAt">;
 };
 
@@ -1265,7 +1270,8 @@ handoff, character knowledge, voice profiles, burn pacing and completed events
 are binding.
 
 Return a brief conversational confirmation, the existing story title, chapter
-metadata with empty content, and chapterBrief as a JSON string using exactly:
+metadata with empty content, and chapterPlan as one direct structured object
+using exactly:
 
 {
   "chapterNumber": 1,
@@ -1311,7 +1317,7 @@ travel merely to separate them. Give every movement a distinct dramatic job,
 an exact inherited entry state and an exact changed ending state. Only the
 final movement may contain the chapter-ending hook.
 
-The plan's chapter number, title and POV must exactly match generatedChapter.
+The chapterPlan number, title and POV must exactly match generatedChapter.
 For a new chapter, replaceChapterNumber is null. For a rewrite, it is the exact
 chapter number being replaced. generatedChapter.content must be empty.
 
@@ -1333,7 +1339,8 @@ Respect the established heat level and burn pacing. Explicit consensual adult
 intimacy may be planned directly when earned by the story. All romantic and
 sexual characters are consenting adults aged eighteen or older.
 
-Keep the reply brief. Return only the required structured response. Never write
+Keep the reply brief. Do not encode chapterPlan as a JSON string. Return it as
+the direct chapterPlan object required by the response structure. Never write
 chapter prose, analysis or markdown.
 `.trim();
 
@@ -2334,7 +2341,7 @@ ${latestMessage}
             schema: editableChapterPlanSchema,
           },
         },
-        max_output_tokens: 2500,
+        max_output_tokens: 5000,
       });
       const usage = planningResponse.usage;
       const inputTokens = usage?.input_tokens ?? 0;
@@ -2448,23 +2455,36 @@ CURRENT STORY WORKSPACE
 
 ${JSON.stringify(planningWorkspace, null, 2)}
 `.trim();
+      const planningInput = usesCompactChapterPlan
+        ? [
+            {
+              role: "system" as const,
+              content: focusedSystemPrompt,
+            },
+            {
+              role: "user" as const,
+              content: latestMessage,
+            },
+          ]
+        : [
+            {
+              role: "system" as const,
+              content: focusedSystemPrompt,
+            },
+            ...planningConversation,
+          ];
       try {
         const planningResponse = await openai.responses.create({
           model: "gpt-5.6-terra",
 
           reasoning: {
-            effort: "low",
+            // This is a bounded structured-output task. Hidden reasoning
+            // tokens share max_output_tokens with the JSON answer, so do not
+            // let reasoning consume the plan's output allowance.
+            effort: usesCompactChapterPlan ? "none" : "low",
           },
 
-          input: [
-            {
-              role: "system",
-
-              content: focusedSystemPrompt,
-            },
-
-            ...planningConversation,
-          ],
+          input: planningInput,
 
           text: {
             verbosity: usesCompactChapterPlan ? "low" : "medium",
@@ -2473,18 +2493,18 @@ ${JSON.stringify(planningWorkspace, null, 2)}
               type: "json_schema",
 
               name: usesCompactChapterPlan
-                ? "compact_chapter_plan"
+                ? "direct_chapter_plan"
                 : "story_chat_response",
 
               strict: true,
 
               schema: usesCompactChapterPlan
-                ? compactChapterPlanSchema
+                ? directChapterPlanSchema
                 : storyChatSchema,
             },
           },
 
-          max_output_tokens: usesCompactChapterPlan ? 1200 : 10000,
+          max_output_tokens: usesCompactChapterPlan ? 4000 : 10000,
         });
         const usage = planningResponse.usage;
         const inputTokens = usage?.input_tokens ?? 0;
@@ -2549,6 +2569,9 @@ ${JSON.stringify(planningWorkspace, null, 2)}
           status: "failed",
           error: planningFailureReason,
         };
+        if (planningFailureReason === "max_output_tokens") {
+          break;
+        }
         continue;
       }
 
@@ -2565,7 +2588,31 @@ ${JSON.stringify(planningWorkspace, null, 2)}
       }
 
       try {
-        parsedOutput = JSON.parse(outputText) as Partial<StoryModelOutput>;
+        const rawOutput = JSON.parse(outputText) as unknown;
+
+        if (usesCompactChapterPlan) {
+          const directOutput = rawOutput as DirectChapterPlanOutput;
+          const cleanPlan = sanitiseEditableChapterPlan(
+            directOutput.chapterPlan,
+            directOutput.generatedChapter?.replaceChapterNumber ??
+              Math.max(
+                0,
+                ...currentStory.chapters.map((chapter) => chapter.number),
+              ) +
+                1,
+          );
+
+          parsedOutput = {
+            reply: directOutput.reply,
+            storyTitle: directOutput.storyTitle,
+            storyBible: currentStory.storyBible,
+            storyState: currentStory.storyState,
+            generatedChapter: directOutput.generatedChapter,
+            chapterBrief: JSON.stringify(cleanPlan),
+          };
+        } else {
+          parsedOutput = rawOutput as Partial<StoryModelOutput>;
+        }
 
         if (isWriterMode) {
           validateCanonicalChapterPlan(cleanString(parsedOutput.chapterBrief));
