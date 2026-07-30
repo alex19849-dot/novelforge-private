@@ -778,28 +778,48 @@ function formatChapterPlan(plan: ChapterPlan): string {
   );
 }
 
-function validateThreeScenePlan(value: string): void {
+function validateCanonicalChapterPlan(
+  value: string,
+  expected?: {
+    chapterNumber: number;
+    title: string;
+    povCharacter: string;
+  },
+): void {
   let parsed: unknown;
 
   try {
     parsed = JSON.parse(value);
   } catch {
-    throw new Error("The model did not return a valid three-scene plan.");
+    throw new Error("The model did not return a valid chapter plan.");
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("The model returned an invalid three-scene plan.");
+    throw new Error("The model returned an invalid chapter plan.");
   }
 
   const plan = parsed as Record<string, unknown>;
-  const requiredPlanStrings = ["chapterGoal", "relationshipChange"];
+  const requiredPlanStrings = [
+    "title",
+    "povCharacter",
+    "chapterGoal",
+    "relationshipChange",
+  ];
 
   if (
     requiredPlanStrings.some(
       (key) => typeof plan[key] !== "string" || !plan[key].trim(),
     )
   ) {
-    throw new Error("The chapter plan is missing its narrative goal.");
+    throw new Error("The chapter plan is missing required metadata.");
+  }
+
+  if (
+    typeof plan.chapterNumber !== "number" ||
+    !Number.isInteger(plan.chapterNumber) ||
+    plan.chapterNumber < 1
+  ) {
+    throw new Error("The chapter plan is missing its chapter number.");
   }
 
   const requiredSceneStrings = [
@@ -809,23 +829,28 @@ function validateThreeScenePlan(value: string): void {
     "newInformation",
     "exitBeat",
   ];
+  const scenes = plan.scenes;
 
-  for (const sceneKey of ["scene1", "scene2", "scene3"]) {
-    const scene = plan[sceneKey];
+  if (!Array.isArray(scenes) || scenes.length < 1 || scenes.length > 5) {
+    throw new Error("The chapter plan must contain between one and five scenes.");
+  }
 
+  for (const [index, scene] of scenes.entries()) {
     if (!scene || typeof scene !== "object" || Array.isArray(scene)) {
-      throw new Error(`The chapter plan is missing ${sceneKey}.`);
+      throw new Error(`The chapter plan is missing Scene ${index + 1}.`);
     }
-
     const sceneCard = scene as Record<string, unknown>;
 
     if (
+      typeof sceneCard.order !== "number" ||
+      !Number.isInteger(sceneCard.order) ||
+      sceneCard.order !== index + 1 ||
       requiredSceneStrings.some(
         (key) =>
           typeof sceneCard[key] !== "string" || !sceneCard[key].trim(),
       )
     ) {
-      throw new Error(`${sceneKey} is incomplete.`);
+      throw new Error(`Scene ${index + 1} is incomplete or out of order.`);
     }
   }
 
@@ -837,6 +862,19 @@ function validateThreeScenePlan(value: string): void {
   ) {
     throw new Error(
       "The chapter plan is missing its completed-beats guardrail.",
+    );
+  }
+
+  if (
+    expected &&
+    (plan.chapterNumber !== expected.chapterNumber ||
+      cleanString(plan.title).toLowerCase() !==
+        cleanString(expected.title).toLowerCase() ||
+      cleanString(plan.povCharacter).toLowerCase() !==
+        cleanString(expected.povCharacter).toLowerCase())
+  ) {
+    throw new Error(
+      "The chapter plan metadata does not match the generated chapter metadata.",
     );
   }
 }
@@ -1526,41 +1564,40 @@ requested chapter:
 Return that metadata in generatedChapter. Set generatedChapter.content
 to an empty string.
 
-Also return a compact three-scene plan in chapterBrief. chapterBrief
+Also return one canonical chapter plan in chapterBrief. chapterBrief
 must be a JSON string using exactly this structure:
 
 {
+  "chapterNumber": 1,
+  "title": "chapter title only",
+  "povCharacter": "POV character name only",
   "chapterGoal": "the concrete story change this chapter delivers",
-  "relationshipChange": "the specific relationship movement earned here",
-  "scene1": {
-    "location": "an established or clearly supported location",
-    "objective": "what the POV character actively tries to achieve",
-    "conflict": "the immediate obstacle or opposing pressure",
-    "newInformation": "what changes, is discovered or is decided",
-    "exitBeat": "the concrete turn that forces the next scene"
-  },
-  "scene2": {
-    "location": "location",
-    "objective": "a new active objective",
-    "conflict": "a developing obstacle",
-    "newInformation": "a new development",
-    "exitBeat": "the turn that forces the final scene"
-  },
-  "scene3": {
-    "location": "location",
-    "objective": "the final active objective",
-    "conflict": "the chapter's strongest pressure",
-    "newInformation": "the decisive consequence, choice or shift",
-    "exitBeat": "the single chapter-ending hook"
-  },
+  "relationshipChange": "the specific relationship or pressure movement earned here",
+  "scenes": [
+    {
+      "order": 1,
+      "location": "an established or clearly supported location",
+      "objective": "what the POV character actively tries to achieve",
+      "conflict": "the immediate obstacle or opposing pressure",
+      "newInformation": "what changes, is discovered or is decided",
+      "exitBeat": "the concrete turn that forces the next scene"
+    }
+  ],
   "completedBeatsToAvoid": [
     "specific action, conversation, thought or reveal that must not be repeated"
   ]
 }
 
+Use between one and five scenes. Use the smallest number that gives the
+chapter a complete, well-paced dramatic movement. Never force a location
+change merely to create another scene.
+
+The chapter number, title and POV character in chapterBrief must exactly
+match the generatedChapter metadata.
+
 Every scene must perform a different narrative job. It must introduce a
 new action, decision, discovery, complication or relationship change.
-Never pad three scenes with the same conversation, internal conflict,
+Never pad several scenes with the same conversation, internal conflict,
 physical action or attraction observation.
 
 Base every scene on the saved Story Bible, continuity state, previous
@@ -2478,7 +2515,7 @@ When writing a brand new chapter:
 
 - use reply only for a brief confirmation
 
-- return chapterBrief as the compact JSON three-scene plan required by
+- return chapterBrief as the canonical one-to-five-scene plan required by
 the system instructions
 
 - make every scene perform a different narrative job
@@ -2534,7 +2571,7 @@ When rewriting an existing chapter:
 
 - do not include rewritten prose in reply
 
-- return chapterBrief as a fresh compact JSON three-scene plan based on
+- return chapterBrief as a fresh canonical one-to-five-scene plan based on
 the story position before the chapter being replaced
 
 - make every scene perform a different narrative job
@@ -2608,7 +2645,7 @@ Do not return storyBible or storyState. The server will preserve them.
 generatedChapter must contain metadata only. Its content must be an empty
 string.
 
-Keep reply brief. Return chapterBrief as the compact JSON three-scene
+Keep reply brief. Return chapterBrief as the canonical one-to-five-scene
 plan required by the system instructions. Each scene must have a distinct
 objective, conflict, new development and exit beat. Include specific
 completed beats that the prose writer must not repeat.
@@ -2830,7 +2867,7 @@ Write commercially publishable fiction.
         parsedOutput = JSON.parse(outputText) as Partial<StoryModelOutput>;
 
         if (isWriterMode) {
-          validateThreeScenePlan(cleanString(parsedOutput.chapterBrief));
+          validateCanonicalChapterPlan(cleanString(parsedOutput.chapterBrief));
         }
 
         break;
@@ -2898,10 +2935,6 @@ Write commercially publishable fiction.
 
     const chapterBrief = cleanString(parsedOutput.chapterBrief);
 
-    if (isWriterMode) {
-      validateThreeScenePlan(chapterBrief);
-    }
-
     const returnedStoryState = {
       ...EMPTY_STORY_STATE,
 
@@ -2914,6 +2947,19 @@ Write commercially publishable fiction.
       if (!parsedOutput.generatedChapter) {
         throw new Error("The model did not return chapter metadata.");
       }
+
+      const expectedChapterNumber =
+        parsedOutput.generatedChapter.replaceChapterNumber ??
+        Math.max(
+          0,
+          ...currentStory.chapters.map((chapter) => chapter.number),
+        ) + 1;
+
+      validateCanonicalChapterPlan(chapterBrief, {
+        chapterNumber: expectedChapterNumber,
+        title: parsedOutput.generatedChapter.title,
+        povCharacter: parsedOutput.generatedChapter.povCharacter,
+      });
 
       if (requestStage === "plan") {
         const plannedAt = new Date().toISOString();
