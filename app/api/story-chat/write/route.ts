@@ -35,9 +35,7 @@ type SceneCard = {
 type ChapterScenePlan = {
   chapterGoal: string;
   relationshipChange: string;
-  scene1: SceneCard;
-  scene2: SceneCard;
-  scene3: SceneCard;
+  scenes: SceneCard[];
   completedBeatsToAvoid: string[];
 };
 
@@ -51,6 +49,7 @@ type WriterRequest = {
   minimumWordCount?: unknown;
   maximumWordCount?: unknown;
   generationStage?: unknown;
+  sceneIndex?: unknown;
 };
 
 function cleanString(value: unknown): string {
@@ -78,6 +77,26 @@ function getGenerationStage(value: unknown): GenerationStage {
   return value === "middle" || value === "final" ? value : "opening";
 }
 
+function getSceneWordRange(sceneCount: number): string {
+  if (sceneCount === 1) {
+    return "2200 to 2800";
+  }
+
+  if (sceneCount === 2) {
+    return "1100 to 1400";
+  }
+
+  if (sceneCount === 3) {
+    return "800 to 1000";
+  }
+
+  if (sceneCount === 4) {
+    return "600 to 800";
+  }
+
+  return "500 to 700";
+}
+
 function parseChapterScenePlan(value: unknown): ChapterScenePlan {
   const rawPlan = cleanString(value);
   let parsed: unknown;
@@ -86,7 +105,7 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
     parsed = JSON.parse(rawPlan);
   } catch {
     throw new Error(
-      "The chapter is missing its validated three-scene plan.",
+      "The chapter is missing its validated scene plan.",
     );
   }
 
@@ -95,7 +114,6 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
   }
 
   const plan = parsed as Record<string, unknown>;
-  const sceneKeys = ["scene1", "scene2", "scene3"] as const;
   const sceneFieldKeys = [
     "location",
     "objective",
@@ -103,20 +121,18 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
     "newInformation",
     "exitBeat",
   ] as const;
-  const scenes = {} as Pick<
-    ChapterScenePlan,
-    "scene1" | "scene2" | "scene3"
-  >;
+  const rawScenes = Array.isArray(plan.scenes)
+    ? plan.scenes.slice(0, 5)
+    : [plan.scene1, plan.scene2, plan.scene3];
+  const scenes: SceneCard[] = [];
 
-  for (const sceneKey of sceneKeys) {
-    const rawScene = plan[sceneKey];
-
+  for (const [index, rawScene] of rawScenes.entries()) {
     if (
       !rawScene ||
       typeof rawScene !== "object" ||
       Array.isArray(rawScene)
     ) {
-      throw new Error(`The chapter scene plan is missing ${sceneKey}.`);
+      throw new Error(`The chapter scene plan is missing Scene ${index + 1}.`);
     }
 
     const sceneRecord = rawScene as Record<string, unknown>;
@@ -126,13 +142,13 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
       const fieldValue = cleanString(sceneRecord[fieldKey]);
 
       if (!fieldValue) {
-        throw new Error(`${sceneKey} is missing ${fieldKey}.`);
+        throw new Error(`Scene ${index + 1} is missing ${fieldKey}.`);
       }
 
       scene[fieldKey] = fieldValue;
     }
 
-    scenes[sceneKey] = scene;
+    scenes.push(scene);
   }
 
   const chapterGoal = cleanString(plan.chapterGoal);
@@ -141,14 +157,14 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
     ? plan.completedBeatsToAvoid.map(cleanString).filter(Boolean)
     : [];
 
-  if (!chapterGoal || !relationshipChange) {
+  if (!chapterGoal || !relationshipChange || scenes.length === 0) {
     throw new Error("The chapter scene plan is missing its narrative goal.");
   }
 
   return {
     chapterGoal,
     relationshipChange,
-    ...scenes,
+    scenes,
     completedBeatsToAvoid,
   };
 }
@@ -286,19 +302,27 @@ function getOpeningPrompt(input: {
   latestUserMessage: string;
   narrativeStyle: string;
 }): string {
+  const isOnlyScene = input.scenePlan.scenes.length === 1;
+  const endingInstruction = isOnlyScene
+    ? `This is the chapter's only scene. Reach its exit beat once, use that
+as the chapter's single ending hook, then stop immediately. Do not add an
+aftermath, closing reflection or second ending.`
+    : `Write only the assigned scene card. Do not borrow actions, conflict,
+information or exit beats from later planned scenes. Reach Scene One's exit
+beat once, then stop. Do not create a chapter ending or closing reflection.`;
+
   return `
 You are NovelForge, a skilled commercial romance novelist.
 
 Write SCENE ONE of one immersive commercial romance chapter.
-Write approximately 800 to 950 words. Return only finished novel prose.
+Write approximately ${getSceneWordRange(input.scenePlan.scenes.length)} words.
+Return only finished novel prose.
 Do not include a chapter number, title, POV heading, notes, analysis,
 outline, markdown or commentary.
 
 Use ${input.narrativeStyle}
 
-Write only the assigned scene card. Do not borrow actions, conflict,
-information or the exit beat from Scene Two or Scene Three. Reach Scene One's
-exit beat once, then stop. Do not create a chapter ending or closing reflection.
+${endingInstruction}
 
 The Story Bible, continuity and plan are binding. Characters must not know
 information they have not learned. Do not reset attraction, conflict, trust or
@@ -339,7 +363,7 @@ ${input.scenePlan.relationshipChange}
 
 SCENE ONE CARD
 
-${JSON.stringify(input.scenePlan.scene1, null, 2)}
+${JSON.stringify(input.scenePlan.scenes[0], null, 2)}
 
 COMPLETED BEATS THAT MUST NOT BE REPEATED
 
@@ -355,6 +379,7 @@ Write only Scene One prose now.
 
 function getLaterMovementPrompt(input: {
   stage: "middle" | "final";
+  sceneIndex: number;
   storyBible: unknown;
   storyState: unknown;
   recentChapters: RecentChapter[];
@@ -363,20 +388,23 @@ function getLaterMovementPrompt(input: {
   latestUserMessage: string;
   narrativeStyle: string;
 }): string {
-  const sceneNumber = input.stage === "middle" ? "TWO" : "THREE";
-  const sceneCard =
-    input.stage === "middle"
-      ? input.scenePlan.scene2
-      : input.scenePlan.scene3;
-  const requestedAdditionalWords =
-    input.stage === "middle" ? "850 to 1000" : "750 to 950";
+  const sceneNumber = input.sceneIndex + 1;
+  const sceneCard = input.scenePlan.scenes[input.sceneIndex];
+  const isFinalScene =
+    input.sceneIndex === input.scenePlan.scenes.length - 1;
+  const requestedAdditionalWords = getSceneWordRange(
+    input.scenePlan.scenes.length,
+  );
   const endingInstruction =
-    input.stage === "middle"
-      ? `Reach Scene Two's exit beat once, then stop. Do not create the chapter
+    !isFinalScene
+      ? `Reach Scene ${sceneNumber}'s exit beat once, then stop. Do not create the chapter
 ending, summarise the relationship or add a closing reflection.`
-      : `Reach Scene Three's exit beat once. That exit beat is the chapter's
+      : `Reach this scene's exit beat once. That exit beat is the chapter's
 only ending hook. Stop immediately afterward. Do not add an aftermath,
 attraction summary, travel, bedtime reflection or second ending.`;
+  const sceneBoundaryInstruction = !isFinalScene
+    ? "Do not borrow the final scene's exit beat early."
+    : "Do not repeat objectives, arguments, actions or conclusions from earlier scenes.";
 
   return `
 Write SCENE ${sceneNumber} of the unfinished commercial romance chapter.
@@ -391,7 +419,7 @@ ${endingInstruction}
 
 Write only the assigned scene card. Do not reuse an objective, argument,
 action, physical business, internal conclusion or attraction observation from
-an earlier scene. Do not borrow the final scene's exit beat early.
+an earlier scene. ${sceneBoundaryInstruction}
 
 The excerpt below contains only the end of the previous scene. Continue from
 its exact physical and emotional position. Maintain its POV, tense, voice and
@@ -477,7 +505,27 @@ export async function POST(request: Request) {
       getWordCount(body.maximumWordCount, 4000),
     );
     const generationStage = getGenerationStage(body.generationStage);
+    const requestedSceneIndex =
+      typeof body.sceneIndex === "number" &&
+      Number.isInteger(body.sceneIndex)
+        ? body.sceneIndex
+        : null;
+    const fallbackSceneIndex =
+      generationStage === "opening"
+        ? 0
+        : generationStage === "final"
+          ? scenePlan.scenes.length - 1
+          : Math.min(1, scenePlan.scenes.length - 1);
+    const sceneIndex = requestedSceneIndex ?? fallbackSceneIndex;
+    const isFinalScene = sceneIndex === scenePlan.scenes.length - 1;
     const existingWordCount = countWords(existingDraft);
+
+    if (sceneIndex < 0 || sceneIndex >= scenePlan.scenes.length) {
+      return NextResponse.json(
+        { error: "The requested chapter scene does not exist." },
+        { status: 400 },
+      );
+    }
 
     if (existingDraft && existingWordCount > maximumWordCount) {
       return NextResponse.json(
@@ -495,9 +543,33 @@ export async function POST(request: Request) {
       );
     }
 
+    if (generationStage === "opening" && sceneIndex !== 0) {
+      return NextResponse.json(
+        { error: "The opening request must write the first planned scene." },
+        { status: 409 },
+      );
+    }
+
     if (generationStage !== "opening" && !existingDraft) {
       return NextResponse.json(
         { error: "A middle or final movement requires an existing draft." },
+        { status: 409 },
+      );
+    }
+
+    if (
+      generationStage === "middle" &&
+      (sceneIndex === 0 || isFinalScene)
+    ) {
+      return NextResponse.json(
+        { error: "A middle request must write a non-final planned scene." },
+        { status: 409 },
+      );
+    }
+
+    if (generationStage === "final" && !isFinalScene) {
+      return NextResponse.json(
+        { error: "The final request must write the last planned scene." },
         { status: 409 },
       );
     }
@@ -514,6 +586,7 @@ export async function POST(request: Request) {
           })
         : getLaterMovementPrompt({
             stage: generationStage,
+            sceneIndex,
             storyBible: body.storyBible ?? {},
             storyState: body.storyState ?? {},
             recentChapters,
@@ -582,7 +655,7 @@ export async function POST(request: Request) {
         validateProse(returnedProse);
 
         diagnostics.push({
-          stage: `chapter_writing_${generationStage}`,
+          stage: `chapter_writing_scene_${sceneIndex + 1}`,
           provider: "openrouter",
           model: WRITING_MODEL,
           status: "succeeded",
@@ -605,10 +678,13 @@ export async function POST(request: Request) {
           prose,
           totalWordCount,
           isComplete:
-            generationStage === "final" &&
+            isFinalScene &&
             totalWordCount >= minimumWordCount &&
             totalWordCount <= maximumWordCount,
           generationStage,
+          sceneIndex,
+          totalScenes: scenePlan.scenes.length,
+          isFinalScene,
           diagnostics,
         });
       } catch (attemptError) {
@@ -618,7 +694,7 @@ export async function POST(request: Request) {
             : new Error("The writing model failed.");
 
         diagnostics.push({
-          stage: `chapter_writing_${generationStage}`,
+          stage: `chapter_writing_scene_${sceneIndex + 1}`,
           provider: "openrouter",
           model: WRITING_MODEL,
           status: "failed",
