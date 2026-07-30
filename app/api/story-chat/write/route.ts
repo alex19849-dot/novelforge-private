@@ -77,24 +77,79 @@ function getGenerationStage(value: unknown): GenerationStage {
   return value === "middle" || value === "final" ? value : "opening";
 }
 
-function getSceneWordRange(sceneCount: number): string {
-  if (sceneCount === 1) {
-    return "2200 to 2800";
+type SceneWordBudget = {
+  minimum: number;
+  maximum: number;
+};
+
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function getSceneWordBudget(input: {
+  minimumWordCount: number;
+  maximumWordCount: number;
+  existingWordCount: number;
+  sceneIndex: number;
+  sceneCount: number;
+}): SceneWordBudget {
+  const remainingScenes = Math.max(1, input.sceneCount - input.sceneIndex);
+  const futureScenes = remainingScenes - 1;
+  const targetChapterWords = Math.round(
+    (input.minimumWordCount + input.maximumWordCount) / 2,
+  );
+  const remainingToMaximum = Math.max(
+    1,
+    input.maximumWordCount - input.existingWordCount,
+  );
+  const remainingToMinimum = Math.max(
+    1,
+    input.minimumWordCount - input.existingWordCount,
+  );
+  const remainingToTarget = clamp(
+    targetChapterWords - input.existingWordCount,
+    remainingToMinimum,
+    remainingToMaximum,
+  );
+
+  if (futureScenes === 0) {
+    const minimum = Math.max(
+      remainingToMinimum,
+      Math.floor(remainingToTarget * 0.9),
+    );
+    const maximum = Math.min(
+      remainingToMaximum,
+      Math.max(minimum, Math.ceil(remainingToTarget * 1.1)),
+    );
+
+    return {
+      minimum: Math.max(1, minimum),
+      maximum: Math.max(1, maximum),
+    };
   }
 
-  if (sceneCount === 2) {
-    return "1100 to 1400";
-  }
+  const idealSceneWords = Math.max(
+    300,
+    Math.round(remainingToTarget / remainingScenes),
+  );
+  const reservedForFutureScenes = futureScenes * 250;
+  const maximumAvailableNow = Math.max(
+    250,
+    remainingToMaximum - reservedForFutureScenes,
+  );
+  const maximum = Math.min(
+    maximumAvailableNow,
+    Math.max(300, Math.ceil(idealSceneWords * 1.15)),
+  );
+  const minimum = Math.min(
+    maximum,
+    Math.max(250, Math.floor(idealSceneWords * 0.85)),
+  );
 
-  if (sceneCount === 3) {
-    return "800 to 1000";
-  }
-
-  if (sceneCount === 4) {
-    return "600 to 800";
-  }
-
-  return "500 to 700";
+  return {
+    minimum,
+    maximum,
+  };
 }
 
 function parseChapterScenePlan(value: unknown): ChapterScenePlan {
@@ -301,6 +356,9 @@ function getOpeningPrompt(input: {
   scenePlan: ChapterScenePlan;
   latestUserMessage: string;
   narrativeStyle: string;
+  wordBudget: SceneWordBudget;
+  minimumWordCount: number;
+  maximumWordCount: number;
 }): string {
   const isOnlyScene = input.scenePlan.scenes.length === 1;
   const endingInstruction = isOnlyScene
@@ -315,7 +373,9 @@ beat once, then stop. Do not create a chapter ending or closing reflection.`;
 You are NovelForge, a skilled commercial romance novelist.
 
 Write SCENE ONE of one immersive commercial romance chapter.
-Write approximately ${getSceneWordRange(input.scenePlan.scenes.length)} words.
+Write between ${input.wordBudget.minimum} and ${input.wordBudget.maximum} words
+for this scene. The complete chapter must finish between
+${input.minimumWordCount} and ${input.maximumWordCount} words.
 Return only finished novel prose.
 Do not include a chapter number, title, POV heading, notes, analysis,
 outline, markdown or commentary.
@@ -387,14 +447,14 @@ function getLaterMovementPrompt(input: {
   existingDraft: string;
   latestUserMessage: string;
   narrativeStyle: string;
+  wordBudget: SceneWordBudget;
+  minimumWordCount: number;
+  maximumWordCount: number;
 }): string {
   const sceneNumber = input.sceneIndex + 1;
   const sceneCard = input.scenePlan.scenes[input.sceneIndex];
   const isFinalScene =
     input.sceneIndex === input.scenePlan.scenes.length - 1;
-  const requestedAdditionalWords = getSceneWordRange(
-    input.scenePlan.scenes.length,
-  );
   const endingInstruction =
     !isFinalScene
       ? `Reach Scene ${sceneNumber}'s exit beat once, then stop. Do not create the chapter
@@ -413,7 +473,9 @@ Return only the new scene prose. Do not repeat, rewrite, summarise or quote
 the earlier scenes. Do not include a chapter heading, title, POV label, note,
 analysis, outline, markdown or commentary.
 
-Write approximately ${requestedAdditionalWords} words.
+Write between ${input.wordBudget.minimum} and ${input.wordBudget.maximum} new
+words for this scene. The complete chapter must finish between
+${input.minimumWordCount} and ${input.maximumWordCount} words.
 
 ${endingInstruction}
 
@@ -519,6 +581,13 @@ export async function POST(request: Request) {
     const sceneIndex = requestedSceneIndex ?? fallbackSceneIndex;
     const isFinalScene = sceneIndex === scenePlan.scenes.length - 1;
     const existingWordCount = countWords(existingDraft);
+    const wordBudget = getSceneWordBudget({
+      minimumWordCount,
+      maximumWordCount,
+      existingWordCount,
+      sceneIndex,
+      sceneCount: scenePlan.scenes.length,
+    });
 
     if (sceneIndex < 0 || sceneIndex >= scenePlan.scenes.length) {
       return NextResponse.json(
@@ -583,6 +652,9 @@ export async function POST(request: Request) {
             scenePlan,
             latestUserMessage,
             narrativeStyle,
+            wordBudget,
+            minimumWordCount,
+            maximumWordCount,
           })
         : getLaterMovementPrompt({
             stage: generationStage,
@@ -594,6 +666,9 @@ export async function POST(request: Request) {
             existingDraft,
             latestUserMessage,
             narrativeStyle,
+            wordBudget,
+            minimumWordCount,
+            maximumWordCount,
           });
 
     const maximumAttempts = 3;
@@ -603,15 +678,26 @@ export async function POST(request: Request) {
       providerCallStartedAt = Date.now();
 
       try {
+        const attemptPrompt =
+          attempt === 1
+            ? prompt
+            : `${prompt}
+
+CRITICAL RETRY
+
+The previous attempt did not produce a usable scene. Write a fresh version of
+this assigned scene. It must contain between ${wordBudget.minimum} and
+${wordBudget.maximum} new words and obey the same ending boundary. Return only
+the replacement scene prose.`;
         const response = await openrouter.chat.completions.create({
           model: WRITING_MODEL,
           messages: [
             {
               role: "user",
-              content: prompt,
+              content: attemptPrompt,
             },
           ],
-          max_tokens: 4500,
+          max_tokens: 6000,
         });
         const rawUsage = response.usage as unknown as
           | Record<string, unknown>
@@ -654,6 +740,30 @@ export async function POST(request: Request) {
 
         validateProse(returnedProse);
 
+        const prose =
+          generationStage === "opening"
+            ? returnedProse
+            : `${existingDraft}\n\n${returnedProse}`.trim();
+        const totalWordCount = countWords(prose);
+        const movementWordCount = countWords(returnedProse);
+        const finalLengthIsValid =
+          totalWordCount >= minimumWordCount &&
+          totalWordCount <= maximumWordCount;
+        const nonFinalExceededChapterMaximum =
+          !isFinalScene && totalWordCount >= maximumWordCount;
+
+        if (
+          attempt < maximumAttempts &&
+          ((isFinalScene && !finalLengthIsValid) ||
+            nonFinalExceededChapterMaximum)
+        ) {
+          throw new Error(
+            isFinalScene
+              ? `The scene produced ${movementWordCount} words and left the chapter at ${totalWordCount}. The complete chapter must finish between ${minimumWordCount} and ${maximumWordCount} words.`
+              : `The scene left no safe word budget for the remaining planned scenes.`,
+          );
+        }
+
         diagnostics.push({
           stage: `chapter_writing_scene_${sceneIndex + 1}`,
           provider: "openrouter",
@@ -668,19 +778,11 @@ export async function POST(request: Request) {
           attempt,
         });
 
-        const prose =
-          generationStage === "opening"
-            ? returnedProse
-            : `${existingDraft}\n\n${returnedProse}`.trim();
-        const totalWordCount = countWords(prose);
-
         return NextResponse.json({
           prose,
           totalWordCount,
           isComplete:
-            isFinalScene &&
-            totalWordCount >= minimumWordCount &&
-            totalWordCount <= maximumWordCount,
+            isFinalScene && finalLengthIsValid,
           generationStage,
           sceneIndex,
           totalScenes: scenePlan.scenes.length,
