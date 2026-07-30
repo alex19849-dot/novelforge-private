@@ -1796,10 +1796,64 @@ device.`,
               .slice(-1);
 
       const finishCompletedChapter = async (content: string) => {
+        let approvedContent = content;
+
+        if (!workingPending.qualityAccepted) {
+          const qualityResponse = await fetch("/api/story-chat/quality", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              storyBible: baseStory.storyBible,
+              storyState: writingStoryState,
+              chapterBrief: workingPending.chapterBrief,
+              chapterTitle: workingPending.generatedChapter.title,
+              povCharacter: workingPending.generatedChapter.povCharacter,
+              chapterContent: content,
+              minimumWordCount: workingPending.minimumWordCount,
+              maximumWordCount: workingPending.maximumWordCount,
+            }),
+          });
+          const qualityData = await readApiJson(qualityResponse);
+
+          if (!isQualityResponse(qualityData)) {
+            throw new Error(
+              "The quality endpoint returned an invalid assessment.",
+            );
+          }
+
+          workingPending = {
+            ...workingPending,
+            draft: qualityData.chapterContent,
+            diagnostics: [
+              ...(workingPending.diagnostics ?? []),
+              ...qualityData.diagnostics,
+            ],
+            qualityAccepted: qualityData.accepted,
+          };
+          savePendingGeneration(workingPending);
+
+          if (!qualityData.accepted) {
+            const hardFailures = qualityData.quality.hardFailures
+              .map((failure) => failure.trim())
+              .filter(Boolean)
+              .join(" ");
+            const reason =
+              hardFailures || qualityData.quality.summary.trim();
+
+            throw new Error(
+              `The completed chapter failed its narrative quality check: ${reason} The full draft has been preserved. Discard it before generating a fresh version.`,
+            );
+          }
+
+          approvedContent = qualityData.chapterContent;
+        }
+
         const chapterStory = applyGeneratedChapter(
           baseStory,
           workingPending,
-          content,
+          approvedContent,
         );
         const completedChapterNumber =
           replacementNumber ??
