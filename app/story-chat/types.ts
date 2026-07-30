@@ -98,6 +98,40 @@ export type StoryVoiceProfile = {
   forbiddenHabits: string[];
 };
 
+export type ChapterPlanScene = {
+  order: number;
+
+  location: string;
+
+  objective: string;
+
+  conflict: string;
+
+  newInformation: string;
+
+  exitBeat: string;
+};
+
+export type ChapterPlan = {
+  chapterNumber: number;
+
+  title: string;
+
+  povCharacter: string;
+
+  chapterGoal: string;
+
+  relationshipChange: string;
+
+  scenes: ChapterPlanScene[];
+
+  completedBeatsToAvoid: string[];
+
+  status: "draft" | "approved";
+
+  updatedAt: string;
+};
+
 export type GenerationDiagnostic = {
   stage: string;
 
@@ -148,6 +182,8 @@ export type StoryState = {
   repetitionWarnings?: string[];
 
   voiceProfiles?: StoryVoiceProfile[];
+
+  chapterPlans?: ChapterPlan[];
 
   lastGenerationDiagnostics?: GenerationDiagnostic[];
 };
