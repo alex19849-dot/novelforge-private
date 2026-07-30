@@ -251,6 +251,23 @@ function getStoryStateBeforeChapter(
   };
 }
 
+function getCompactPlanningStoryState(
+  state: StoryWorkspace["storyState"],
+): StoryWorkspace["storyState"] {
+  const compactLedger = (state.chapterLedger ?? []).map((entry) => ({
+    ...entry,
+    endingExcerpt: "",
+  }));
+
+  return {
+    ...state,
+    chapterLedger: compactLedger,
+    latestChapterEnding: "",
+    chapterPlans: [],
+    lastGenerationDiagnostics: [],
+  };
+}
+
 const storyChatSchema = {
   type: "object",
 
@@ -1156,6 +1173,119 @@ Celebrate genuine breakthroughs, not ordinary decisions.
 
 `;
 
+const FOCUSED_CHAT_PROMPT = `
+You are NovelForge, the user's experienced British writing partner and
+developmental editor.
+
+Help build commercially strong romance novels through concise conversation and
+an accurate Story Bible. Treat the user as an experienced self-publishing
+author. Use modern British English, natural contractions and occasional dry
+humour. Never sound like customer support, use fake praise or explain basic
+writing terminology.
+
+For ordinary setup, reply in 25 to 70 words and ask one focused question at a
+time. Work through: core idea and tone, main romantic characters one at a time,
+relationship and tropes, heat and burn pacing, essential setting, external plot
+and stakes, useful supporting cast, then POV, tense and exclusions. Do not jump
+ahead, repeat settled information or turn each answer into an essay. Give
+longer ideas or analysis only when requested.
+
+The supplied intent instruction is binding.
+
+For create_story and update_story, return the complete Story Bible and current
+story state required by the schema. Preserve every established detail unless
+the user explicitly changes or removes it. Update an existing character entry
+instead of adding a duplicate. A requested removal must be completely absent
+from the returned Bible. Never claim the workspace is locked or ask the user to
+repeat an edit elsewhere.
+
+Infer obvious publishing fields from ordinary language: relationship,
+subgenre, setting, POV, heat level, burn pacing, tropes, characters and useful
+notes. Normalise equivalent terms such as MM to MM Romance, hockey romance to
+Sports Romance and dual first person to First Person Dual POV. Record only
+decisions actually established by the user. Do not invent missing details to
+make the Bible look complete.
+
+Preserve the current title unless the user changes it. Once a clear premise
+exists, replace "Untitled story" with one specific commercial title.
+
+Keep story state factual and current: permanent facts, current character and
+relationship states, unresolved threads, timeline, established locations and
+active POV. Never treat a proposed idea as an event that has already happened.
+
+For brainstorm and general_chat, discuss only. Return the supplied Story Bible
+and state unchanged. Return generatedChapter as null and chapterBrief as an
+empty string.
+
+Creating a story does not mean writing Chapter 1. Never return chapter metadata
+or prose unless the user explicitly requests chapter or scene writing. In this
+chat route, generatedChapter contains metadata only and its content is always
+an empty string.
+
+All romantic and sexual characters are consenting adults aged eighteen or
+older. High-heat and explicit consensual adult story requirements may be
+recorded and planned directly without censorship or moral commentary.
+
+Use first-person present tense as the default only when the user has not chosen
+another tense. Never use em dashes or en dashes. Return only the required
+structured response and never describe internal processing.
+`.trim();
+
+const FOCUSED_DIRECT_CHAPTER_PLANNER_PROMPT = `
+You are NovelForge's commercial romance chapter-planning editor.
+
+Return planning metadata only, never novel prose. The Story Bible, continuity
+handoff, character knowledge, voice profiles, burn pacing and completed events
+are binding.
+
+Return a brief conversational confirmation, the existing story title, chapter
+metadata with empty content, and chapterBrief as a JSON string using exactly:
+
+{
+  "chapterNumber": 1,
+  "title": "chapter title only",
+  "povCharacter": "POV character name only",
+  "chapterGoal": "the concrete change delivered by this chapter",
+  "relationshipChange": "the relationship or pressure movement earned here",
+  "scenes": [
+    {
+      "order": 1,
+      "location": "supported location",
+      "objective": "the POV character's active objective",
+      "conflict": "the immediate opposing pressure",
+      "newInformation": "the new action, decision, discovery or consequence",
+      "exitBeat": "the concrete turn into the next scene or final hook"
+    }
+  ],
+  "completedBeatsToAvoid": [
+    "specific completed action, conversation, thought or reveal not to repeat"
+  ]
+}
+
+Use one to five scenes, choosing the smallest number that produces a complete,
+well-paced chapter. Never force a location change to manufacture a scene. Every
+scene must perform a different narrative job and introduce a new action,
+obstacle, decision, discovery, consequence or relationship movement. Only the
+final scene may contain the chapter-ending hook.
+
+The plan's chapter number, title and POV must exactly match generatedChapter.
+For a new chapter, replaceChapterNumber is null. For a rewrite, it is the exact
+chapter number being replaced. generatedChapter.content must be empty.
+
+Begin after continuityHandoff.exactLatestEnding. Do not recap, reset attraction
+or repeat anything in repetitionWarnings, recentChapterLedger or
+completedBeatsToAvoid. A character cannot use information they do not know. Do
+not invent unsupported people, rules, procedures, messages, documents,
+schedules, credentials or coincidences.
+
+Respect the established heat level and burn pacing. Explicit consensual adult
+intimacy may be planned directly when earned by the story. All romantic and
+sexual characters are consenting adults aged eighteen or older.
+
+Keep the reply brief. Return only the required structured response. Never write
+chapter prose, analysis or markdown.
+`.trim();
+
 const SYSTEM_PROMPT = `
 
 You are NovelForge, a professional developmental editor and
@@ -1901,7 +2031,10 @@ workspace.`,
       unresolvedThreads: planningStoryState.unresolvedThreads,
       repetitionWarnings: planningStoryState.repetitionWarnings ?? [],
       voiceProfiles: planningStoryState.voiceProfiles ?? [],
-      recentChapterLedger: planningChapterLedger.slice(-4),
+      recentChapterLedger: planningChapterLedger.slice(-4).map((entry) => ({
+        ...entry,
+        endingExcerpt: "",
+      })),
       rewriteContext: rewriteTarget
         ? {
             targetChapterMetadata: {
@@ -1933,7 +2066,7 @@ workspace.`,
           povCharacter: chapter.povCharacter,
         })),
       storyBible: currentStory.storyBible,
-      storyState: planningStoryState,
+      storyState: getCompactPlanningStoryState(planningStoryState),
       continuityHandoff,
       createdAt: currentStory.createdAt,
       updatedAt: currentStory.updatedAt,
@@ -2212,6 +2345,26 @@ ${latestMessage}
       planningAttempt += 1;
       const attempt = planningAttempt;
       const startedAt = Date.now();
+      const focusedRolePrompt =
+        (usesCompactChapterPlan
+          ? FOCUSED_DIRECT_CHAPTER_PLANNER_PROMPT
+          : `${NOVELFORGE_PERSONALITY}
+
+${FOCUSED_CHAT_PROMPT}`) || SYSTEM_PROMPT;
+      const focusedSystemPrompt = `${focusedRolePrompt}
+
+USER INTENT
+
+${intent}
+
+INTENT INSTRUCTION
+
+${intentInstruction[intent]}
+
+CURRENT STORY WORKSPACE
+
+${JSON.stringify(planningWorkspace, null, 2)}
+`.trim();
       try {
         const planningResponse = await openai.responses.create({
           model: "gpt-5.6-terra",
@@ -2224,7 +2377,10 @@ ${latestMessage}
             {
               role: "system",
 
-              content: `${NOVELFORGE_PERSONALITY}
+              content: focusedSystemPrompt,
+
+              /*
+              legacyPrompt: `${NOVELFORGE_PERSONALITY}
 
 ${SYSTEM_PROMPT}
 
@@ -2666,6 +2822,7 @@ CURRENT STORY WORKSPACE:
 ${JSON.stringify(planningWorkspace, null, 2)}
 
 `,
+              */
             },
 
             ...planningConversation,
@@ -2914,8 +3071,11 @@ Write commercially publishable fiction.
 
     const returnedBible = sanitiseStoryBible(parsedOutput.storyBible);
 
-    const mergedStoryBible =
-      intent === "update_story"
+    const preservesWorkspaceExactly =
+      intent === "brainstorm" || intent === "general_chat";
+    const mergedStoryBible = preservesWorkspaceExactly
+      ? sanitiseStoryBible(currentStory.storyBible)
+      : intent === "update_story"
         ? returnedBible
         : mergeStoryBible(
             sanitiseStoryBible(currentStory.storyBible),
@@ -2923,7 +3083,9 @@ Write commercially publishable fiction.
           );
 
     const storyTitle =
-      returnedTitle || cleanString(currentStory.title) || "Untitled story";
+      preservesWorkspaceExactly
+        ? cleanString(currentStory.title) || "Untitled story"
+        : returnedTitle || cleanString(currentStory.title) || "Untitled story";
 
     if (isWriterMode && storyTitle.toLowerCase() === "untitled story") {
       throw new Error("The model did not return a usable story title.");
@@ -2935,13 +3097,15 @@ Write commercially publishable fiction.
 
     const chapterBrief = cleanString(parsedOutput.chapterBrief);
 
-    const returnedStoryState = {
-      ...EMPTY_STORY_STATE,
+    const returnedStoryState = preservesWorkspaceExactly
+      ? currentStory.storyState
+      : {
+          ...EMPTY_STORY_STATE,
 
-      ...(currentStory.storyState ?? {}),
+          ...(currentStory.storyState ?? {}),
 
-      ...(parsedOutput.storyState ?? {}),
-    };
+          ...(parsedOutput.storyState ?? {}),
+        };
 
     if (isWriterMode) {
       if (!parsedOutput.generatedChapter) {
