@@ -10,13 +10,6 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const openrouter = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
-});
-
-const REPAIR_MODEL = "mistralai/mistral-large-2512";
-
 type QualityRequest = {
   storyBible?: unknown;
   storyState?: unknown;
@@ -523,157 +516,6 @@ ${input.chapterContent}
   };
 }
 
-async function repairChapter(input: {
-  storyBible: unknown;
-  storyState: unknown;
-  chapterBrief: string;
-  chapterTitle: string;
-  povCharacter: string;
-  chapterContent: string;
-  assessment: QualityAssessment;
-  minimumWordCount: number;
-  maximumWordCount: number;
-  attempt: number;
-}): Promise<{
-  chapterContent: string;
-  diagnostic: GenerationDiagnostic;
-}> {
-  const startedAt = Date.now();
-  const response = await openrouter.chat.completions.create({
-    model: REPAIR_MODEL,
-    messages: [
-      {
-        role: "user",
-        content: `
-You are performing a surgical editorial repair on one completed commercial
-romance chapter.
-
-Return the complete corrected chapter prose only. Do not return commentary,
-analysis, headings, markdown, a summary, a plan or JSON.
-
-Change only material required to correct the supplied failures. Preserve every
-unaffected scene, paragraph, line of dialogue, characterisation choice, joke,
-sensory detail and plot beat as closely as possible. Do not replace the chapter
-with a different story and do not add a new subplot.
-
-Maintain the exact first-person POV, tense, character voice and formatting.
-Keep the chapter between ${input.minimumWordCount} and
-${input.maximumWordCount} words.
-
-Resolve contradictions using the Story Bible, continuity state, chapter plan
-and facts established earlier in the chapter. Keep character behaviour
-credible for established ages and roles. Remove duplicated versions of the
-same memory, explanation or emotional conclusion.
-
-Romantic knowledge is binding continuity. Do not let the POV consciously know,
-name or accurately explain attraction before the planned recognition
-milestone. For a gay awakening or first-attraction arc, preserve uncertainty
-and misinterpretation until the plan explicitly earns conscious recognition.
-Do not let the ending hook claim knowledge about another character's motives
-or attraction unless the chapter establishes evidence for that conclusion.
-
-Follow the Story Bible's heat level and burn pacing. All romantic and sexual
-characters are consenting adults aged eighteen or older. Preserve required
-explicit consensual adult content without censorship or fade to black.
-
-STORY BIBLE
-
-${JSON.stringify(input.storyBible, null, 2)}
-
-CONTINUITY BEFORE THIS CHAPTER
-
-${JSON.stringify(cleanQualityStoryState(input.storyState), null, 2)}
-
-CHAPTER PLAN
-
-${input.chapterBrief}
-
-CHAPTER METADATA
-
-Title: ${input.chapterTitle}
-POV: ${input.povCharacter}
-
-OBJECTIVE FAILURES TO REPAIR
-
-${JSON.stringify(input.assessment.hardFailures, null, 2)}
-
-SPECIFIC REPAIR INSTRUCTIONS
-
-${JSON.stringify(input.assessment.repairInstructions, null, 2)}
-
-QUALITY SUMMARY
-
-${input.assessment.summary}
-
-ORIGINAL COMPLETE CHAPTER
-
-${input.chapterContent}
-        `.trim(),
-      },
-    ],
-    max_tokens: 6000,
-    temperature: 0.35,
-  });
-  const usage = response.usage as unknown as
-    | Record<string, unknown>
-    | undefined;
-  const inputTokens =
-    typeof usage?.prompt_tokens === "number" ? usage.prompt_tokens : 0;
-  const outputTokens =
-    typeof usage?.completion_tokens === "number"
-      ? usage.completion_tokens
-      : 0;
-  const totalTokens =
-    typeof usage?.total_tokens === "number"
-      ? usage.total_tokens
-      : inputTokens + outputTokens;
-  const costUsd = typeof usage?.cost === "number" ? usage.cost : null;
-  const diagnostic: GenerationDiagnostic = {
-    stage: "chapter_quality_targeted_repair",
-    provider: "openrouter",
-    model: REPAIR_MODEL,
-    status: "succeeded",
-    inputTokens,
-    outputTokens,
-    totalTokens,
-    costUsd,
-    costType: costUsd === null ? "unavailable" : "reported",
-    durationMs: Date.now() - startedAt,
-    attempt: input.attempt,
-  };
-  const choice = response.choices[0];
-
-  if (choice?.finish_reason === "length") {
-    throw new DiagnosticFailure(
-      "The targeted repair reached its token limit before completing the chapter.",
-      diagnostic,
-    );
-  }
-
-  if (choice?.finish_reason === "content_filter") {
-    throw new DiagnosticFailure(
-      "The writing provider stopped the targeted repair because of its content filter.",
-      diagnostic,
-    );
-  }
-
-  const chapterContent = cleanGeneratedProse(
-    cleanString(choice?.message?.content),
-  );
-
-  if (!chapterContent) {
-    throw new DiagnosticFailure(
-      "The targeted repair model returned no chapter prose.",
-      diagnostic,
-    );
-  }
-
-  return {
-    chapterContent,
-    diagnostic,
-  };
-}
-
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
   let pipelineStartedAt = 0;
@@ -682,13 +524,6 @@ export async function POST(request: Request) {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: "OPENAI_API_KEY is not configured." },
-        { status: 500 },
-      );
-    }
-
-    if (!process.env.OPENROUTER_API_KEY) {
-      return NextResponse.json(
-        { error: "OPENROUTER_API_KEY is not configured." },
         { status: 500 },
       );
     }
@@ -734,62 +569,23 @@ export async function POST(request: Request) {
     const firstAssessment = firstQualityResult.assessment;
     diagnostics.push(firstQualityResult.diagnostic);
 
-    if (assessmentPasses(firstAssessment, mechanicalFailures)) {
-      return NextResponse.json({
-        accepted: true,
-        chapterContent,
-        quality: firstAssessment,
-        qualityWarnings: [],
-        repaired: false,
-        diagnostics,
-      });
-    }
-
-    const repairResult = await repairChapter({
-      storyBible: body.storyBible ?? {},
-      storyState: body.storyState ?? {},
-      chapterBrief,
-      chapterTitle,
-      povCharacter,
-      chapterContent,
-      assessment: firstAssessment,
-      minimumWordCount: acceptedMinimumWordCount,
-      maximumWordCount: allowedMaximumWordCount,
-      attempt: 1,
-    });
-    diagnostics.push(repairResult.diagnostic);
-    const repairedContent = repairResult.chapterContent;
-    const repairedMechanicalFailures = validateMechanicalQuality(
-      repairedContent,
-      acceptedMinimumWordCount,
-      allowedMaximumWordCount,
-    );
-    const secondQualityResult = await assessChapter({
-      storyBible: body.storyBible ?? {},
-      storyState: body.storyState ?? {},
-      chapterBrief,
-      chapterTitle,
-      povCharacter,
-      chapterContent: repairedContent,
-      mechanicalFailures: repairedMechanicalFailures,
-      attempt: 2,
-    });
-    const secondAssessment = secondQualityResult.assessment;
-    diagnostics.push(secondQualityResult.diagnostic);
     const accepted = assessmentPasses(
-      secondAssessment,
-      repairedMechanicalFailures,
+      firstAssessment,
+      mechanicalFailures,
     );
 
     return NextResponse.json({
       accepted,
-      chapterContent: repairedContent,
-      quality: secondAssessment,
-      qualityWarnings: [
-        ...secondAssessment.hardFailures,
-        ...secondAssessment.repairInstructions,
-      ],
-      repaired: true,
+      chapterContent,
+      quality: firstAssessment,
+      qualityWarnings: accepted
+        ? []
+        : [
+            ...mechanicalFailures,
+            ...firstAssessment.hardFailures,
+            ...firstAssessment.repairInstructions,
+          ],
+      repaired: false,
       diagnostics,
     });
   } catch (error) {
