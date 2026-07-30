@@ -2222,7 +2222,7 @@ ${JSON.stringify(currentStory.storyBible, null, 2)}
 
 CONTINUITY BEFORE THIS CHAPTER
 
-${JSON.stringify(stateBeforePlan, null, 2)}
+${JSON.stringify(getCompactPlanningStoryState(stateBeforePlan), null, 2)}
 
 PRECEDING CHAPTER ENDING
 
