@@ -230,6 +230,85 @@ function cleanGeneratedProse(content: string): string {
     .trim();
 }
 
+function removeExactDuplicateParagraphs(content: string): string {
+  const paragraphs = content
+    .split(/\n\s*\n/u)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  const retained: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    const fingerprint = paragraph
+      .toLowerCase()
+      .replace(/[“”]/gu, '"')
+      .replace(/[‘’]/gu, "'")
+      .replace(/\s+/gu, " ")
+      .trim();
+    const isSubstantial =
+      fingerprint.length >= 35 &&
+      fingerprint.split(/\s+/u).length >= 7;
+
+    if (isSubstantial && seen.has(fingerprint)) {
+      continue;
+    }
+
+    if (isSubstantial) {
+      seen.add(fingerprint);
+    }
+
+    retained.push(paragraph);
+  }
+
+  return retained.join("\n\n").trim();
+}
+
+function hasLongTextOverlap(left: string, right: string): boolean {
+  const normalise = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9'’]+/gu, " ")
+      .trim()
+      .split(/\s+/u)
+      .filter(Boolean);
+  const leftWords = normalise(left);
+  const rightWords = normalise(right);
+  const windowSize = 18;
+
+  if (
+    leftWords.length < windowSize ||
+    rightWords.length < windowSize
+  ) {
+    return false;
+  }
+
+  const windows = new Set<string>();
+
+  for (
+    let index = 0;
+    index + windowSize <= leftWords.length;
+    index += 1
+  ) {
+    windows.add(leftWords.slice(index, index + windowSize).join(" "));
+  }
+
+  for (
+    let index = 0;
+    index + windowSize <= rightWords.length;
+    index += 1
+  ) {
+    if (
+      windows.has(
+        rightWords.slice(index, index + windowSize).join(" "),
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function countOccurrences(content: string, target: string): number {
   if (!target) {
     return 0;
@@ -750,7 +829,9 @@ plan. Preserve the selected heat level. If the target contains explicit
 consensual adult intimacy, keep it explicit and do not censor, soften or fade
 it out.
 
-Return only the complete replacement passage.
+Return only the complete replacement passage. After its final sentence,
+output <END_REPAIR> on its own line. Never copy BEFORE CONTEXT or AFTER
+CONTEXT into the replacement.
 
 STORY BIBLE
 
@@ -787,9 +868,12 @@ ${input.chapterContent.slice(target.end, contextEnd)}
           `.trim(),
         },
       ],
-      max_tokens: 2200,
-      temperature: 0.35,
+      max_tokens: 1400,
+      temperature: 0.25,
       top_p: 0.9,
+      frequency_penalty: 0.18,
+      presence_penalty: 0.05,
+      stop: ["<END_REPAIR>"],
     });
     const usage = response.usage as unknown as
       | Record<string, unknown>
@@ -834,12 +918,28 @@ ${input.chapterContent.slice(target.end, contextEnd)}
     }
 
     const newText = cleanGeneratedProse(
-      cleanString(choice?.message?.content),
+      cleanString(choice?.message?.content).replace(
+        /(?:\n\s*)?<END_REPAIR>\s*$/i,
+        "",
+      ),
     );
+    const beforeContext = input.chapterContent.slice(
+      contextStart,
+      target.start,
+    );
+    const afterContext = input.chapterContent.slice(
+      target.end,
+      contextEnd,
+    );
+    const oldWordCount = countWords(target.oldText);
+    const newWordCount = countWords(newText);
 
     if (
       !newText ||
       newText === target.oldText ||
+      newWordCount > Math.max(900, oldWordCount * 2) ||
+      hasLongTextOverlap(newText, beforeContext) ||
+      hasLongTextOverlap(newText, afterContext) ||
       /^\s*chapter\s+\d+\b/im.test(newText) ||
       /```|^\s{0,3}#{1,6}\s+\S+/mu.test(newText)
     ) {
@@ -896,8 +996,8 @@ export async function POST(request: Request) {
     const chapterBrief = cleanString(body.chapterBrief);
     const chapterTitle = cleanString(body.chapterTitle);
     const povCharacter = cleanString(body.povCharacter);
-    const chapterContent = cleanGeneratedProse(
-      cleanString(body.chapterContent),
+    const chapterContent = removeExactDuplicateParagraphs(
+      cleanGeneratedProse(cleanString(body.chapterContent)),
     );
     const minimumWordCount = getWordCount(body.minimumWordCount, 2000);
     const maximumWordCount = Math.max(
@@ -1009,7 +1109,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       accepted,
-      chapterContent: repairedContent,
+      // Never persist a repair that failed its own reassessment. Keeping the
+      // clean pre-repair chapter makes Resume retry from a stable baseline
+      // instead of compounding failed patches.
+      chapterContent: accepted ? repairedContent : chapterContent,
       quality: secondQualityResult.assessment,
       qualityWarnings: accepted
         ? []
@@ -1018,7 +1121,7 @@ export async function POST(request: Request) {
             ...secondQualityResult.assessment.hardFailures,
             ...secondQualityResult.assessment.repairInstructions,
           ],
-      repaired: true,
+      repaired: accepted,
       diagnostics,
     });
   } catch (error) {
