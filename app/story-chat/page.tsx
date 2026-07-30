@@ -39,6 +39,7 @@ type PendingChapterGeneration = {
   qualityAccepted?: boolean;
   nextGenerationStage?: GenerationStage;
   nextSceneIndex?: number;
+  continueCurrentMovement?: boolean;
 };
 
 type WriterResponse = {
@@ -479,7 +480,9 @@ function isPendingGeneration(
     (pending.nextSceneIndex === undefined ||
       (typeof pending.nextSceneIndex === "number" &&
         Number.isInteger(pending.nextSceneIndex) &&
-        pending.nextSceneIndex >= 0))
+        pending.nextSceneIndex >= 0)) &&
+    (pending.continueCurrentMovement === undefined ||
+      typeof pending.continueCurrentMovement === "boolean")
   );
 }
 
@@ -1843,7 +1846,7 @@ device.`,
               hardFailures || qualityData.quality.summary.trim();
 
             throw new Error(
-              `The completed chapter failed its narrative quality check: ${reason} The full draft has been preserved. Discard it before generating a fresh version.`,
+              `The completed chapter still needs a bounded repair: ${reason} The readable draft has been preserved. Press Resume to retry only the targeted repair and quality check.`,
             );
           }
 
@@ -1927,7 +1930,7 @@ device.`,
           : workingPending.nextGenerationStage === "middle"
             ? 1
             : plannedSceneCount - 1);
-      const maximumMovementCalls = plannedSceneCount + 8;
+      const maximumMovementCalls = plannedSceneCount + 2;
 
       for (
         let movementCall = 0;
@@ -1960,6 +1963,8 @@ device.`,
             maximumWordCount: workingPending.maximumWordCount,
             generationStage,
             sceneIndex,
+            continueCurrentMovement:
+              workingPending.continueCurrentMovement === true,
           }),
         });
 
@@ -2005,6 +2010,7 @@ device.`,
           ],
           nextGenerationStage,
           nextSceneIndex,
+          continueCurrentMovement: needsFinalContinuation,
         };
         savePendingGeneration(workingPending);
 
@@ -2311,6 +2317,7 @@ device.`,
           diagnostics: [],
           nextGenerationStage: "opening",
           nextSceneIndex: 0,
+          continueCurrentMovement: false,
         };
 
         await persistStory(plannedStory);
@@ -2393,6 +2400,9 @@ device.`,
           ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
           : 4000,
         diagnostics: [...preplanningDiagnostics, ...(data.diagnostics ?? [])],
+        nextGenerationStage: "opening",
+        nextSceneIndex: 0,
+        continueCurrentMovement: false,
       };
 
       savePendingGeneration(pending);
