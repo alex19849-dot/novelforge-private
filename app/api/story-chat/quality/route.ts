@@ -384,6 +384,16 @@ nitpicks, demand unnecessary technical detail or penalise a sensible
 general description merely because a more specialised version exists.
 When uncertain, do not treat the detail as wrong.
 
+Do not treat ordinary, plausible rule-breaking as a factual error merely
+because a character is below a local legal age. In particular, do not fail a
+chapter because a nineteen- or twenty-year-old has a beer or other alcoholic
+drink in a private family home, dorm, party or similarly plausible setting.
+Distinguish possessing or consuming alcohol from legally purchasing it or
+being served in a licensed venue. Consider parental or guardian provision,
+private-home exceptions and ordinary human behaviour. Only flag alcohol law
+when the prose makes a specific legal claim that is clearly false or when an
+age-restricted purchase or licensed sale is central to the scene.
+
 The chapter brief is strong guidance, not a rigid checklist. Do not fail
 an otherwise cohesive, commercially effective chapter merely because it
 reaches the intended objective through different scene beats or omits a
