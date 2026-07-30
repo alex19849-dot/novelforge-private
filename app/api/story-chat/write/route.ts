@@ -1175,10 +1175,12 @@ analysis, planning, headings, markdown or commentary.`,
             : `${existingDraft}\n\n${returnedProse}`.trim();
         const totalWordCount = countWords(prose);
         const movementWordCount = countWords(returnedProse);
-        const minimumAcceptedMovementWords = Math.max(
-          300,
-          Math.floor(wordBudget.minimum * 0.8),
-        );
+        // Movement length is a pacing target, not a quality verdict. A clean,
+        // purposeful short movement can still belong in a valid 2,000 to
+        // 4,000-word chapter. Enforce the hard minimum only on the completed
+        // chapter instead of discarding usable prose and forcing Magnum into
+        // a destructive rewrite.
+        const minimumAcceptedMovementWords = 250;
         const maximumAcceptedMovementWords = Math.ceil(
           wordBudget.maximum * 1.2,
         );
@@ -1190,7 +1192,7 @@ analysis, planning, headings, markdown or commentary.`,
 
         if (movementWordCount < minimumAcceptedMovementWords) {
           throw new Error(
-            `The movement returned only ${movementWordCount} words and did not develop its assigned dramatic job.`,
+            `The movement returned only ${movementWordCount} words and was too short to preserve safely.`,
           );
         }
 
