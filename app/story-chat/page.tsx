@@ -218,6 +218,79 @@ function getRequestedWordCount(message: string): number | null {
   return Number.isFinite(wordCount) ? wordCount : null;
 }
 
+type ChapterDeletionRequest =
+  | { kind: "none" }
+  | { kind: "ambiguous" }
+  | { kind: "exact"; chapterNumber: number };
+
+const CHAPTER_NUMBER_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+};
+
+function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
+  if (!/\b(?:delete|remove)\b/i.test(message)) {
+    return { kind: "none" };
+  }
+
+  const numberedChapter = message.match(
+    /\bchapter\s+(?:number\s+)?(\d+)\b/i,
+  );
+
+  if (numberedChapter) {
+    const chapterNumber = Number(numberedChapter[1] ?? "");
+
+    return Number.isInteger(chapterNumber) && chapterNumber > 0
+      ? { kind: "exact", chapterNumber }
+      : { kind: "ambiguous" };
+  }
+
+  const wordedChapter = message.match(
+    /\bchapter\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/i,
+  );
+
+  if (wordedChapter) {
+    const chapterNumber =
+      CHAPTER_NUMBER_WORDS[wordedChapter[1]?.toLowerCase() ?? ""];
+
+    if (!chapterNumber) {
+      return { kind: "ambiguous" };
+    }
+
+    return {
+      kind: "exact",
+      chapterNumber,
+    };
+  }
+
+  if (
+    /\bchapter\b/i.test(message) ||
+    /\b(?:delete|remove)\s+(?:that|this|it)\b/i.test(message)
+  ) {
+    return { kind: "ambiguous" };
+  }
+
+  return { kind: "none" };
+}
+
 function isGenerationDiagnostic(value: unknown): value is GenerationDiagnostic {
   if (!value || typeof value !== "object") {
     return false;
@@ -1803,9 +1876,15 @@ device.`,
     event.preventDefault();
 
     const trimmedMessage = input.trim();
+    const deletionRequest = getChapterDeletionRequest(trimmedMessage);
     const hasPendingChapter = pendingGeneration?.storyId === story?.id;
 
-    if (!story || !trimmedMessage || isThinking || hasPendingChapter) {
+    if (
+      !story ||
+      !trimmedMessage ||
+      isThinking ||
+      (hasPendingChapter && deletionRequest.kind === "none")
+    ) {
       return;
     }
 
@@ -1831,6 +1910,127 @@ device.`,
     setIsThinking(true);
 
     try {
+      if (deletionRequest.kind === "ambiguous") {
+        const clarificationStory: StoryWorkspace = {
+          ...requestStory,
+          messages: [
+            ...requestStory.messages,
+            {
+              id: Date.now() + 1,
+              role: "assistant",
+              content:
+                "Which saved chapter number do you want me to delete? If you mean a Story Bible entry instead, name that entry.",
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(clarificationStory);
+        return;
+      }
+
+      if (deletionRequest.kind === "exact") {
+        const chapterNumber = deletionRequest.chapterNumber;
+        const chapterExists = requestStory.chapters.some(
+          (chapter) => chapter.number === chapterNumber,
+        );
+        const pendingTargetNumber =
+          pendingGeneration?.storyId === requestStory.id
+            ? (pendingGeneration.generatedChapter.replaceChapterNumber ??
+              Math.max(
+                0,
+                ...requestStory.chapters.map((chapter) => chapter.number),
+              ) + 1)
+            : null;
+        const clearsPendingDraft = pendingTargetNumber === chapterNumber;
+
+        if (!chapterExists) {
+          const missingChapterStory: StoryWorkspace = {
+            ...requestStory,
+            messages: [
+              ...requestStory.messages,
+              {
+                id: Date.now() + 1,
+                role: "assistant",
+                content: clearsPendingDraft
+                  ? `Chapter ${chapterNumber} was not saved, but its preserved draft has been cleared.`
+                  : `Chapter ${chapterNumber} does not exist, so nothing was deleted.`,
+              },
+            ],
+            updatedAt: new Date().toISOString(),
+          };
+
+          await persistStory(missingChapterStory);
+
+          if (clearsPendingDraft) {
+            clearPendingGeneration();
+          }
+
+          return;
+        }
+
+        const remainingChapters = requestStory.chapters.filter(
+          (chapter) => chapter.number !== chapterNumber,
+        );
+        let rebuiltStoryState: StoryState = {
+          ...EMPTY_STORY_STATE,
+        };
+        let deletionDiagnostics: GenerationDiagnostic[] = [];
+
+        if (remainingChapters.length > 0) {
+          const latestRemainingChapter = remainingChapters.at(-1);
+
+          if (!latestRemainingChapter) {
+            throw new Error(
+              "The remaining chapters could not be prepared for continuity.",
+            );
+          }
+
+          const ledgerData = await updateContinuityLedger({
+            storyBible: requestStory.storyBible,
+            storyState: {
+              ...EMPTY_STORY_STATE,
+            },
+            chapters: remainingChapters,
+            chapter: latestRemainingChapter,
+            rebuild: true,
+          });
+
+          rebuiltStoryState = ledgerData.storyState;
+          deletionDiagnostics = ledgerData.diagnostics;
+        }
+
+        const deletedChapterStory: StoryWorkspace = {
+          ...requestStory,
+          chapters: remainingChapters,
+          storyState: {
+            ...rebuiltStoryState,
+            lastGenerationDiagnostics: deletionDiagnostics,
+          },
+          messages: [
+            ...requestStory.messages,
+            {
+              id: Date.now() + 1,
+              role: "assistant",
+              content: `Chapter ${chapterNumber} has been deleted${
+                clearsPendingDraft
+                  ? " and its preserved draft has been cleared"
+                  : ""
+              }. Continuity has been rebuilt from the remaining chapters. Later chapter numbers were left unchanged.`,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(deletedChapterStory);
+
+        if (clearsPendingDraft) {
+          clearPendingGeneration();
+        }
+
+        return;
+      }
+
       if (
         planningStory.chapters.length > 0 &&
         !planningStory.storyState.chapterLedger?.length
@@ -2436,7 +2636,7 @@ disabled:opacity-40"
             <form onSubmit={sendMessage} className="flex items-end gap-3">
               <textarea
                 value={input}
-                disabled={isThinking || Boolean(pendingForCurrentStory)}
+                disabled={isThinking}
                 onChange={(event) => setInput(event.target.value)}
                 onKeyDown={(event) => {
                   if (
@@ -2460,7 +2660,10 @@ disabled:cursor-not-allowed disabled:opacity-60"
               <button
                 type="submit"
                 disabled={
-                  !input.trim() || isThinking || Boolean(pendingForCurrentStory)
+                  !input.trim() ||
+                  isThinking ||
+                  (Boolean(pendingForCurrentStory) &&
+                    getChapterDeletionRequest(input).kind === "none")
                 }
                 className="h-14 rounded-2xl bg-pink-500 px-6 font-semibold text-white
 transition hover:bg-pink-400 disabled:cursor-not-allowed
