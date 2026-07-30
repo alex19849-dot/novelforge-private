@@ -140,6 +140,43 @@ function getWordCount(value: unknown, fallback: number): number {
   return Math.round(value);
 }
 
+function cleanQualityStoryState(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const state = {
+    ...(value as Record<string, unknown>),
+  };
+
+  delete state.lastGenerationDiagnostics;
+  delete state.diagnostics;
+  delete state.generationDiagnostics;
+  delete state.chapterPlans;
+
+  if (Array.isArray(state.chapterLedger)) {
+    state.chapterLedger = state.chapterLedger
+      .filter(
+        (entry): entry is Record<string, unknown> =>
+          Boolean(entry) && typeof entry === "object" && !Array.isArray(entry),
+      )
+      .slice(-6)
+      .map((entry, index, entries) => {
+        const compactEntry = {
+          ...entry,
+        };
+
+        if (index < entries.length - 1) {
+          delete compactEntry.endingExcerpt;
+        }
+
+        return compactEntry;
+      });
+  }
+
+  return state;
+}
+
 function cleanGeneratedProse(content: string): string {
   let cleaned = content
     .replace(/^\uFEFF/, "")
@@ -228,12 +265,19 @@ romance novel.
 
 Judge the completed chapter against the supplied chapter brief, Story
 Bible and actual continuity ledger. Assess only what is on the page.
+Read the complete chapter from beginning to end before scoring it. Check
+later scenes against details established earlier in the same chapter,
+not only against the pre-chapter ledger.
 
 Score each category from 1 to 10.
 
 A passing chapter must:
 
 - preserve names, facts, chronology, locations and character knowledge
+- preserve ages, family roles, physical positions, possessions, actions
+and who is present in each location throughout the chapter
+- make every character behave credibly for their established age unless
+the prose supplies a clear reason otherwise
 - use credible terminology, procedures and professional behaviour for
 the Story Bible's exact country, region, time period and occupation
 - use the required POV person and narrative tense consistently
@@ -246,8 +290,45 @@ have", "he is", "cannot" and "it does not"
 the current intimacy milestone
 - avoid replaying recent scenes, gestures, attraction beats, internal
 conclusions and hooks
+- avoid repeating the same memory, explanation, backstory fact or
+emotional conclusion in different scenes of the same chapter
+- preserve the exact planned romance milestone and burn stage
 - end with a concrete, effective hook
+- ensure the POV character has enough observed evidence to reach any
+conclusion stated by the hook
 - contain no mechanical failures
+
+ROMANTIC KNOWLEDGE AND AWAKENING ARE HARD CONTINUITY:
+
+Treat the Story Bible, chapter plan, continuity ledger and character
+knowledge as binding limits on what the POV character consciously
+understands.
+
+For a gay awakening, bisexual awakening, first attraction or similar
+discovery arc, distinguish unconscious physical or emotional reactions
+from conscious knowledge. Before the planned recognition milestone, the
+POV may misread fixation as rivalry, anger, jealousy, admiration,
+territoriality or unresolved history. The POV must not already imagine
+kissing or having sex with the love interest, label the feeling as
+attraction, admit they have been lying about wanting them, or correctly
+declare the other character's hidden attraction unless the supplied
+continuity proves that recognition has already happened.
+
+If the chapter prematurely gives the POV conscious romantic or sexual
+knowledge that belongs to a later milestone, record an objective hard
+failure. Do not excuse it as ordinary denial. Also record an objective
+hard failure when the ending hook claims knowledge about another
+character's motives or feelings without evidence established on the
+page.
+
+INTRA-CHAPTER CONTINUITY IS A HARD REQUIREMENT:
+
+Track each named character through the chapter. Flag incompatible age
+behaviour, unexplained location changes, duplicated introductions,
+contradictory actions, impossible possession changes and repeated
+versions of the same past event. A short ordinary transition may be
+implied, but do not invent an off-page explanation to excuse a visible
+contradiction.
 
 Judge relationshipProgression by comparing the central relationship at
 the opening and ending of the chapter. Identify whether at least one of
@@ -287,10 +368,13 @@ reaches the intended objective through different scene beats or omits a
 nonessential planned detail.
 
 Use hardFailures only for objective continuity contradictions,
+incompatible age or family behaviour, premature romantic knowledge,
+unsupported character conclusions, duplicated story information,
 high-confidence factual errors central to the scene or premise, wrong
 POV, wrong tense, malformed prose, unsafe age or consent problems, or a
 chapter that is genuinely unfinished. Do not use hardFailures for
-subjective preferences or minor deviations from the planned beats.
+subjective preferences, isolated style words or minor deviations from
+the planned beats.
 
 Set passed to false when continuity or POV and tense scores below 7,
 when any other score is below 6, or when an objective hard failure
@@ -319,7 +403,7 @@ ${JSON.stringify(input.storyBible, null, 2)}
 
 ACTUAL CONTINUITY LEDGER:
 
-${JSON.stringify(input.storyState, null, 2)}
+${JSON.stringify(cleanQualityStoryState(input.storyState), null, 2)}
 
 CHAPTER BRIEF:
 
@@ -460,13 +544,14 @@ export async function POST(request: Request) {
     const firstAssessment = firstQualityResult.assessment;
     diagnostics.push(firstQualityResult.diagnostic);
 
-    // The model's editorial judgement is advisory. Language models can
-    // incorrectly promote subjective story criticism to a hard failure,
-    // which previously trapped complete chapters in an expensive
-    // repair/rejection loop. Only deterministic mechanical validation may
-    // block a completed chapter here. Continuity, voice, pacing and hook
-    // concerns are returned to the UI as warnings for the author to review.
-    const accepted = mechanicalFailures.length === 0;
+    const accepted =
+      mechanicalFailures.length === 0 &&
+      firstAssessment.hardFailures.length === 0 &&
+      firstAssessment.scores.continuity >= 7 &&
+      firstAssessment.scores.relationshipProgression >= 6 &&
+      firstAssessment.scores.povAndTense >= 7 &&
+      firstAssessment.scores.repetitionControl >= 6 &&
+      firstAssessment.scores.hookStrength >= 6;
 
     return NextResponse.json({
       accepted,
