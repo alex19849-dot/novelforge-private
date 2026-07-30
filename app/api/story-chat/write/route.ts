@@ -118,13 +118,13 @@ function getSceneWordBudget(input: {
   );
 
   if (futureScenes === 0) {
-    const minimum = Math.max(
-      remainingToMinimum,
-      Math.floor(remainingToTarget * 0.9),
-    );
+    const minimum =
+      remainingToMinimum <= 500
+        ? remainingToMinimum
+        : Math.min(700, Math.max(450, remainingToMinimum));
     const maximum = Math.min(
       remainingToMaximum,
-      Math.max(minimum, Math.ceil(remainingToTarget * 1.1)),
+      Math.max(minimum, Math.min(950, remainingToTarget)),
     );
 
     return {
@@ -480,6 +480,71 @@ function validateProse(content: string): void {
 
 }
 
+function getContinuationExcerpt(content: string, maximumWords = 1400): string {
+  const words = content.trim().split(/\s+/).filter(Boolean);
+
+  if (words.length <= maximumWords) {
+    return content.trim();
+  }
+
+  return words.slice(-maximumWords).join(" ");
+}
+
+function validateNoDraftOverlap(
+  existingDraft: string,
+  newMovement: string,
+): void {
+  if (!existingDraft.trim()) {
+    return;
+  }
+
+  const normalize = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9'’]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+  const existingWords = normalize(existingDraft);
+  const movementWords = normalize(newMovement);
+  const windowSize = 14;
+
+  if (
+    existingWords.length < windowSize ||
+    movementWords.length < windowSize
+  ) {
+    return;
+  }
+
+  const existingWindows = new Set<string>();
+
+  for (
+    let index = 0;
+    index + windowSize <= existingWords.length;
+    index += 1
+  ) {
+    existingWindows.add(
+      existingWords.slice(index, index + windowSize).join(" "),
+    );
+  }
+
+  for (
+    let index = 0;
+    index + windowSize <= movementWords.length;
+    index += 1
+  ) {
+    const window = movementWords
+      .slice(index, index + windowSize)
+      .join(" ");
+
+    if (existingWindows.has(window)) {
+      throw new Error(
+        "The writing model repeated prose or restarted an event already present in the saved draft. The duplicate movement was not saved.",
+      );
+    }
+  }
+}
+
 function getOpeningPrompt(input: {
   storyBible: unknown;
   storyState: unknown;
@@ -625,9 +690,19 @@ Stop at a natural active beat that can be continued directly.`;
   const sceneBoundaryInstruction = !isFinalScene
     ? "Do not borrow the final scene's exit beat early."
     : "Do not repeat objectives, arguments, actions or conclusions from earlier scenes.";
+  const continuationExcerpt = getContinuationExcerpt(input.existingDraft);
+  const finalParagraph =
+    input.existingDraft
+      .trim()
+      .split(/\n\s*\n/)
+      .filter(Boolean)
+      .at(-1) ?? "";
 
   return `
-Write SCENE ${sceneNumber} of the unfinished commercial romance chapter.
+Continue SCENE ${sceneNumber} of the unfinished commercial romance chapter.
+This is an additional movement inside a scene that has already begun. Some
+or all of the scene card may already exist in the draft. Never restart the
+scene card, location, arrival, conversation or confrontation.
 
 Return only the new scene prose. Do not repeat, rewrite, summarise or quote
 the earlier scenes. Do not include a chapter heading, title, POV label, note,
@@ -643,10 +718,16 @@ Write only the assigned scene card. Do not reuse an objective, argument,
 action, physical business, internal conclusion or attraction observation from
 an earlier scene. ${sceneBoundaryInstruction}
 
-The draft below contains every earlier scene in this chapter. Continue from
-its final sentence and exact physical and emotional position. Do not repeat,
-rewrite or summarise anything already present. Maintain its POV, tense, voice
-and formatting. Use natural contractions.
+The read-only excerpt below contains the chapter immediately before this
+movement. Continue after its final sentence and from its exact location,
+physical state, knowledge and emotional position. Anything shown in the
+excerpt has already happened and must not happen again. Do not make a
+character arrive somewhere they have already reached. Do not restart a
+conversation or confrontation. Do not restore, move or reuse an object whose
+condition or location has already changed. If a scene-card instruction has
+already happened, advance to the next unfinished consequence instead.
+Maintain the established POV, tense, voice and formatting. Use natural
+contractions.
 
 Use ${input.narrativeStyle}
 
@@ -707,9 +788,13 @@ COMPLETED BEATS THAT MUST NOT BE REPEATED
 
 ${JSON.stringify(input.scenePlan.completedBeatsToAvoid, null, 2)}
 
-COMPLETE CHAPTER DRAFT SO FAR
+DRAFT CONTINUATION EXCERPT, READ ONLY
 
-${input.existingDraft}
+${continuationExcerpt}
+
+EXACT FINAL PARAGRAPH, CONTINUE AFTER THIS WITHOUT QUOTING IT
+
+${finalParagraph}
 
 USER'S ORIGINAL REQUEST
 
@@ -932,6 +1017,7 @@ analysis, planning, headings, markdown or commentary.`,
         const returnedProse = cleanGeneratedProse(rawProse);
 
         validateProse(returnedProse);
+        validateNoDraftOverlap(existingDraft, returnedProse);
 
         const prose =
           generationStage === "opening"
