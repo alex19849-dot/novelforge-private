@@ -8,11 +8,9 @@ export const runtime = "nodejs";
 
 export const maxDuration = 300;
 
-const WRITING_MODEL = "sao10k/l3.3-euryale-70b";
+const PRIMARY_WRITING_MODEL = "anthracite-org/magnum-v4-72b";
 
-const EURYALE_SAMPLING = {
-  min_p: 0.1,
-} as const;
+const FALLBACK_WRITING_MODEL = "anthracite-org/magnum-v4-72b";
 
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
@@ -407,6 +405,79 @@ function validateProse(content: string): void {
     );
   }
 
+  const promptLeakagePatterns = [
+    /\bSTORY BIBLE\b/i,
+    /\bCONTINUITY STATE\b/i,
+    /\bCHAPTER GOAL\b/i,
+    /\bRELATIONSHIP CHANGE\b/i,
+    /\bSCENE \d+ CARD\b/i,
+    /\bCOMPLETED BEATS THAT MUST NOT BE REPEATED\b/i,
+    /\bCOMPLETE CHAPTER DRAFT SO FAR\b/i,
+    /\bUSER'S (?:CURRENT|ORIGINAL) (?:CHAPTER )?REQUEST\b/i,
+    /<\|(?:system|user|assistant|end)[^>]*\|>/i,
+    /\[(?:INST|\/INST)\]/i,
+  ];
+
+  if (promptLeakagePatterns.some((pattern) => pattern.test(content))) {
+    throw new Error(
+      "The writing model leaked instructions or prompt data into the prose. The chapter was not saved.",
+    );
+  }
+
+  const lines = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const markdownLines = lines.filter((line) =>
+    /^(?:[-+*]\s+|\d+[.)]\s+|>\s+|\|.+\|$)/u.test(line),
+  ).length;
+  const hasMarkdownEmphasis =
+    /(?:^|\s)(?:\*\*|__)[^\n]+(?:\*\*|__)(?:\s|$)/u.test(content);
+
+  if (
+    markdownLines >= 2 ||
+    (lines.length > 0 && markdownLines / lines.length > 0.12) ||
+    hasMarkdownEmphasis
+  ) {
+    throw new Error(
+      "The writing model returned formatted notes or markdown instead of clean novel prose. The chapter was not saved.",
+    );
+  }
+
+  const normalizedWords = content
+    .toLowerCase()
+    .replace(/[^a-z0-9'’]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const repeatedWindows = new Map<string, number>();
+
+  for (let index = 0; index + 9 < normalizedWords.length; index += 1) {
+    const window = normalizedWords.slice(index, index + 10).join(" ");
+    const occurrences = (repeatedWindows.get(window) ?? 0) + 1;
+    repeatedWindows.set(window, occurrences);
+
+    if (occurrences >= 3) {
+      throw new Error(
+        "The writing model fell into repetitive or mechanically corrupted text. The chapter was not saved.",
+      );
+    }
+  }
+
+  const proseCharacters = Array.from(content);
+  const suspiciousCharacters = proseCharacters.filter(
+    (character) => !/[\p{L}\p{N}\p{P}\p{Z}\n\r\t]/u.test(character),
+  ).length;
+
+  if (
+    proseCharacters.length > 0 &&
+    suspiciousCharacters / proseCharacters.length > 0.01
+  ) {
+    throw new Error(
+      "The writing model returned mechanically corrupted characters. The chapter was not saved.",
+    );
+  }
+
 }
 
 function getOpeningPrompt(input: {
@@ -782,6 +853,8 @@ export async function POST(request: Request) {
 
     for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
       providerCallStartedAt = Date.now();
+      const writingModel =
+        attempt === 1 ? PRIMARY_WRITING_MODEL : FALLBACK_WRITING_MODEL;
       let attemptInputTokens = 0;
       let attemptOutputTokens = 0;
       let attemptTotalTokens = 0;
@@ -800,7 +873,7 @@ this assigned scene. It must contain between ${wordBudget.minimum} and
 ${wordBudget.maximum} new words and obey the same ending boundary. Return only
 the replacement scene prose.`;
         const response = await openrouter.chat.completions.create({
-          model: WRITING_MODEL,
+          model: writingModel,
           messages: [
             {
               role: "system",
@@ -816,8 +889,8 @@ analysis, planning, headings, markdown or commentary.`,
             },
           ],
           max_tokens: 6000,
-          temperature: 1.1,
-          ...EURYALE_SAMPLING,
+          temperature: attempt === 1 ? 0.9 : 0.75,
+          top_p: 0.95,
         });
         const rawUsage = response.usage as unknown as
           | Record<string, unknown>
@@ -881,7 +954,7 @@ analysis, planning, headings, markdown or commentary.`,
         diagnostics.push({
           stage: `chapter_writing_scene_${sceneIndex + 1}`,
           provider: "openrouter",
-          model: WRITING_MODEL,
+          model: writingModel,
           status: "succeeded",
           inputTokens: attemptInputTokens,
           outputTokens: attemptOutputTokens,
@@ -913,7 +986,7 @@ analysis, planning, headings, markdown or commentary.`,
         diagnostics.push({
           stage: `chapter_writing_scene_${sceneIndex + 1}`,
           provider: "openrouter",
-          model: WRITING_MODEL,
+          model: writingModel,
           status: "failed",
           inputTokens: attemptInputTokens,
           outputTokens: attemptOutputTokens,
@@ -947,7 +1020,7 @@ analysis, planning, headings, markdown or commentary.`,
       diagnostics.push({
         stage: "chapter_writing",
         provider: "openrouter",
-        model: WRITING_MODEL,
+        model: PRIMARY_WRITING_MODEL,
         status: "failed",
         inputTokens: 0,
         outputTokens: 0,
