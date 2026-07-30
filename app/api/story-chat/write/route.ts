@@ -33,6 +33,9 @@ type SceneCard = {
 };
 
 type ChapterScenePlan = {
+  chapterNumber: number | null;
+  title: string;
+  povCharacter: string;
   chapterGoal: string;
   relationshipChange: string;
   scenes: SceneCard[];
@@ -208,6 +211,14 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
 
   const chapterGoal = cleanString(plan.chapterGoal);
   const relationshipChange = cleanString(plan.relationshipChange);
+  const chapterNumber =
+    typeof plan.chapterNumber === "number" &&
+    Number.isInteger(plan.chapterNumber) &&
+    plan.chapterNumber > 0
+      ? plan.chapterNumber
+      : null;
+  const title = cleanString(plan.title);
+  const povCharacter = cleanString(plan.povCharacter);
   const completedBeatsToAvoid = Array.isArray(plan.completedBeatsToAvoid)
     ? plan.completedBeatsToAvoid.map(cleanString).filter(Boolean)
     : [];
@@ -217,6 +228,9 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
   }
 
   return {
+    chapterNumber,
+    title,
+    povCharacter,
     chapterGoal,
     relationshipChange,
     scenes,
@@ -224,10 +238,31 @@ function parseChapterScenePlan(value: unknown): ChapterScenePlan {
   };
 }
 
-function getDraftTail(text: string, maximumWords = 600): string {
+function getEndingExcerpt(text: string, maximumWords = 700): string {
   const words = text.trim().split(/\s+/);
 
   return words.slice(-maximumWords).join(" ");
+}
+
+function getActivePov(
+  scenePlan: ChapterScenePlan,
+  storyState: unknown,
+): string {
+  if (scenePlan.povCharacter) {
+    return scenePlan.povCharacter;
+  }
+
+  if (
+    storyState &&
+    typeof storyState === "object" &&
+    !Array.isArray(storyState)
+  ) {
+    return cleanString(
+      (storyState as Record<string, unknown>).activePOV,
+    );
+  }
+
+  return "";
 }
 
 function getWritingContinuityState(value: unknown): unknown {
@@ -242,6 +277,27 @@ function getWritingContinuityState(value: unknown): unknown {
   delete writingState.lastGenerationDiagnostics;
   delete writingState.diagnostics;
   delete writingState.generationDiagnostics;
+  delete writingState.chapterPlans;
+  delete writingState.latestChapterEnding;
+
+  const chapterLedger = writingState.chapterLedger;
+
+  if (Array.isArray(chapterLedger)) {
+    writingState.chapterLedger = chapterLedger
+      .filter(
+        (entry): entry is Record<string, unknown> =>
+          Boolean(entry) && typeof entry === "object",
+      )
+      .map((entry) => {
+        const compactEntry = {
+          ...entry,
+        };
+
+        delete compactEntry.endingExcerpt;
+
+        return compactEntry;
+      });
+  }
 
   return writingState;
 }
@@ -260,7 +316,7 @@ function cleanRecentChapters(value: unknown): RecentChapter[] {
       number: typeof chapter.number === "number" ? chapter.number : index + 1,
       title: cleanString(chapter.title),
       povCharacter: cleanString(chapter.povCharacter),
-      content: cleanString(chapter.content),
+      content: getEndingExcerpt(cleanString(chapter.content)),
     }))
     .filter((chapter) => chapter.content)
     .slice(-1);
@@ -382,6 +438,19 @@ outline, markdown or commentary.
 
 Use ${input.narrativeStyle}
 
+CHAPTER IDENTITY
+
+Chapter ${input.scenePlan.chapterNumber ?? "next"}: ${
+  input.scenePlan.title || "Use the planned chapter title."
+}
+
+POV CHARACTER
+
+${getActivePov(input.scenePlan, input.storyState) || "Use the established active POV."}
+
+Remain in this character's POV for the entire scene. Never switch heads.
+Apply this character's saved narrative and dialogue voice profile.
+
 ${endingInstruction}
 
 The Story Bible, continuity and plan are binding. Characters must not know
@@ -409,7 +478,7 @@ CONTINUITY STATE
 
 ${JSON.stringify(getWritingContinuityState(input.storyState), null, 2)}
 
-PREVIOUS CHAPTER
+PREVIOUS CHAPTER ENDING
 
 ${JSON.stringify(input.recentChapters.at(-1) ?? null, null, 2)}
 
@@ -483,11 +552,25 @@ Write only the assigned scene card. Do not reuse an objective, argument,
 action, physical business, internal conclusion or attraction observation from
 an earlier scene. ${sceneBoundaryInstruction}
 
-The excerpt below contains only the end of the previous scene. Continue from
-its exact physical and emotional position. Maintain its POV, tense, voice and
-formatting. Use natural contractions.
+The draft below contains every earlier scene in this chapter. Continue from
+its final sentence and exact physical and emotional position. Do not repeat,
+rewrite or summarise anything already present. Maintain its POV, tense, voice
+and formatting. Use natural contractions.
 
 Use ${input.narrativeStyle}
+
+CHAPTER IDENTITY
+
+Chapter ${input.scenePlan.chapterNumber ?? "next"}: ${
+  input.scenePlan.title || "Use the planned chapter title."
+}
+
+POV CHARACTER
+
+${getActivePov(input.scenePlan, input.storyState) || "Use the established active POV."}
+
+Remain in this character's POV for the entire scene. Never switch heads.
+Apply this character's saved narrative and dialogue voice profile.
 
 The Story Bible, continuity and scene plan are binding. Never repeat the
 completed beats listed below. Do not invent an unsupported stranger, rule,
@@ -510,7 +593,7 @@ CONTINUITY STATE
 
 ${JSON.stringify(getWritingContinuityState(input.storyState), null, 2)}
 
-PREVIOUS CHAPTER
+PREVIOUS CHAPTER ENDING
 
 ${JSON.stringify(input.recentChapters.at(-1) ?? null, null, 2)}
 
@@ -530,15 +613,15 @@ COMPLETED BEATS THAT MUST NOT BE REPEATED
 
 ${JSON.stringify(input.scenePlan.completedBeatsToAvoid, null, 2)}
 
-END OF PREVIOUS SCENE
+COMPLETE CHAPTER DRAFT SO FAR
 
-${getDraftTail(input.existingDraft)}
+${input.existingDraft}
 
 USER'S ORIGINAL REQUEST
 
 ${input.latestUserMessage || "Continue the chapter naturally."}
 
-Continue immediately after the excerpt's final sentence. Return only Scene
+Continue immediately after the draft's final sentence. Return only Scene
 ${sceneNumber} prose.
   `.trim();
 }
@@ -698,6 +781,7 @@ the replacement scene prose.`;
             },
           ],
           max_tokens: 6000,
+          temperature: 0.7,
         });
         const rawUsage = response.usage as unknown as
           | Record<string, unknown>
