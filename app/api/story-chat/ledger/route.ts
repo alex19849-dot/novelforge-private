@@ -81,26 +81,32 @@ const ledgerSchema = {
   properties: {
     importantFacts: {
       type: "array",
+      maxItems: 120,
       items: { type: "string" },
     },
     characterStates: {
       type: "array",
+      maxItems: 40,
       items: { type: "string" },
     },
     relationshipStates: {
       type: "array",
+      maxItems: 30,
       items: { type: "string" },
     },
     unresolvedThreads: {
       type: "array",
+      maxItems: 60,
       items: { type: "string" },
     },
     timeline: {
       type: "array",
+      maxItems: 120,
       items: { type: "string" },
     },
     locations: {
       type: "array",
+      maxItems: 60,
       items: { type: "string" },
     },
     activePOV: {
@@ -108,14 +114,17 @@ const ledgerSchema = {
     },
     characterKnowledge: {
       type: "array",
+      maxItems: 120,
       items: { type: "string" },
     },
     repetitionWarnings: {
       type: "array",
+      maxItems: 60,
       items: { type: "string" },
     },
     voiceProfiles: {
       type: "array",
+      maxItems: 12,
       items: {
         type: "object",
         additionalProperties: false,
@@ -141,6 +150,7 @@ const ledgerSchema = {
           internalThoughtPattern: { type: "string" },
           forbiddenHabits: {
             type: "array",
+            maxItems: 20,
             items: { type: "string" },
           },
         },
@@ -148,6 +158,7 @@ const ledgerSchema = {
     },
     chapterEntries: {
       type: "array",
+      maxItems: 100,
       items: {
         type: "object",
         additionalProperties: false,
@@ -173,14 +184,17 @@ const ledgerSchema = {
           intimacyMilestone: { type: "string" },
           newFacts: {
             type: "array",
+            maxItems: 30,
             items: { type: "string" },
           },
           unresolvedThreads: {
             type: "array",
+            maxItems: 30,
             items: { type: "string" },
           },
           repeatedBeats: {
             type: "array",
+            maxItems: 30,
             items: { type: "string" },
           },
         },
@@ -212,6 +226,41 @@ function cleanExistingLedger(value: unknown): Array<Record<string, unknown>> {
           Boolean(entry) && typeof entry === "object",
       )
     : [];
+}
+
+function cleanStateForAnalysis(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  const state = {
+    ...(value as Record<string, unknown>),
+  };
+
+  delete state.lastGenerationDiagnostics;
+  delete state.diagnostics;
+  delete state.generationDiagnostics;
+  delete state.chapterPlans;
+  delete state.latestChapterEnding;
+
+  if (Array.isArray(state.chapterLedger)) {
+    state.chapterLedger = state.chapterLedger
+      .filter(
+        (entry): entry is Record<string, unknown> =>
+          Boolean(entry) && typeof entry === "object",
+      )
+      .map((entry) => {
+        const compactEntry = {
+          ...entry,
+        };
+
+        delete compactEntry.endingExcerpt;
+
+        return compactEntry;
+      });
+  }
+
+  return state;
 }
 
 function cleanChapters(value: unknown): Array<{
@@ -304,7 +353,9 @@ export async function POST(request: Request) {
             },
           ];
     const stateForAnalysis =
-      requiresFullRebuild && !isBatchRebuild ? {} : (body.storyState ?? {});
+      requiresFullRebuild && !isBatchRebuild
+        ? {}
+        : cleanStateForAnalysis(body.storyState);
 
     if (chaptersToAnalyse.length === 0) {
       throw new Error("No chapters were available for continuity analysis.");
@@ -320,76 +371,50 @@ export async function POST(request: Request) {
         {
           role: "system",
           content: `
-You maintain factual continuity for a commercial novel.
+You maintain the factual continuity ledger for a commercial romance novel.
 
-Read the supplied completed chapter or chapters themselves. Record only
-what the prose actually establishes. Never treat a plan, implication or
-likely future event as a completed fact.
+Read the supplied completed prose. Record only events and changes the prose
+actually establishes. A plan, implication, fantasy, fear or likely future event
+is not a completed fact.
 
-Return a compact but complete updated story state.
+Return the complete current state required by the schema. Preserve existing
+facts, knowledge, threads and voice guidance unless the supplied prose changes
+them. Keep entries concise, specific and useful to the next chapter writer.
 
-Preserve established facts that the new chapter does not change. Update
-each character's current emotional, physical and situational state.
-Record what each named character knows, suspects, misunderstands or is
-concealing. Record the exact relationship change and the furthest
-romantic or sexual intimacy milestone actually reached.
+Track:
 
-Identify active unresolved threads. Keep the timeline chronological.
-Identify repeated scene constructions, emotional beats, gestures,
-internal conclusions or phrases that future chapters should avoid.
+- permanent facts and chronological events;
+- each important character's current physical, emotional and situational state;
+- the current state of important relationships;
+- what named characters know, suspect, misunderstand or conceal;
+- active unresolved threads and established locations;
+- the exact relationship shift and furthest intimacy milestone reached;
+- repeated scene constructions, jokes, gestures, attraction observations,
+  internal conclusions or phrases future chapters must avoid.
 
-Create one distinct voiceProfiles entry for every established main POV
-character. Build each profile from the Story Bible, the user's stated
-characterisation and the completed prose. Preserve the user's intended
-personality even when a generated chapter has slipped into generic prose.
+Return one chapterEntries item for every supplied chapter in chapter-number
+order. Each entry must describe that chapter only.
 
-Every voice profile must be operational enough for another writer to
-imitate that character without seeing the source chapter:
+Maintain one operational voice profile for every established main POV
+character. Preserve an existing profile unless the Story Bible or completed
+prose establishes a genuine stable change. Never copy generic weaknesses from a
+generated chapter into the intended voice.
 
-- narrativeRhythm must describe typical sentence length, pace, fragment
-use and how the rhythm changes under pressure;
-- vocabulary must identify preferred register, recurring word types,
-professional or regional language, swearing habits and language this
-character would never naturally use;
-- humourStyle must state what the character finds funny, how they deliver
-humour and whether humour hides fear, attraction, anger or vulnerability;
-- emotionalDeflection must state the character's specific defence
-mechanism and the observable behaviour it produces;
-- sensoryFocus must state what this character notices first in rooms,
-people, conflict and attraction;
-- dialoguePattern must describe directness, interruptions, questions,
-evasions, pet names, formality and how speech changes with the love
-interest;
-- internalThoughtPattern must describe what the character admits
-privately, what they rationalise and what they refuse to name;
-- forbiddenHabits must contain concrete phrases, reactions, jokes and
-sentence habits that would make this voice generic or too similar to
-another POV.
+Each profile must state concrete, character-specific guidance for narrative
+rhythm, vocabulary, humour, emotional deflection, sensory focus, dialogue and
+internal thought. forbiddenHabits must identify phrases, reactions, jokes and
+sentence habits that would make the voice generic or too similar to another
+POV. Contrast the main POV voices through specific observable differences, not
+empty labels such as witty, guarded, dry or confident.
 
-Do not use empty labels such as sharp, witty, confident, guarded, dry,
-sarcastic, observant or emotionally unavailable without explaining
-exactly how that quality appears on the page. Contrast the main POV
-profiles against each other explicitly. Give each character at least
-three differences that the other main POV character must not inherit.
+Natural contractions are standard in contemporary narration, thought and
+dialogue unless the Story Bible deliberately establishes formal speech.
 
-Preserve an existing voice profile when it remains consistent with the
-Story Bible. Refine it when new prose reveals a genuine additional trait,
-but never flatten distinct voices toward the same generated-fiction
-style.
+Record explicit consensual adult intimacy factually and accurately. Do not
+censor, soften, embellish or moralise. All romantic and sexual characters are
+consenting adults aged eighteen or older.
 
-Natural contractions are the default for contemporary narration,
-internal thought and dialogue. Do not preserve pervasive stiff
-uncontracted phrasing as a character trait unless the Story Bible
-clearly establishes that the character is deliberately formal.
-
-Return one chapterEntries item for every supplied chapter, in chapter
-number order.
-
-Explicit consensual adult intimacy must be recorded factually and
-accurately. Do not censor it, soften it, rewrite it or add moral
-commentary.
-
-Do not invent events. Do not write novel prose.
+Do not invent events, rewrite prose, include plans or discuss your reasoning.
           `.trim(),
         },
         {
@@ -418,7 +443,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
           schema: ledgerSchema,
         },
       },
-      max_output_tokens: 7000,
+      max_output_tokens: 6000,
     });
     const usage = response.usage;
     const inputTokens = usage?.input_tokens ?? 0;
