@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 export const maxDuration = 300;
 
-const WRITING_MODEL = "mistralai/mistral-large-2512";
+const WRITING_MODEL = "sao10k/l3.3-euryale-70b";
 
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
