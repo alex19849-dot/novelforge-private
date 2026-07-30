@@ -15,7 +15,7 @@ const openrouter = new OpenAI({
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
 });
 
-const REPAIR_MODEL = "sao10k/l3.3-euryale-70b";
+const REPAIR_MODEL = "anthracite-org/magnum-v4-72b";
 
 type QualityRequest = {
   storyBible?: unknown;
@@ -32,6 +32,10 @@ type QualityAssessment = {
   passed: boolean;
   hardFailures: string[];
   repairInstructions: string[];
+  repairTargets: Array<{
+    oldText: string;
+    instruction: string;
+  }>;
   summary: string;
   scores: {
     continuity: number;
@@ -60,9 +64,11 @@ type GenerationDiagnostic = {
   error?: string;
 };
 
-type LocalRepairPatch = {
+type VerifiedRepairTarget = {
   oldText: string;
-  newText: string;
+  instruction: string;
+  start: number;
+  end: number;
 };
 
 class DiagnosticFailure extends Error {
@@ -86,6 +92,7 @@ const qualitySchema = {
     "passed",
     "hardFailures",
     "repairInstructions",
+    "repairTargets",
     "summary",
     "scores",
   ],
@@ -100,6 +107,19 @@ const qualitySchema = {
     repairInstructions: {
       type: "array",
       items: { type: "string" },
+    },
+    repairTargets: {
+      type: "array",
+      maxItems: 4,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["oldText", "instruction"],
+        properties: {
+          oldText: { type: "string" },
+          instruction: { type: "string" },
+        },
+      },
     },
     summary: {
       type: "string",
@@ -210,22 +230,6 @@ function cleanGeneratedProse(content: string): string {
     .trim();
 }
 
-function extractJsonObject(content: string): string {
-  const cleaned = content
-    .replace(/^\uFEFF/, "")
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/```\s*$/i, "")
-    .trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-
-  if (start < 0 || end <= start) {
-    throw new Error("The local repair model returned no JSON object.");
-  }
-
-  return cleaned.slice(start, end + 1);
-}
-
 function countOccurrences(content: string, target: string): number {
   if (!target) {
     return 0;
@@ -234,80 +238,135 @@ function countOccurrences(content: string, target: string): number {
   return content.split(target).length - 1;
 }
 
-function applyValidatedLocalPatches(
+function normaliseWithMap(value: string): {
+  text: string;
+  sourceIndexes: number[];
+} {
+  let text = "";
+  const sourceIndexes: number[] = [];
+  let previousWasSpace = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const sourceCharacter = value[index] ?? "";
+    const character = sourceCharacter
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/[—–]/g, "-")
+      .toLowerCase();
+    const isSpace = /\s/u.test(character);
+
+    if (isSpace) {
+      if (previousWasSpace) {
+        continue;
+      }
+
+      text += " ";
+      sourceIndexes.push(index);
+      previousWasSpace = true;
+      continue;
+    }
+
+    text += character;
+    sourceIndexes.push(index);
+    previousWasSpace = false;
+  }
+
+  return {
+    text: text.trim(),
+    sourceIndexes,
+  };
+}
+
+function resolveUniquePassage(
   chapterContent: string,
-  value: unknown,
-): string {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("The local repair response was invalid.");
+  requestedPassage: string,
+): Pick<VerifiedRepairTarget, "oldText" | "start" | "end"> {
+  if (countOccurrences(chapterContent, requestedPassage) === 1) {
+    const start = chapterContent.indexOf(requestedPassage);
+
+    return {
+      oldText: requestedPassage,
+      start,
+      end: start + requestedPassage.length,
+    };
   }
 
-  const rawPatches = (value as Record<string, unknown>).patches;
+  const normalisedChapter = normaliseWithMap(chapterContent);
+  const normalisedPassage = normaliseWithMap(requestedPassage).text;
+  const firstMatch = normalisedChapter.text.indexOf(normalisedPassage);
+  const secondMatch =
+    firstMatch < 0
+      ? -1
+      : normalisedChapter.text.indexOf(
+          normalisedPassage,
+          firstMatch + normalisedPassage.length,
+        );
 
-  if (!Array.isArray(rawPatches) || rawPatches.length < 1) {
-    throw new Error("The local repair model returned no usable patches.");
+  if (!normalisedPassage || firstMatch < 0 || secondMatch >= 0) {
+    throw new Error(
+      "The quality assessment did not identify one unique repair passage.",
+    );
   }
 
-  if (rawPatches.length > 8) {
-    throw new Error("The local repair attempted too many changes.");
+  const start = normalisedChapter.sourceIndexes[firstMatch];
+  const finalNormalisedIndex = firstMatch + normalisedPassage.length - 1;
+  const finalSourceIndex =
+    normalisedChapter.sourceIndexes[finalNormalisedIndex];
+
+  if (start === undefined || finalSourceIndex === undefined) {
+    throw new Error("The repair passage could not be mapped safely.");
   }
 
-  const patches: LocalRepairPatch[] = rawPatches.map((rawPatch, index) => {
-    if (
-      !rawPatch ||
-      typeof rawPatch !== "object" ||
-      Array.isArray(rawPatch)
-    ) {
-      throw new Error(`Local repair patch ${index + 1} was invalid.`);
-    }
+  return {
+    oldText: chapterContent.slice(start, finalSourceIndex + 1),
+    start,
+    end: finalSourceIndex + 1,
+  };
+}
 
-    const patch = rawPatch as Record<string, unknown>;
-    const oldText = cleanString(patch.oldText);
-    const newText = cleanString(patch.newText);
+function verifyRepairTargets(
+  chapterContent: string,
+  assessment: QualityAssessment,
+): VerifiedRepairTarget[] {
+  if (assessment.repairTargets.length === 0) {
+    throw new Error("The quality assessment returned no bounded repair targets.");
+  }
 
-    if (!oldText || !newText || oldText === newText) {
-      throw new Error(`Local repair patch ${index + 1} was empty.`);
-    }
+  const targets = assessment.repairTargets.map((target) => {
+    const requestedPassage = cleanString(target.oldText);
+    const instruction = cleanString(target.instruction);
 
-    if (countOccurrences(chapterContent, oldText) !== 1) {
-      throw new Error(
-        `Local repair patch ${index + 1} did not identify one exact passage.`,
-      );
+    if (!requestedPassage || !instruction) {
+      throw new Error("The quality assessment returned an empty repair target.");
     }
 
     return {
-      oldText,
-      newText,
+      ...resolveUniquePassage(chapterContent, requestedPassage),
+      instruction,
     };
   });
-  const changedCharacterCount = patches.reduce(
-    (total, patch) => total + patch.oldText.length,
+  const ordered = [...targets].sort((left, right) => left.start - right.start);
+
+  for (let index = 1; index < ordered.length; index += 1) {
+    if (ordered[index].start < ordered[index - 1].end) {
+      throw new Error("The quality assessment returned overlapping repairs.");
+    }
+  }
+
+  const changedCharacterCount = ordered.reduce(
+    (total, target) => total + target.oldText.length,
     0,
   );
   const maximumLocalChange = Math.max(
-    2000,
+    2200,
     Math.floor(chapterContent.length * 0.35),
   );
 
   if (changedCharacterCount > maximumLocalChange) {
-    throw new Error(
-      "The local repair attempted to replace too much of the chapter.",
-    );
+    throw new Error("The required changes are too broad for safe local repair.");
   }
 
-  let repairedContent = chapterContent;
-
-  for (const patch of patches) {
-    if (countOccurrences(repairedContent, patch.oldText) !== 1) {
-      throw new Error(
-        "Two local repair patches overlapped or invalidated one another.",
-      );
-    }
-
-    repairedContent = repairedContent.replace(patch.oldText, patch.newText);
-  }
-
-  return cleanGeneratedProse(repairedContent);
+  return ordered;
 }
 
 function assessmentPasses(
@@ -533,6 +592,15 @@ explicit scene that the brief requires.
 
 repairInstructions must be concrete, local and actionable. Identify the
 specific material that must change. Do not request a different story.
+
+When the chapter fails, return one to four non-overlapping repairTargets.
+Each oldText must be one exact contiguous passage copied from the completed
+chapter, including its punctuation and paragraph breaks. Choose the smallest
+passage that can be rewritten to correct the failure, but include enough text
+to identify it uniquely. For a missing transition, consequence or hook, target
+the existing passage immediately where that material belongs. Never invent an
+oldText quotation. When the chapter passes, return an empty repairTargets
+array.
         `.trim(),
       },
       {
@@ -643,46 +711,46 @@ async function repairChapterLocally(input: {
   attempt: number;
 }): Promise<{
   chapterContent: string;
-  diagnostic: GenerationDiagnostic;
+  diagnostics: GenerationDiagnostic[];
 }> {
-  const startedAt = Date.now();
-  const response = await openrouter.chat.completions.create({
-    model: REPAIR_MODEL,
-    messages: [
-      {
-        role: "system",
-        content: `You are a precise commercial-romance line editor. Repair only
-the passages responsible for the supplied quality failures. Return one JSON
-object and no other text. Never rewrite the complete chapter.`,
-      },
-      {
-        role: "user",
-        content: `
-Return exactly:
+  const targets = verifyRepairTargets(
+    input.chapterContent,
+    input.assessment,
+  );
+  const replacements: Array<VerifiedRepairTarget & { newText: string }> = [];
+  const diagnostics: GenerationDiagnostic[] = [];
 
-{
-  "patches": [
-    {
-      "oldText": "one exact, contiguous passage copied character-for-character from the original chapter",
-      "newText": "the complete replacement passage"
-    }
-  ]
-}
+  for (const [index, target] of targets.entries()) {
+    const startedAt = Date.now();
+    const contextStart = Math.max(0, target.start - 1800);
+    const contextEnd = Math.min(
+      input.chapterContent.length,
+      target.end + 1800,
+    );
+    const response = await openrouter.chat.completions.create({
+      model: REPAIR_MODEL,
+      messages: [
+        {
+          role: "system",
+          content: `You are NovelForge's precise commercial-romance passage
+editor. Return only replacement novel prose for the supplied target passage.
+Never return JSON, notes, headings, markdown or the surrounding context.`,
+        },
+        {
+          role: "user",
+          content: `
+Rewrite only TARGET PASSAGE so it satisfies REPAIR REQUIREMENT and fits
+smoothly between BEFORE CONTEXT and AFTER CONTEXT.
 
-Use between one and eight patches. oldText must be copied exactly from the
-chapter, including punctuation, quotation marks and paragraph breaks. Each
-oldText passage must occur exactly once. Include enough surrounding prose to
-make it unique, but replace only the material that genuinely needs correction.
+Preserve the established first-person POV, tense, character voice, natural
+contractions, chronology, physical state and all unaffected facts. Do not
+introduce a new scene, subplot, prior romance, attraction milestone, housing
+solution or other convenient development unsupported by the binding chapter
+plan. Preserve the selected heat level. If the target contains explicit
+consensual adult intimacy, keep it explicit and do not censor, soften or fade
+it out.
 
-Do not alter unaffected prose. Do not modernise, summarise, censor, soften or
-restyle the chapter. Preserve first-person POV, present tense, character voice,
-natural contractions, heat level and explicit consensual adult content.
-
-Fix every objective hard failure and the concrete repair instructions. When a
-score failure concerns plot movement, relationship progression, voice,
-repetition or hook strength, repair the smallest passage capable of solving it.
-Do not introduce a new subplot or contradict the Story Bible, continuity or
-chapter plan.
+Return only the complete replacement passage.
 
 STORY BIBLE
 
@@ -692,7 +760,7 @@ CONTINUITY BEFORE THIS CHAPTER
 
 ${JSON.stringify(cleanQualityStoryState(input.storyState), null, 2)}
 
-CHAPTER PLAN
+BINDING CHAPTER PLAN
 
 ${input.chapterBrief}
 
@@ -701,91 +769,108 @@ CHAPTER METADATA
 Title: ${input.chapterTitle}
 POV: ${input.povCharacter}
 
-HARD FAILURES
+REPAIR REQUIREMENT
 
-${JSON.stringify(input.assessment.hardFailures, null, 2)}
+${target.instruction}
 
-REPAIR INSTRUCTIONS
+BEFORE CONTEXT, READ ONLY
 
-${JSON.stringify(input.assessment.repairInstructions, null, 2)}
+${input.chapterContent.slice(contextStart, target.start)}
 
-QUALITY SUMMARY
+TARGET PASSAGE
 
-${input.assessment.summary}
+${target.oldText}
 
-ORIGINAL CHAPTER
+AFTER CONTEXT, READ ONLY
 
-${input.chapterContent}
-        `.trim(),
-      },
-    ],
-    max_tokens: 3500,
-    temperature: 0.2,
-  });
-  const usage = response.usage as unknown as
-    | Record<string, unknown>
-    | undefined;
-  const inputTokens =
-    typeof usage?.prompt_tokens === "number" ? usage.prompt_tokens : 0;
-  const outputTokens =
-    typeof usage?.completion_tokens === "number"
-      ? usage.completion_tokens
-      : 0;
-  const totalTokens =
-    typeof usage?.total_tokens === "number"
-      ? usage.total_tokens
-      : inputTokens + outputTokens;
-  const costUsd = typeof usage?.cost === "number" ? usage.cost : null;
-  const diagnostic: GenerationDiagnostic = {
-    stage: "chapter_quality_local_repair",
-    provider: "openrouter",
-    model: REPAIR_MODEL,
-    status: "succeeded",
-    inputTokens,
-    outputTokens,
-    totalTokens,
-    costUsd,
-    costType: costUsd === null ? "unavailable" : "reported",
-    durationMs: Date.now() - startedAt,
-    attempt: input.attempt,
-  };
-  const choice = response.choices[0];
-
-  if (choice?.finish_reason === "length") {
-    throw new DiagnosticFailure(
-      "The local repair reached its token limit before returning its patches.",
-      diagnostic,
-    );
-  }
-
-  if (choice?.finish_reason === "content_filter") {
-    throw new DiagnosticFailure(
-      "The provider stopped the local repair because of its content filter.",
-      diagnostic,
-    );
-  }
-
-  try {
-    const output = JSON.parse(
-      extractJsonObject(cleanString(choice?.message?.content)),
-    ) as unknown;
-    const chapterContent = applyValidatedLocalPatches(
-      input.chapterContent,
-      output,
-    );
-
-    return {
-      chapterContent,
-      diagnostic,
+${input.chapterContent.slice(target.end, contextEnd)}
+          `.trim(),
+        },
+      ],
+      max_tokens: 2200,
+      temperature: 0.35,
+      top_p: 0.9,
+    });
+    const usage = response.usage as unknown as
+      | Record<string, unknown>
+      | undefined;
+    const inputTokens =
+      typeof usage?.prompt_tokens === "number" ? usage.prompt_tokens : 0;
+    const outputTokens =
+      typeof usage?.completion_tokens === "number"
+        ? usage.completion_tokens
+        : 0;
+    const costUsd = typeof usage?.cost === "number" ? usage.cost : null;
+    const diagnostic: GenerationDiagnostic = {
+      stage: `chapter_quality_passage_repair_${index + 1}`,
+      provider: "openrouter",
+      model: REPAIR_MODEL,
+      status: "succeeded",
+      inputTokens,
+      outputTokens,
+      totalTokens:
+        typeof usage?.total_tokens === "number"
+          ? usage.total_tokens
+          : inputTokens + outputTokens,
+      costUsd,
+      costType: costUsd === null ? "unavailable" : "reported",
+      durationMs: Date.now() - startedAt,
+      attempt: input.attempt,
     };
-  } catch (error) {
-    throw new DiagnosticFailure(
-      error instanceof Error
-        ? error.message
-        : "The local repair returned invalid patches.",
-      diagnostic,
+    const choice = response.choices[0];
+
+    if (choice?.finish_reason === "length") {
+      throw new DiagnosticFailure(
+        "Magnum reached its limit while repairing one passage.",
+        diagnostic,
+      );
+    }
+
+    if (choice?.finish_reason === "content_filter") {
+      throw new DiagnosticFailure(
+        "The repair provider stopped the passage because of its content filter.",
+        diagnostic,
+      );
+    }
+
+    const newText = cleanGeneratedProse(
+      cleanString(choice?.message?.content),
     );
+
+    if (
+      !newText ||
+      newText === target.oldText ||
+      /^\s*chapter\s+\d+\b/im.test(newText) ||
+      /```|^\s{0,3}#{1,6}\s+\S+/mu.test(newText)
+    ) {
+      throw new DiagnosticFailure(
+        "Magnum returned an invalid bounded replacement passage.",
+        diagnostic,
+      );
+    }
+
+    diagnostics.push(diagnostic);
+    replacements.push({
+      ...target,
+      newText,
+    });
   }
+
+  let chapterContent = input.chapterContent;
+
+  for (const replacement of [...replacements].sort(
+    (left, right) => right.start - left.start,
+  )) {
+    chapterContent =
+      chapterContent.slice(0, replacement.start) +
+      replacement.newText +
+      chapterContent.slice(replacement.end);
+  }
+
+  return {
+    chapterContent: cleanGeneratedProse(chapterContent),
+    diagnostics,
+  };
 }
 
 export async function POST(request: Request) {
@@ -877,7 +962,7 @@ export async function POST(request: Request) {
         assessment: firstAssessment,
         attempt: 1,
       });
-      diagnostics.push(repairResult.diagnostic);
+      diagnostics.push(...repairResult.diagnostics);
     } catch (repairError) {
       if (repairError instanceof DiagnosticFailure) {
         diagnostics.push(repairError.diagnostic);
