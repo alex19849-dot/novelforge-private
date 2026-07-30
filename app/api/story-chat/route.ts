@@ -114,6 +114,54 @@ function getRequestedWordCount(message: string): number | null {
   return Number.isFinite(wordCount) ? wordCount : null;
 }
 
+function getRequestedChapterNumber(message: string): number | null {
+  const numberedMatch = message.match(/\bchapter\s+(\d+)\b/i);
+
+  if (numberedMatch) {
+    const chapterNumber = Number(numberedMatch[1] ?? "");
+
+    return Number.isInteger(chapterNumber) && chapterNumber > 0
+      ? chapterNumber
+      : null;
+  }
+
+  const numberWords = [
+    "one",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+  ];
+  const wordedMatch = message.match(
+    new RegExp(`\\bchapter\\s+(${numberWords.join("|")})\\b`, "i"),
+  );
+
+  if (!wordedMatch) {
+    return null;
+  }
+
+  const wordIndex = numberWords.indexOf(
+    wordedMatch[1]?.toLowerCase() ?? "",
+  );
+
+  return wordIndex >= 0 ? wordIndex + 1 : null;
+}
+
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
@@ -161,6 +209,46 @@ const EMPTY_STORY_STATE = {
 
   activePOV: "",
 };
+
+function getStoryStateBeforeChapter(
+  state: StoryWorkspace["storyState"],
+  chapterNumber: number,
+): StoryWorkspace["storyState"] {
+  const earlierLedger = (state.chapterLedger ?? []).filter(
+    (entry) => entry.chapterNumber < chapterNumber,
+  );
+  const previousEntry = earlierLedger.at(-1);
+  const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
+
+  return {
+    ...EMPTY_STORY_STATE,
+    importantFacts: unique(
+      earlierLedger.flatMap((entry) => entry.newFacts ?? []),
+    ),
+    relationshipStates: previousEntry?.relationshipShift
+      ? [previousEntry.relationshipShift]
+      : [],
+    unresolvedThreads: previousEntry?.unresolvedThreads ?? [],
+    timeline: earlierLedger.map(
+      (entry) => `Chapter ${entry.chapterNumber}: ${entry.summary}`,
+    ),
+    locations: unique(
+      earlierLedger.flatMap((entry) => [
+        entry.openingLocation,
+        entry.endingLocation,
+      ]),
+    ),
+    activePOV: previousEntry?.povCharacter ?? "",
+    chapterLedger: earlierLedger,
+    latestChapterEnding: previousEntry?.endingExcerpt ?? "",
+    characterKnowledge: [],
+    repetitionWarnings: unique(
+      earlierLedger.flatMap((entry) => entry.repeatedBeats ?? []),
+    ).slice(-30),
+    voiceProfiles: state.voiceProfiles ?? [],
+    lastGenerationDiagnostics: [],
+  };
+}
 
 const storyChatSchema = {
   type: "object",
@@ -1499,62 +1587,80 @@ workspace.`,
     const usesCompactChapterPlan =
       requestStage === "plan" && isWriterMode && intent !== "create_story";
 
-    const requestedChapterMatch = latestMessage.match(/\bchapter\s+(\d+)\b/i);
-    const requestedChapterNumber = requestedChapterMatch
-      ? Number(requestedChapterMatch[1])
-      : null;
+    const requestedChapterNumber =
+      getRequestedChapterNumber(latestMessage);
     const latestChapter = currentStory.chapters.at(-1) ?? null;
-    const chapterLedger = currentStory.storyState.chapterLedger ?? [];
-    const latestLedgerEntry = chapterLedger.at(-1) ?? null;
     const rewriteTarget =
       intent === "rewrite_chapter" && requestedChapterNumber !== null
         ? (currentStory.chapters.find(
             (chapter) => chapter.number === requestedChapterNumber,
           ) ?? null)
         : null;
+
+    if (intent === "rewrite_chapter" && requestedChapterNumber === null) {
+      throw new Error(
+        "Tell me which chapter number you want rewritten.",
+      );
+    }
+
+    if (
+      intent === "rewrite_chapter" &&
+      requestedChapterNumber !== null &&
+      !rewriteTarget
+    ) {
+      throw new Error(
+        `Chapter ${requestedChapterNumber} could not be found for rewriting.`,
+      );
+    }
     const rewritePrecedingChapter = rewriteTarget
       ? (currentStory.chapters.find(
           (chapter) => chapter.number === rewriteTarget.number - 1,
         ) ?? null)
       : null;
-    const rewriteFollowingChapter = rewriteTarget
-      ? (currentStory.chapters.find(
-          (chapter) => chapter.number === rewriteTarget.number + 1,
-        ) ?? null)
-      : null;
+    const planningStoryState = rewriteTarget
+      ? getStoryStateBeforeChapter(
+          currentStory.storyState,
+          rewriteTarget.number,
+        )
+      : currentStory.storyState;
+    const planningChapterLedger = planningStoryState.chapterLedger ?? [];
+    const planningLatestLedgerEntry = planningChapterLedger.at(-1) ?? null;
+    const planningLatestChapter = rewriteTarget
+      ? rewritePrecedingChapter
+      : latestChapter;
     const continuityHandoff = {
-      latestCompletedChapter: latestChapter
+      latestCompletedChapter: planningLatestChapter
         ? {
-            number: latestChapter.number,
-            title: latestChapter.title,
-            povCharacter: latestChapter.povCharacter,
+            number: planningLatestChapter.number,
+            title: planningLatestChapter.title,
+            povCharacter: planningLatestChapter.povCharacter,
           }
         : null,
       exactLatestEnding:
-        currentStory.storyState.latestChapterEnding ||
-        latestLedgerEntry?.endingExcerpt ||
-        (latestChapter ? getEndingExcerpt(latestChapter.content, 500) : ""),
+        planningStoryState.latestChapterEnding ||
+        planningLatestLedgerEntry?.endingExcerpt ||
+        (planningLatestChapter
+          ? getEndingExcerpt(planningLatestChapter.content, 500)
+          : ""),
       latestRelationshipState:
-        currentStory.storyState.relationshipStates.at(-1) ?? "",
-      latestIntimacyMilestone: latestLedgerEntry?.intimacyMilestone ?? "",
-      currentCharacterStates: currentStory.storyState.characterStates,
-      characterKnowledge: currentStory.storyState.characterKnowledge ?? [],
-      unresolvedThreads: currentStory.storyState.unresolvedThreads,
-      repetitionWarnings: currentStory.storyState.repetitionWarnings ?? [],
-      voiceProfiles: currentStory.storyState.voiceProfiles ?? [],
-      recentChapterLedger: chapterLedger.slice(-4),
+        planningStoryState.relationshipStates.at(-1) ?? "",
+      latestIntimacyMilestone:
+        planningLatestLedgerEntry?.intimacyMilestone ?? "",
+      currentCharacterStates: planningStoryState.characterStates,
+      characterKnowledge: planningStoryState.characterKnowledge ?? [],
+      unresolvedThreads: planningStoryState.unresolvedThreads,
+      repetitionWarnings: planningStoryState.repetitionWarnings ?? [],
+      voiceProfiles: planningStoryState.voiceProfiles ?? [],
+      recentChapterLedger: planningChapterLedger.slice(-4),
       rewriteContext: rewriteTarget
         ? {
-            targetChapter: rewriteTarget,
+            targetChapterMetadata: {
+              number: rewriteTarget.number,
+              title: rewriteTarget.title,
+              povCharacter: rewriteTarget.povCharacter,
+            },
             precedingChapterEnding: rewritePrecedingChapter
               ? getEndingExcerpt(rewritePrecedingChapter.content, 500)
-              : "",
-            followingChapterOpening: rewriteFollowingChapter
-              ? rewriteFollowingChapter.content
-                  .trim()
-                  .split(/\s+/)
-                  .slice(0, 500)
-                  .join(" ")
               : "",
           }
         : null,
@@ -1566,13 +1672,18 @@ workspace.`,
       seriesType: currentStory.seriesType,
       seriesTitle: currentStory.seriesTitle,
       bookNumber: currentStory.bookNumber,
-      chapters: currentStory.chapters.map((chapter) => ({
-        number: chapter.number,
-        title: chapter.title,
-        povCharacter: chapter.povCharacter,
-      })),
+      chapters: currentStory.chapters
+        .filter(
+          (chapter) =>
+            !rewriteTarget || chapter.number < rewriteTarget.number,
+        )
+        .map((chapter) => ({
+          number: chapter.number,
+          title: chapter.title,
+          povCharacter: chapter.povCharacter,
+        })),
       storyBible: currentStory.storyBible,
-      storyState: currentStory.storyState,
+      storyState: planningStoryState,
       continuityHandoff,
       createdAt: currentStory.createdAt,
       updatedAt: currentStory.updatedAt,
@@ -1735,13 +1846,20 @@ consequence or escalation.
 
 When rewriting a chapter:
 
-- Use rewriteContext.targetChapter as the prose being replaced.
+- Treat the rewrite as a fresh route through the story from the exact
+position immediately before the target chapter.
 
-- Preserve continuity with precedingChapterEnding and
-followingChapterOpening.
+- Use rewriteContext.targetChapterMetadata only to preserve the chapter
+number, title and POV where appropriate.
 
-- Do not alter facts required by later chapters unless the user
-explicitly requests that wider change.
+- Begin after precedingChapterEnding. Do not reconstruct, paraphrase,
+imitate or recycle prose, scenes, dialogue, beats or conclusions from
+the discarded chapter.
+
+- Do not plan backwards from later chapters or include future events
+merely to reconnect with prose that follows the rewritten chapter.
+
+- The continuity ledger will be rebuilt after the replacement is saved.
 
 BURN PACING RULES
 
