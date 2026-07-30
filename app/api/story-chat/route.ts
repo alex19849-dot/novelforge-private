@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { detectStoryIntent } from "../../../src/lib/detect-story-intent";
 
 import type {
+  ChapterPlan,
   GenerationDiagnostic,
   StoryBible,
   StoryWorkspace,
@@ -535,6 +536,99 @@ const compactChapterPlanSchema = {
   },
 } as const;
 
+const editableChapterPlanSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reply", "storyTitle", "chapterPlan"],
+  properties: {
+    reply: {
+      type: "string",
+    },
+    storyTitle: {
+      type: "string",
+    },
+    chapterPlan: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "chapterNumber",
+        "title",
+        "povCharacter",
+        "chapterGoal",
+        "relationshipChange",
+        "scenes",
+        "completedBeatsToAvoid",
+      ],
+      properties: {
+        chapterNumber: {
+          type: "integer",
+        },
+        title: {
+          type: "string",
+        },
+        povCharacter: {
+          type: "string",
+        },
+        chapterGoal: {
+          type: "string",
+        },
+        relationshipChange: {
+          type: "string",
+        },
+        scenes: {
+          type: "array",
+          minItems: 1,
+          maxItems: 5,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: [
+              "order",
+              "location",
+              "objective",
+              "conflict",
+              "newInformation",
+              "exitBeat",
+            ],
+            properties: {
+              order: {
+                type: "integer",
+              },
+              location: {
+                type: "string",
+              },
+              objective: {
+                type: "string",
+              },
+              conflict: {
+                type: "string",
+              },
+              newInformation: {
+                type: "string",
+              },
+              exitBeat: {
+                type: "string",
+              },
+            },
+          },
+        },
+        completedBeatsToAvoid: {
+          type: "array",
+          items: {
+            type: "string",
+          },
+        },
+      },
+    },
+  },
+} as const;
+
+type EditableChapterPlanOutput = {
+  reply: string;
+  storyTitle: string;
+  chapterPlan: Omit<ChapterPlan, "status" | "updatedAt">;
+};
+
 type StoryModelOutput = {
   reply: string;
 
@@ -593,6 +687,95 @@ function cleanStringArray(value: unknown): string[] {
   }
 
   return cleaned;
+}
+
+function sanitiseEditableChapterPlan(
+  value: unknown,
+  fallbackChapterNumber: number,
+): ChapterPlan {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("The planning model returned an invalid chapter plan.");
+  }
+
+  const plan = value as Record<string, unknown>;
+  const rawScenes = Array.isArray(plan.scenes) ? plan.scenes : [];
+  const scenes = rawScenes
+    .filter(
+      (scene): scene is Record<string, unknown> =>
+        Boolean(scene) && typeof scene === "object" && !Array.isArray(scene),
+    )
+    .slice(0, 5)
+    .map((scene, index) => ({
+      order: index + 1,
+      location: cleanString(scene.location),
+      objective: cleanString(scene.objective),
+      conflict: cleanString(scene.conflict),
+      newInformation: cleanString(scene.newInformation),
+      exitBeat: cleanString(scene.exitBeat),
+    }));
+  const chapterNumber =
+    typeof plan.chapterNumber === "number" &&
+    Number.isInteger(plan.chapterNumber) &&
+    plan.chapterNumber > 0
+      ? plan.chapterNumber
+      : fallbackChapterNumber;
+
+  if (
+    scenes.length === 0 ||
+    scenes.some(
+      (scene) =>
+        !scene.location ||
+        !scene.objective ||
+        !scene.conflict ||
+        !scene.newInformation ||
+        !scene.exitBeat,
+    )
+  ) {
+    throw new Error("The chapter plan contains an incomplete scene.");
+  }
+
+  const title = cleanString(plan.title);
+  const povCharacter = cleanString(plan.povCharacter);
+  const chapterGoal = cleanString(plan.chapterGoal);
+  const relationshipChange = cleanString(plan.relationshipChange);
+
+  if (!title || !povCharacter || !chapterGoal || !relationshipChange) {
+    throw new Error("The chapter plan is missing required metadata.");
+  }
+
+  return {
+    chapterNumber,
+    title,
+    povCharacter,
+    chapterGoal,
+    relationshipChange,
+    scenes,
+    completedBeatsToAvoid: cleanStringArray(plan.completedBeatsToAvoid),
+    status: "draft",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function formatChapterPlan(plan: ChapterPlan): string {
+  const scenes = plan.scenes
+    .map(
+      (scene) =>
+        `Scene ${scene.order}, ${scene.location}\n` +
+        `Goal: ${scene.objective}\n` +
+        `Conflict: ${scene.conflict}\n` +
+        `Change: ${scene.newInformation}\n` +
+        `Exit: ${scene.exitBeat}`,
+    )
+    .join("\n\n");
+
+  return (
+    `Chapter ${plan.chapterNumber}: ${plan.title}\n` +
+    `POV: ${plan.povCharacter}\n` +
+    `Chapter goal: ${plan.chapterGoal}\n` +
+    `Relationship change: ${plan.relationshipChange}\n\n` +
+    `${scenes}\n\n` +
+    "Tell me what you want changed, or say approve this plan."
+  );
 }
 
 function validateThreeScenePlan(value: string): void {
@@ -1589,6 +1772,36 @@ workspace.`,
 
     const requestedChapterNumber =
       getRequestedChapterNumber(latestMessage);
+    const savedChapterPlans = currentStory.storyState.chapterPlans ?? [];
+    const latestDraftPlan =
+      [...savedChapterPlans]
+        .filter((plan) => plan.status === "draft")
+        .sort((left, right) => left.chapterNumber - right.chapterNumber)
+        .at(-1) ?? null;
+    const explicitlyPlansChapter =
+      /\b(?:plan|outline|map)\b[\s\S]{0,80}\bchapter\b/i.test(
+        latestMessage,
+      ) ||
+      /\bchapter\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b[\s\S]{0,80}\b(?:plan|outline|scenes?)\b/i.test(
+        latestMessage,
+      );
+    const explicitlyApprovesPlan =
+      /\b(?:approve|lock|finalise|finalize|use)\b[\s\S]{0,80}\bplan\b/i.test(
+        latestMessage,
+      ) ||
+      /\bplan\b[\s\S]{0,80}\b(?:approved|locked|finalised|finalized)\b/i.test(
+        latestMessage,
+      );
+    const editsExistingPlan =
+      Boolean(latestDraftPlan) &&
+      (/\bscene\s+\d+\b/i.test(latestMessage) ||
+        /\b(?:change|replace|add|remove|delete|split|merge|move|swap|make)\b[\s\S]{0,120}\b(?:scene|plan|chapter)\b/i.test(
+          latestMessage,
+        ));
+    const isChapterPlanConversation =
+      explicitlyPlansChapter ||
+      explicitlyApprovesPlan ||
+      editsExistingPlan;
     const latestChapter = currentStory.chapters.at(-1) ?? null;
     const rewriteTarget =
       intent === "rewrite_chapter" && requestedChapterNumber !== null
@@ -1688,6 +1901,274 @@ workspace.`,
       createdAt: currentStory.createdAt,
       updatedAt: currentStory.updatedAt,
     };
+
+    if (isChapterPlanConversation && !isWriterMode) {
+      const nextChapterNumber =
+        currentStory.chapters.length > 0
+          ? Math.max(
+              ...currentStory.chapters.map((chapter) => chapter.number),
+            ) + 1
+          : 1;
+      const selectedChapterNumber =
+        requestedChapterNumber ??
+        latestDraftPlan?.chapterNumber ??
+        nextChapterNumber;
+      const existingPlan =
+        savedChapterPlans.find(
+          (plan) => plan.chapterNumber === selectedChapterNumber,
+        ) ?? null;
+
+      if (explicitlyApprovesPlan) {
+        if (!existingPlan) {
+          const reply =
+            "Which chapter plan do you want to approve? Give me the chapter number.";
+          const clarificationStory: StoryWorkspace = {
+            ...currentStory,
+            messages: [
+              ...currentStory.messages,
+              {
+                id: Date.now(),
+                role: "assistant",
+                content: reply,
+              },
+            ],
+            updatedAt: new Date().toISOString(),
+          };
+
+          return NextResponse.json({
+            reply,
+            intent: "general_chat",
+            story: clarificationStory,
+            generatedChapter: null,
+            chapterBrief: "",
+            diagnostics: planningDiagnostics,
+          });
+        }
+
+        const approvedPlan: ChapterPlan = {
+          ...existingPlan,
+          status: "approved",
+          updatedAt: new Date().toISOString(),
+        };
+        const reply = `Chapter ${selectedChapterNumber} plan approved and locked for generation.`;
+        const approvedStory: StoryWorkspace = {
+          ...currentStory,
+          storyState: {
+            ...currentStory.storyState,
+            chapterPlans: [
+              ...savedChapterPlans.filter(
+                (plan) => plan.chapterNumber !== selectedChapterNumber,
+              ),
+              approvedPlan,
+            ].sort(
+              (left, right) => left.chapterNumber - right.chapterNumber,
+            ),
+          },
+          messages: [
+            ...currentStory.messages,
+            {
+              id: Date.now(),
+              role: "assistant",
+              content: reply,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+
+        return NextResponse.json({
+          reply,
+          intent: "update_story",
+          story: approvedStory,
+          generatedChapter: null,
+          chapterBrief: "",
+          diagnostics: planningDiagnostics,
+        });
+      }
+
+      const chapterBeforePlan = currentStory.chapters
+        .filter((chapter) => chapter.number < selectedChapterNumber)
+        .at(-1);
+      const stateBeforePlan = currentStory.chapters.some(
+        (chapter) => chapter.number === selectedChapterNumber,
+      )
+        ? getStoryStateBeforeChapter(
+            currentStory.storyState,
+            selectedChapterNumber,
+          )
+        : currentStory.storyState;
+      const startedAt = Date.now();
+      planningAttempt += 1;
+      const planningResponse = await openai.responses.create({
+        model: "gpt-5.6-terra",
+        reasoning: {
+          effort: "low",
+        },
+        input: [
+          {
+            role: "system",
+            content: `
+You are NovelForge's chapter-planning editor.
+
+Create or amend one saved chapter plan. Return planning only, never novel
+prose. The user is an experienced commercial romance author.
+
+Use between one and five scenes. Use the smallest number that gives the
+chapter a complete, well-paced dramatic movement. A sustained scene is
+allowed. Never force a location change merely to create another scene.
+
+Every scene must perform a different narrative job. It must introduce a
+new action, objective, obstacle, decision, discovery, consequence or
+relationship change. Never divide one repeated conversation, attraction
+observation or internal conflict into several nearly identical cards.
+
+Scene exit beats must connect in order. Only the final scene may contain
+the chapter-ending hook. Respect the Story Bible, POV, burn pacing,
+continuity, character knowledge and completed beats. Do not invent a
+convenient stranger, rule, procedure, message, document, schedule,
+credential or coincidence.
+
+When an existing plan is supplied, preserve everything the user has not
+asked to change. Apply their requested amendment precisely.
+
+All romantic and sexual characters are consenting adults aged eighteen
+or older. When the established story progression calls for explicit
+consensual adult intimacy, the plan may state that directly and
+specifically without censorship or fade to black.
+
+Keep the conversational reply brief. Do not mention schemas or internal
+processing.
+            `.trim(),
+          },
+          {
+            role: "user",
+            content: `
+CHAPTER NUMBER
+
+${selectedChapterNumber}
+
+STORY BIBLE
+
+${JSON.stringify(currentStory.storyBible, null, 2)}
+
+CONTINUITY BEFORE THIS CHAPTER
+
+${JSON.stringify(stateBeforePlan, null, 2)}
+
+PRECEDING CHAPTER ENDING
+
+${
+  chapterBeforePlan
+    ? getEndingExcerpt(chapterBeforePlan.content, 500)
+    : ""
+}
+
+EXISTING SAVED PLAN
+
+${JSON.stringify(existingPlan, null, 2)}
+
+USER'S REQUEST
+
+${latestMessage}
+            `.trim(),
+          },
+        ],
+        text: {
+          verbosity: "low",
+          format: {
+            type: "json_schema",
+            name: "editable_chapter_plan",
+            strict: true,
+            schema: editableChapterPlanSchema,
+          },
+        },
+        max_output_tokens: 2500,
+      });
+      const usage = planningResponse.usage;
+      const inputTokens = usage?.input_tokens ?? 0;
+      const outputTokens = usage?.output_tokens ?? 0;
+      const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+      const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+
+      planningDiagnostics.push({
+        stage: "chapter_plan_editing",
+        provider: "openai",
+        model: "gpt-5.6-terra",
+        status: "succeeded",
+        inputTokens,
+        outputTokens,
+        totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+        costUsd:
+          (uncachedTokens * 1.25 +
+            cachedTokens * 0.125 +
+            outputTokens * 7.5) /
+          1_000_000,
+        costType: "estimated",
+        durationMs: Date.now() - startedAt,
+        attempt: planningAttempt,
+      });
+
+      if (planningResponse.status === "incomplete") {
+        throw new Error(
+          `The chapter plan was incomplete because ${
+            planningResponse.incomplete_details?.reason ??
+            "the response was truncated"
+          }.`,
+        );
+      }
+
+      const outputText = planningResponse.output_text?.trim();
+
+      if (!outputText) {
+        throw new Error("The planning model returned no chapter plan.");
+      }
+
+      const output = JSON.parse(outputText) as EditableChapterPlanOutput;
+      const savedPlan = {
+        ...sanitiseEditableChapterPlan(
+          output.chapterPlan,
+          selectedChapterNumber,
+        ),
+        chapterNumber: selectedChapterNumber,
+      };
+      const reply = formatChapterPlan(savedPlan);
+      const plannedStory: StoryWorkspace = {
+        ...currentStory,
+        title:
+          cleanString(output.storyTitle) ||
+          cleanString(currentStory.title) ||
+          "Untitled story",
+        storyState: {
+          ...currentStory.storyState,
+          chapterPlans: [
+            ...savedChapterPlans.filter(
+              (plan) => plan.chapterNumber !== selectedChapterNumber,
+            ),
+            savedPlan,
+          ].sort(
+            (left, right) => left.chapterNumber - right.chapterNumber,
+          ),
+        },
+        messages: [
+          ...currentStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content: reply,
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+
+      return NextResponse.json({
+        reply,
+        intent: "update_story",
+        story: plannedStory,
+        generatedChapter: null,
+        chapterBrief: "",
+        diagnostics: planningDiagnostics,
+      });
+    }
+
     const createPlanningResponse = async (
       planningConversation: typeof conversation,
     ) => {
