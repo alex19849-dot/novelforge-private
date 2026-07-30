@@ -474,6 +474,11 @@ const editableChapterPlanSchema = {
         "povCharacter",
         "chapterGoal",
         "relationshipChange",
+        "startingState",
+        "endingState",
+        "knowledgeLimits",
+        "premiseLocks",
+        "mustNotHappen",
         "scenes",
         "completedBeatsToAvoid",
       ],
@@ -493,9 +498,36 @@ const editableChapterPlanSchema = {
         relationshipChange: {
           type: "string",
         },
-        scenes: {
+        startingState: {
+          type: "string",
+        },
+        endingState: {
+          type: "string",
+        },
+        knowledgeLimits: {
           type: "array",
           minItems: 1,
+          items: {
+            type: "string",
+          },
+        },
+        premiseLocks: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "string",
+          },
+        },
+        mustNotHappen: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "string",
+          },
+        },
+        scenes: {
+          type: "array",
+          minItems: 3,
           maxItems: 5,
           items: {
             type: "object",
@@ -507,6 +539,10 @@ const editableChapterPlanSchema = {
               "conflict",
               "newInformation",
               "exitBeat",
+              "entryState",
+              "endingState",
+              "wordTarget",
+              "mustNotHappen",
             ],
             properties: {
               order: {
@@ -526,6 +562,24 @@ const editableChapterPlanSchema = {
               },
               exitBeat: {
                 type: "string",
+              },
+              entryState: {
+                type: "string",
+              },
+              endingState: {
+                type: "string",
+              },
+              wordTarget: {
+                type: "integer",
+                minimum: 450,
+                maximum: 1100,
+              },
+              mustNotHappen: {
+                type: "array",
+                minItems: 1,
+                items: {
+                  type: "string",
+                },
               },
             },
           },
@@ -630,6 +684,16 @@ function sanitiseEditableChapterPlan(
       conflict: cleanString(scene.conflict),
       newInformation: cleanString(scene.newInformation),
       exitBeat: cleanString(scene.exitBeat),
+      entryState: cleanString(scene.entryState),
+      endingState: cleanString(scene.endingState),
+      wordTarget:
+        typeof scene.wordTarget === "number" &&
+        Number.isInteger(scene.wordTarget) &&
+        scene.wordTarget >= 450 &&
+        scene.wordTarget <= 1100
+          ? scene.wordTarget
+          : 750,
+      mustNotHappen: cleanStringArray(scene.mustNotHappen),
     }));
   const chapterNumber =
     typeof plan.chapterNumber === "number" &&
@@ -639,14 +703,16 @@ function sanitiseEditableChapterPlan(
       : fallbackChapterNumber;
 
   if (
-    scenes.length === 0 ||
+    scenes.length < 3 ||
     scenes.some(
       (scene) =>
         !scene.location ||
         !scene.objective ||
         !scene.conflict ||
         !scene.newInformation ||
-        !scene.exitBeat,
+        !scene.exitBeat ||
+        !scene.entryState ||
+        !scene.endingState,
     )
   ) {
     throw new Error("The chapter plan contains an incomplete scene.");
@@ -656,8 +722,24 @@ function sanitiseEditableChapterPlan(
   const povCharacter = cleanString(plan.povCharacter);
   const chapterGoal = cleanString(plan.chapterGoal);
   const relationshipChange = cleanString(plan.relationshipChange);
+  const startingState = cleanString(plan.startingState);
+  const endingState = cleanString(plan.endingState);
+  const knowledgeLimits = cleanStringArray(plan.knowledgeLimits);
+  const premiseLocks = cleanStringArray(plan.premiseLocks);
+  const mustNotHappen = cleanStringArray(plan.mustNotHappen);
 
-  if (!title || !povCharacter || !chapterGoal || !relationshipChange) {
+  if (
+    !title ||
+    !povCharacter ||
+    !chapterGoal ||
+    !relationshipChange ||
+    !startingState ||
+    !endingState ||
+    knowledgeLimits.length === 0 ||
+    premiseLocks.length === 0 ||
+    mustNotHappen.length === 0 ||
+    scenes.some((scene) => (scene.mustNotHappen?.length ?? 0) === 0)
+  ) {
     throw new Error("The chapter plan is missing required metadata.");
   }
 
@@ -667,6 +749,11 @@ function sanitiseEditableChapterPlan(
     povCharacter,
     chapterGoal,
     relationshipChange,
+    startingState,
+    endingState,
+    knowledgeLimits,
+    premiseLocks,
+    mustNotHappen,
     scenes,
     completedBeatsToAvoid: cleanStringArray(plan.completedBeatsToAvoid),
     status: "draft",
@@ -679,10 +766,13 @@ function formatChapterPlan(plan: ChapterPlan): string {
     .map(
       (scene) =>
         `Scene ${scene.order}, ${scene.location}\n` +
+        `Starts: ${scene.entryState}\n` +
         `Goal: ${scene.objective}\n` +
         `Conflict: ${scene.conflict}\n` +
         `Change: ${scene.newInformation}\n` +
-        `Exit: ${scene.exitBeat}`,
+        `Exit: ${scene.exitBeat}\n` +
+        `Ends: ${scene.endingState}\n` +
+        `Target: ${scene.wordTarget} words`,
     )
     .join("\n\n");
 
@@ -691,6 +781,8 @@ function formatChapterPlan(plan: ChapterPlan): string {
     `POV: ${plan.povCharacter}\n` +
     `Chapter goal: ${plan.chapterGoal}\n` +
     `Relationship change: ${plan.relationshipChange}\n\n` +
+    `Starts: ${plan.startingState}\n` +
+    `Ends: ${plan.endingState}\n\n` +
     `${scenes}\n\n` +
     "Tell me what you want changed, or say approve this plan."
   );
@@ -722,6 +814,8 @@ function validateCanonicalChapterPlan(
     "povCharacter",
     "chapterGoal",
     "relationshipChange",
+    "startingState",
+    "endingState",
   ];
 
   if (
@@ -746,11 +840,15 @@ function validateCanonicalChapterPlan(
     "conflict",
     "newInformation",
     "exitBeat",
+    "entryState",
+    "endingState",
   ];
   const scenes = plan.scenes;
 
-  if (!Array.isArray(scenes) || scenes.length < 1 || scenes.length > 5) {
-    throw new Error("The chapter plan must contain between one and five scenes.");
+  if (!Array.isArray(scenes) || scenes.length < 3 || scenes.length > 5) {
+    throw new Error(
+      "The chapter plan must contain between three and five movements.",
+    );
   }
 
   for (const [index, scene] of scenes.entries()) {
@@ -763,6 +861,15 @@ function validateCanonicalChapterPlan(
       typeof sceneCard.order !== "number" ||
       !Number.isInteger(sceneCard.order) ||
       sceneCard.order !== index + 1 ||
+      typeof sceneCard.wordTarget !== "number" ||
+      !Number.isInteger(sceneCard.wordTarget) ||
+      sceneCard.wordTarget < 450 ||
+      sceneCard.wordTarget > 1100 ||
+      !Array.isArray(sceneCard.mustNotHappen) ||
+      sceneCard.mustNotHappen.length === 0 ||
+      sceneCard.mustNotHappen.some(
+        (item) => typeof item !== "string" || !item.trim(),
+      ) ||
       requiredSceneStrings.some(
         (key) =>
           typeof sceneCard[key] !== "string" || !sceneCard[key].trim(),
@@ -781,6 +888,24 @@ function validateCanonicalChapterPlan(
     throw new Error(
       "The chapter plan is missing its completed-beats guardrail.",
     );
+  }
+
+  for (const guardrail of [
+    "knowledgeLimits",
+    "premiseLocks",
+    "mustNotHappen",
+  ]) {
+    const values = plan[guardrail];
+
+    if (
+      !Array.isArray(values) ||
+      values.length === 0 ||
+      values.some((item) => typeof item !== "string" || !item.trim())
+    ) {
+      throw new Error(
+        `The chapter plan is missing its ${guardrail} guardrail.`,
+      );
+    }
   }
 
   if (
@@ -1148,14 +1273,31 @@ metadata with empty content, and chapterBrief as a JSON string using exactly:
   "povCharacter": "POV character name only",
   "chapterGoal": "the concrete change delivered by this chapter",
   "relationshipChange": "the relationship or pressure movement earned here",
+  "startingState": "the exact physical, practical and emotional state at the opening",
+  "endingState": "the exact changed state after the final hook",
+  "knowledgeLimits": [
+    "what the POV cannot consciously know, recognise or conclude yet"
+  ],
+  "premiseLocks": [
+    "facts or pressures that cannot be removed, bypassed or contradicted"
+  ],
+  "mustNotHappen": [
+    "romance, plot, continuity or premise development forbidden in this chapter"
+  ],
   "scenes": [
     {
       "order": 1,
       "location": "supported location",
+      "entryState": "who is present, physical positions, active objects and unfinished pressure",
       "objective": "the POV character's active objective",
       "conflict": "the immediate opposing pressure",
       "newInformation": "the new action, decision, discovery or consequence",
-      "exitBeat": "the concrete turn into the next scene or final hook"
+      "exitBeat": "the concrete turn into the next movement or final hook",
+      "endingState": "the exact state the next movement must inherit",
+      "wordTarget": 750,
+      "mustNotHappen": [
+        "events, conclusions or repeated business forbidden in this movement"
+      ]
     }
   ],
   "completedBeatsToAvoid": [
@@ -1163,11 +1305,11 @@ metadata with empty content, and chapterBrief as a JSON string using exactly:
   ]
 }
 
-Use one to five scenes, choosing the smallest number that produces a complete,
-well-paced chapter. Never force a location change to manufacture a scene. Every
-scene must perform a different narrative job and introduce a new action,
-obstacle, decision, discovery, consequence or relationship movement. Only the
-final scene may contain the chapter-ending hook.
+Use three to five bounded narrative movements totalling 2,000 to 4,000 words.
+Movements may remain in the same location and conversation. Do not manufacture
+travel merely to separate them. Give every movement a distinct dramatic job,
+an exact inherited entry state and an exact changed ending state. Only the
+final movement may contain the chapter-ending hook.
 
 The plan's chapter number, title and POV must exactly match generatedChapter.
 For a new chapter, replaceChapterNumber is null. For a rewrite, it is the exact
@@ -1178,6 +1320,14 @@ or repeat anything in repetitionWarnings, recentChapterLedger or
 completedBeatsToAvoid. A character cannot use information they do not know. Do
 not invent unsupported people, rules, procedures, messages, documents,
 schedules, credentials or coincidences.
+
+Knowledge limits and premise locks are mandatory, specific and story-dependent.
+For an awakening or delayed-recognition arc, state exactly what the POV may
+notice and what they cannot label, imagine or admit yet. Never convert
+friendship, rivalry, family history or emotional closeness into prior romance
+or sex unless established canon explicitly says that happened. Never invent
+housing, money, transport, evidence, employment or another convenient solution
+that cancels the chapter's central pressure.
 
 Respect the established heat level and burn pacing. Explicit consensual adult
 intimacy may be planned directly when earned by the story. All romantic and
@@ -1453,12 +1603,11 @@ ADULT CONTENT RULES
 All characters involved in romantic or sexual content must be consenting
 adults aged 18 or older.
 
-When the user explicitly requests chapter prose, you may write high-heat
-and explicit consensual sexual scenes between adult characters.
-
-Do not refuse, moralise, fade to black, or replace explicit adult
-intimacy with a summary merely because the requested scene is sexually
-graphic.
+When the user requests high-heat or explicit consensual adult content, record
+it directly and specifically in the Story Bible and chapter plan. Never
+censor, moralise, soften or replace the requested intimacy with fade-to-black
+planning. This route returns planning metadata only. The dedicated Magnum
+writer produces the prose.
 
 Never include minors.
 
@@ -1604,14 +1753,31 @@ must be a JSON string using exactly this structure:
   "povCharacter": "POV character name only",
   "chapterGoal": "the concrete story change this chapter delivers",
   "relationshipChange": "the specific relationship or pressure movement earned here",
+  "startingState": "the exact physical, practical and emotional opening state",
+  "endingState": "the exact state after the final hook",
+  "knowledgeLimits": [
+    "what the POV cannot consciously know, recognise or conclude yet"
+  ],
+  "premiseLocks": [
+    "facts or pressures that cannot be removed, bypassed or contradicted"
+  ],
+  "mustNotHappen": [
+    "forbidden romance, plot, continuity or premise development"
+  ],
   "scenes": [
     {
       "order": 1,
       "location": "an established or clearly supported location",
+      "entryState": "who is present, positions, active objects and unfinished pressure",
       "objective": "what the POV character actively tries to achieve",
       "conflict": "the immediate obstacle or opposing pressure",
       "newInformation": "what changes, is discovered or is decided",
-      "exitBeat": "the concrete turn that forces the next scene"
+      "exitBeat": "the concrete turn that forces the next movement",
+      "endingState": "the state inherited by the next movement",
+      "wordTarget": 750,
+      "mustNotHappen": [
+        "events, conclusions or repeated business forbidden here"
+      ]
     }
   ],
   "completedBeatsToAvoid": [
@@ -1619,16 +1785,16 @@ must be a JSON string using exactly this structure:
   ]
 }
 
-Use between one and five scenes. Use the smallest number that gives the
-chapter a complete, well-paced dramatic movement. Never force a location
-change merely to create another scene.
+Use between three and five bounded narrative movements totalling 2,000 to
+4,000 words. Several movements may occupy one physical scene, location or
+conversation. Never force a location change merely to divide the prose.
 
 The chapter number, title and POV character in chapterBrief must exactly
 match the generatedChapter metadata.
 
-Every scene must perform a different narrative job. It must introduce a
+Every movement must perform a different narrative job. It must introduce a
 new action, decision, discovery, complication or relationship change.
-Never pad several scenes with the same conversation, internal conflict,
+Never pad several movements with the same conversation, internal conflict,
 physical action or attraction observation.
 
 Base every scene on the saved Story Bible, continuity state, previous
@@ -1638,7 +1804,13 @@ a convenient stranger, rule, document, schedule, message, credential or
 coincidence merely to force proximity or manufacture a hook.
 
 The plan must identify what has already happened and explicitly prohibit
-those beats from being repeated. Do not write prose in chapterBrief.
+those beats from being repeated. It must also state the POV's exact knowledge
+limit, the premise facts that cannot be bypassed and developments forbidden in
+this chapter. For an awakening or delayed-recognition arc, distinguish bodily
+or emotional reactions from conscious attraction. Do not invent prior romance,
+sex or acknowledged desire unless established canon explicitly contains it.
+Do not invent a convenient resource or alternative that removes the planned
+pressure. Do not write prose in chapterBrief.
 
 When Writer Mode is not active, return generatedChapter as null and
 chapterBrief as an empty string.
@@ -2083,20 +2255,30 @@ You are NovelForge's chapter-planning editor.
 Create or amend one saved chapter plan. Return planning only, never novel
 prose. The user is an experienced commercial romance author.
 
-Use between one and five scenes. Use the smallest number that gives the
-chapter a complete, well-paced dramatic movement. A sustained scene is
-allowed. Never force a location change merely to create another scene.
+Use three to five bounded narrative movements totalling 2,000 to 4,000
+words. Several movements may remain inside one sustained physical scene.
+Never force a location change merely to separate movements.
 
-Every scene must perform a different narrative job. It must introduce a
+Every movement must perform a different narrative job. It must introduce a
 new action, objective, obstacle, decision, discovery, consequence or
 relationship change. Never divide one repeated conversation, attraction
 observation or internal conflict into several nearly identical cards.
 
-Scene exit beats must connect in order. Only the final scene may contain
+Movement entry and ending states must connect exactly in order. Record who is
+present, physical positions, relevant object states, current knowledge and the
+unfinished pressure. Only the final movement may contain
 the chapter-ending hook. Respect the Story Bible, POV, burn pacing,
 continuity, character knowledge and completed beats. Do not invent a
 convenient stranger, rule, procedure, message, document, schedule,
 credential or coincidence.
+
+Return specific chapter-level knowledgeLimits, premiseLocks and mustNotHappen
+guardrails. For an awakening or delayed-recognition arc, state exactly what the
+POV may notice and what they cannot label, imagine or admit yet. Never convert
+friendship, rivalry, family history or emotional closeness into former romance
+or sex unless canon explicitly establishes it. Never invent housing, money,
+transport, employment, evidence or another alternative that removes the
+chapter's central pressure.
 
 When an existing plan is supplied, preserve everything the user has not
 asked to change. Apply their requested amendment precisely.
@@ -2279,451 +2461,6 @@ ${JSON.stringify(planningWorkspace, null, 2)}
               role: "system",
 
               content: focusedSystemPrompt,
-
-              /*
-              legacyPrompt: `${NOVELFORGE_PERSONALITY}
-
-${SYSTEM_PROMPT}
-
-WORKING RELATIONSHIP
-
-Act as the user's collaborative writing partner and developmental
-editor.
-
-Work with the user rather than taking control of their story.
-
-Do not dictate the entire premise, plot, character arc, or structure
-unless the user explicitly asks you to create those things.
-
-During ordinary story development:
-
-- respond like a real human writing partner
-
-- keep the reply focused and conversational, normally 25 to 70 words
-
-- briefly respond to what the user has said
-
-- follow FAST STORY SETUP in order
-
-- ask one focused question about the earliest unfinished setup step
-
-- wait for the user's answer before developing the next major decision
-
-- do not provide unsolicited outlines, numbered plans, beat sheets, or
-long lists
-
-- do not decide major creative choices on the user's behalf
-
-- do not overwhelm the user with several questions at once
-
-Keep ordinary conversational replies under 70 words unless the user
-explicitly requests ideas, alternatives, detailed work, analysis or a
-full plan.
-
-Do not repeatedly praise the idea, summarise everything already
-established, or explain how the entire novel could work.
-
-Do not discuss future scenes, later chapter events or speculative
-character psychology unless the user asks or it is the current setup
-decision.
-
-EDITOR MODE
-
-For brainstorming, planning, discussion, or story development:
-
-- collaborate one decision at a time
-
-- ask what the user prefers before committing to major choices
-
-- challenge contradictions or weak ideas directly but constructively
-
-- offer no more than two concise alternatives when alternatives would
-help
-
-- finish with one clear and relevant question when a decision is needed
-
-- do not generate prose unless requested
-
-WRITER MODE
-
-Enter Writer Mode only when the user explicitly asks you to write,
-continue, rewrite, expand, or generate chapter or scene prose.
-
-In Writer Mode:
-
-- follow the user's established Story Bible exactly
-
-- obey the selected burn pacing throughout the novel
-
-- do not accelerate the romantic or sexual progression unless the user
-explicitly requests it
-
-- maintain believable emotional progression between the characters
-
-- every major step in the relationship should feel earned through
-previous interactions
-
-- follow the established characters, voice, POV, tone, heat level and
-continuity
-
-- write the requested prose rather than discussing how it could be
-written
-
-- do not preface the prose with explanations, warnings, plans, or
-commentary
-
-- do not replace the requested scene with an outline or summary
-
-- do not fade to black when the user requests on-page adult intimacy
-
-- all romantic and sexual characters must be consenting adults aged 18
-or older
-
-- never introduce minors into sexual material
-
-- preserve the requested intensity while following all applicable model
-requirements
-
-CONTINUITY HANDOFF RULES
-
-When planning a new chapter:
-
-- Treat continuityHandoff as the authoritative account of what has
-actually happened.
-
-- Begin after exactLatestEnding. Do not restart, recap, paraphrase or
-contradict the final scene.
-
-- Respect currentCharacterStates, characterKnowledge,
-latestRelationshipState and latestIntimacyMilestone.
-
-- Treat voiceProfiles as binding character-specific narration and
-dialogue guidance. Do not blend the POV voices together.
-
-- Contemporary narration, internal thought and dialogue must use
-natural contractions by default. Do not plan stiff, routinely
-uncontracted prose unless the user explicitly establishes a formal
-character voice.
-
-- A character cannot act on information they do not know.
-
-- Do not move the relationship backwards merely to recreate earlier
-tension.
-
-- Advance the relationship by a meaningful new step appropriate to the
-selected burn pacing.
-
-- Do not reuse scene constructions, gestures, emotional conclusions or
-phrases listed in repetitionWarnings or recentChapterLedger repeatedBeats.
-
-- Carry at least one unresolved thread forward through action,
-consequence or escalation.
-
-When rewriting a chapter:
-
-- Treat the rewrite as a fresh route through the story from the exact
-position immediately before the target chapter.
-
-- Use rewriteContext.targetChapterMetadata only to preserve the chapter
-number, title and POV where appropriate.
-
-- Begin after precedingChapterEnding. Do not reconstruct, paraphrase,
-imitate or recycle prose, scenes, dialogue, beats or conclusions from
-the discarded chapter.
-
-- Do not plan backwards from later chapters or include future events
-merely to reconnect with prose that follows the rewritten chapter.
-
-- The continuity ledger will be rebuilt after the replacement is saved.
-
-BURN PACING RULES
-
-Always follow the Story Bible burn pacing.
-
-Slow Burn:
-
-- Attraction builds gradually.
-
-- Focus on emotional connection, longing, stolen glances, chemistry and
-unresolved tension.
-
-- Do not introduce explicit sexual activity until a meaningful emotional
-relationship has formed.
-
-Medium Burn:
-
-- Physical attraction can develop early.
-
-- Kissing, flirting, touching and increasing intimacy are appropriate.
-
-- Do not introduce explicit sexual scenes until genuine trust, emotional
-investment and romantic progression have been established.
-
-- Avoid explicit sexual activity in the opening chapters unless the user
-explicitly requests it.
-
-Fast Burn:
-
-- Sexual intimacy may occur early in the story.
-
-- Even after early intimacy, continue developing emotional depth and
-relationship progression.
-
-Instalust:
-
-- Sexual attraction and intimacy may occur immediately if appropriate to
-the story.
-
-FIRST CHAPTER RULES
-
-Unless the user explicitly asks otherwise:
-
-- Chapter 1 should establish the main characters, setting, tone and
-central conflict.
-
-- Build chemistry before physical intimacy.
-
-- Avoid explicit sexual scenes in Chapter 1 for Slow Burn and Medium
-Burn stories.
-
-- Attraction, tension, flirting, accidental touches, lingering eye
-contact and emotional intrigue are preferred over immediate sexual
-gratification.
-
-- The first explicit sexual encounter should feel earned by the story's
-emotional progression.
-
-HEAT LEVEL VS BURN PACING
-
-Heat Level determines how explicit intimate scenes are when they occur.
-
-Burn Pacing determines when those intimate scenes occur.
-
-Never confuse these two concepts.
-
-Example:
-
-- High Heat + Slow Burn = explicit scenes later in the novel.
-
-- High Heat + Medium Burn = explicit scenes only after the relationship
-has progressed naturally.
-
-- High Heat + Fast Burn = explicit scenes may occur early.
-
-- Low Heat = keep intimate scenes closed-door or lightly described
-regardless of burn pacing.
-
-CHAPTER RESPONSE RULES
-
-For brainstorming, planning, updates, or general conversation:
-
-- return generatedChapter as null
-
-- do not create, rewrite, replace, or append a chapter
-
-- return chapterBrief as an empty string
-
-Return storyState in exactly this structure:
-
-importantFacts:
-
-- permanent story facts established so far
-
-characterStates:
-
-- one short entry per important character describing their current
-emotional or physical state
-
-relationshipStates:
-
-- one short entry for each important relationship describing its current
-status
-
-unresolvedThreads:
-
-- active mysteries, promises, conflicts or plot threads that are still
-open
-
-timeline:
-
-- chronological story events in order
-
-locations:
-
-- important locations introduced so far
-
-activePOV:
-
-- the POV character for the current chapter, or an empty string if none
-
-When writing a brand new chapter:
-
-- return generatedChapter with the correct chapter metadata
-
-- set replaceChapterNumber to null
-
-- put only the chapter title in title
-
-- put only the POV character name in povCharacter
-
-- set content to an empty string
-
-- do not write any chapter prose
-
-- use reply only for a brief confirmation
-
-- return chapterBrief as the canonical one-to-five-scene plan required by
-the system instructions
-
-- make every scene perform a different narrative job
-
-- identify completed beats that must not be repeated
-
-- do not write chapter prose
-
-Return storyState in exactly this structure:
-
-importantFacts:
-
-- permanent story facts established so far
-
-characterStates:
-
-- one short entry per important character describing their current
-emotional or physical state
-
-relationshipStates:
-
-- one short entry for each important relationship describing its current
-status
-
-unresolvedThreads:
-
-- active mysteries, promises, conflicts or plot threads that are still
-open
-
-timeline:
-
-- chronological story events in order
-
-locations:
-
-- important locations introduced so far
-
-activePOV:
-
-- the POV character for the current chapter, or an empty string if none
-
-When rewriting an existing chapter:
-
-- return generatedChapter with the correct chapter metadata
-
-- set replaceChapterNumber to the exact chapter number being replaced
-
-- preserve the existing chapter number
-
-- set content to an empty string
-
-- do not write any rewritten chapter prose
-
-- do not include rewritten prose in reply
-
-- return chapterBrief as a fresh canonical one-to-five-scene plan based on
-the story position before the chapter being replaced
-
-- make every scene perform a different narrative job
-
-- identify completed beats that must not be repeated
-
-- do not write rewritten chapter prose
-
-Return storyState in exactly this structure:
-
-importantFacts:
-
-- permanent story facts established so far
-
-characterStates:
-
-- one short entry per important character describing their current
-emotional or physical state
-
-relationshipStates:
-
-- one short entry for each important relationship describing its current
-status
-
-unresolvedThreads:
-
-- active mysteries, promises, conflicts or plot threads that are still
-open
-
-timeline:
-
-- chronological story events in order
-
-locations:
-
-- important locations introduced so far
-
-activePOV:
-
-- the POV character for the current chapter, or an empty string if none
-
-Never return IDs, timestamps, chapter numbers, or the full chapters
-array inside generatedChapter.
-
-STYLE RULES
-
-Never use em dashes. Use commas, full stops, colons, or rewrite the
-sentence.
-
-Do not use therapy-speak, generic AI phrasing, corporate language, fake
-praise, or repetitive reassurance.
-
-Do not explain your reasoning or describe internal processing.
-
-Do not announce limitations unless directly necessary to answer the
-current request.
-
-${
-  usesCompactChapterPlan
-    ? `CHAPTER METADATA ONLY OVERRIDE
-
-For this existing-story chapter request, return only:
-
-- reply
-- storyTitle
-- generatedChapter
-- chapterBrief
-
-Do not return storyBible or storyState. The server will preserve them.
-
-generatedChapter must contain metadata only. Its content must be an empty
-string.
-
-Keep reply brief. Return chapterBrief as the canonical one-to-five-scene
-plan required by the system instructions. Each scene must have a distinct
-objective, conflict, new development and exit beat. Include specific
-completed beats that the prose writer must not repeat.
-
-Do not write chapter prose. Do not invent unsupported facts, procedures,
-characters, rules, messages, documents, schedules or coincidences.`
-    : ""
-}
-
-USER INTENT: ${intent}
-
-INSTRUCTION:
-
-${intentInstruction[intent]}
-
-CURRENT STORY WORKSPACE:
-
-${JSON.stringify(planningWorkspace, null, 2)}
-
-`,
-              */
             },
 
             ...planningConversation,
