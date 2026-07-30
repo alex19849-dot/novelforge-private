@@ -12,6 +12,7 @@ import BiblePanel from "./components/BiblePanel";
 
 import type {
   ActiveTab,
+  ChapterPlan,
   GenerationDiagnostic,
   StoryBible,
   StoryChapter,
@@ -37,6 +38,7 @@ type PendingChapterGeneration = {
   diagnostics?: GenerationDiagnostic[];
   qualityAccepted?: boolean;
   nextGenerationStage?: GenerationStage;
+  nextSceneIndex?: number;
 };
 
 type WriterResponse = {
@@ -44,6 +46,9 @@ type WriterResponse = {
   totalWordCount: number;
   isComplete: boolean;
   generationStage: GenerationStage;
+  sceneIndex?: number;
+  totalScenes?: number;
+  isFinalScene?: boolean;
   diagnostics: GenerationDiagnostic[];
 };
 
@@ -120,6 +125,8 @@ const EMPTY_STORY_STATE = {
   repetitionWarnings: [],
 
   voiceProfiles: [],
+
+  chapterPlans: [],
 
   lastGenerationDiagnostics: [],
 };
@@ -246,11 +253,7 @@ const CHAPTER_NUMBER_WORDS: Record<string, number> = {
   twenty: 20,
 };
 
-function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
-  if (!/\b(?:delete|remove)\b/i.test(message)) {
-    return { kind: "none" };
-  }
-
+function getChapterNumberFromMessage(message: string): number | null {
   const numberedChapter = message.match(
     /\bchapter\s+(?:number\s+)?(\d+)\b/i,
   );
@@ -259,26 +262,39 @@ function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
     const chapterNumber = Number(numberedChapter[1] ?? "");
 
     return Number.isInteger(chapterNumber) && chapterNumber > 0
-      ? { kind: "exact", chapterNumber }
-      : { kind: "ambiguous" };
+      ? chapterNumber
+      : null;
   }
 
   const wordedChapter = message.match(
     /\bchapter\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/i,
   );
 
-  if (wordedChapter) {
-    const chapterNumber =
-      CHAPTER_NUMBER_WORDS[wordedChapter[1]?.toLowerCase() ?? ""];
+  if (!wordedChapter) {
+    return null;
+  }
 
-    if (!chapterNumber) {
-      return { kind: "ambiguous" };
-    }
+  return (
+    CHAPTER_NUMBER_WORDS[wordedChapter[1]?.toLowerCase() ?? ""] ?? null
+  );
+}
 
-    return {
-      kind: "exact",
-      chapterNumber,
-    };
+function requestsChapterGeneration(message: string): boolean {
+  return (
+    /\b(?:write|generate|create)\b[\s\S]{0,100}\bchapter\b/i.test(message) ||
+    /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(message)
+  );
+}
+
+function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
+  if (!/\b(?:delete|remove)\b/i.test(message)) {
+    return { kind: "none" };
+  }
+
+  const chapterNumber = getChapterNumberFromMessage(message);
+
+  if (chapterNumber !== null) {
+    return { kind: "exact", chapterNumber };
   }
 
   if (
@@ -419,6 +435,12 @@ function isWriterResponse(value: unknown): value is WriterResponse {
     (response.generationStage === "opening" ||
       response.generationStage === "middle" ||
       response.generationStage === "final") &&
+    (response.sceneIndex === undefined ||
+      typeof response.sceneIndex === "number") &&
+    (response.totalScenes === undefined ||
+      typeof response.totalScenes === "number") &&
+    (response.isFinalScene === undefined ||
+      typeof response.isFinalScene === "boolean") &&
     isDiagnosticArray(response.diagnostics)
   );
 }
@@ -453,7 +475,11 @@ function isPendingGeneration(
     (pending.nextGenerationStage === undefined ||
       pending.nextGenerationStage === "opening" ||
       pending.nextGenerationStage === "middle" ||
-      pending.nextGenerationStage === "final")
+      pending.nextGenerationStage === "final") &&
+    (pending.nextSceneIndex === undefined ||
+      (typeof pending.nextSceneIndex === "number" &&
+        Number.isInteger(pending.nextSceneIndex) &&
+        pending.nextSceneIndex >= 0))
   );
 }
 
@@ -529,6 +555,57 @@ function isStoryBible(value: unknown): value is StoryBible {
   );
 }
 
+function isChapterPlan(value: unknown): value is ChapterPlan {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const plan = value as Partial<ChapterPlan>;
+
+  return (
+    typeof plan.chapterNumber === "number" &&
+    typeof plan.title === "string" &&
+    typeof plan.povCharacter === "string" &&
+    typeof plan.chapterGoal === "string" &&
+    typeof plan.relationshipChange === "string" &&
+    Array.isArray(plan.scenes) &&
+    plan.scenes.length >= 1 &&
+    plan.scenes.length <= 5 &&
+    plan.scenes.every(
+      (scene) =>
+        Boolean(scene) &&
+        typeof scene === "object" &&
+        typeof scene.order === "number" &&
+        typeof scene.location === "string" &&
+        typeof scene.objective === "string" &&
+        typeof scene.conflict === "string" &&
+        typeof scene.newInformation === "string" &&
+        typeof scene.exitBeat === "string",
+    ) &&
+    isStringArray(plan.completedBeatsToAvoid) &&
+    (plan.status === "draft" || plan.status === "approved") &&
+    typeof plan.updatedAt === "string"
+  );
+}
+
+function getPlannedSceneCount(chapterBrief: string): number {
+  try {
+    const parsed = JSON.parse(chapterBrief) as Record<string, unknown>;
+
+    if (Array.isArray(parsed.scenes)) {
+      return Math.min(5, Math.max(1, parsed.scenes.length));
+    }
+
+    if (parsed.scene1 && parsed.scene2 && parsed.scene3) {
+      return 3;
+    }
+  } catch {
+    return 3;
+  }
+
+  return 3;
+}
+
 function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
   if (!value || typeof value !== "object") {
     return false;
@@ -574,6 +651,10 @@ function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
           typeof profile.internalThoughtPattern === "string" &&
           isStringArray(profile.forbiddenHabits),
       ));
+  const chapterPlansAreValid =
+    state.chapterPlans === undefined ||
+    (Array.isArray(state.chapterPlans) &&
+      state.chapterPlans.every(isChapterPlan));
 
   return (
     isStringArray(state.importantFacts) &&
@@ -591,6 +672,7 @@ function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
     (state.repetitionWarnings === undefined ||
       isStringArray(state.repetitionWarnings)) &&
     voiceProfilesAreValid &&
+    chapterPlansAreValid &&
     (state.lastGenerationDiagnostics === undefined ||
       isDiagnosticArray(state.lastGenerationDiagnostics))
   );
@@ -1757,6 +1839,10 @@ device.`,
           ...chapterStory,
           storyState: {
             ...ledgerData.storyState,
+            chapterPlans:
+              chapterStory.storyState.chapterPlans ??
+              baseStory.storyState.chapterPlans ??
+              [],
             lastGenerationDiagnostics: allDiagnostics,
           },
           updatedAt: new Date().toISOString(),
@@ -1766,11 +1852,28 @@ device.`,
         clearPendingGeneration();
       };
 
-      let generationStage: GenerationStage =
-        workingPending.nextGenerationStage ??
-        (!workingPending.draft.trim() ? "opening" : "final");
+      const plannedSceneCount = getPlannedSceneCount(
+        workingPending.chapterBrief,
+      );
+      let sceneIndex =
+        workingPending.nextSceneIndex ??
+        (!workingPending.draft.trim()
+          ? 0
+          : workingPending.nextGenerationStage === "middle"
+            ? 1
+            : plannedSceneCount - 1);
 
-      for (let sceneAttempt = 0; sceneAttempt < 3; sceneAttempt += 1) {
+      for (
+        let sceneAttempt = 0;
+        sceneAttempt < plannedSceneCount;
+        sceneAttempt += 1
+      ) {
+        const generationStage: GenerationStage =
+          sceneIndex === 0
+            ? "opening"
+            : sceneIndex === plannedSceneCount - 1
+              ? "final"
+              : "middle";
         const response = await fetch("/api/story-chat/write", {
           method: "POST",
           headers: {
@@ -1787,23 +1890,35 @@ device.`,
             minimumWordCount: workingPending.minimumWordCount,
             maximumWordCount: workingPending.maximumWordCount,
             generationStage,
+            sceneIndex,
           }),
         });
 
         const data = await readApiJson(response);
 
-        if (!isWriterResponse(data) || data.generationStage !== generationStage) {
+        if (
+          !isWriterResponse(data) ||
+          data.generationStage !== generationStage ||
+          (data.sceneIndex !== undefined && data.sceneIndex !== sceneIndex) ||
+          (data.totalScenes !== undefined &&
+            data.totalScenes !== plannedSceneCount)
+        ) {
           throw new Error(
             "The writing endpoint returned an invalid chapter scene.",
           );
         }
 
+        const isFinalScene =
+          data.isFinalScene ?? sceneIndex === plannedSceneCount - 1;
+        const nextSceneIndex = isFinalScene ? undefined : sceneIndex + 1;
         const nextGenerationStage: GenerationStage | undefined =
-          generationStage === "opening"
-            ? "middle"
-            : generationStage === "middle"
-              ? "final"
-              : undefined;
+          nextSceneIndex === undefined
+            ? undefined
+            : nextSceneIndex === 0
+              ? "opening"
+              : nextSceneIndex === plannedSceneCount - 1
+                ? "final"
+                : "middle";
 
         workingPending = {
           ...workingPending,
@@ -1813,13 +1928,14 @@ device.`,
             ...data.diagnostics,
           ],
           nextGenerationStage,
+          nextSceneIndex,
         };
         savePendingGeneration(workingPending);
 
-        if (generationStage === "final") {
+        if (isFinalScene) {
           if (!data.isComplete) {
             throw new Error(
-              `The three-scene writer finished at ${data.totalWordCount} words, outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The complete draft has been preserved for review.`,
+              `The planned chapter finished at ${data.totalWordCount} words, outside the accepted ${workingPending.minimumWordCount} to ${workingPending.maximumWordCount} range. The complete draft has been preserved for review.`,
             );
           }
 
@@ -1827,11 +1943,11 @@ device.`,
           return;
         }
 
-        generationStage = nextGenerationStage ?? "final";
+        sceneIndex = nextSceneIndex ?? plannedSceneCount - 1;
       }
 
       throw new Error(
-        "The three-scene writer exceeded its scene limit. The draft has been preserved.",
+        "The writer exceeded the saved plan's scene limit. The draft has been preserved.",
       );
     } catch (error) {
       if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
@@ -2005,6 +2121,11 @@ device.`,
           chapters: remainingChapters,
           storyState: {
             ...rebuiltStoryState,
+            chapterPlans: (
+              requestStory.storyState.chapterPlans ?? []
+            ).filter(
+              (plan) => plan.chapterNumber !== chapterNumber,
+            ),
             lastGenerationDiagnostics: deletionDiagnostics,
           },
           messages: [
@@ -2028,6 +2149,98 @@ device.`,
           clearPendingGeneration();
         }
 
+        return;
+      }
+
+      const requestedPlanChapterNumber =
+        getChapterNumberFromMessage(trimmedMessage);
+      const savedPlan =
+        requestedPlanChapterNumber === null
+          ? null
+          : (planningStory.storyState.chapterPlans ?? []).find(
+              (plan) =>
+                plan.chapterNumber === requestedPlanChapterNumber,
+            ) ?? null;
+      const existingPlannedChapter =
+        requestedPlanChapterNumber === null
+          ? null
+          : planningStory.chapters.find(
+              (chapter) =>
+                chapter.number === requestedPlanChapterNumber,
+            ) ?? null;
+      const explicitlyRewritesPlan =
+        /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(trimmedMessage);
+      const usesSavedPlan =
+        requestsChapterGeneration(trimmedMessage) &&
+        savedPlan !== null &&
+        (!existingPlannedChapter ||
+          (explicitlyRewritesPlan && savedPlan.status === "draft"));
+
+      if (usesSavedPlan && savedPlan) {
+        const approvedPlan: ChapterPlan = {
+          ...savedPlan,
+          status: "approved",
+          updatedAt: new Date().toISOString(),
+        };
+        const reply = `Chapter ${approvedPlan.chapterNumber} plan locked. Writing ${approvedPlan.scenes.length} ${
+          approvedPlan.scenes.length === 1 ? "scene" : "scenes"
+        } now.`;
+        const plannedStory: StoryWorkspace = {
+          ...planningStory,
+          storyState: {
+            ...planningStory.storyState,
+            chapterPlans: [
+              ...(planningStory.storyState.chapterPlans ?? []).filter(
+                (plan) =>
+                  plan.chapterNumber !== approvedPlan.chapterNumber,
+              ),
+              approvedPlan,
+            ].sort(
+              (left, right) => left.chapterNumber - right.chapterNumber,
+            ),
+          },
+          messages: [
+            ...planningStory.messages,
+            {
+              id: Date.now() + 1,
+              role: "assistant",
+              content: reply,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+        const requestedWordCount = getRequestedWordCount(trimmedMessage);
+        const requestedTarget = requestedWordCount
+          ? Math.min(4000, Math.max(2000, requestedWordCount))
+          : null;
+        const pending: PendingChapterGeneration = {
+          storyId: plannedStory.id,
+          generatedChapter: {
+            title: approvedPlan.title,
+            povCharacter: approvedPlan.povCharacter,
+            content: "",
+            replaceChapterNumber:
+              explicitlyRewritesPlan && existingPlannedChapter
+                ? approvedPlan.chapterNumber
+                : null,
+          },
+          chapterBrief: JSON.stringify(approvedPlan),
+          latestUserMessage: trimmedMessage,
+          draft: "",
+          minimumWordCount: requestedTarget
+            ? Math.max(2000, Math.floor(requestedTarget * 0.95))
+            : 2000,
+          maximumWordCount: requestedTarget
+            ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
+            : 4000,
+          diagnostics: [],
+          nextGenerationStage: "opening",
+          nextSceneIndex: 0,
+        };
+
+        await persistStory(plannedStory);
+        savePendingGeneration(pending);
+        await runPendingChapter(pending, plannedStory);
         return;
       }
 
