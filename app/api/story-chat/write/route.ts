@@ -10,6 +10,10 @@ export const maxDuration = 300;
 
 const WRITING_MODEL = "sao10k/l3.3-euryale-70b";
 
+const EURYALE_SAMPLING = {
+  min_p: 0.1,
+} as const;
+
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
@@ -457,13 +461,18 @@ The Story Bible, continuity and plan are binding. Characters must not know
 information they have not learned. Do not reset attraction, conflict, trust or
 intimacy. Use natural contractions and a distinct character voice.
 
-Never repeat any completed beat listed below. Every paragraph must move the
-scene's action, decision, knowledge, risk or relationship. Avoid generic
-attraction shorthand, repetitive internal summary, therapy-speak, purple prose,
-stock reactions and interchangeable banter.
+Never repeat any completed beat listed below. The scene as a whole must create
+meaningful movement in action, knowledge, risk or relationship. Allow natural
+breathing room for atmosphere, humour, observation, tension and sensory detail
+when those elements deepen the reader's experience. Avoid generic attraction
+shorthand, repetitive internal summary, therapy-speak, purple prose, stock
+reactions and interchangeable banter.
 
-Do not invent an unsupported stranger, rule, procedure, document, message,
-schedule, credential or coincidence. Never use em dashes or en dashes.
+You may create ordinary connective details and unnamed background activity
+needed for a natural scene. Do not invent a new named character, major rule,
+crucial message, convenient document, coincidence or factual development that
+changes the planned plot or established continuity. Never use em dashes or en
+dashes.
 
 Follow the Story Bible's heat level and burn pacing. All romantic and sexual
 characters are consenting adults aged eighteen or older. When established
@@ -573,8 +582,11 @@ Remain in this character's POV for the entire scene. Never switch heads.
 Apply this character's saved narrative and dialogue voice profile.
 
 The Story Bible, continuity and scene plan are binding. Never repeat the
-completed beats listed below. Do not invent an unsupported stranger, rule,
-procedure, document, message, schedule, credential or coincidence.
+completed beats listed below. You may create ordinary connective details and
+unnamed background activity needed for a natural scene. Do not invent a new
+named character, major rule, crucial message, convenient document, coincidence
+or factual development that changes the planned plot or established
+continuity.
 
 Avoid generic attraction shorthand, repetitive internal summary, therapy-speak,
 purple prose, stock reactions and interchangeable banter. Never use em dashes
@@ -776,12 +788,21 @@ the replacement scene prose.`;
           model: WRITING_MODEL,
           messages: [
             {
+              role: "system",
+              content: `You are NovelForge's commercial romance prose writer.
+Write immersive, emotionally intelligent fiction with distinct character
+voices. Treat the supplied Story Bible, continuity and approved scene plan as
+binding canon. Return only the requested scene's finished novel prose, with no
+analysis, planning, headings, markdown or commentary.`,
+            },
+            {
               role: "user",
               content: attemptPrompt,
             },
           ],
           max_tokens: 6000,
-          temperature: 0.7,
+          temperature: 1.1,
+          ...EURYALE_SAMPLING,
         });
         const rawUsage = response.usage as unknown as
           | Record<string, unknown>
