@@ -385,12 +385,37 @@ Track:
 
 - permanent facts and chronological events;
 - each important character's current physical, emotional and situational state;
+- the final location of every present named character and any important object,
+  possession, injury, clothing, vehicle, room or evidence whose state changed;
 - the current state of important relationships;
 - what named characters know, suspect, misunderstand or conceal;
 - active unresolved threads and established locations;
 - the exact relationship shift and furthest intimacy milestone reached;
 - repeated scene constructions, jokes, gestures, attraction observations,
   internal conclusions or phrases future chapters must avoid.
+
+CONTINUITY PRECISION
+
+Record concrete before-and-after changes, not broad mood summaries. If a
+character arrives, leaves, moves rooms, loses or recovers an object, changes
+clothes, drinks, eats, sleeps, becomes injured or learns information, preserve
+the final state needed by the next chapter.
+
+Character knowledge is individual. State who knows each fact and how they
+learned it. Never allow one character's narration, private thought or secret to
+become another character's knowledge without an on-page disclosure.
+
+Romantic knowledge is also individual. Distinguish physical awareness,
+fixation, jealousy, denial, suspicion, conscious attraction, acknowledged
+desire, intimacy and declared feelings. For an awakening arc, never upgrade an
+unlabelled reaction into recognised attraction merely because the reader can
+understand it.
+
+Do not convert friendship, rivalry, family history, former closeness or
+unresolved conflict into prior romance or sex unless the prose explicitly
+establishes that history. Do not infer off-page housing, money, transport,
+employment, evidence or another solution that removes an active premise
+pressure.
 
 Return one chapterEntries item for every supplied chapter in chapter-number
 order. Each entry must describe that chapter only.
@@ -400,7 +425,7 @@ character. Preserve an existing profile unless the Story Bible or completed
 prose establishes a genuine stable change. Never copy generic weaknesses from a
 generated chapter into the intended voice.
 
-Each profile must state concrete, character-specific guidance for narrative
+Each voice profile must state concrete, character-specific guidance for narrative
 rhythm, vocabulary, humour, emotional deflection, sensory focus, dialogue and
 internal thought. forbiddenHabits must identify phrases, reactions, jokes and
 sentence habits that would make the voice generic or too similar to another
