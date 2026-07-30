@@ -771,6 +771,10 @@ export async function POST(request: Request) {
 
     for (let attempt = 1; attempt <= maximumAttempts; attempt += 1) {
       providerCallStartedAt = Date.now();
+      let attemptInputTokens = 0;
+      let attemptOutputTokens = 0;
+      let attemptTotalTokens = 0;
+      let attemptCostUsd: number | null = null;
 
       try {
         const attemptPrompt =
@@ -807,19 +811,19 @@ analysis, planning, headings, markdown or commentary.`,
         const rawUsage = response.usage as unknown as
           | Record<string, unknown>
           | undefined;
-        const inputTokens =
+        attemptInputTokens =
           typeof rawUsage?.prompt_tokens === "number"
             ? rawUsage.prompt_tokens
             : 0;
-        const outputTokens =
+        attemptOutputTokens =
           typeof rawUsage?.completion_tokens === "number"
             ? rawUsage.completion_tokens
             : 0;
-        const totalTokens =
+        attemptTotalTokens =
           typeof rawUsage?.total_tokens === "number"
             ? rawUsage.total_tokens
-            : inputTokens + outputTokens;
-        const costUsd =
+            : attemptInputTokens + attemptOutputTokens;
+        attemptCostUsd =
           typeof rawUsage?.cost === "number" ? rawUsage.cost : null;
         const choice = response.choices[0];
         const finishReason = choice?.finish_reason;
@@ -874,11 +878,12 @@ analysis, planning, headings, markdown or commentary.`,
           provider: "openrouter",
           model: WRITING_MODEL,
           status: "succeeded",
-          inputTokens,
-          outputTokens,
-          totalTokens,
-          costUsd,
-          costType: costUsd === null ? "unavailable" : "reported",
+          inputTokens: attemptInputTokens,
+          outputTokens: attemptOutputTokens,
+          totalTokens: attemptTotalTokens,
+          costUsd: attemptCostUsd,
+          costType:
+            attemptCostUsd === null ? "unavailable" : "reported",
           durationMs: Date.now() - providerCallStartedAt,
           attempt,
         });
@@ -905,11 +910,12 @@ analysis, planning, headings, markdown or commentary.`,
           provider: "openrouter",
           model: WRITING_MODEL,
           status: "failed",
-          inputTokens: 0,
-          outputTokens: 0,
-          totalTokens: 0,
-          costUsd: null,
-          costType: "unavailable",
+          inputTokens: attemptInputTokens,
+          outputTokens: attemptOutputTokens,
+          totalTokens: attemptTotalTokens,
+          costUsd: attemptCostUsd,
+          costType:
+            attemptCostUsd === null ? "unavailable" : "reported",
           durationMs: Date.now() - providerCallStartedAt,
           attempt,
           error: lastError.message,
