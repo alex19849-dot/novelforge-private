@@ -27,6 +27,7 @@ const PENDING_GENERATION_KEY = "novelforge-pending-chapter-generation";
 
 type PendingChapterGeneration = {
   storyId: string;
+  savedAt?: string;
   generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
   chapterBrief: string;
   latestUserMessage: string;
@@ -443,6 +444,7 @@ function isPendingGeneration(
 
   return (
     typeof pending.storyId === "string" &&
+    (pending.savedAt === undefined || typeof pending.savedAt === "string") &&
     Boolean(chapter) &&
     typeof chapter?.title === "string" &&
     typeof chapter?.povCharacter === "string" &&
@@ -461,6 +463,21 @@ function isPendingGeneration(
     (pending.diagnostics === undefined ||
       isDiagnosticArray(pending.diagnostics))
   );
+}
+
+function parseRemotePendingGeneration(
+  value: unknown,
+): PendingChapterGeneration | null {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isPendingGeneration(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 class ApiRequestError extends Error {
@@ -1146,6 +1163,19 @@ export default function StoryChatPage() {
       updatedAt: data.updated_at,
     });
 
+    const remotePending = parseRemotePendingGeneration(data.custom_rewrite);
+
+    if (remotePending?.storyId === data.id) {
+      setPendingGeneration(remotePending);
+      window.localStorage.setItem(
+        PENDING_GENERATION_KEY,
+        JSON.stringify(remotePending),
+      );
+    } else {
+      setPendingGeneration(null);
+      window.localStorage.removeItem(PENDING_GENERATION_KEY);
+    }
+
     setActiveTab("chapters");
 
     setReaderOpen((data.chapters ?? []).length > 0);
@@ -1393,6 +1423,18 @@ undone.`,
               updatedAt: data.updated_at,
             });
 
+            const remotePending = parseRemotePendingGeneration(
+              data.custom_rewrite,
+            );
+
+            if (remotePending?.storyId === data.id) {
+              setPendingGeneration(remotePending);
+              window.localStorage.setItem(
+                PENDING_GENERATION_KEY,
+                JSON.stringify(remotePending),
+              );
+            }
+
             setHasLoaded(true);
 
             setHasLoadedRemoteStory(true);
@@ -1503,6 +1545,36 @@ undone.`,
 
     saveStoryToSupabase();
   }, [story, hasLoaded, hasLoadedRemoteStory, userId, isThinking]);
+
+  useEffect(() => {
+    if (
+      !hasLoadedRemoteStory ||
+      !userId ||
+      !story ||
+      !pendingGeneration ||
+      pendingGeneration.storyId !== story.id
+    ) {
+      return;
+    }
+
+    const pendingToSave = pendingGeneration;
+    const timeoutId = window.setTimeout(async () => {
+      const { error } = await supabase
+        .from("stories")
+        .update({
+          custom_rewrite: JSON.stringify(pendingToSave),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", pendingToSave.storyId)
+        .eq("user_id", userId);
+
+      if (error) {
+        console.error("Could not sync the unfinished chapter draft:", error);
+      }
+    }, 800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [pendingGeneration, story, userId, hasLoadedRemoteStory]);
 
   function startNewStory() {
     const confirmed = window.confirm(
@@ -1712,13 +1784,39 @@ device.`,
   }
 
   function savePendingGeneration(pending: PendingChapterGeneration) {
-    setPendingGeneration(pending);
-    localStorage.setItem(PENDING_GENERATION_KEY, JSON.stringify(pending));
+    const pendingWithTimestamp = {
+      ...pending,
+      savedAt: new Date().toISOString(),
+    };
+
+    setPendingGeneration(pendingWithTimestamp);
+    localStorage.setItem(
+      PENDING_GENERATION_KEY,
+      JSON.stringify(pendingWithTimestamp),
+    );
   }
 
   function clearPendingGeneration() {
+    const pendingStoryId = pendingGeneration?.storyId;
+
     setPendingGeneration(null);
     localStorage.removeItem(PENDING_GENERATION_KEY);
+
+    if (userId && pendingStoryId) {
+      void supabase
+        .from("stories")
+        .update({
+          custom_rewrite: "",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", pendingStoryId)
+        .eq("user_id", userId)
+        .then(({ error }) => {
+          if (error) {
+            console.error("Could not clear the synced chapter draft:", error);
+          }
+        });
+    }
   }
 
   async function persistStory(nextStory: StoryWorkspace) {
