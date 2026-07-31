@@ -130,6 +130,14 @@ function getPrompt(input: {
     "Use the Story Bible's POV and tense. Default to first-person present tense only when the Story Bible does not specify them.",
     "Remain in " + input.povCharacter + "'s POV. Never switch heads.",
     "Use natural contractions, a distinct character voice and readable paragraphing.",
+    "Every sentence must be complete, grammatical and naturally phrased. Never omit articles, pronouns, auxiliary verbs, prepositions or connecting words for brevity or style.",
+    "Never use an em dash or en dash. Use full stops, commas, colons, semicolons or parentheses where grammatically appropriate. Ordinary hyphens are allowed only inside genuine compound words.",
+    "Write controlled commercial prose, not a summary of what the viewpoint character thinks and feels. Build the scene through specific action, dialogue, sensory detail and individual observation.",
+    "Do not explain an emotion after the action or physical response has already shown it. Do not repeatedly announce nerves, determination, confusion, attraction or discomfort.",
+    "Avoid generic reaction crutches such as a pounding heart, a caught breath, taking a deep breath, being unable to help thinking or noticing, and reminding oneself why one is here unless that exact reaction is both fresh and necessary.",
+    "Do not begin successive paragraphs with the same construction. Vary sentence length naturally without fragments, clipped article-free phrasing or run-on sentences.",
+    "Dialogue must sound like the specific people speaking. Avoid formal exposition disguised as dialogue, generic interview language and speeches that explain facts both characters already know.",
+    "Do not invent previous meetings, conversations, opinions, memories or familiarity. A viewpoint character may know only what the Story Bible, continuity, plan or on-page events establish they know.",
     "The Story Bible, canonical chapter plan and accepted continuity are binding.",
     "Follow the plan in order, but write only the next useful portion. Do not rush to the chapter's final hook unless the remaining plan and user instruction require it.",
     "Preserve ages, timeline, locations, possessions, family facts, physical positions and character knowledge.",
@@ -248,6 +256,29 @@ function repetitionWarnings(
   const warnings: string[] = [];
   const existingParagraphs = new Set(substantialParagraphs(comparisonDraft));
   const returnedParagraphs = substantialParagraphs(section);
+
+  if (/[—–]/u.test(section)) {
+    warnings.push(
+      "This section contains a prohibited em dash or en dash. Review it before continuing.",
+    );
+  }
+
+  const reactionCrutches = [
+    /\bmy heart (?:is )?pound(?:s|ing)\b/gi,
+    /\bi (?:take|draw) a deep breath\b/gi,
+    /\bi can(?:not|'t) help but\b/gi,
+    /\bi remind myself\b/gi,
+  ];
+
+  if (
+    reactionCrutches.some(
+      (pattern) => Array.from(section.matchAll(pattern)).length > 1,
+    )
+  ) {
+    warnings.push(
+      "This section repeats a generic physical or internal reaction. Review it before continuing.",
+    );
+  }
 
   if (
     returnedParagraphs.some((paragraph) => existingParagraphs.has(paragraph))
@@ -414,15 +445,15 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "Write only finished commercial romance prose. Canon, POV and user direction are binding.",
+                "Write only polished, grammatically complete commercial romance prose. Canon, POV, established character knowledge, punctuation rules and user direction are binding. Never use em dashes or en dashes, omit necessary words, summarise the scene or pad it with generic emotional explanation.",
             },
             { role: "user", content: writingPrompt },
           ],
           max_tokens: 1600,
-          temperature: 0.68,
-          top_p: 0.9,
-          frequency_penalty: 0.14,
-          presence_penalty: 0.06,
+          temperature: 0.55,
+          top_p: 0.88,
+          frequency_penalty: 0,
+          presence_penalty: 0,
         });
         usage = response.usage as Usage | undefined;
         const choice = response.choices[0];
