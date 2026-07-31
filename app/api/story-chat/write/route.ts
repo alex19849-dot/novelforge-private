@@ -1,48 +1,34 @@
 import OpenAI from "openai";
+
 import { NextResponse } from "next/server";
+
 import type { GenerationDiagnostic } from "../../../story-chat/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 180;
 
-const WRITING_MODEL = "nousresearch/hermes-4-405b";
+const WRITING_MODEL = "anthracite-org/magnum-v4-72b";
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
 });
 
-type ChapterPart = "part1" | "part2";
-type RecentChapter = {
-  number: number;
-  title: string;
-  povCharacter: string;
-  content: string;
-};
-type CanonicalPlan = {
-  chapterNumber: number | null;
-  title: string;
-  povCharacter: string;
-  chapterGoal: string;
-  relationshipChange: string;
-  startingState: string;
-  endingState: string;
-  knowledgeLimits: string[];
-  premiseLocks: string[];
-  mustNotHappen: string[];
-  plannedEvents: unknown[];
-  completedBeatsToAvoid: string[];
-};
+type SectionAction = "start" | "continue" | "rewrite";
+
 type WriterRequest = {
   storyBible?: unknown;
   storyState?: unknown;
   recentChapters?: unknown;
   chapterBrief?: unknown;
+  chapterTitle?: unknown;
+  povCharacter?: unknown;
+  chapterDraft?: unknown;
+  sectionToRewrite?: unknown;
+  sectionInstruction?: unknown;
   latestUserMessage?: unknown;
-  part?: unknown;
-  part1?: unknown;
-  generationStage?: unknown;
-  existingDraft?: unknown;
+  action?: unknown;
 };
+
 type Usage = {
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -52,99 +38,30 @@ type Usage = {
 
 class TechnicalWriterError extends Error {}
 
-function string(value: unknown): string {
+function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function strings(value: unknown): string[] {
-  return Array.isArray(value) ? value.map(string).filter(Boolean) : [];
-}
-
-function wordCount(text: string): number {
+function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function getPart(body: WriterRequest): ChapterPart {
-  if (body.part === "part1" || body.part === "part2") return body.part;
-  if (body.generationStage === "opening") return "part1";
-  if (body.generationStage === "middle" || body.generationStage === "final") {
-    return "part2";
-  }
-  throw new Error("The writer request must specify part1 or part2.");
+function endingExcerpt(text: string, maximumWords: number): string {
+  return text
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(-maximumWords)
+    .join(" ");
 }
 
-function parsePlan(value: unknown): CanonicalPlan {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(string(value));
-  } catch {
-    throw new Error("The chapter is missing its canonical chapter plan.");
+function cleanStoryState(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("The canonical chapter plan is invalid.");
-  }
-  const raw = parsed as Record<string, unknown>;
-  const plannedEvents = Array.isArray(raw.plannedEvents)
-    ? raw.plannedEvents
-    : Array.isArray(raw.scenes)
-      ? raw.scenes
-      : [];
-  const plan: CanonicalPlan = {
-    chapterNumber:
-      typeof raw.chapterNumber === "number" &&
-      Number.isInteger(raw.chapterNumber) &&
-      raw.chapterNumber > 0
-        ? raw.chapterNumber
-        : null,
-    title: string(raw.title),
-    povCharacter: string(raw.povCharacter),
-    chapterGoal: string(raw.chapterGoal),
-    relationshipChange: string(raw.relationshipChange),
-    startingState: string(raw.startingState),
-    endingState: string(raw.endingState),
-    knowledgeLimits: strings(raw.knowledgeLimits),
-    premiseLocks: strings(raw.premiseLocks),
-    mustNotHappen: strings(raw.mustNotHappen),
-    plannedEvents,
-    completedBeatsToAvoid: strings(raw.completedBeatsToAvoid),
-  };
-  if (
-    !plan.title ||
-    !plan.povCharacter ||
-    !plan.chapterGoal ||
-    !plan.relationshipChange ||
-    !plan.startingState ||
-    !plan.endingState ||
-    plan.knowledgeLimits.length === 0 ||
-    plan.premiseLocks.length === 0 ||
-    plan.mustNotHappen.length === 0 ||
-    plan.plannedEvents.length === 0
-  ) {
-    throw new Error("The canonical chapter plan is incomplete.");
-  }
-  return plan;
-}
 
-function recentChapters(value: unknown): RecentChapter[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter(
-      (item): item is Record<string, unknown> =>
-        Boolean(item) && typeof item === "object" && !Array.isArray(item),
-    )
-    .map((item) => ({
-      number: typeof item.number === "number" ? item.number : 0,
-      title: string(item.title),
-      povCharacter: string(item.povCharacter),
-      content: string(item.content),
-    }))
-    .filter((item) => item.content)
-    .slice(-2);
-}
-
-function continuity(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const state = value as Record<string, unknown>;
+
   return {
     importantFacts: state.importantFacts ?? [],
     characterStates: state.characterStates ?? [],
@@ -160,163 +77,223 @@ function continuity(value: unknown): unknown {
   };
 }
 
-function finalParagraph(text: string): string {
-  return (
-    text
-      .trim()
-      .split(/\n\s*\n/)
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .at(-1) ?? ""
-  );
+function cleanRecentChapters(value: unknown): unknown[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (chapter): chapter is Record<string, unknown> =>
+        Boolean(chapter) &&
+        typeof chapter === "object" &&
+        !Array.isArray(chapter),
+    )
+    .slice(-2)
+    .map((chapter) => ({
+      number: chapter.number,
+      title: cleanString(chapter.title),
+      povCharacter: cleanString(chapter.povCharacter),
+      endingExcerpt: endingExcerpt(cleanString(chapter.content), 500),
+    }));
 }
 
-function prompt(input: {
-  part: ChapterPart;
-  plan: CanonicalPlan;
+function getAction(value: unknown): SectionAction {
+  return value === "start" || value === "rewrite" ? value : "continue";
+}
+
+function getPrompt(input: {
+  action: SectionAction;
   storyBible: unknown;
   storyState: unknown;
-  recentChapters: RecentChapter[];
-  part1: string;
+  recentChapters: unknown[];
+  chapterBrief: string;
+  chapterTitle: string;
+  povCharacter: string;
+  chapterDraft: string;
+  sectionToRewrite: string;
+  sectionInstruction: string;
   latestUserMessage: string;
 }): string {
-  const bible =
-    input.storyBible && typeof input.storyBible === "object"
-      ? (input.storyBible as Record<string, unknown>)
-      : {};
-  const style = string(bible.pov) || "first-person present tense";
-  const task =
-    input.part === "part1"
-      ? "Write Part 1. Begin at the exact starting state. Cover only the earlier planned progression. Leave meaningful action for Part 2. Do not reach the final hook. Finish on a complete sentence at a natural active transition."
-      : "Write Part 2 only. Continue immediately after Part 1's exact final sentence. Do not quote, recap, paraphrase or restart Part 1. Complete only the remaining plan, reach the exact ending state and finish with the planned hook once.";
+  const draftContext = endingExcerpt(input.chapterDraft, 1400);
+  const actionInstruction =
+    input.action === "start"
+      ? "Begin the chapter at the canonical plan's exact opening state."
+      : input.action === "rewrite"
+        ? "Write a replacement for SECTION TO REWRITE only. Preserve the surrounding chapter continuity and satisfy the user's section instruction."
+        : "Continue immediately after CURRENT CHAPTER ENDING. Do not recap, restart or quote its final sentence.";
+
   return [
-    "You are NovelForge's commercial adult romance prose writer.",
-    "Write finished novel prose in " +
-      style +
-      ". Use natural contractions and the saved POV character's distinct voice.",
-    "Remain in " +
-      input.plan.povCharacter +
-      "'s single POV for both technical parts. Never switch POV.",
-    "The Story Bible, continuity and canonical plan are binding. Preserve physical staging, ages, locations, possessions, family details and timeline.",
-    "Do not invent prior romance, attraction or intimacy. In a gay-for-you awakening, develop attraction through involuntary attention, physical reaction, denial and changed behaviour before conscious acknowledgement.",
-    "Do not duplicate or restart events, exchanges, observations or paragraphs. Use direct, consensual, explicit adult sexual prose when the Story Bible and plan require it. Do not censor, summarise or fade to black.",
-    "Return only novel prose, between 1,000 and 1,350 words. No heading, title, POV label, outline, markdown, notes, warning, word count or commentary.",
-    "After the final complete prose sentence, output <END_PART> on its own line. The marker is mandatory. Never continue after it.",
-    "CHAPTER PLAN\n" + JSON.stringify(input.plan, null, 2),
+    "You are NovelForge's commercial adult MM romance prose writer.",
+    "Write one polished section of approximately 600 to 1,000 words.",
+    "Return only novel prose followed by <END_SECTION> on its own line.",
+    "Use the Story Bible's POV and tense. Default to first-person present tense only when the Story Bible does not specify them.",
+    "Remain in " + input.povCharacter + "'s POV. Never switch heads.",
+    "Use natural contractions, a distinct character voice and readable paragraphing.",
+    "The Story Bible, canonical chapter plan and accepted continuity are binding.",
+    "Follow the plan in order, but write only the next useful portion. Do not rush to the chapter's final hook unless the remaining plan and user instruction require it.",
+    "Preserve ages, timeline, locations, possessions, family facts, physical positions and character knowledge.",
+    "Do not invent prior romance, attraction or intimacy. In a gay-for-you or delayed-awareness arc, involuntary attention, physical reaction, denial and changed behaviour must precede conscious acknowledgement.",
+    "Do not repeat completed actions, conversations, jokes, gestures, attraction observations, internal conclusions or paragraphs.",
+    "Write direct consensual explicit adult sexual content when the established story progression and current instruction require it. Never censor, summarise or fade to black.",
+    "Do not include a chapter heading, POV label, outline, notes, markdown, warnings, analysis or commentary.",
     "STORY BIBLE\n" + JSON.stringify(input.storyBible ?? {}, null, 2),
-    "CONTINUITY\n" + JSON.stringify(continuity(input.storyState), null, 2),
-    "RECENT CHAPTERS\n" + JSON.stringify(input.recentChapters, null, 2),
-    input.part === "part2"
-      ? "PART 1, READ-ONLY CANON\n" +
-        input.part1 +
-        "\nEXACT FINAL PARAGRAPH\n" +
-        finalParagraph(input.part1)
+    "CANONICAL CHAPTER PLAN\n" + input.chapterBrief,
+    "CONTINUITY\n" + JSON.stringify(cleanStoryState(input.storyState), null, 2),
+    "RECENT CHAPTER ENDINGS\n" + JSON.stringify(input.recentChapters, null, 2),
+    input.chapterDraft
+      ? "CURRENT CHAPTER ENDING, READ ONLY\n" + draftContext
       : "",
-    "USER REQUEST\n" +
-      (input.latestUserMessage || "Write the approved chapter."),
-    "FINAL BINDING KNOWLEDGE LIMITS\n" +
-      JSON.stringify(input.plan.knowledgeLimits, null, 2),
-    "FINAL BINDING MUST-NOT-HAPPEN LOCKS\n" +
-      JSON.stringify(input.plan.mustNotHappen, null, 2),
-    "FINAL BINDING ENDING STATE\n" + input.plan.endingState,
-    "TASK\n" +
-      task +
-      " Obey every knowledge limit and must-not-happen lock literally. Do not substitute a more romantic, sexual or dramatic event.",
+    input.action === "rewrite"
+      ? "SECTION TO REWRITE, READ ONLY\n" + input.sectionToRewrite
+      : "",
+    "CHAPTER METADATA\nTitle: " +
+      input.chapterTitle +
+      "\nPOV: " +
+      input.povCharacter,
+    "USER'S CHAPTER REQUEST\n" +
+      (input.latestUserMessage || "Write the chapter naturally."),
+    "SECTION INSTRUCTION\n" +
+      (input.sectionInstruction || "Write the next planned section."),
+    "ACTION\n" + actionInstruction,
+    "Complete the section on a finished sentence, then output <END_SECTION>. Do not continue after the marker.",
   ]
     .filter(Boolean)
     .join("\n\n");
 }
 
-function instructionLike(text: string): boolean {
-  return [
-    /^#{1,6}\s/m,
-    /^\x60\x60\x60/m,
-    /^\s*(outline|analysis|notes?|instructions?|chapter plan|word count)\s*:/im,
-    /^\s*(here('s| is)|certainly|sure)[,!:]/i,
-    /<\/?(END_|CHAPTER|PART|think)[^>]*>/i,
-  ].some((pattern) => pattern.test(text.trim()));
-}
-
-function truncated(text: string): boolean {
-  const prose = text.trim();
-  const last = prose.at(-1) ?? "";
-  return (
-    !prose ||
-    /[,;:(\[{"'“‘-]$/.test(last) ||
-    /\b(and|but|or|because|although|while|when|that|the|a|an|to|of|with|into|from)$/i.test(
-      finalParagraph(prose),
-    )
-  );
-}
-
-function completedPart(raw: string): string {
+function extractCompletedSection(raw: string): string {
   const trimmed = raw.trim();
 
-  if (!/<END_PART>\s*$/i.test(trimmed)) {
+  if (!/<END_SECTION>\s*$/i.test(trimmed)) {
     throw new Error(
-      "Hermes did not deliberately complete the part before its output ended.",
+      "The writing model did not deliberately complete the section.",
     );
   }
 
-  const prose = trimmed.replace(/\s*<END_PART>\s*$/i, "").trim();
+  const section = trimmed.replace(/\s*<END_SECTION>\s*$/i, "").trim();
 
-  if (!prose) {
-    throw new Error("Hermes returned an end marker without chapter prose.");
+  if (!section) {
+    throw new Error("The writing model returned no section prose.");
   }
 
-  return prose;
+  return section;
+}
+
+function validateSection(section: string): void {
+  if (
+    /^\s*chapter\s+\d+\b/im.test(section) ||
+    /^\s{0,3}#{1,6}\s+\S+/mu.test(section) ||
+    /```/.test(section) ||
+    /^\s*(outline|analysis|notes?|instructions?|chapter plan|word count)\s*:/im.test(
+      section,
+    ) ||
+    /<\/?think[^>]*>/i.test(section)
+  ) {
+    throw new Error(
+      "The writing model returned headings, markdown or instruction-like text instead of clean prose.",
+    );
+  }
+
+  if (!/[.!?…”’']$/u.test(section)) {
+    throw new Error(
+      "The writing model returned an obviously truncated section.",
+    );
+  }
+
+  if (countWords(section) < 120) {
+    throw new Error(
+      "The writing model returned too little prose to preserve safely.",
+    );
+  }
 }
 
 function normalise(text: string): string {
   return text
     .toLowerCase()
-    .replace(/[^a-z0-9' ]+/g, " ")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/[^a-z0-9'" ]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-function validate(
-  prose: string,
-  finishReason: string | null | undefined,
-  part1: string,
-) {
-  if (finishReason === "length") {
-    throw new Error(
-      "Hermes reached its output limit and returned truncated prose.",
-    );
-  }
-  if (finishReason === "content_filter") {
-    throw new Error(
-      "The writing provider stopped the response with a content filter.",
-    );
-  }
-  if (instructionLike(prose)) {
-    throw new Error(
-      "Hermes returned markdown or instruction-like text instead of prose.",
-    );
-  }
-  if (truncated(prose)) {
-    throw new Error("Hermes returned obviously truncated prose.");
-  }
-  const words = wordCount(prose);
-  if (words < 250) {
-    throw new Error(
-      "Hermes returned only " +
-        words +
-        " words, too little to preserve safely.",
-    );
-  }
-  if (part1) {
-    const opening = normalise(prose).split(" ").slice(0, 45).join(" ");
-    if (opening.split(" ").length >= 25 && normalise(part1).includes(opening)) {
-      throw new Error("Part 2 repeats prose already present in Part 1.");
-    }
-  }
+function substantialParagraphs(text: string): string[] {
+  return text
+    .split(/\n\s*\n/)
+    .map(normalise)
+    .filter((paragraph) => paragraph.split(" ").length >= 12);
 }
 
-function technical(error: unknown): boolean {
-  if (error instanceof TechnicalWriterError) return true;
-  if (error instanceof OpenAI.APIConnectionError) return true;
+function wordWindows(text: string, size: number): Set<string> {
+  const words = normalise(text).split(" ").filter(Boolean);
+  const windows = new Set<string>();
+
+  for (let index = 0; index + size <= words.length; index += 1) {
+    windows.add(words.slice(index, index + size).join(" "));
+  }
+
+  return windows;
+}
+
+function repetitionWarnings(
+  chapterDraft: string,
+  section: string,
+  sectionToRewrite: string,
+): string[] {
+  const comparisonDraft =
+    sectionToRewrite && chapterDraft.includes(sectionToRewrite)
+      ? chapterDraft.replace(sectionToRewrite, "")
+      : chapterDraft;
+  const warnings: string[] = [];
+  const existingParagraphs = new Set(substantialParagraphs(comparisonDraft));
+  const returnedParagraphs = substantialParagraphs(section);
+
+  if (
+    returnedParagraphs.some((paragraph) => existingParagraphs.has(paragraph))
+  ) {
+    warnings.push(
+      "This section contains a substantial paragraph already present in the chapter.",
+    );
+  }
+
+  if (comparisonDraft.trim()) {
+    const existingWindows = wordWindows(comparisonDraft, 16);
+    const sectionWindows = wordWindows(section, 16);
+    let sharedWindows = 0;
+
+    for (const window of sectionWindows) {
+      if (existingWindows.has(window)) {
+        sharedWindows += 1;
+      }
+    }
+
+    if (sharedWindows >= 2) {
+      warnings.push(
+        "This section contains passages that closely overlap existing chapter prose.",
+      );
+    }
+  }
+
+  const internalParagraphs = substantialParagraphs(section);
+  if (new Set(internalParagraphs).size !== internalParagraphs.length) {
+    warnings.push(
+      "This section repeats one of its own substantial paragraphs.",
+    );
+  }
+
+  return warnings;
+}
+
+function isTechnicalFailure(error: unknown): boolean {
+  if (error instanceof TechnicalWriterError) {
+    return true;
+  }
+
+  if (error instanceof OpenAI.APIConnectionError) {
+    return true;
+  }
+
   if (error instanceof OpenAI.APIError) {
     return (
       error.status === undefined ||
@@ -326,12 +303,12 @@ function technical(error: unknown): boolean {
       (typeof error.status === "number" && error.status >= 500)
     );
   }
+
   return error instanceof TypeError;
 }
 
 function diagnostic(input: {
   status: "succeeded" | "failed";
-  part: ChapterPart;
   usage?: Usage;
   durationMs: number;
   attempt: number;
@@ -341,8 +318,9 @@ function diagnostic(input: {
   const outputTokens = input.usage?.completion_tokens ?? 0;
   const costUsd =
     typeof input.usage?.cost === "number" ? input.usage.cost : null;
+
   return {
-    stage: "chapter_writing_" + input.part,
+    stage: "chapter_section_writing",
     provider: "openrouter",
     model: WRITING_MODEL,
     status: input.status,
@@ -359,6 +337,7 @@ function diagnostic(input: {
 
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
+
   try {
     if (!process.env.OPENROUTER_API_KEY) {
       return NextResponse.json(
@@ -366,39 +345,68 @@ export async function POST(request: Request) {
         { status: 500 },
       );
     }
+
     const body = (await request.json()) as WriterRequest;
-    const part = getPart(body);
-    const plan = parsePlan(body.chapterBrief);
-    const part1 =
-      part === "part2" ? string(body.part1) || string(body.existingDraft) : "";
+    const action = getAction(body.action);
+    const chapterBrief = cleanString(body.chapterBrief);
+    const chapterTitle = cleanString(body.chapterTitle);
+    const povCharacter = cleanString(body.povCharacter);
+    const chapterDraft = cleanString(body.chapterDraft);
+    const sectionToRewrite = cleanString(body.sectionToRewrite);
+
+    if (!chapterBrief || !povCharacter) {
+      return NextResponse.json(
+        { error: "A canonical chapter plan and POV character are required." },
+        { status: 400 },
+      );
+    }
+
+    if (action === "start" && chapterDraft) {
+      return NextResponse.json(
+        { error: "A new chapter section cannot start with an existing draft." },
+        { status: 409 },
+      );
+    }
+
+    if (action === "continue" && !chapterDraft) {
+      return NextResponse.json(
+        { error: "Continuing a chapter requires its existing draft." },
+        { status: 409 },
+      );
+    }
+
     if (
-      part === "part1" &&
-      (string(body.part1) || string(body.existingDraft))
+      action === "rewrite" &&
+      (!chapterDraft ||
+        !sectionToRewrite ||
+        !chapterDraft.includes(sectionToRewrite))
     ) {
       return NextResponse.json(
-        { error: "Part 1 must start without an existing chapter draft." },
+        {
+          error: "Rewriting requires an exact section from the current draft.",
+        },
         { status: 409 },
       );
     }
-    if (part === "part2" && !part1) {
-      return NextResponse.json(
-        { error: "Part 2 requires the untouched Part 1 prose." },
-        { status: 409 },
-      );
-    }
-    const writingPrompt = prompt({
-      part,
-      plan,
+
+    const writingPrompt = getPrompt({
+      action,
       storyBible: body.storyBible ?? {},
       storyState: body.storyState ?? {},
-      recentChapters: recentChapters(body.recentChapters),
-      part1,
-      latestUserMessage: string(body.latestUserMessage),
+      recentChapters: cleanRecentChapters(body.recentChapters),
+      chapterBrief,
+      chapterTitle,
+      povCharacter,
+      chapterDraft,
+      sectionToRewrite,
+      sectionInstruction: cleanString(body.sectionInstruction),
+      latestUserMessage: cleanString(body.latestUserMessage),
     });
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const startedAt = Date.now();
       let usage: Usage | undefined;
+
       try {
         const response = await openrouter.chat.completions.create({
           model: WRITING_MODEL,
@@ -406,83 +414,85 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "Write only polished novel prose. The supplied canon and single POV are binding.",
+                "Write only finished commercial romance prose. Canon, POV and user direction are binding.",
             },
             { role: "user", content: writingPrompt },
           ],
-          // Hermes has enough output headroom to deliver the full 1,000 to 1,400-word part.
-          max_tokens: 2400,
-          temperature: 0.5,
-          top_p: 0.85,
-          frequency_penalty: 0.12,
+          max_tokens: 1600,
+          temperature: 0.68,
+          top_p: 0.9,
+          frequency_penalty: 0.14,
           presence_penalty: 0.06,
-          // Prose writing needs direct mode. Prevent hybrid reasoning traces from
-          // consuming the output budget or leaking into chapter text.
-          reasoning: { enabled: false },
-        } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming & {
-          reasoning: { enabled: boolean };
         });
         usage = response.usage as Usage | undefined;
         const choice = response.choices[0];
-        const raw = choice?.message?.content;
-        if (!raw?.trim()) {
-          throw new TechnicalWriterError("Hermes returned an empty response.");
-        }
-        const returnedPart = completedPart(raw);
-        validate(returnedPart, choice?.finish_reason, part1);
-        const prose =
-          part === "part1"
-            ? returnedPart
-            : (part1 + "\n\n" + returnedPart).trim();
-        const totalWordCount = wordCount(prose);
-        if (part === "part2" && totalWordCount > 4000) {
+
+        if (choice?.finish_reason === "length") {
           throw new Error(
-            "The combined draft is " +
-              totalWordCount +
-              " words and exceeds the 4,000-word maximum.",
+            "The writing model reached its output limit before completing the section.",
           );
         }
+
+        if (choice?.finish_reason === "content_filter") {
+          throw new Error(
+            "The writing provider stopped the section with a content filter.",
+          );
+        }
+
+        const raw = choice?.message?.content;
+
+        if (!raw?.trim()) {
+          throw new TechnicalWriterError(
+            "The writing model returned an empty response.",
+          );
+        }
+
+        const section = extractCompletedSection(raw);
+        validateSection(section);
+        const warnings = repetitionWarnings(
+          chapterDraft,
+          section,
+          sectionToRewrite,
+        );
+
         diagnostics.push(
           diagnostic({
             status: "succeeded",
-            part,
             usage,
             durationMs: Date.now() - startedAt,
             attempt,
           }),
         );
+
         return NextResponse.json({
-          prose,
-          returnedPart,
-          part,
-          totalWordCount,
-          isComplete:
-            part === "part2" &&
-            totalWordCount >= 2000 &&
-            totalWordCount <= 4000,
+          section,
+          wordCount: countWords(section),
+          warnings,
+          action,
           diagnostics,
         });
       } catch (error) {
         const writerError =
           error instanceof Error
             ? error
-            : new Error("The writing model failed.");
-        const retryable = technical(error);
+            : new Error("The section writer failed.");
+        const retryable = isTechnicalFailure(error);
+
         diagnostics.push(
           diagnostic({
             status: "failed",
-            part,
             usage,
             durationMs: Date.now() - startedAt,
             attempt,
             error: writerError.message,
           }),
         );
+
         if (!retryable || attempt === 2) {
           return NextResponse.json(
             {
               error: writerError.message,
-              preservedDraft: part1 || null,
+              preservedDraft: chapterDraft || null,
               diagnostics,
             },
             { status: retryable ? 502 : 422 },
@@ -490,12 +500,13 @@ export async function POST(request: Request) {
         }
       }
     }
+
     throw new Error("The writing provider failed.");
   } catch (error) {
     return NextResponse.json(
       {
         error:
-          error instanceof Error ? error.message : "The chapter writer failed.",
+          error instanceof Error ? error.message : "The section writer failed.",
         diagnostics,
       },
       { status: 500 },
