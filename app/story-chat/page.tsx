@@ -25,27 +25,26 @@ const STORAGE_KEY = "novelforge-current-story";
 
 const PENDING_GENERATION_KEY = "novelforge-pending-chapter-generation";
 
-type PendingPhase = "part1" | "part2" | "quality" | "rejected" | "ledger";
-
 type PendingChapterGeneration = {
   storyId: string;
   generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
   chapterBrief: string;
   latestUserMessage: string;
   draft: string;
+  lastSection?: string;
+  repetitionWarnings?: string[];
   minimumWordCount: number;
   maximumWordCount: number;
   diagnostics?: GenerationDiagnostic[];
-  qualityAccepted?: boolean;
-  phase?: PendingPhase;
 };
 
+type SectionAction = "start" | "continue" | "rewrite";
+
 type WriterResponse = {
-  prose: string;
-  returnedPart: string;
-  part: "part1" | "part2";
-  totalWordCount: number;
-  isComplete: boolean;
+  section: string;
+  wordCount: number;
+  warnings: string[];
+  action: SectionAction;
   diagnostics: GenerationDiagnostic[];
 };
 
@@ -421,13 +420,13 @@ function isWriterResponse(value: unknown): value is WriterResponse {
   const response = value as Partial<WriterResponse>;
 
   return (
-    typeof response.prose === "string" &&
-    Boolean(response.prose.trim()) &&
-    typeof response.returnedPart === "string" &&
-    Boolean(response.returnedPart.trim()) &&
-    (response.part === "part1" || response.part === "part2") &&
-    typeof response.totalWordCount === "number" &&
-    typeof response.isComplete === "boolean" &&
+    typeof response.section === "string" &&
+    Boolean(response.section.trim()) &&
+    typeof response.wordCount === "number" &&
+    isStringArray(response.warnings) &&
+    (response.action === "start" ||
+      response.action === "continue" ||
+      response.action === "rewrite") &&
     isDiagnosticArray(response.diagnostics)
   );
 }
@@ -453,18 +452,14 @@ function isPendingGeneration(
     typeof pending.chapterBrief === "string" &&
     typeof pending.latestUserMessage === "string" &&
     typeof pending.draft === "string" &&
+    (pending.lastSection === undefined ||
+      typeof pending.lastSection === "string") &&
+    (pending.repetitionWarnings === undefined ||
+      isStringArray(pending.repetitionWarnings)) &&
     typeof pending.minimumWordCount === "number" &&
     typeof pending.maximumWordCount === "number" &&
     (pending.diagnostics === undefined ||
-      isDiagnosticArray(pending.diagnostics)) &&
-    (pending.qualityAccepted === undefined ||
-      typeof pending.qualityAccepted === "boolean") &&
-    (pending.phase === undefined ||
-      pending.phase === "part1" ||
-      pending.phase === "part2" ||
-      pending.phase === "quality" ||
-      pending.phase === "rejected" ||
-      pending.phase === "ledger")
+      isDiagnosticArray(pending.diagnostics))
   );
 }
 
@@ -981,6 +976,8 @@ export default function StoryChatPage() {
 
   const [pendingGeneration, setPendingGeneration] =
     useState<PendingChapterGeneration | null>(null);
+
+  const [sectionInstruction, setSectionInstruction] = useState("");
 
   const [stories, setStories] = useState<
     {
@@ -1751,26 +1748,38 @@ device.`,
     await loadStoryList(userId);
   }
 
-  async function runPendingChapter(
+  function updatePendingDraft(content: string) {
+    if (!pendingGeneration) {
+      return;
+    }
+
+    savePendingGeneration({
+      ...pendingGeneration,
+      draft: content,
+      lastSection:
+        pendingGeneration.lastSection &&
+        content.includes(pendingGeneration.lastSection)
+          ? pendingGeneration.lastSection
+          : undefined,
+    });
+  }
+
+  async function writeChapterSection(
     initialPending: PendingChapterGeneration,
     baseStory: StoryWorkspace,
+    action: SectionAction,
   ) {
     setIsThinking(true);
-    let workingPending: PendingChapterGeneration = {
-      ...initialPending,
-      minimumWordCount: Math.max(2000, initialPending.minimumWordCount),
-      maximumWordCount: Math.min(4000, initialPending.maximumWordCount),
-      phase:
-        initialPending.phase ??
-        (initialPending.draft.trim() ? "part2" : "part1"),
-    };
+    let workingPending = initialPending;
     savePendingGeneration(workingPending);
 
     try {
-      if (workingPending.phase === "rejected") {
-        throw new Error(
-          "Terra rejected this preserved draft. Choose Accept, Rewrite, Targeted Repair or Manual Edit when those controls are added. Resume will not overwrite it.",
-        );
+      if (action === "continue" && !workingPending.draft.trim()) {
+        throw new Error("There is no chapter draft to continue.");
+      }
+
+      if (action === "rewrite" && !workingPending.lastSection?.trim()) {
+        throw new Error("There is no previous generated section to rewrite.");
       }
 
       const replacementNumber =
@@ -1785,145 +1794,122 @@ device.`,
           : baseStory.chapters
               .filter((chapter) => chapter.number < replacementNumber)
               .slice(-2);
+      const response = await fetch("/api/story-chat/write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          storyBible: baseStory.storyBible,
+          storyState: writingStoryState,
+          recentChapters,
+          chapterBrief: workingPending.chapterBrief,
+          chapterTitle: workingPending.generatedChapter.title,
+          povCharacter: workingPending.generatedChapter.povCharacter,
+          chapterDraft: workingPending.draft,
+          sectionToRewrite:
+            action === "rewrite" ? (workingPending.lastSection ?? "") : "",
+          sectionInstruction,
+          latestUserMessage: workingPending.latestUserMessage,
+        }),
+      });
+      const data = await readApiJson(response);
 
-      if (workingPending.phase === "part1") {
-        const response = await fetch("/api/story-chat/write", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            storyBible: baseStory.storyBible,
-            storyState: writingStoryState,
-            recentChapters,
-            chapterBrief: workingPending.chapterBrief,
-            latestUserMessage: workingPending.latestUserMessage,
-            part: "part1",
-            part1: "",
-          }),
-        });
-        const data = await readApiJson(response);
+      if (!isWriterResponse(data) || data.action !== action) {
+        throw new Error("The writer returned an invalid chapter section.");
+      }
 
-        if (!isWriterResponse(data) || data.part !== "part1") {
+      let nextDraft = workingPending.draft.trim();
+
+      if (action === "start") {
+        nextDraft = data.section.trim();
+      } else if (action === "continue") {
+        nextDraft = (nextDraft + "\n\n" + data.section.trim()).trim();
+      } else {
+        const oldSection = workingPending.lastSection ?? "";
+        const sectionStart = nextDraft.lastIndexOf(oldSection);
+
+        if (sectionStart < 0) {
           throw new Error(
-            "The writing endpoint returned an invalid Part 1 response.",
+            "The previous section changed and could not be replaced safely.",
           );
         }
 
+        nextDraft =
+          nextDraft.slice(0, sectionStart) +
+          data.section.trim() +
+          nextDraft.slice(sectionStart + oldSection.length);
+        nextDraft = nextDraft.trim();
+      }
+
+      workingPending = {
+        ...workingPending,
+        draft: nextDraft,
+        lastSection: data.section.trim(),
+        repetitionWarnings: data.warnings,
+        diagnostics: [
+          ...(workingPending.diagnostics ?? []),
+          ...data.diagnostics,
+        ],
+      };
+      savePendingGeneration(workingPending);
+      setSectionInstruction("");
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
         workingPending = {
           ...workingPending,
-          draft: data.returnedPart.trim(),
-          phase: "part2",
           diagnostics: [
             ...(workingPending.diagnostics ?? []),
-            ...data.diagnostics,
+            ...error.diagnostics,
           ],
         };
         savePendingGeneration(workingPending);
       }
 
-      if (workingPending.phase === "part2") {
-        const untouchedPart1 = workingPending.draft.trim();
+      const message =
+        error instanceof Error ? error.message : "The section writer failed.";
+      const failedStory: StoryWorkspace = {
+        ...baseStory,
+        storyState: {
+          ...baseStory.storyState,
+          lastGenerationDiagnostics: workingPending.diagnostics ?? [],
+        },
+        messages: [
+          ...baseStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content:
+              "I couldn't write that section: " +
+              message +
+              " Your existing chapter draft has been preserved.",
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
 
-        if (!untouchedPart1) {
-          throw new Error("The preserved Part 1 draft is missing.");
-        }
+      setStory(failedStory);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(failedStory));
+    } finally {
+      setIsThinking(false);
+    }
+  }
 
-        const response = await fetch("/api/story-chat/write", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            storyBible: baseStory.storyBible,
-            storyState: writingStoryState,
-            recentChapters,
-            chapterBrief: workingPending.chapterBrief,
-            latestUserMessage: workingPending.latestUserMessage,
-            part: "part2",
-            part1: untouchedPart1,
-          }),
-        });
-        const data = await readApiJson(response);
+  async function completePendingChapter(
+    pending: PendingChapterGeneration,
+    baseStory: StoryWorkspace,
+  ) {
+    if (!pending.draft.trim()) {
+      return;
+    }
 
-        if (!isWriterResponse(data) || data.part !== "part2") {
-          throw new Error(
-            "The writing endpoint returned an invalid Part 2 response.",
-          );
-        }
+    setIsThinking(true);
 
-        workingPending = {
-          ...workingPending,
-          draft: data.prose.trim(),
-          phase: "quality",
-          diagnostics: [
-            ...(workingPending.diagnostics ?? []),
-            ...data.diagnostics,
-          ],
-        };
-        savePendingGeneration(workingPending);
-      }
-
-      if (workingPending.phase === "quality") {
-        const preservedCombinedDraft = workingPending.draft.trim();
-
-        if (!preservedCombinedDraft) {
-          throw new Error("The completed combined draft is missing.");
-        }
-
-        const qualityResponse = await fetch("/api/story-chat/quality", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            storyBible: baseStory.storyBible,
-            storyState: writingStoryState,
-            chapterBrief: workingPending.chapterBrief,
-            chapterTitle: workingPending.generatedChapter.title,
-            povCharacter: workingPending.generatedChapter.povCharacter,
-            chapterContent: preservedCombinedDraft,
-            minimumWordCount: workingPending.minimumWordCount,
-            maximumWordCount: workingPending.maximumWordCount,
-          }),
-        });
-        const qualityData = await readApiJson(qualityResponse);
-
-        if (!isQualityResponse(qualityData)) {
-          throw new Error(
-            "The quality endpoint returned an invalid assessment.",
-          );
-        }
-
-        workingPending = {
-          ...workingPending,
-          draft: preservedCombinedDraft,
-          phase: qualityData.accepted ? "ledger" : "rejected",
-          qualityAccepted: qualityData.accepted,
-          diagnostics: [
-            ...(workingPending.diagnostics ?? []),
-            ...qualityData.diagnostics,
-          ],
-        };
-        savePendingGeneration(workingPending);
-
-        if (!qualityData.accepted) {
-          const failures = qualityData.quality.hardFailures
-            .map((failure) => failure.trim())
-            .filter(Boolean)
-            .join(" ");
-          const reason = failures || qualityData.quality.summary.trim();
-
-          throw new Error(
-            "Terra rejected the completed chapter: " +
-              reason +
-              " The untouched combined draft has been preserved. It has not been repaired, rewritten or saved as a completed chapter.",
-          );
-        }
-      }
-
-      if (workingPending.phase !== "ledger") {
-        throw new Error("The chapter pipeline stopped at an unknown phase.");
-      }
-
+    try {
+      const replacementNumber = pending.generatedChapter.replaceChapterNumber;
       const chapterStory = applyGeneratedChapter(
         baseStory,
-        workingPending,
-        workingPending.draft,
+        pending,
+        pending.draft,
       );
       const completedChapterNumber =
         replacementNumber ??
@@ -1933,9 +1919,7 @@ device.`,
       );
 
       if (!completedChapter) {
-        throw new Error(
-          "The accepted chapter could not be prepared for continuity.",
-        );
+        throw new Error("The chapter could not be prepared for continuity.");
       }
 
       const latestExistingChapterNumber = Math.max(
@@ -1954,7 +1938,7 @@ device.`,
         rebuild: needsLedgerRebuild,
       });
       const allDiagnostics = [
-        ...(workingPending.diagnostics ?? []),
+        ...(pending.diagnostics ?? []),
         ...ledgerData.diagnostics,
       ];
       const completedStory: StoryWorkspace = {
@@ -1967,38 +1951,39 @@ device.`,
             [],
           lastGenerationDiagnostics: allDiagnostics,
         },
+        messages: [
+          ...chapterStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content:
+              "Chapter " +
+              completedChapterNumber +
+              " completed and continuity updated.",
+          },
+        ],
         updatedAt: new Date().toISOString(),
       };
 
       await persistStory(completedStory);
       clearPendingGeneration();
+      setSectionInstruction("");
     } catch (error) {
-      if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
-        workingPending = {
-          ...workingPending,
-          diagnostics: [
-            ...(workingPending.diagnostics ?? []),
-            ...error.diagnostics,
-          ],
-        };
-        savePendingGeneration(workingPending);
-      }
-
       const message =
-        error instanceof Error ? error.message : "The writing request failed.";
-      const failedDiagnostics = workingPending.diagnostics ?? [];
+        error instanceof Error
+          ? error.message
+          : "The chapter could not be completed.";
       const failedStory: StoryWorkspace = {
         ...baseStory,
-        storyState: {
-          ...baseStory.storyState,
-          lastGenerationDiagnostics: failedDiagnostics,
-        },
         messages: [
           ...baseStory.messages,
           {
             id: Date.now(),
             role: "assistant",
-            content: "I couldn't complete the chapter: " + message,
+            content:
+              "I couldn't complete the chapter: " +
+              message +
+              " The editable draft has been preserved.",
           },
         ],
         updatedAt: new Date().toISOString(),
@@ -2250,12 +2235,11 @@ device.`,
             ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
             : 4000,
           diagnostics: [],
-          phase: "part1",
         };
 
         await persistStory(plannedStory);
         savePendingGeneration(pending);
-        await runPendingChapter(pending, plannedStory);
+        await writeChapterSection(pending, plannedStory, "start");
         return;
       }
 
@@ -2333,11 +2317,10 @@ device.`,
           ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
           : 4000,
         diagnostics: [...preplanningDiagnostics, ...(data.diagnostics ?? [])],
-        phase: "part1",
       };
 
       savePendingGeneration(pending);
-      await runPendingChapter(pending, plannedStory);
+      await writeChapterSection(pending, plannedStory, "start");
     } catch (error) {
       console.error(
         "Story chat request failed:",
@@ -2828,37 +2811,102 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
             )}
 
             {pendingForCurrentStory && (
-              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-pink-500/30 bg-pink-500/10 p-3">
-                <p className="min-w-0 flex-1 text-sm text-pink-100">
-                  Chapter progress saved
-                  {pendingForCurrentStory.draft
-                    ? `, ${countWords(pendingForCurrentStory.draft)} words`
-                    : ""}
-                  .
-                </p>
+              <div className="mb-4 rounded-xl border border-pink-500/30 bg-pink-500/10 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-pink-100">
+                    Editable chapter draft,{" "}
+                    {countWords(pendingForCurrentStory.draft)} words
+                  </p>
 
-                <button
-                  type="button"
+                  <button
+                    type="button"
+                    disabled={isThinking}
+                    onClick={clearPendingGeneration}
+                    className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:bg-white/5 disabled:opacity-40"
+                  >
+                    Discard
+                  </button>
+                </div>
+
+                <textarea
+                  value={pendingForCurrentStory.draft}
                   disabled={isThinking}
-                  onClick={() =>
-                    void runPendingChapter(pendingForCurrentStory, story)
+                  onChange={(event) => updatePendingDraft(event.target.value)}
+                  placeholder="Your generated chapter prose will appear here."
+                  rows={14}
+                  className="mt-4 max-h-[48dvh] w-full resize-y overflow-y-auto rounded-xl border border-white/10 bg-neutral-950 px-4 py-4 text-base leading-7 text-white outline-none focus:border-pink-500 disabled:opacity-60"
+                />
+
+                {(pendingForCurrentStory.repetitionWarnings?.length ?? 0) >
+                  0 && (
+                  <div className="mt-3 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+                    {pendingForCurrentStory.repetitionWarnings?.map(
+                      (warning) => (
+                        <p key={warning}>{warning}</p>
+                      ),
+                    )}
+                  </div>
+                )}
+
+                <textarea
+                  value={sectionInstruction}
+                  disabled={isThinking}
+                  onChange={(event) =>
+                    setSectionInstruction(event.target.value)
                   }
-                  className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-semibold
-text-white transition hover:bg-pink-400 disabled:opacity-40"
-                >
-                  {isThinking ? "Writing..." : "Resume"}
-                </button>
+                  placeholder="Optional guidance for the next section, for example: keep the argument hostile and do not introduce attraction yet."
+                  rows={2}
+                  className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-neutral-600 focus:border-pink-500 disabled:opacity-60"
+                />
 
-                <button
-                  type="button"
-                  disabled={isThinking}
-                  onClick={clearPendingGeneration}
-                  className="rounded-lg border border-white/10 px-4 py-2 text-sm
-font-semibold text-neutral-300 transition hover:bg-white/5
-disabled:opacity-40"
-                >
-                  Discard
-                </button>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    disabled={
+                      isThinking || !pendingForCurrentStory.draft.trim()
+                    }
+                    onClick={() =>
+                      void writeChapterSection(
+                        pendingForCurrentStory,
+                        story,
+                        "continue",
+                      )
+                    }
+                    className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-pink-400 disabled:opacity-40"
+                  >
+                    {isThinking ? "Writing..." : "Continue"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      isThinking || !pendingForCurrentStory.lastSection?.trim()
+                    }
+                    onClick={() =>
+                      void writeChapterSection(
+                        pendingForCurrentStory,
+                        story,
+                        "rewrite",
+                      )
+                    }
+                    className="rounded-lg border border-pink-500/40 bg-pink-500/10 px-4 py-2 text-sm font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:opacity-40"
+                  >
+                    Rewrite Last Section
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      isThinking || !pendingForCurrentStory.draft.trim()
+                    }
+                    onClick={() =>
+                      void completePendingChapter(pendingForCurrentStory, story)
+                    }
+                    className="rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20 disabled:opacity-40"
+                  >
+                    Complete Chapter
+                  </button>
+                </div>
               </div>
             )}
 
