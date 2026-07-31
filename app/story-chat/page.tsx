@@ -2045,13 +2045,24 @@ device.`,
         !baseStory.storyState.chapterLedger?.length ||
         (replacementNumber !== null &&
           replacementNumber < latestExistingChapterNumber);
-      const ledgerData = await updateContinuityLedger({
-        storyBible: chapterStory.storyBible,
-        storyState: baseStory.storyState,
-        chapters: chapterStory.chapters,
-        chapter: completedChapter,
-        rebuild: needsLedgerRebuild,
-      });
+      let ledgerData;
+
+try {
+  ledgerData = await updateContinuityLedger({
+    storyBible: chapterStory.storyBible,
+    storyState: baseStory.storyState,
+    chapters: chapterStory.chapters,
+    chapter: completedChapter,
+    rebuild: needsLedgerRebuild,
+  });
+} catch (error) {
+  console.error("Continuity ledger failed:", error);
+
+  ledgerData = {
+    storyState: baseStory.storyState,
+    diagnostics: [],
+  };
+}
       const allDiagnostics = [
         ...(pending.diagnostics ?? []),
         ...ledgerData.diagnostics,
