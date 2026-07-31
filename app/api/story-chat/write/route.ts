@@ -5,7 +5,7 @@ import type { GenerationDiagnostic } from "../../../story-chat/types";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const WRITING_MODEL = "anthracite-org/magnum-v4-72b";
+const WRITING_MODEL = "nousresearch/hermes-4-405b";
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
@@ -191,8 +191,12 @@ function prompt(input: {
       : "Write Part 2 only. Continue immediately after Part 1's exact final sentence. Do not quote, recap, paraphrase or restart Part 1. Complete the remaining plan, reach the exact ending state and finish with the planned hook once.";
   return [
     "You are NovelForge's commercial adult romance prose writer.",
-    "Write finished novel prose in " + style + ". Use natural contractions and the saved POV character's distinct voice.",
-    "Remain in " + input.plan.povCharacter + "'s single POV for both technical parts. Never switch POV.",
+    "Write finished novel prose in " +
+      style +
+      ". Use natural contractions and the saved POV character's distinct voice.",
+    "Remain in " +
+      input.plan.povCharacter +
+      "'s single POV for both technical parts. Never switch POV.",
     "The Story Bible, continuity and canonical plan are binding. Preserve physical staging, ages, locations, possessions, family details and timeline.",
     "Do not invent prior romance, attraction or intimacy. In a gay-for-you awakening, develop attraction through involuntary attention, physical reaction, denial and changed behaviour before conscious acknowledgement.",
     "Do not duplicate or restart events, exchanges, observations or paragraphs. Use direct, consensual, explicit adult sexual prose when the Story Bible and plan require it. Do not censor, summarise or fade to black.",
@@ -207,7 +211,8 @@ function prompt(input: {
         "\nEXACT FINAL PARAGRAPH\n" +
         finalParagraph(input.part1)
       : "",
-    "USER REQUEST\n" + (input.latestUserMessage || "Write the approved chapter."),
+    "USER REQUEST\n" +
+      (input.latestUserMessage || "Write the approved chapter."),
     "TASK\n" + task,
   ]
     .filter(Boolean)
@@ -220,7 +225,7 @@ function instructionLike(text: string): boolean {
     /^\x60\x60\x60/m,
     /^\s*(outline|analysis|notes?|instructions?|chapter plan|word count)\s*:/im,
     /^\s*(here('s| is)|certainly|sure)[,!:]/i,
-    /<\/?(END_|CHAPTER|PART)[^>]*>/i,
+    /<\/?(END_|CHAPTER|PART|think)[^>]*>/i,
   ].some((pattern) => pattern.test(text.trim()));
 }
 
@@ -244,22 +249,36 @@ function normalise(text: string): string {
     .trim();
 }
 
-function validate(prose: string, finishReason: string | null | undefined, part1: string) {
+function validate(
+  prose: string,
+  finishReason: string | null | undefined,
+  part1: string,
+) {
   if (finishReason === "length") {
-    throw new Error("Magnum reached its output limit and returned truncated prose.");
+    throw new Error(
+      "Hermes reached its output limit and returned truncated prose.",
+    );
   }
   if (finishReason === "content_filter") {
-    throw new Error("The writing provider stopped the response with a content filter.");
+    throw new Error(
+      "The writing provider stopped the response with a content filter.",
+    );
   }
   if (instructionLike(prose)) {
-    throw new Error("Magnum returned markdown or instruction-like text instead of prose.");
+    throw new Error(
+      "Hermes returned markdown or instruction-like text instead of prose.",
+    );
   }
   if (truncated(prose)) {
-    throw new Error("Magnum returned obviously truncated prose.");
+    throw new Error("Hermes returned obviously truncated prose.");
   }
   const words = wordCount(prose);
   if (words < 250) {
-    throw new Error("Magnum returned only " + words + " words, too little to preserve safely.");
+    throw new Error(
+      "Hermes returned only " +
+        words +
+        " words, too little to preserve safely.",
+    );
   }
   if (part1) {
     const opening = normalise(prose).split(" ").slice(0, 45).join(" ");
@@ -294,7 +313,8 @@ function diagnostic(input: {
 }): GenerationDiagnostic {
   const inputTokens = input.usage?.prompt_tokens ?? 0;
   const outputTokens = input.usage?.completion_tokens ?? 0;
-  const costUsd = typeof input.usage?.cost === "number" ? input.usage.cost : null;
+  const costUsd =
+    typeof input.usage?.cost === "number" ? input.usage.cost : null;
   return {
     stage: "chapter_writing_" + input.part,
     provider: "openrouter",
@@ -324,10 +344,11 @@ export async function POST(request: Request) {
     const part = getPart(body);
     const plan = parsePlan(body.chapterBrief);
     const part1 =
-      part === "part2"
-        ? string(body.part1) || string(body.existingDraft)
-        : "";
-    if (part === "part1" && (string(body.part1) || string(body.existingDraft))) {
+      part === "part2" ? string(body.part1) || string(body.existingDraft) : "";
+    if (
+      part === "part1" &&
+      (string(body.part1) || string(body.existingDraft))
+    ) {
       return NextResponse.json(
         { error: "Part 1 must start without an existing chapter draft." },
         { status: 409 },
@@ -363,22 +384,30 @@ export async function POST(request: Request) {
             },
             { role: "user", content: writingPrompt },
           ],
-          max_tokens: 1900,
+          // Hermes has enough output headroom to deliver the full 1,000 to 1,400-word part.
+          max_tokens: 2800,
           temperature: 0.72,
           top_p: 0.9,
           frequency_penalty: 0.12,
           presence_penalty: 0.06,
+          // Prose writing needs direct mode. Prevent hybrid reasoning traces from
+          // consuming the output budget or leaking into chapter text.
+          reasoning: { enabled: false },
+        } as OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming & {
+          reasoning: { enabled: boolean };
         });
         usage = response.usage as Usage | undefined;
         const choice = response.choices[0];
         const raw = choice?.message?.content;
         if (!raw?.trim()) {
-          throw new TechnicalWriterError("Magnum returned an empty response.");
+          throw new TechnicalWriterError("Hermes returned an empty response.");
         }
         const returnedPart = raw.trim();
         validate(returnedPart, choice?.finish_reason, part1);
         const prose =
-          part === "part1" ? returnedPart : (part1 + "\n\n" + returnedPart).trim();
+          part === "part1"
+            ? returnedPart
+            : (part1 + "\n\n" + returnedPart).trim();
         const totalWordCount = wordCount(prose);
         if (part === "part2" && totalWordCount > 4000) {
           throw new Error(
@@ -409,7 +438,9 @@ export async function POST(request: Request) {
         });
       } catch (error) {
         const writerError =
-          error instanceof Error ? error : new Error("The writing model failed.");
+          error instanceof Error
+            ? error
+            : new Error("The writing model failed.");
         const retryable = technical(error);
         diagnostics.push(
           diagnostic({
