@@ -2729,7 +2729,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
           </div>
         )}
 
-        {activeTab === "chat" && (
+        {activeTab === "chat" && !pendingForCurrentStory && (
           <ChatPanel messages={visibleChatMessages} isThinking={isThinking} />
         )}
 
@@ -2768,8 +2768,11 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
 
         {activeTab === "chat" && (
           <footer
-            className="shrink-0 border-t border-white/10
-bg-neutral-950/95 px-5 py-5 backdrop-blur"
+            className={`border-t border-white/10 bg-neutral-950/95 px-4 backdrop-blur sm:px-5 ${
+              pendingForCurrentStory
+                ? "min-h-0 flex-1 overflow-y-auto py-4 sm:py-5"
+                : "shrink-0 py-5"
+            }`}
           >
             {currentDiagnostics.length > 0 && (
               <details className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
@@ -2811,7 +2814,7 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
             )}
 
             {pendingForCurrentStory && (
-              <div className="mb-4 rounded-xl border border-pink-500/30 bg-pink-500/10 p-4">
+              <div className="mx-auto mb-4 max-w-5xl rounded-xl border border-pink-500/30 bg-pink-500/10 p-3 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-pink-100">
                     Editable chapter draft,{" "}
@@ -2833,8 +2836,8 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
                   disabled={isThinking}
                   onChange={(event) => updatePendingDraft(event.target.value)}
                   placeholder="Your generated chapter prose will appear here."
-                  rows={14}
-                  className="mt-4 max-h-[48dvh] w-full resize-y overflow-y-auto rounded-xl border border-white/10 bg-neutral-950 px-4 py-4 text-base leading-7 text-white outline-none focus:border-pink-500 disabled:opacity-60"
+                  rows={10}
+                  className="mt-3 h-[clamp(14rem,45dvh,32rem)] w-full resize-y overflow-y-auto rounded-xl border border-white/10 bg-neutral-950 px-4 py-4 text-base leading-7 text-white outline-none focus:border-pink-500 disabled:opacity-60 sm:mt-4"
                 />
 
                 {(pendingForCurrentStory.repetitionWarnings?.length ?? 0) >
@@ -2859,7 +2862,7 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
                   className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-neutral-600 focus:border-pink-500 disabled:opacity-60"
                 />
 
-                <div className="mt-3 flex flex-wrap gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
                   <button
                     type="button"
                     disabled={
@@ -2872,7 +2875,7 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
                         "continue",
                       )
                     }
-                    className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-pink-400 disabled:opacity-40"
+                    className="w-full rounded-lg bg-pink-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-pink-400 disabled:opacity-40 sm:w-auto sm:py-2"
                   >
                     {isThinking ? "Writing..." : "Continue"}
                   </button>
@@ -2889,7 +2892,7 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
                         "rewrite",
                       )
                     }
-                    className="rounded-lg border border-pink-500/40 bg-pink-500/10 px-4 py-2 text-sm font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:opacity-40"
+                    className="w-full rounded-lg border border-pink-500/40 bg-pink-500/10 px-4 py-3 text-sm font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:opacity-40 sm:w-auto sm:py-2"
                   >
                     Rewrite Last Section
                   </button>
@@ -2902,7 +2905,7 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
                     onClick={() =>
                       void completePendingChapter(pendingForCurrentStory, story)
                     }
-                    className="rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20 disabled:opacity-40"
+                    className="w-full rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20 disabled:opacity-40 sm:w-auto sm:py-2"
                   >
                     Complete Chapter
                   </button>
@@ -2910,6 +2913,7 @@ bg-neutral-950/95 px-5 py-5 backdrop-blur"
               </div>
             )}
 
+            {!pendingForCurrentStory && (
             <form onSubmit={sendMessage} className="flex items-end gap-3">
               <textarea
                 value={input}
@@ -2950,7 +2954,9 @@ disabled:opacity-40"
               </button>
             </form>
 
-            <p className="mt-3 text-center text-xs text-neutral-600">
+            )}
+
+            <p className={`${pendingForCurrentStory ? "mt-1" : "mt-3"} text-center text-xs text-neutral-600`}>
               Your story workspace saves automatically on this device.
             </p>
           </footer>
