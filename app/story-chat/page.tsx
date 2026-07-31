@@ -1029,49 +1029,66 @@ export default function StoryChatPage() {
   const storyBible = story?.storyBible ?? EMPTY_STORY_BIBLE;
 
   useEffect(() => {
+    let isActive = true;
+    const authTimeoutId = window.setTimeout(() => {
+      if (isActive) {
+        setAuthChecked(true);
+      }
+    }, 5000);
+
+    function applySession(session: {
+      user?: { id?: string } | null;
+    } | null) {
+      if (!isActive) {
+        return;
+      }
+
+      const id = session?.user?.id ?? null;
+
+      window.clearTimeout(authTimeoutId);
+      setUserId(id);
+      setAuthChecked(true);
+
+      if (id) {
+        window.setTimeout(() => {
+          if (!isActive) {
+            return;
+          }
+
+          void loadStoryList(id).catch((error) => {
+            console.error("Failed to load stories:", error);
+          });
+        }, 0);
+      }
+    }
+
     async function loadUser() {
       try {
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
-        const id = session?.user?.id ?? null;
-
-        setUserId(id);
-
-        setAuthChecked(true);
-
-        if (id) {
-          await loadStoryList(id);
-        }
+        applySession(session);
       } catch (error) {
         console.error("Failed to check login:", error);
 
-        setUserId(null);
-
-        setAuthChecked(true);
+        applySession(null);
       }
     }
 
-    loadUser();
+    void loadUser();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      const id = session?.user?.id ?? null;
-
-      setUserId(id);
-
-      setAuthChecked(true);
-
-      if (id) {
-        loadStoryList(id).catch((error) => {
-          console.error("Failed to load stories:", error);
-        });
-      }
+      applySession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isActive = false;
+      window.clearTimeout(authTimeoutId);
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function loadStoryList(currentUserId: string) {
