@@ -25,7 +25,7 @@ const STORAGE_KEY = "novelforge-current-story";
 
 const PENDING_GENERATION_KEY = "novelforge-pending-chapter-generation";
 
-type GenerationStage = "opening" | "middle" | "final";
+type PendingPhase = "part1" | "part2" | "quality" | "rejected" | "ledger";
 
 type PendingChapterGeneration = {
   storyId: string;
@@ -37,19 +37,15 @@ type PendingChapterGeneration = {
   maximumWordCount: number;
   diagnostics?: GenerationDiagnostic[];
   qualityAccepted?: boolean;
-  nextGenerationStage?: GenerationStage;
-  nextSceneIndex?: number;
-  continueCurrentMovement?: boolean;
+  phase?: PendingPhase;
 };
 
 type WriterResponse = {
   prose: string;
+  returnedPart: string;
+  part: "part1" | "part2";
   totalWordCount: number;
   isComplete: boolean;
-  generationStage: GenerationStage;
-  sceneIndex?: number;
-  totalScenes?: number;
-  isFinalScene?: boolean;
   diagnostics: GenerationDiagnostic[];
 };
 
@@ -255,9 +251,7 @@ const CHAPTER_NUMBER_WORDS: Record<string, number> = {
 };
 
 function getChapterNumberFromMessage(message: string): number | null {
-  const numberedChapter = message.match(
-    /\bchapter\s+(?:number\s+)?(\d+)\b/i,
-  );
+  const numberedChapter = message.match(/\bchapter\s+(?:number\s+)?(\d+)\b/i);
 
   if (numberedChapter) {
     const chapterNumber = Number(numberedChapter[1] ?? "");
@@ -275,9 +269,7 @@ function getChapterNumberFromMessage(message: string): number | null {
     return null;
   }
 
-  return (
-    CHAPTER_NUMBER_WORDS[wordedChapter[1]?.toLowerCase() ?? ""] ?? null
-  );
+  return CHAPTER_NUMBER_WORDS[wordedChapter[1]?.toLowerCase() ?? ""] ?? null;
 }
 
 function requestsChapterGeneration(message: string): boolean {
@@ -431,17 +423,11 @@ function isWriterResponse(value: unknown): value is WriterResponse {
   return (
     typeof response.prose === "string" &&
     Boolean(response.prose.trim()) &&
+    typeof response.returnedPart === "string" &&
+    Boolean(response.returnedPart.trim()) &&
+    (response.part === "part1" || response.part === "part2") &&
     typeof response.totalWordCount === "number" &&
     typeof response.isComplete === "boolean" &&
-    (response.generationStage === "opening" ||
-      response.generationStage === "middle" ||
-      response.generationStage === "final") &&
-    (response.sceneIndex === undefined ||
-      typeof response.sceneIndex === "number") &&
-    (response.totalScenes === undefined ||
-      typeof response.totalScenes === "number") &&
-    (response.isFinalScene === undefined ||
-      typeof response.isFinalScene === "boolean") &&
     isDiagnosticArray(response.diagnostics)
   );
 }
@@ -473,16 +459,12 @@ function isPendingGeneration(
       isDiagnosticArray(pending.diagnostics)) &&
     (pending.qualityAccepted === undefined ||
       typeof pending.qualityAccepted === "boolean") &&
-    (pending.nextGenerationStage === undefined ||
-      pending.nextGenerationStage === "opening" ||
-      pending.nextGenerationStage === "middle" ||
-      pending.nextGenerationStage === "final") &&
-    (pending.nextSceneIndex === undefined ||
-      (typeof pending.nextSceneIndex === "number" &&
-        Number.isInteger(pending.nextSceneIndex) &&
-        pending.nextSceneIndex >= 0)) &&
-    (pending.continueCurrentMovement === undefined ||
-      typeof pending.continueCurrentMovement === "boolean")
+    (pending.phase === undefined ||
+      pending.phase === "part1" ||
+      pending.phase === "part2" ||
+      pending.phase === "quality" ||
+      pending.phase === "rejected" ||
+      pending.phase === "ledger")
   );
 }
 
@@ -1774,17 +1756,23 @@ device.`,
     baseStory: StoryWorkspace,
   ) {
     setIsThinking(true);
-    let workingPending: PendingChapterGeneration =
-      initialPending.minimumWordCount === 3000 &&
-      initialPending.maximumWordCount === 4000
-        ? {
-            ...initialPending,
-            minimumWordCount: 2000,
-          }
-        : initialPending;
+    let workingPending: PendingChapterGeneration = {
+      ...initialPending,
+      minimumWordCount: Math.max(2000, initialPending.minimumWordCount),
+      maximumWordCount: Math.min(4000, initialPending.maximumWordCount),
+      phase:
+        initialPending.phase ??
+        (initialPending.draft.trim() ? "part2" : "part1"),
+    };
     savePendingGeneration(workingPending);
 
     try {
+      if (workingPending.phase === "rejected") {
+        throw new Error(
+          "Terra rejected this preserved draft. Choose Accept, Rewrite, Targeted Repair or Manual Edit when those controls are added. Resume will not overwrite it.",
+        );
+      }
+
       const replacementNumber =
         workingPending.generatedChapter.replaceChapterNumber;
       const writingStoryState = getStoryStateBeforeChapter(
@@ -1793,243 +1781,197 @@ device.`,
       );
       const recentChapters =
         replacementNumber === null
-          ? baseStory.chapters.slice(-1)
+          ? baseStory.chapters.slice(-2)
           : baseStory.chapters
               .filter((chapter) => chapter.number < replacementNumber)
-              .slice(-1);
+              .slice(-2);
 
-      const finishCompletedChapter = async (content: string) => {
-        let approvedContent = content;
-
-        if (!workingPending.qualityAccepted) {
-          const qualityResponse = await fetch("/api/story-chat/quality", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              storyBible: baseStory.storyBible,
-              storyState: writingStoryState,
-              chapterBrief: workingPending.chapterBrief,
-              chapterTitle: workingPending.generatedChapter.title,
-              povCharacter: workingPending.generatedChapter.povCharacter,
-              chapterContent: content,
-              minimumWordCount: workingPending.minimumWordCount,
-              maximumWordCount: workingPending.maximumWordCount,
-            }),
-          });
-          const qualityData = await readApiJson(qualityResponse);
-
-          if (!isQualityResponse(qualityData)) {
-            throw new Error(
-              "The quality endpoint returned an invalid assessment.",
-            );
-          }
-
-          workingPending = {
-            ...workingPending,
-            draft: qualityData.chapterContent,
-            diagnostics: [
-              ...(workingPending.diagnostics ?? []),
-              ...qualityData.diagnostics,
-            ],
-            qualityAccepted: qualityData.accepted,
-          };
-          savePendingGeneration(workingPending);
-
-          if (!qualityData.accepted) {
-            const hardFailures = qualityData.quality.hardFailures
-              .map((failure) => failure.trim())
-              .filter(Boolean)
-              .join(" ");
-            const reason =
-              hardFailures || qualityData.quality.summary.trim();
-
-            throw new Error(
-              `The completed chapter still needs a bounded repair: ${reason} The readable draft has been preserved. Press Resume to retry only the targeted repair and quality check.`,
-            );
-          }
-
-          approvedContent = qualityData.chapterContent;
-        }
-
-        const chapterStory = applyGeneratedChapter(
-          baseStory,
-          workingPending,
-          approvedContent,
-        );
-        const completedChapterNumber =
-          replacementNumber ??
-          Math.max(0, ...baseStory.chapters.map((chapter) => chapter.number)) +
-            1;
-        const completedChapter = chapterStory.chapters.find(
-          (chapter) => chapter.number === completedChapterNumber,
-        );
-
-        if (!completedChapter) {
-          throw new Error(
-            "The completed chapter could not be prepared for continuity.",
-          );
-        }
-
-        const latestExistingChapterNumber = Math.max(
-          0,
-          ...baseStory.chapters.map((chapter) => chapter.number),
-        );
-        const needsLedgerRebuild =
-          !baseStory.storyState.chapterLedger?.length ||
-          (replacementNumber !== null &&
-            replacementNumber < latestExistingChapterNumber);
-        const ledgerData = await updateContinuityLedger({
-          storyBible: chapterStory.storyBible,
-          storyState: baseStory.storyState,
-          chapters: chapterStory.chapters,
-          chapter: completedChapter,
-          rebuild: needsLedgerRebuild,
-        });
-
-        const allDiagnostics = [
-          ...(workingPending.diagnostics ?? []),
-          ...ledgerData.diagnostics,
-        ];
-        const completedStory: StoryWorkspace = {
-          ...chapterStory,
-          storyState: {
-            ...ledgerData.storyState,
-            chapterPlans:
-              chapterStory.storyState.chapterPlans ??
-              baseStory.storyState.chapterPlans ??
-              [],
-            lastGenerationDiagnostics: allDiagnostics,
-          },
-          updatedAt: new Date().toISOString(),
-        };
-
-        await persistStory(completedStory);
-        clearPendingGeneration();
-      };
-
-      const hasCompletedDraftAwaitingQualityOrLedger =
-        Boolean(workingPending.draft.trim()) &&
-        workingPending.qualityAccepted !== undefined &&
-        workingPending.nextSceneIndex === undefined &&
-        workingPending.nextGenerationStage === undefined;
-
-      if (hasCompletedDraftAwaitingQualityOrLedger) {
-        await finishCompletedChapter(workingPending.draft.trim());
-        return;
-      }
-
-      const plannedSceneCount = getPlannedSceneCount(
-        workingPending.chapterBrief,
-      );
-      let sceneIndex =
-        workingPending.nextSceneIndex ??
-        (!workingPending.draft.trim()
-          ? 0
-          : workingPending.nextGenerationStage === "middle"
-            ? 1
-            : plannedSceneCount - 1);
-      const maximumMovementCalls = plannedSceneCount + 2;
-
-      for (
-        let movementCall = 0;
-        movementCall < maximumMovementCalls;
-        movementCall += 1
-      ) {
-        const hasDraftToContinue = Boolean(workingPending.draft.trim());
-        const generationStage: GenerationStage =
-          hasDraftToContinue && sceneIndex === plannedSceneCount - 1
-            ? "final"
-            : sceneIndex === 0
-            ? "opening"
-            : sceneIndex === plannedSceneCount - 1
-              ? "final"
-              : "middle";
+      if (workingPending.phase === "part1") {
         const response = await fetch("/api/story-chat/write", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             storyBible: baseStory.storyBible,
             storyState: writingStoryState,
             recentChapters,
             chapterBrief: workingPending.chapterBrief,
             latestUserMessage: workingPending.latestUserMessage,
-            existingDraft:
-              generationStage === "opening" ? "" : workingPending.draft,
-            minimumWordCount: workingPending.minimumWordCount,
-            maximumWordCount: workingPending.maximumWordCount,
-            generationStage,
-            sceneIndex,
-            continueCurrentMovement:
-              workingPending.continueCurrentMovement === true,
+            part: "part1",
+            part1: "",
           }),
         });
-
         const data = await readApiJson(response);
 
-        if (
-          !isWriterResponse(data) ||
-          data.generationStage !== generationStage ||
-          (data.sceneIndex !== undefined && data.sceneIndex !== sceneIndex) ||
-          (data.totalScenes !== undefined &&
-            data.totalScenes !== plannedSceneCount)
-        ) {
+        if (!isWriterResponse(data) || data.part !== "part1") {
           throw new Error(
-            "The writing endpoint returned an invalid chapter scene.",
+            "The writing endpoint returned an invalid Part 1 response.",
           );
         }
 
-        const isFinalScene =
-          data.isFinalScene ?? sceneIndex === plannedSceneCount - 1;
-        const needsFinalContinuation = isFinalScene && !data.isComplete;
-        const nextSceneIndex = needsFinalContinuation
-          ? sceneIndex
-          : isFinalScene
-            ? undefined
-            : sceneIndex + 1;
-        const nextGenerationStage: GenerationStage | undefined =
-          needsFinalContinuation
-            ? "final"
-            : nextSceneIndex === undefined
-            ? undefined
-            : nextSceneIndex === 0
-              ? "opening"
-              : nextSceneIndex === plannedSceneCount - 1
-                ? "final"
-                : "middle";
-
         workingPending = {
           ...workingPending,
-          draft: data.prose.trim(),
+          draft: data.returnedPart.trim(),
+          phase: "part2",
           diagnostics: [
             ...(workingPending.diagnostics ?? []),
             ...data.diagnostics,
           ],
-          nextGenerationStage,
-          nextSceneIndex,
-          continueCurrentMovement: needsFinalContinuation,
+        };
+        savePendingGeneration(workingPending);
+      }
+
+      if (workingPending.phase === "part2") {
+        const untouchedPart1 = workingPending.draft.trim();
+
+        if (!untouchedPart1) {
+          throw new Error("The preserved Part 1 draft is missing.");
+        }
+
+        const response = await fetch("/api/story-chat/write", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storyBible: baseStory.storyBible,
+            storyState: writingStoryState,
+            recentChapters,
+            chapterBrief: workingPending.chapterBrief,
+            latestUserMessage: workingPending.latestUserMessage,
+            part: "part2",
+            part1: untouchedPart1,
+          }),
+        });
+        const data = await readApiJson(response);
+
+        if (!isWriterResponse(data) || data.part !== "part2") {
+          throw new Error(
+            "The writing endpoint returned an invalid Part 2 response.",
+          );
+        }
+
+        workingPending = {
+          ...workingPending,
+          draft: data.prose.trim(),
+          phase: "quality",
+          diagnostics: [
+            ...(workingPending.diagnostics ?? []),
+            ...data.diagnostics,
+          ],
+        };
+        savePendingGeneration(workingPending);
+      }
+
+      if (workingPending.phase === "quality") {
+        const preservedCombinedDraft = workingPending.draft.trim();
+
+        if (!preservedCombinedDraft) {
+          throw new Error("The completed combined draft is missing.");
+        }
+
+        const qualityResponse = await fetch("/api/story-chat/quality", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storyBible: baseStory.storyBible,
+            storyState: writingStoryState,
+            chapterBrief: workingPending.chapterBrief,
+            chapterTitle: workingPending.generatedChapter.title,
+            povCharacter: workingPending.generatedChapter.povCharacter,
+            chapterContent: preservedCombinedDraft,
+            minimumWordCount: workingPending.minimumWordCount,
+            maximumWordCount: workingPending.maximumWordCount,
+          }),
+        });
+        const qualityData = await readApiJson(qualityResponse);
+
+        if (!isQualityResponse(qualityData)) {
+          throw new Error(
+            "The quality endpoint returned an invalid assessment.",
+          );
+        }
+
+        workingPending = {
+          ...workingPending,
+          draft: preservedCombinedDraft,
+          phase: qualityData.accepted ? "ledger" : "rejected",
+          qualityAccepted: qualityData.accepted,
+          diagnostics: [
+            ...(workingPending.diagnostics ?? []),
+            ...qualityData.diagnostics,
+          ],
         };
         savePendingGeneration(workingPending);
 
-        if (isFinalScene) {
-          if (!data.isComplete) {
-            sceneIndex = nextSceneIndex ?? plannedSceneCount - 1;
-            continue;
-          }
+        if (!qualityData.accepted) {
+          const failures = qualityData.quality.hardFailures
+            .map((failure) => failure.trim())
+            .filter(Boolean)
+            .join(" ");
+          const reason = failures || qualityData.quality.summary.trim();
 
-          await finishCompletedChapter(data.prose.trim());
-          return;
+          throw new Error(
+            "Terra rejected the completed chapter: " +
+              reason +
+              " The untouched combined draft has been preserved. It has not been repaired, rewritten or saved as a completed chapter.",
+          );
         }
-
-        sceneIndex = nextSceneIndex ?? plannedSceneCount - 1;
       }
 
-      throw new Error(
-        `The writer could not reach ${workingPending.minimumWordCount} words after ${maximumMovementCalls} movements. The draft has been preserved and can be resumed.`,
+      if (workingPending.phase !== "ledger") {
+        throw new Error("The chapter pipeline stopped at an unknown phase.");
+      }
+
+      const chapterStory = applyGeneratedChapter(
+        baseStory,
+        workingPending,
+        workingPending.draft,
       );
+      const completedChapterNumber =
+        replacementNumber ??
+        Math.max(0, ...baseStory.chapters.map((chapter) => chapter.number)) + 1;
+      const completedChapter = chapterStory.chapters.find(
+        (chapter) => chapter.number === completedChapterNumber,
+      );
+
+      if (!completedChapter) {
+        throw new Error(
+          "The accepted chapter could not be prepared for continuity.",
+        );
+      }
+
+      const latestExistingChapterNumber = Math.max(
+        0,
+        ...baseStory.chapters.map((chapter) => chapter.number),
+      );
+      const needsLedgerRebuild =
+        !baseStory.storyState.chapterLedger?.length ||
+        (replacementNumber !== null &&
+          replacementNumber < latestExistingChapterNumber);
+      const ledgerData = await updateContinuityLedger({
+        storyBible: chapterStory.storyBible,
+        storyState: baseStory.storyState,
+        chapters: chapterStory.chapters,
+        chapter: completedChapter,
+        rebuild: needsLedgerRebuild,
+      });
+      const allDiagnostics = [
+        ...(workingPending.diagnostics ?? []),
+        ...ledgerData.diagnostics,
+      ];
+      const completedStory: StoryWorkspace = {
+        ...chapterStory,
+        storyState: {
+          ...ledgerData.storyState,
+          chapterPlans:
+            chapterStory.storyState.chapterPlans ??
+            baseStory.storyState.chapterPlans ??
+            [],
+          lastGenerationDiagnostics: allDiagnostics,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+
+      await persistStory(completedStory);
+      clearPendingGeneration();
     } catch (error) {
       if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
         workingPending = {
@@ -2056,7 +1998,7 @@ device.`,
           {
             id: Date.now(),
             role: "assistant",
-            content: `I couldn't complete the chapter: ${message}`,
+            content: "I couldn't complete the chapter: " + message,
           },
         ],
         updatedAt: new Date().toISOString(),
@@ -2202,9 +2144,7 @@ device.`,
           chapters: remainingChapters,
           storyState: {
             ...rebuiltStoryState,
-            chapterPlans: (
-              requestStory.storyState.chapterPlans ?? []
-            ).filter(
+            chapterPlans: (requestStory.storyState.chapterPlans ?? []).filter(
               (plan) => plan.chapterNumber !== chapterNumber,
             ),
             lastGenerationDiagnostics: deletionDiagnostics,
@@ -2238,17 +2178,15 @@ device.`,
       const savedPlan =
         requestedPlanChapterNumber === null
           ? null
-          : (planningStory.storyState.chapterPlans ?? []).find(
-              (plan) =>
-                plan.chapterNumber === requestedPlanChapterNumber,
-            ) ?? null;
+          : ((planningStory.storyState.chapterPlans ?? []).find(
+              (plan) => plan.chapterNumber === requestedPlanChapterNumber,
+            ) ?? null);
       const existingPlannedChapter =
         requestedPlanChapterNumber === null
           ? null
-          : planningStory.chapters.find(
-              (chapter) =>
-                chapter.number === requestedPlanChapterNumber,
-            ) ?? null;
+          : (planningStory.chapters.find(
+              (chapter) => chapter.number === requestedPlanChapterNumber,
+            ) ?? null);
       const explicitlyRewritesPlan =
         /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(trimmedMessage);
       const usesSavedPlan =
@@ -2272,13 +2210,10 @@ device.`,
             ...planningStory.storyState,
             chapterPlans: [
               ...(planningStory.storyState.chapterPlans ?? []).filter(
-                (plan) =>
-                  plan.chapterNumber !== approvedPlan.chapterNumber,
+                (plan) => plan.chapterNumber !== approvedPlan.chapterNumber,
               ),
               approvedPlan,
-            ].sort(
-              (left, right) => left.chapterNumber - right.chapterNumber,
-            ),
+            ].sort((left, right) => left.chapterNumber - right.chapterNumber),
           },
           messages: [
             ...planningStory.messages,
@@ -2315,9 +2250,7 @@ device.`,
             ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
             : 4000,
           diagnostics: [],
-          nextGenerationStage: "opening",
-          nextSceneIndex: 0,
-          continueCurrentMovement: false,
+          phase: "part1",
         };
 
         await persistStory(plannedStory);
@@ -2400,9 +2333,7 @@ device.`,
           ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
           : 4000,
         diagnostics: [...preplanningDiagnostics, ...(data.diagnostics ?? [])],
-        nextGenerationStage: "opening",
-        nextSceneIndex: 0,
-        continueCurrentMovement: false,
+        phase: "part1",
       };
 
       savePendingGeneration(pending);
