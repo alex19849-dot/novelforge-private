@@ -61,9 +61,8 @@ export type StoryVoiceProfile = {
 };
 
 /**
- * A movement is a bounded piece of one chapter. Several movements may remain
- * in the same physical scene. This prevents the writer from repeatedly
- * restarting one oversized scene merely to reach the chapter word target.
+ * Legacy scene-card shape retained only while saved plans and the remaining
+ * API routes are migrated. The two-part writer does not iterate these cards.
  */
 export type ChapterPlanScene = {
   order: number;
@@ -83,12 +82,30 @@ export type ChapterPlanScene = {
   mustNotHappen?: string[];
 };
 
+export type ChapterPlanEvent = {
+  order: number;
+  event: string;
+  location: string;
+  staging: string;
+  continuityChange: string;
+  relationshipChange: string;
+};
+
 export type ChapterPlan = {
   chapterNumber: number;
   title: string;
   povCharacter: string;
   chapterGoal: string;
   relationshipChange: string;
+  /**
+   * The concise canonical progression consumed by both technical writing
+   * halves. Optional during deployment so existing saved plans remain valid.
+   */
+  plannedEvents?: ChapterPlanEvent[];
+
+  /**
+   * Legacy compatibility only. New orchestration never loops over these.
+   */
   scenes: ChapterPlanScene[];
   completedBeatsToAvoid: string[];
 
@@ -104,6 +121,32 @@ export type ChapterPlan = {
 
   status: "draft" | "approved";
   updatedAt: string;
+};
+
+export type ChapterWritingPart = "part1" | "part2";
+
+export type ChapterReviewStatus =
+  | "writing_part1"
+  | "writing_part2"
+  | "awaiting_quality"
+  | "accepted"
+  | "rejected"
+  | "awaiting_ledger";
+
+export type ChapterQualityAssessment = {
+  passed: boolean;
+  hardFailures: string[];
+  repairInstructions: string[];
+  summary: string;
+  scores: {
+    continuity: number;
+    plotMovement: number;
+    relationshipProgression: number;
+    voiceDistinctiveness: number;
+    povAndTense: number;
+    repetitionControl: number;
+    hookStrength: number;
+  };
 };
 
 export type GenerationDiagnostic = {
