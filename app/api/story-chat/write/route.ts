@@ -136,7 +136,13 @@ function getPrompt(input: {
     "Do not explain an emotion after the action or physical response has already shown it. Do not repeatedly announce nerves, determination, confusion, attraction or discomfort.",
     "Avoid generic reaction crutches such as a pounding heart, a caught breath, taking a deep breath, being unable to help thinking or noticing, and reminding oneself why one is here unless that exact reaction is both fresh and necessary.",
     "Do not begin successive paragraphs with the same construction. Vary sentence length naturally without fragments, clipped article-free phrasing or run-on sentences.",
+    "Use colons sparingly in narration and dialogue. Do not make the prose sound like a report, slide deck, list or essay merely because the viewpoint character is analytical.",
     "Dialogue must sound like the specific people speaking. Avoid formal exposition disguised as dialogue, generic interview language and speeches that explain facts both characters already know.",
+    "Keep exposition brief enough for the scene to move. When a plan, interview, presentation or explanation has established its purpose, advance to the next planned action instead of supplying more examples and lists.",
+    "Track every character's exact physical position before writing a movement. A standing character cannot stand again, crossed arms cannot simultaneously rest on furniture, and nobody may become physically close without an on-page movement that closes the distance.",
+    "When recurring side characters speak or perform important actions, introduce and use their established names or roles. Do not repeatedly call them only the man, the woman or another generic label.",
+    "Avoid vague attraction placeholders such as something I cannot name, not anger exactly, an unfamiliar feeling, something tighter, a charged look or an unexplained pull. In delayed-awareness stories, describe only the concrete action the viewpoint character can presently interpret.",
+    "Do not repeatedly use eyes, gaze, jaw, teeth, breath, heartbeat, clenched hands or body tension as interchangeable shortcuts for emotion. Any ordinary gesture may appear when apt, but vary the evidence and do not overuse it across the chapter.",
     "Do not invent previous meetings, conversations, opinions, memories or familiarity. A viewpoint character may know only what the Story Bible, continuity, plan or on-page events establish they know.",
     "The Story Bible, canonical chapter plan and accepted continuity are binding.",
     "Follow the plan in order, but write only the next useful portion. Do not rush to the chapter's final hook unless the remaining plan and user instruction require it.",
@@ -263,20 +269,41 @@ function repetitionWarnings(
     );
   }
 
-  const reactionCrutches = [
-    /\bmy heart (?:is )?pound(?:s|ing)\b/gi,
-    /\bi (?:take|draw) a deep breath\b/gi,
-    /\bi can(?:not|'t) help but\b/gi,
-    /\bi remind myself\b/gi,
+  const combinedProse = `${comparisonDraft}\n\n${section}`;
+  const overuseChecks: { pattern: RegExp; maximum: number }[] = [
+    { pattern: /\bmy heart (?:is )?pound(?:s|ing)\b/gi, maximum: 1 },
+    { pattern: /\bi (?:take|draw) a deep breath\b/gi, maximum: 1 },
+    { pattern: /\bi can(?:not|'t) help but\b/gi, maximum: 1 },
+    { pattern: /\bi remind myself\b/gi, maximum: 1 },
+    { pattern: /\b(?:his|her|my|their) jaw\b/gi, maximum: 3 },
+    { pattern: /\b(?:his|her|my|their) (?:eyes|gaze)\b/gi, maximum: 6 },
+    { pattern: /\bclench(?:es|ed|ing)? (?:his|her|my|their) teeth\b/gi, maximum: 2 },
   ];
 
   if (
-    reactionCrutches.some(
-      (pattern) => Array.from(section.matchAll(pattern)).length > 1,
+    overuseChecks.some(
+      ({ pattern, maximum }) =>
+        Array.from(combinedProse.matchAll(pattern)).length > maximum,
     )
   ) {
     warnings.push(
-      "This section repeats a generic physical or internal reaction. Review it before continuing.",
+      "This section overuses a physical or internal reaction already used in the chapter. Review it before continuing.",
+    );
+  }
+
+  if ((section.match(/:/g) ?? []).length > 3) {
+    warnings.push(
+      "This section uses colons unusually often for novel prose. Review whether the narration has become list-like or explanatory.",
+    );
+  }
+
+  if (
+    /\b(?:something i (?:can(?:not|'t)|could(?: not|n't)) (?:name|identify)|not \w+[,.]? exactly|an unfamiliar feeling|an unexplained pull)\b/i.test(
+      section,
+    )
+  ) {
+    warnings.push(
+      "This section uses vague unnamed-awareness phrasing that may advance attraction prematurely.",
     );
   }
 
