@@ -2837,7 +2837,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
                   onChange={(event) => updatePendingDraft(event.target.value)}
                   placeholder="Your generated chapter prose will appear here."
                   rows={10}
-                  className="mt-3 h-[clamp(14rem,45dvh,32rem)] w-full resize-y overflow-y-auto rounded-xl border border-white/10 bg-neutral-950 px-4 py-4 text-base leading-7 text-white outline-none focus:border-pink-500 disabled:opacity-60 sm:mt-4"
+                  className="mt-3 h-[clamp(14rem,45dvh,32rem)] w-full resize-y overflow-y-auto rounded-xl border border-amber-900/30 bg-[#f3e5c8] px-4 py-4 text-base leading-7 text-[#2f261d] caret-[#2f261d] outline-none placeholder:text-[#786a58] focus:border-amber-700 disabled:opacity-60 sm:mt-4"
                 />
 
                 {(pendingForCurrentStory.repetitionWarnings?.length ?? 0) >
