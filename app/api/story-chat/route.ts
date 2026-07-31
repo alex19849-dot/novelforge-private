@@ -61,9 +61,7 @@ function getRequestedChapterNumber(message: string): number | null {
     return null;
   }
 
-  const wordIndex = numberWords.indexOf(
-    wordedMatch[1]?.toLowerCase() ?? "",
-  );
+  const wordIndex = numberWords.indexOf(wordedMatch[1]?.toLowerCase() ?? "");
 
   return wordIndex >= 0 ? wordIndex + 1 : null;
 }
@@ -120,7 +118,8 @@ function getStoryStateBeforeChapter(
     (entry) => entry.chapterNumber < chapterNumber,
   );
   const previousEntry = earlierLedger.at(-1);
-  const unique = (values: string[]) => Array.from(new Set(values.filter(Boolean)));
+  const unique = (values: string[]) =>
+    Array.from(new Set(values.filter(Boolean)));
 
   return {
     ...EMPTY_STORY_STATE,
@@ -411,143 +410,87 @@ const storyChatSchema = {
   },
 } as const;
 
+const canonicalPlanProperties = {
+  chapterNumber: { type: "integer" },
+  title: { type: "string" },
+  povCharacter: { type: "string" },
+  chapterGoal: { type: "string" },
+  relationshipChange: { type: "string" },
+  startingState: { type: "string" },
+  endingState: { type: "string" },
+  knowledgeLimits: {
+    type: "array",
+    minItems: 1,
+    items: { type: "string" },
+  },
+  premiseLocks: {
+    type: "array",
+    minItems: 1,
+    items: { type: "string" },
+  },
+  mustNotHappen: {
+    type: "array",
+    minItems: 1,
+    items: { type: "string" },
+  },
+  plannedEvents: {
+    type: "array",
+    minItems: 4,
+    maxItems: 8,
+    items: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "order",
+        "event",
+        "location",
+        "staging",
+        "continuityChange",
+        "relationshipChange",
+      ],
+      properties: {
+        order: { type: "integer" },
+        event: { type: "string" },
+        location: { type: "string" },
+        staging: { type: "string" },
+        continuityChange: { type: "string" },
+        relationshipChange: { type: "string" },
+      },
+    },
+  },
+  completedBeatsToAvoid: {
+    type: "array",
+    items: { type: "string" },
+  },
+} as const;
+
+const canonicalPlanRequired = [
+  "chapterNumber",
+  "title",
+  "povCharacter",
+  "chapterGoal",
+  "relationshipChange",
+  "startingState",
+  "endingState",
+  "knowledgeLimits",
+  "premiseLocks",
+  "mustNotHappen",
+  "plannedEvents",
+  "completedBeatsToAvoid",
+] as const;
+
 const editableChapterPlanSchema = {
   type: "object",
   additionalProperties: false,
   required: ["reply", "storyTitle", "chapterPlan"],
   properties: {
-    reply: {
-      type: "string",
-    },
-    storyTitle: {
-      type: "string",
-    },
+    reply: { type: "string" },
+    storyTitle: { type: "string" },
     chapterPlan: {
       type: "object",
       additionalProperties: false,
-      required: [
-        "chapterNumber",
-        "title",
-        "povCharacter",
-        "chapterGoal",
-        "relationshipChange",
-        "startingState",
-        "endingState",
-        "knowledgeLimits",
-        "premiseLocks",
-        "mustNotHappen",
-        "scenes",
-        "completedBeatsToAvoid",
-      ],
-      properties: {
-        chapterNumber: {
-          type: "integer",
-        },
-        title: {
-          type: "string",
-        },
-        povCharacter: {
-          type: "string",
-        },
-        chapterGoal: {
-          type: "string",
-        },
-        relationshipChange: {
-          type: "string",
-        },
-        startingState: {
-          type: "string",
-        },
-        endingState: {
-          type: "string",
-        },
-        knowledgeLimits: {
-          type: "array",
-          minItems: 1,
-          items: {
-            type: "string",
-          },
-        },
-        premiseLocks: {
-          type: "array",
-          minItems: 1,
-          items: {
-            type: "string",
-          },
-        },
-        mustNotHappen: {
-          type: "array",
-          minItems: 1,
-          items: {
-            type: "string",
-          },
-        },
-        scenes: {
-          type: "array",
-          minItems: 3,
-          maxItems: 5,
-          items: {
-            type: "object",
-            additionalProperties: false,
-            required: [
-              "order",
-              "location",
-              "objective",
-              "conflict",
-              "newInformation",
-              "exitBeat",
-              "entryState",
-              "endingState",
-              "wordTarget",
-              "mustNotHappen",
-            ],
-            properties: {
-              order: {
-                type: "integer",
-              },
-              location: {
-                type: "string",
-              },
-              objective: {
-                type: "string",
-              },
-              conflict: {
-                type: "string",
-              },
-              newInformation: {
-                type: "string",
-              },
-              exitBeat: {
-                type: "string",
-              },
-              entryState: {
-                type: "string",
-              },
-              endingState: {
-                type: "string",
-              },
-              wordTarget: {
-                type: "integer",
-                minimum: 450,
-                maximum: 1100,
-              },
-              mustNotHappen: {
-                type: "array",
-                minItems: 1,
-                items: {
-                  type: "string",
-                },
-              },
-            },
-          },
-        },
-        completedBeatsToAvoid: {
-          type: "array",
-          items: {
-            type: "string",
-          },
-        },
-      },
+      required: canonicalPlanRequired,
+      properties: canonicalPlanProperties,
     },
   },
 } as const;
@@ -557,39 +500,27 @@ const directChapterPlanSchema = {
   additionalProperties: false,
   required: ["reply", "storyTitle", "generatedChapter", "chapterPlan"],
   properties: {
-    reply: {
-      type: "string",
-    },
-    storyTitle: {
-      type: "string",
-    },
+    reply: { type: "string" },
+    storyTitle: { type: "string" },
     generatedChapter: {
       type: "object",
       additionalProperties: false,
       required: ["title", "povCharacter", "content", "replaceChapterNumber"],
       properties: {
-        title: {
-          type: "string",
-        },
-        povCharacter: {
-          type: "string",
-        },
-        content: {
-          type: "string",
-        },
+        title: { type: "string" },
+        povCharacter: { type: "string" },
+        content: { type: "string" },
         replaceChapterNumber: {
-          anyOf: [
-            {
-              type: "integer",
-            },
-            {
-              type: "null",
-            },
-          ],
+          anyOf: [{ type: "integer" }, { type: "null" }],
         },
       },
     },
-    chapterPlan: editableChapterPlanSchema.properties.chapterPlan,
+    chapterPlan: {
+      type: "object",
+      additionalProperties: false,
+      required: canonicalPlanRequired,
+      properties: canonicalPlanProperties,
+    },
   },
 } as const;
 
@@ -674,64 +605,54 @@ function sanitiseEditableChapterPlan(
     throw new Error("The planning model returned an invalid chapter plan.");
   }
 
-  const plan = value as Record<string, unknown>;
-  const rawScenes = Array.isArray(plan.scenes) ? plan.scenes : [];
-  const scenes = rawScenes
+  const raw = value as Record<string, unknown>;
+  const rawEvents = Array.isArray(raw.plannedEvents) ? raw.plannedEvents : [];
+  const plannedEvents = rawEvents
     .filter(
-      (scene): scene is Record<string, unknown> =>
-        Boolean(scene) && typeof scene === "object" && !Array.isArray(scene),
+      (event): event is Record<string, unknown> =>
+        Boolean(event) && typeof event === "object" && !Array.isArray(event),
     )
-    .slice(0, 5)
-    .map((scene, index) => ({
+    .slice(0, 8)
+    .map((event, index) => ({
       order: index + 1,
-      location: cleanString(scene.location),
-      objective: cleanString(scene.objective),
-      conflict: cleanString(scene.conflict),
-      newInformation: cleanString(scene.newInformation),
-      exitBeat: cleanString(scene.exitBeat),
-      entryState: cleanString(scene.entryState),
-      endingState: cleanString(scene.endingState),
-      wordTarget:
-        typeof scene.wordTarget === "number" &&
-        Number.isInteger(scene.wordTarget) &&
-        scene.wordTarget >= 450 &&
-        scene.wordTarget <= 1100
-          ? scene.wordTarget
-          : 750,
-      mustNotHappen: cleanStringArray(scene.mustNotHappen),
+      event: cleanString(event.event),
+      location: cleanString(event.location),
+      staging: cleanString(event.staging),
+      continuityChange: cleanString(event.continuityChange),
+      relationshipChange: cleanString(event.relationshipChange),
     }));
-  const chapterNumber =
-    typeof plan.chapterNumber === "number" &&
-    Number.isInteger(plan.chapterNumber) &&
-    plan.chapterNumber > 0
-      ? plan.chapterNumber
-      : fallbackChapterNumber;
 
   if (
-    scenes.length < 3 ||
-    scenes.some(
-      (scene) =>
-        !scene.location ||
-        !scene.objective ||
-        !scene.conflict ||
-        !scene.newInformation ||
-        !scene.exitBeat ||
-        !scene.entryState ||
-        !scene.endingState,
+    plannedEvents.length < 4 ||
+    plannedEvents.some(
+      (event) =>
+        !event.event ||
+        !event.location ||
+        !event.staging ||
+        !event.continuityChange ||
+        !event.relationshipChange,
     )
   ) {
-    throw new Error("The chapter plan contains an incomplete scene.");
+    throw new Error(
+      "The canonical chapter plan must contain four to eight complete events.",
+    );
   }
 
-  const title = cleanString(plan.title);
-  const povCharacter = cleanString(plan.povCharacter);
-  const chapterGoal = cleanString(plan.chapterGoal);
-  const relationshipChange = cleanString(plan.relationshipChange);
-  const startingState = cleanString(plan.startingState);
-  const endingState = cleanString(plan.endingState);
-  const knowledgeLimits = cleanStringArray(plan.knowledgeLimits);
-  const premiseLocks = cleanStringArray(plan.premiseLocks);
-  const mustNotHappen = cleanStringArray(plan.mustNotHappen);
+  const chapterNumber =
+    typeof raw.chapterNumber === "number" &&
+    Number.isInteger(raw.chapterNumber) &&
+    raw.chapterNumber > 0
+      ? raw.chapterNumber
+      : fallbackChapterNumber;
+  const title = cleanString(raw.title);
+  const povCharacter = cleanString(raw.povCharacter);
+  const chapterGoal = cleanString(raw.chapterGoal);
+  const relationshipChange = cleanString(raw.relationshipChange);
+  const startingState = cleanString(raw.startingState);
+  const endingState = cleanString(raw.endingState);
+  const knowledgeLimits = cleanStringArray(raw.knowledgeLimits);
+  const premiseLocks = cleanStringArray(raw.premiseLocks);
+  const mustNotHappen = cleanStringArray(raw.mustNotHappen);
 
   if (
     !title ||
@@ -742,11 +663,26 @@ function sanitiseEditableChapterPlan(
     !endingState ||
     knowledgeLimits.length === 0 ||
     premiseLocks.length === 0 ||
-    mustNotHappen.length === 0 ||
-    scenes.some((scene) => (scene.mustNotHappen?.length ?? 0) === 0)
+    mustNotHappen.length === 0
   ) {
-    throw new Error("The chapter plan is missing required metadata.");
+    throw new Error("The canonical chapter plan is missing required metadata.");
   }
+
+  // Saved-plan compatibility only. The writer never loops over these cards.
+  const compatibilityScenes = plannedEvents.slice(0, 5).map((event, index) => ({
+    order: index + 1,
+    location: event.location,
+    objective: event.event,
+    conflict: event.relationshipChange,
+    newInformation: event.continuityChange,
+    exitBeat:
+      plannedEvents[index + 1]?.event ??
+      "Reach the planned chapter ending and final hook.",
+    entryState: event.staging,
+    endingState: plannedEvents[index + 1]?.staging ?? endingState,
+    wordTarget: 650,
+    mustNotHappen,
+  }));
 
   return {
     chapterNumber,
@@ -759,37 +695,50 @@ function sanitiseEditableChapterPlan(
     knowledgeLimits,
     premiseLocks,
     mustNotHappen,
-    scenes,
-    completedBeatsToAvoid: cleanStringArray(plan.completedBeatsToAvoid),
+    plannedEvents,
+    scenes: compatibilityScenes,
+    completedBeatsToAvoid: cleanStringArray(raw.completedBeatsToAvoid),
     status: "draft",
     updatedAt: new Date().toISOString(),
   };
 }
 
 function formatChapterPlan(plan: ChapterPlan): string {
-  const scenes = plan.scenes
+  const progression = (plan.plannedEvents ?? [])
     .map(
-      (scene) =>
-        `Scene ${scene.order}, ${scene.location}\n` +
-        `Starts: ${scene.entryState}\n` +
-        `Goal: ${scene.objective}\n` +
-        `Conflict: ${scene.conflict}\n` +
-        `Change: ${scene.newInformation}\n` +
-        `Exit: ${scene.exitBeat}\n` +
-        `Ends: ${scene.endingState}\n` +
-        `Target: ${scene.wordTarget} words`,
+      (event) =>
+        String(event.order) +
+        ". " +
+        event.event +
+        "\n   Location: " +
+        event.location +
+        "\n   Staging: " +
+        event.staging +
+        "\n   Continuity change: " +
+        event.continuityChange +
+        "\n   Relationship change: " +
+        event.relationshipChange,
     )
     .join("\n\n");
 
   return (
-    `Chapter ${plan.chapterNumber}: ${plan.title}\n` +
-    `POV: ${plan.povCharacter}\n` +
-    `Chapter goal: ${plan.chapterGoal}\n` +
-    `Relationship change: ${plan.relationshipChange}\n\n` +
-    `Starts: ${plan.startingState}\n` +
-    `Ends: ${plan.endingState}\n\n` +
-    `${scenes}\n\n` +
-    "Tell me what you want changed, or say approve this plan."
+    "Chapter " +
+    plan.chapterNumber +
+    ": " +
+    plan.title +
+    "\nPOV: " +
+    plan.povCharacter +
+    "\nChapter goal: " +
+    plan.chapterGoal +
+    "\nRelationship change: " +
+    plan.relationshipChange +
+    "\n\nStarts: " +
+    plan.startingState +
+    "\nEnds: " +
+    plan.endingState +
+    "\n\nCanonical progression\n\n" +
+    progression +
+    "\n\nTell me what you want changed, or say approve this plan."
   );
 }
 
@@ -806,15 +755,15 @@ function validateCanonicalChapterPlan(
   try {
     parsed = JSON.parse(value);
   } catch {
-    throw new Error("The model did not return a valid chapter plan.");
+    throw new Error("The model did not return a valid canonical chapter plan.");
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("The model returned an invalid chapter plan.");
+    throw new Error("The model returned an invalid canonical chapter plan.");
   }
 
   const plan = parsed as Record<string, unknown>;
-  const requiredPlanStrings = [
+  const requiredStrings = [
     "title",
     "povCharacter",
     "chapterGoal",
@@ -824,75 +773,49 @@ function validateCanonicalChapterPlan(
   ];
 
   if (
-    requiredPlanStrings.some(
+    requiredStrings.some(
       (key) => typeof plan[key] !== "string" || !plan[key].trim(),
-    )
-  ) {
-    throw new Error("The chapter plan is missing required metadata.");
-  }
-
-  if (
+    ) ||
     typeof plan.chapterNumber !== "number" ||
     !Number.isInteger(plan.chapterNumber) ||
     plan.chapterNumber < 1
   ) {
-    throw new Error("The chapter plan is missing its chapter number.");
+    throw new Error("The canonical chapter plan is missing required metadata.");
   }
 
-  const requiredSceneStrings = [
-    "location",
-    "objective",
-    "conflict",
-    "newInformation",
-    "exitBeat",
-    "entryState",
-    "endingState",
-  ];
-  const scenes = plan.scenes;
+  const events = plan.plannedEvents;
 
-  if (!Array.isArray(scenes) || scenes.length < 3 || scenes.length > 5) {
+  if (!Array.isArray(events) || events.length < 4 || events.length > 8) {
     throw new Error(
-      "The chapter plan must contain between three and five movements.",
+      "The canonical chapter plan must contain four to eight events.",
     );
   }
 
-  for (const [index, scene] of scenes.entries()) {
-    if (!scene || typeof scene !== "object" || Array.isArray(scene)) {
-      throw new Error(`The chapter plan is missing Scene ${index + 1}.`);
+  const eventStrings = [
+    "event",
+    "location",
+    "staging",
+    "continuityChange",
+    "relationshipChange",
+  ];
+
+  for (const [index, event] of events.entries()) {
+    if (!event || typeof event !== "object" || Array.isArray(event)) {
+      throw new Error("The canonical progression contains an invalid event.");
     }
-    const sceneCard = scene as Record<string, unknown>;
+
+    const item = event as Record<string, unknown>;
 
     if (
-      typeof sceneCard.order !== "number" ||
-      !Number.isInteger(sceneCard.order) ||
-      sceneCard.order !== index + 1 ||
-      typeof sceneCard.wordTarget !== "number" ||
-      !Number.isInteger(sceneCard.wordTarget) ||
-      sceneCard.wordTarget < 450 ||
-      sceneCard.wordTarget > 1100 ||
-      !Array.isArray(sceneCard.mustNotHappen) ||
-      sceneCard.mustNotHappen.length === 0 ||
-      sceneCard.mustNotHappen.some(
-        (item) => typeof item !== "string" || !item.trim(),
-      ) ||
-      requiredSceneStrings.some(
-        (key) =>
-          typeof sceneCard[key] !== "string" || !sceneCard[key].trim(),
+      item.order !== index + 1 ||
+      eventStrings.some(
+        (key) => typeof item[key] !== "string" || !item[key].trim(),
       )
     ) {
-      throw new Error(`Scene ${index + 1} is incomplete or out of order.`);
+      throw new Error(
+        "Canonical event " + (index + 1) + " is incomplete or out of order.",
+      );
     }
-  }
-
-  if (
-    !Array.isArray(plan.completedBeatsToAvoid) ||
-    plan.completedBeatsToAvoid.some(
-      (beat) => typeof beat !== "string" || !beat.trim(),
-    )
-  ) {
-    throw new Error(
-      "The chapter plan is missing its completed-beats guardrail.",
-    );
   }
 
   for (const guardrail of [
@@ -908,9 +831,22 @@ function validateCanonicalChapterPlan(
       values.some((item) => typeof item !== "string" || !item.trim())
     ) {
       throw new Error(
-        `The chapter plan is missing its ${guardrail} guardrail.`,
+        "The canonical chapter plan is missing its " +
+          guardrail +
+          " guardrail.",
       );
     }
+  }
+
+  if (
+    !Array.isArray(plan.completedBeatsToAvoid) ||
+    plan.completedBeatsToAvoid.some(
+      (beat) => typeof beat !== "string" || !beat.trim(),
+    )
+  ) {
+    throw new Error(
+      "The canonical chapter plan is missing completed-beat safeguards.",
+    );
   }
 
   if (
@@ -922,7 +858,7 @@ function validateCanonicalChapterPlan(
         cleanString(expected.povCharacter).toLowerCase())
   ) {
     throw new Error(
-      "The chapter plan metadata does not match the generated chapter metadata.",
+      "The canonical plan metadata does not match the chapter metadata.",
     );
   }
 }
@@ -1265,83 +1201,40 @@ structured response and never describe internal processing.
 const FOCUSED_DIRECT_CHAPTER_PLANNER_PROMPT = `
 You are NovelForge's commercial romance chapter-planning editor.
 
-Return planning metadata only, never novel prose. The Story Bible, continuity
-handoff, character knowledge, voice profiles, burn pacing and completed events
-are binding.
+Return planning metadata only, never novel prose. The Story Bible, continuity,
+character knowledge, voice profiles, burn pacing and completed events are
+binding.
 
-Return a brief conversational confirmation, the existing story title, chapter
-metadata with empty content, and chapterPlan as one direct structured object
-using exactly:
+Return one concise canonical chapterPlan using chapterNumber, title,
+povCharacter, chapterGoal, relationshipChange, startingState, endingState,
+knowledgeLimits, premiseLocks, mustNotHappen, plannedEvents and
+completedBeatsToAvoid.
 
-{
-  "chapterNumber": 1,
-  "title": "chapter title only",
-  "povCharacter": "POV character name only",
-  "chapterGoal": "the concrete change delivered by this chapter",
-  "relationshipChange": "the relationship or pressure movement earned here",
-  "startingState": "the exact physical, practical and emotional state at the opening",
-  "endingState": "the exact changed state after the final hook",
-  "knowledgeLimits": [
-    "what the POV cannot consciously know, recognise or conclude yet"
-  ],
-  "premiseLocks": [
-    "facts or pressures that cannot be removed, bypassed or contradicted"
-  ],
-  "mustNotHappen": [
-    "romance, plot, continuity or premise development forbidden in this chapter"
-  ],
-  "scenes": [
-    {
-      "order": 1,
-      "location": "supported location",
-      "entryState": "who is present, physical positions, active objects and unfinished pressure",
-      "objective": "the POV character's active objective",
-      "conflict": "the immediate opposing pressure",
-      "newInformation": "the new action, decision, discovery or consequence",
-      "exitBeat": "the concrete turn into the next movement or final hook",
-      "endingState": "the exact state the next movement must inherit",
-      "wordTarget": 750,
-      "mustNotHappen": [
-        "events, conclusions or repeated business forbidden in this movement"
-      ]
-    }
-  ],
-  "completedBeatsToAvoid": [
-    "specific completed action, conversation, thought or reveal not to repeat"
-  ]
-}
+plannedEvents must contain four to eight chronological events. Each event has
+order, event, location, staging, continuityChange and relationshipChange.
+Together they describe one 2,000 to 4,000-word chapter. They are not scenes,
+writing prompts or technical halves. Do not plan Part 1 and Part 2 separately.
 
-Use three to five bounded narrative movements totalling 2,000 to 4,000 words.
-Movements may remain in the same location and conversation. Do not manufacture
-travel merely to separate them. Give every movement a distinct dramatic job,
-an exact inherited entry state and an exact changed ending state. Only the
-final movement may contain the chapter-ending hook.
+The chapterPlan number, title and single POV must exactly match
+generatedChapter. For a new chapter, replaceChapterNumber is null. For a
+rewrite, it is the exact chapter number. generatedChapter.content stays empty.
 
-The chapterPlan number, title and POV must exactly match generatedChapter.
-For a new chapter, replaceChapterNumber is null. For a rewrite, it is the exact
-chapter number being replaced. generatedChapter.content must be empty.
+Begin after continuityHandoff.exactLatestEnding. Do not recap, restart or repeat
+anything in repetitionWarnings, recentChapterLedger or
+completedBeatsToAvoid. Preserve physical positions, objects, knowledge,
+timeline, ages, locations, possessions and family facts.
 
-Begin after continuityHandoff.exactLatestEnding. Do not recap, reset attraction
-or repeat anything in repetitionWarnings, recentChapterLedger or
-completedBeatsToAvoid. A character cannot use information they do not know. Do
-not invent unsupported people, rules, procedures, messages, documents,
-schedules, credentials or coincidences.
+Every event must create a different action, decision, discovery, complication
+or earned relationship change. Do not manufacture people, rules, procedures,
+messages, documents, schedules, credentials or coincidences.
 
-Knowledge limits and premise locks are mandatory, specific and story-dependent.
-For an awakening or delayed-recognition arc, state exactly what the POV may
-notice and what they cannot label, imagine or admit yet. Never convert
-friendship, rivalry, family history or emotional closeness into prior romance
-or sex unless established canon explicitly says that happened. Never invent
-housing, money, transport, evidence, employment or another convenient solution
-that cancels the chapter's central pressure.
+For an awakening or delayed-recognition arc, state what the POV may physically
+notice and what they cannot yet label, imagine or admit. Never invent prior
+romance, sex or attraction. Explicit consensual adult intimacy may be planned
+directly when earned by the Story Bible and chapter position.
 
-Respect the established heat level and burn pacing. Explicit consensual adult
-intimacy may be planned directly when earned by the story. All romantic and
-sexual characters are consenting adults aged eighteen or older.
-
-Keep the reply brief. Do not encode chapterPlan as a JSON string. Return it as
-the direct chapterPlan object required by the response structure. Never write
-chapter prose, analysis or markdown.
+All romantic and sexual characters are consenting adults aged eighteen or
+older. Keep the reply brief. Return chapterPlan as a structured object.
 `.trim();
 
 const SYSTEM_PROMPT = `
@@ -1735,89 +1628,71 @@ the user asks for it.
 
 Return only the required structured response.
 
-CHAPTER METADATA AND SCENE PLAN
+CANONICAL CHAPTER PLAN
 
-When Writer Mode is active, choose the metadata needed to identify the
-requested chapter:
+When Writer Mode is active, choose the chapter number, title, single POV
+character and whether an existing chapter is being replaced. Return that
+metadata in generatedChapter and keep generatedChapter.content empty.
 
-- chapter number
-
-- chapter title
-
-- POV character
-
-- whether an existing chapter is being replaced
-
-Return that metadata in generatedChapter. Set generatedChapter.content
-to an empty string.
-
-Also return one canonical chapter plan in chapterBrief. chapterBrief
-must be a JSON string using exactly this structure:
+Return one concise canonical plan in chapterBrief as a JSON string using
+exactly this structure:
 
 {
   "chapterNumber": 1,
   "title": "chapter title only",
-  "povCharacter": "POV character name only",
-  "chapterGoal": "the concrete story change this chapter delivers",
-  "relationshipChange": "the specific relationship or pressure movement earned here",
-  "startingState": "the exact physical, practical and emotional opening state",
-  "endingState": "the exact state after the final hook",
+  "povCharacter": "one POV character for the entire chapter",
+  "chapterGoal": "the concrete story change delivered",
+  "relationshipChange": "the precise relationship movement earned",
+  "startingState": "exact physical, practical and emotional opening state",
+  "endingState": "exact state after the final planned hook",
   "knowledgeLimits": [
     "what the POV cannot consciously know, recognise or conclude yet"
   ],
   "premiseLocks": [
-    "facts or pressures that cannot be removed, bypassed or contradicted"
+    "facts and pressures that cannot be bypassed or contradicted"
   ],
   "mustNotHappen": [
-    "forbidden romance, plot, continuity or premise development"
+    "forbidden plot, romance, continuity or premise development"
   ],
-  "scenes": [
+  "plannedEvents": [
     {
       "order": 1,
-      "location": "an established or clearly supported location",
-      "entryState": "who is present, positions, active objects and unfinished pressure",
-      "objective": "what the POV character actively tries to achieve",
-      "conflict": "the immediate obstacle or opposing pressure",
-      "newInformation": "what changes, is discovered or is decided",
-      "exitBeat": "the concrete turn that forces the next movement",
-      "endingState": "the state inherited by the next movement",
-      "wordTarget": 750,
-      "mustNotHappen": [
-        "events, conclusions or repeated business forbidden here"
-      ]
+      "event": "the concrete action, decision, discovery or complication",
+      "location": "the established location",
+      "staging": "who is present, positions, active objects and physical state",
+      "continuityChange": "the new fact or state created by this event",
+      "relationshipChange": "how pressure, trust, denial or intimacy changes"
     }
   ],
   "completedBeatsToAvoid": [
-    "specific action, conversation, thought or reveal that must not be repeated"
+    "specific action, exchange, thought or reveal that must not repeat"
   ]
 }
 
-Use between three and five bounded narrative movements totalling 2,000 to
-4,000 words. Several movements may occupy one physical scene, location or
-conversation. Never force a location change merely to divide the prose.
+Use four to eight chronological events for one 2,000 to 4,000-word chapter.
+This is one chapter plan, not separate scene prompts and not separate plans
+for Part 1 and Part 2. Do not divide the plan into technical writing halves.
+The two Magnum calls will share this exact plan and the same POV.
 
-The chapter number, title and POV character in chapterBrief must exactly
-match the generatedChapter metadata.
+Every event must perform a different narrative job. Keep physical transitions
+and staging explicit enough that the prose cannot teleport characters or
+contradict positions. Do not restart conversations, arrivals, attraction
+observations, conflicts or reveals.
 
-Every movement must perform a different narrative job. It must introduce a
-new action, decision, discovery, complication or relationship change.
-Never pad several movements with the same conversation, internal conflict,
-physical action or attraction observation.
+Base the plan only on the saved Story Bible, accepted continuity, previous
+chapters and the user's request. Preserve ages, locations, possessions, family
+facts and timeline. Do not invent convenient rules, messages, documents,
+credentials, strangers or coincidences to manufacture the plot.
 
-Base every scene on the saved Story Bible, continuity state, previous
-chapters and the user's request. Do not contradict established knowledge,
-roles, chronology, locations or relationship progression. Do not invent
-a convenient stranger, rule, document, schedule, message, credential or
-coincidence merely to force proximity or manufacture a hook.
+For a gay-for-you or delayed-awareness arc, bodily attention, involuntary
+physical reaction, denial and changed behaviour must precede conscious
+acknowledgement. Do not invent prior romance, sex, attraction or awareness.
+Plan consensual explicit adult intimacy directly when the approved Story Bible
+and earned chapter position require it.
 
-The plan must identify what has already happened and explicitly prohibit
-those beats from being repeated. It must also state the POV's exact knowledge
-limit, the premise facts that cannot be bypassed and developments forbidden in
-this chapter. For an awakening or delayed-recognition arc, distinguish bodily
-or emotional reactions from conscious attraction. Do not invent prior romance,
-sex or acknowledged desire unless established canon explicitly contains it.
-Do not invent a convenient resource or alternative that removes the planned
-pressure. Do not write prose in chapterBrief.
+The chapter number, title and POV in chapterBrief must exactly match
+generatedChapter. End with the planned hook. Do not write prose in
+chapterBrief.
 
 When Writer Mode is not active, return generatedChapter as null and
 chapterBrief as an empty string.
@@ -2017,8 +1892,7 @@ workspace.`,
     const usesCompactChapterPlan =
       requestStage === "plan" && isWriterMode && intent !== "create_story";
 
-    const requestedChapterNumber =
-      getRequestedChapterNumber(latestMessage);
+    const requestedChapterNumber = getRequestedChapterNumber(latestMessage);
     const savedChapterPlans = currentStory.storyState.chapterPlans ?? [];
     const latestDraftPlan =
       [...savedChapterPlans]
@@ -2026,9 +1900,7 @@ workspace.`,
         .sort((left, right) => left.chapterNumber - right.chapterNumber)
         .at(-1) ?? null;
     const explicitlyPlansChapter =
-      /\b(?:plan|outline|map)\b[\s\S]{0,80}\bchapter\b/i.test(
-        latestMessage,
-      ) ||
+      /\b(?:plan|outline|map)\b[\s\S]{0,80}\bchapter\b/i.test(latestMessage) ||
       /\bchapter\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b[\s\S]{0,80}\b(?:plan|outline|scenes?)\b/i.test(
         latestMessage,
       );
@@ -2046,9 +1918,7 @@ workspace.`,
           latestMessage,
         ));
     const isChapterPlanConversation =
-      explicitlyPlansChapter ||
-      explicitlyApprovesPlan ||
-      editsExistingPlan;
+      explicitlyPlansChapter || explicitlyApprovesPlan || editsExistingPlan;
     const latestChapter = currentStory.chapters.at(-1) ?? null;
     const rewriteTarget =
       intent === "rewrite_chapter" && requestedChapterNumber !== null
@@ -2058,9 +1928,7 @@ workspace.`,
         : null;
 
     if (intent === "rewrite_chapter" && requestedChapterNumber === null) {
-      throw new Error(
-        "Tell me which chapter number you want rewritten.",
-      );
+      throw new Error("Tell me which chapter number you want rewritten.");
     }
 
     if (
@@ -2137,8 +2005,7 @@ workspace.`,
       bookNumber: currentStory.bookNumber,
       chapters: currentStory.chapters
         .filter(
-          (chapter) =>
-            !rewriteTarget || chapter.number < rewriteTarget.number,
+          (chapter) => !rewriteTarget || chapter.number < rewriteTarget.number,
         )
         .map((chapter) => ({
           number: chapter.number,
@@ -2210,9 +2077,7 @@ workspace.`,
                 (plan) => plan.chapterNumber !== selectedChapterNumber,
               ),
               approvedPlan,
-            ].sort(
-              (left, right) => left.chapterNumber - right.chapterNumber,
-            ),
+            ].sort((left, right) => left.chapterNumber - right.chapterNumber),
           },
           messages: [
             ...currentStory.messages,
@@ -2262,30 +2127,25 @@ You are NovelForge's chapter-planning editor.
 Create or amend one saved chapter plan. Return planning only, never novel
 prose. The user is an experienced commercial romance author.
 
-Use three to five bounded narrative movements totalling 2,000 to 4,000
-words. Several movements may remain inside one sustained physical scene.
-Never force a location change merely to separate movements.
+Create one concise canonical progression of four to eight chronological
+plannedEvents for a single 2,000 to 4,000-word chapter. Do not create scene
+cards or separate plans for technical writing halves.
 
-Every movement must perform a different narrative job. It must introduce a
-new action, objective, obstacle, decision, discovery, consequence or
-relationship change. Never divide one repeated conversation, attraction
-observation or internal conflict into several nearly identical cards.
+Each event must perform a different narrative job through a new action,
+decision, discovery, complication or earned relationship change. Record its
+location, exact physical staging, continuity change and relationship change.
+The progression must connect cleanly from the startingState to endingState,
+with the planned chapter hook only at the end.
 
-Movement entry and ending states must connect exactly in order. Record who is
-present, physical positions, relevant object states, current knowledge and the
-unfinished pressure. Only the final movement may contain
-the chapter-ending hook. Respect the Story Bible, POV, burn pacing,
-continuity, character knowledge and completed beats. Do not invent a
-convenient stranger, rule, procedure, message, document, schedule,
-credential or coincidence.
+Respect the Story Bible, single POV, burn pacing, continuity, character
+knowledge and completed beats. Do not invent convenient people, rules,
+procedures, messages, documents, schedules, credentials or coincidences.
 
-Return specific chapter-level knowledgeLimits, premiseLocks and mustNotHappen
-guardrails. For an awakening or delayed-recognition arc, state exactly what the
-POV may notice and what they cannot label, imagine or admit yet. Never convert
-friendship, rivalry, family history or emotional closeness into former romance
-or sex unless canon explicitly establishes it. Never invent housing, money,
-transport, employment, evidence or another alternative that removes the
-chapter's central pressure.
+Return specific knowledgeLimits, premiseLocks and mustNotHappen guardrails.
+For an awakening or delayed-recognition arc, state what the POV may physically
+notice and what they cannot label, imagine or admit yet. Never invent prior
+romance, sex or attraction, or an alternative that removes the central
+pressure.
 
 When an existing plan is supplied, preserve everything the user has not
 asked to change. Apply their requested amendment precisely.
@@ -2316,11 +2176,7 @@ ${JSON.stringify(getCompactPlanningStoryState(stateBeforePlan), null, 2)}
 
 PRECEDING CHAPTER ENDING
 
-${
-  chapterBeforePlan
-    ? getEndingExcerpt(chapterBeforePlan.content, 500)
-    : ""
-}
+${chapterBeforePlan ? getEndingExcerpt(chapterBeforePlan.content, 500) : ""}
 
 EXISTING SAVED PLAN
 
@@ -2358,9 +2214,7 @@ ${latestMessage}
         outputTokens,
         totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
         costUsd:
-          (uncachedTokens * 1.25 +
-            cachedTokens * 0.125 +
-            outputTokens * 7.5) /
+          (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
           1_000_000,
         costType: "estimated",
         durationMs: Date.now() - startedAt,
@@ -2404,9 +2258,7 @@ ${latestMessage}
               (plan) => plan.chapterNumber !== selectedChapterNumber,
             ),
             savedPlan,
-          ].sort(
-            (left, right) => left.chapterNumber - right.chapterNumber,
-          ),
+          ].sort((left, right) => left.chapterNumber - right.chapterNumber),
         },
         messages: [
           ...currentStory.messages,
@@ -2598,8 +2450,7 @@ ${JSON.stringify(planningWorkspace, null, 2)}
               Math.max(
                 0,
                 ...currentStory.chapters.map((chapter) => chapter.number),
-              ) +
-                1,
+              ) + 1,
           );
 
           parsedOutput = {
@@ -2673,10 +2524,9 @@ ${JSON.stringify(planningWorkspace, null, 2)}
             returnedBible,
           );
 
-    const storyTitle =
-      preservesWorkspaceExactly
-        ? cleanString(currentStory.title) || "Untitled story"
-        : returnedTitle || cleanString(currentStory.title) || "Untitled story";
+    const storyTitle = preservesWorkspaceExactly
+      ? cleanString(currentStory.title) || "Untitled story"
+      : returnedTitle || cleanString(currentStory.title) || "Untitled story";
 
     if (isWriterMode && storyTitle.toLowerCase() === "untitled story") {
       throw new Error("The model did not return a usable story title.");
@@ -2705,10 +2555,8 @@ ${JSON.stringify(planningWorkspace, null, 2)}
 
       const expectedChapterNumber =
         parsedOutput.generatedChapter.replaceChapterNumber ??
-        Math.max(
-          0,
-          ...currentStory.chapters.map((chapter) => chapter.number),
-        ) + 1;
+        Math.max(0, ...currentStory.chapters.map((chapter) => chapter.number)) +
+          1;
 
       validateCanonicalChapterPlan(chapterBrief, {
         chapterNumber: expectedChapterNumber,
