@@ -625,28 +625,11 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
     };
   }
 
-  console.warn(
-    "Continuing with previous story state because the continuity ledger failed.",
-  );
-
-  return NextResponse.json({
-    storyState: {
-      importantFacts: existingStoryState.importantFacts ?? [],
-      characterStates: existingStoryState.characterStates ?? [],
-      relationshipStates: existingStoryState.relationshipStates ?? [],
-      unresolvedThreads: existingStoryState.unresolvedThreads ?? [],
-      timeline: existingStoryState.timeline ?? [],
-      locations: existingStoryState.locations ?? [],
-      activePOV: existingStoryState.activePOV ?? povCharacter,
-      chapterLedger: existingLedger,
-      latestChapterEnding:
-        existingStoryState.latestChapterEnding ??
-        getEndingExcerpt(chapterContent),
-      characterKnowledge: existingStoryState.characterKnowledge ?? [],
-      repetitionWarnings: existingStoryState.repetitionWarnings ?? [],
-      voiceProfiles: existingStoryState.voiceProfiles ?? [],
+  return NextResponse.json(
+    {
+      error: message,
+      diagnostics: diagnostic ? [diagnostic] : [],
     },
-    diagnostics: diagnostic ? [diagnostic] : [],
-    ledgerWarning: message,
-  });
-      }
+    { status: 502 },
+  );
+  }
