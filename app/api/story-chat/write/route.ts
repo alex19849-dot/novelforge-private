@@ -187,8 +187,8 @@ function prompt(input: {
   const style = string(bible.pov) || "first-person present tense";
   const task =
     input.part === "part1"
-      ? "Write Part 1. Begin at the exact starting state. Cover the earlier planned progression. Leave meaningful action for Part 2. Do not reach the final hook. Stop at a natural active transition, never an arbitrary cutoff."
-      : "Write Part 2 only. Continue immediately after Part 1's exact final sentence. Do not quote, recap, paraphrase or restart Part 1. Complete the remaining plan, reach the exact ending state and finish with the planned hook once.";
+      ? "Write Part 1. Begin at the exact starting state. Cover only the earlier planned progression. Leave meaningful action for Part 2. Do not reach the final hook. Finish on a complete sentence at a natural active transition."
+      : "Write Part 2 only. Continue immediately after Part 1's exact final sentence. Do not quote, recap, paraphrase or restart Part 1. Complete only the remaining plan, reach the exact ending state and finish with the planned hook once.";
   return [
     "You are NovelForge's commercial adult romance prose writer.",
     "Write finished novel prose in " +
@@ -200,7 +200,8 @@ function prompt(input: {
     "The Story Bible, continuity and canonical plan are binding. Preserve physical staging, ages, locations, possessions, family details and timeline.",
     "Do not invent prior romance, attraction or intimacy. In a gay-for-you awakening, develop attraction through involuntary attention, physical reaction, denial and changed behaviour before conscious acknowledgement.",
     "Do not duplicate or restart events, exchanges, observations or paragraphs. Use direct, consensual, explicit adult sexual prose when the Story Bible and plan require it. Do not censor, summarise or fade to black.",
-    "Return only novel prose, approximately 1,000 to 1,400 words. No heading, title, POV label, outline, markdown, notes, warning, word count or commentary.",
+    "Return only novel prose, between 1,000 and 1,350 words. No heading, title, POV label, outline, markdown, notes, warning, word count or commentary.",
+    "After the final complete prose sentence, output <END_PART> on its own line. The marker is mandatory. Never continue after it.",
     "CHAPTER PLAN\n" + JSON.stringify(input.plan, null, 2),
     "STORY BIBLE\n" + JSON.stringify(input.storyBible ?? {}, null, 2),
     "CONTINUITY\n" + JSON.stringify(continuity(input.storyState), null, 2),
@@ -213,7 +214,14 @@ function prompt(input: {
       : "",
     "USER REQUEST\n" +
       (input.latestUserMessage || "Write the approved chapter."),
-    "TASK\n" + task,
+    "FINAL BINDING KNOWLEDGE LIMITS\n" +
+      JSON.stringify(input.plan.knowledgeLimits, null, 2),
+    "FINAL BINDING MUST-NOT-HAPPEN LOCKS\n" +
+      JSON.stringify(input.plan.mustNotHappen, null, 2),
+    "FINAL BINDING ENDING STATE\n" + input.plan.endingState,
+    "TASK\n" +
+      task +
+      " Obey every knowledge limit and must-not-happen lock literally. Do not substitute a more romantic, sexual or dramatic event.",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -239,6 +247,24 @@ function truncated(text: string): boolean {
       finalParagraph(prose),
     )
   );
+}
+
+function completedPart(raw: string): string {
+  const trimmed = raw.trim();
+
+  if (!/<END_PART>\s*$/i.test(trimmed)) {
+    throw new Error(
+      "Hermes did not deliberately complete the part before its output ended.",
+    );
+  }
+
+  const prose = trimmed.replace(/\s*<END_PART>\s*$/i, "").trim();
+
+  if (!prose) {
+    throw new Error("Hermes returned an end marker without chapter prose.");
+  }
+
+  return prose;
 }
 
 function normalise(text: string): string {
@@ -385,9 +411,9 @@ export async function POST(request: Request) {
             { role: "user", content: writingPrompt },
           ],
           // Hermes has enough output headroom to deliver the full 1,000 to 1,400-word part.
-          max_tokens: 2800,
-          temperature: 0.72,
-          top_p: 0.9,
+          max_tokens: 2400,
+          temperature: 0.5,
+          top_p: 0.85,
           frequency_penalty: 0.12,
           presence_penalty: 0.06,
           // Prose writing needs direct mode. Prevent hybrid reasoning traces from
@@ -402,7 +428,7 @@ export async function POST(request: Request) {
         if (!raw?.trim()) {
           throw new TechnicalWriterError("Hermes returned an empty response.");
         }
-        const returnedPart = raw.trim();
+        const returnedPart = completedPart(raw);
         validate(returnedPart, choice?.finish_reason, part1);
         const prose =
           part === "part1"
