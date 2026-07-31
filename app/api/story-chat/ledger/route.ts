@@ -506,34 +506,39 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
     }
 
     const output = JSON.parse(outputText) as LedgerModelOutput;
-    const analysedEntries = output.chapterEntries.map((entry) => {
-      const sourceChapter = chaptersToAnalyse.find(
+   const analysedEntries = output.chapterEntries
+  .map((entry, index) => {
+    const sourceChapter =
+      chaptersToAnalyse.find(
         (chapter) => chapter.number === entry.chapterNumber,
+      ) ?? chaptersToAnalyse[index];
+
+    if (!sourceChapter) {
+      console.warn(
+        `Skipping invalid continuity entry for chapter ${entry.chapterNumber}.`,
       );
+      return null;
+    }
 
-      if (!sourceChapter) {
-        throw new Error(
-          `The continuity model returned an unknown Chapter ${entry.chapterNumber}.`,
-        );
-      }
-
-      return {
-        chapterNumber: sourceChapter.number,
-        title: sourceChapter.title,
-        povCharacter: sourceChapter.povCharacter,
-        summary: cleanString(entry.summary),
-        openingLocation: cleanString(entry.openingLocation),
-        endingLocation: cleanString(entry.endingLocation),
-        endingTime: cleanString(entry.endingTime),
-        endingExcerpt: getEndingExcerpt(sourceChapter.content),
-        relationshipShift: cleanString(entry.relationshipShift),
-        intimacyMilestone: cleanString(entry.intimacyMilestone),
-        newFacts: entry.newFacts,
-        unresolvedThreads: entry.unresolvedThreads,
-        repeatedBeats: entry.repeatedBeats,
-      };
-    });
-
+    return {
+      chapterNumber: sourceChapter.number,
+      title: sourceChapter.title,
+      povCharacter: sourceChapter.povCharacter,
+      summary: cleanString(entry.summary),
+      openingLocation: cleanString(entry.openingLocation),
+      endingLocation: cleanString(entry.endingLocation),
+      endingTime: cleanString(entry.endingTime),
+      endingExcerpt: getEndingExcerpt(sourceChapter.content),
+      relationshipShift: cleanString(entry.relationshipShift),
+      intimacyMilestone: cleanString(entry.intimacyMilestone),
+      newFacts: entry.newFacts,
+      unresolvedThreads: entry.unresolvedThreads,
+      repeatedBeats: entry.repeatedBeats,
+    };
+  })
+  .filter(
+    (entry): entry is NonNullable<typeof entry> => entry !== null,
+  );
     const analysedNumbers = new Set(
       analysedEntries.map((entry) => entry.chapterNumber),
     );
@@ -589,42 +594,59 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
       },
       diagnostics: [diagnostic],
     });
-  } catch (error) {
-    console.error("CONTINUITY LEDGER FAILED:", error);
-    const message =
-      error instanceof Error
-        ? error.message
-        : "The continuity ledger could not be created.";
+} catch (error) {
+  console.error("CONTINUITY LEDGER FAILED:", error);
 
-    if (diagnostic) {
-      diagnostic = {
-        ...diagnostic,
-        status: "failed",
-        error: message,
-      };
-    } else if (providerCallStartedAt > 0) {
-      diagnostic = {
-        stage: diagnosticStage,
-        provider: "openai",
-        model: "gpt-5.6-terra",
-        status: "failed",
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
-        costUsd: null,
-        costType: "unavailable",
-        durationMs: Date.now() - providerCallStartedAt,
-        attempt: 1,
-        error: message,
-      };
-    }
+  const message =
+    error instanceof Error
+      ? error.message
+      : "The continuity ledger could not be created.";
 
-    return NextResponse.json(
-      {
-        error: message,
-        diagnostics: diagnostic ? [diagnostic] : [],
-      },
-      { status: 502 },
-    );
+  if (diagnostic) {
+    diagnostic = {
+      ...diagnostic,
+      status: "failed",
+      error: message,
+    };
+  } else if (providerCallStartedAt > 0) {
+    diagnostic = {
+      stage: diagnosticStage,
+      provider: "openai",
+      model: "gpt-5.6-terra",
+      status: "failed",
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      costUsd: null,
+      costType: "unavailable",
+      durationMs: Date.now() - providerCallStartedAt,
+      attempt: 1,
+      error: message,
+    };
   }
-}
+
+  console.warn(
+    "Continuing with previous story state because the continuity ledger failed.",
+  );
+
+  return NextResponse.json({
+    storyState: {
+      importantFacts: existingStoryState.importantFacts ?? [],
+      characterStates: existingStoryState.characterStates ?? [],
+      relationshipStates: existingStoryState.relationshipStates ?? [],
+      unresolvedThreads: existingStoryState.unresolvedThreads ?? [],
+      timeline: existingStoryState.timeline ?? [],
+      locations: existingStoryState.locations ?? [],
+      activePOV: existingStoryState.activePOV ?? povCharacter,
+      chapterLedger: existingLedger,
+      latestChapterEnding:
+        existingStoryState.latestChapterEnding ??
+        getEndingExcerpt(chapterContent),
+      characterKnowledge: existingStoryState.characterKnowledge ?? [],
+      repetitionWarnings: existingStoryState.repetitionWarnings ?? [],
+      voiceProfiles: existingStoryState.voiceProfiles ?? [],
+    },
+    diagnostics: diagnostic ? [diagnostic] : [],
+    ledgerWarning: message,
+  });
+      }
