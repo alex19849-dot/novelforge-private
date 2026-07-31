@@ -7,7 +7,7 @@ import type { GenerationDiagnostic } from "../../../story-chat/types";
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
-const WRITING_MODEL = "anthracite-org/magnum-v4-72b";
+const WRITING_MODEL = "aion-labs/aion-3.0";
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
