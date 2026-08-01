@@ -130,7 +130,7 @@ function getPrompt(input: {
     "Return only novel prose followed by <END_SECTION> on its own line.",
     "Use the Story Bible's POV and tense. Default to first-person present tense only when the Story Bible does not specify them.",
     "Remain in " + input.povCharacter + "'s POV. Never switch heads.",
-    "Use natural contractions, a distinct character voice and readable paragraphing.",
+    "Use natural contractions by default in narration, internal thought and dialogue: I'm, I've, I'd, it's, that's, you're, he's, she's, we're, they're, don't, doesn't, didn't, can't, couldn't, won't and wouldn't. Use uncontracted forms such as I am, it is, that is, you are, he is, she is, do not and cannot only for deliberate emphasis or an established formal voice, never as the ordinary sentence pattern.",
     "Every sentence must be complete, grammatical and naturally phrased. Never omit articles, pronouns, auxiliary verbs, prepositions or connecting words for brevity or style.",
     "Never use an em dash or en dash. Use full stops, commas, colons, semicolons or parentheses where grammatically appropriate. Ordinary hyphens are allowed only inside genuine compound words.",
     "Write controlled commercial prose, not a summary of what the viewpoint character thinks and feels. Build the scene through specific action, dialogue, sensory detail and individual observation.",
@@ -505,7 +505,7 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "Write only polished, grammatically complete commercial romance prose. Canon, POV, established character knowledge, punctuation rules and user direction are binding. Keep consensual adult intimacy on the page when the story requires it. Never use em dashes or en dashes, omit necessary words, summarise the scene or pad it with generic emotional explanation.",
+                "Write only polished, grammatically complete commercial romance prose. Use natural contractions by default in narration, thought and dialogue unless an uncontracted form carries deliberate emphasis. Canon, POV, established character knowledge, punctuation rules and user direction are binding. Keep consensual adult intimacy on the page when the story requires it. Never use em dashes or en dashes, omit necessary words, summarise the scene or pad it with generic emotional explanation.",
             },
             { role: "user", content: writingPrompt },
           ],
