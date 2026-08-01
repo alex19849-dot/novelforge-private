@@ -249,7 +249,7 @@ function substantialParagraphs(text: string): string[] {
 function proseSentences(text: string): string[] {
   return text
     .replace(/\n+/g, " ")
-    .split(/(?<=[.!?])\s+(?=[“\"']?[A-Z])/u)
+    .split(/(?<=[.!?])\s+(?=[“"']?[A-Z])/u)
     .map((sentence) => sentence.trim())
     .filter(Boolean);
 }
@@ -314,7 +314,7 @@ function repetitionWarnings(
 
   const sentences = proseSentences(section);
   const firstPersonOpenings = sentences.filter((sentence) =>
-    /^[“\"']?I(?:\s|['’])/u.test(sentence),
+    /^[“"']?I(?:\s|['’])/u.test(sentence),
   ).length;
 
   if (
@@ -327,7 +327,7 @@ function repetitionWarnings(
   }
 
   if (
-    /(?:^|[.!?]\s+)[“\"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b[^.!?]*[.!?]\s+[“\"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b/iu.test(
+    /(?:^|[.!?]\s+)[“"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b[^.!?]*[.!?]\s+[“"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b/iu.test(
       section,
     )
   ) {
