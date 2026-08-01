@@ -1023,7 +1023,12 @@ function mergeStoryBible(
 
 function parseRequestBody(
   value: unknown,
-): { story: StoryWorkspace; stage: "complete" | "plan" } | null {
+): {
+  story: StoryWorkspace;
+  stage: "complete" | "plan";
+  chatOnly: boolean;
+  draftContext: string;
+} | null {
   function isStoryWorkspace(value: unknown): value is StoryWorkspace {
     return (
       !!value &&
@@ -1042,6 +1047,8 @@ function parseRequestBody(
   const body = value as {
     story?: StoryWorkspace;
     stage?: unknown;
+    chatOnly?: unknown;
+    draftContext?: unknown;
   };
 
   if (!body.story) {
@@ -1055,6 +1062,11 @@ function parseRequestBody(
   return {
     story: body.story,
     stage: body.stage === "plan" ? "plan" : "complete",
+    chatOnly: body.chatOnly === true,
+    draftContext:
+      typeof body.draftContext === "string"
+        ? body.draftContext.trim().slice(-40000)
+        : "",
   };
 }
 
@@ -1722,6 +1734,8 @@ export async function POST(request: Request) {
 
     const currentStory = parsedBody?.story;
     const requestStage = parsedBody?.stage ?? "complete";
+    const chatOnly = parsedBody?.chatOnly ?? false;
+    const draftContext = parsedBody?.draftContext ?? "";
 
     if (!currentStory) {
       return NextResponse.json(
@@ -1815,6 +1829,10 @@ export async function POST(request: Request) {
 
     if (intent !== "rewrite_chapter" && explicitlyRequestsChapterProse) {
       intent = "continue_story";
+    }
+
+    if (chatOnly) {
+      intent = "general_chat";
     }
 
     const intentInstruction: Record<typeof intent, string> = {
@@ -2306,6 +2324,16 @@ ${intentInstruction[intent]}
 CURRENT STORY WORKSPACE
 
 ${JSON.stringify(planningWorkspace, null, 2)}
+
+${
+  chatOnly && draftContext
+    ? `UNFINISHED CHAPTER DRAFT, READ ONLY
+
+${draftContext}
+
+Use this draft only to answer the user's question. Never rewrite, continue, repair, complete or return replacement prose unless the user explicitly asks for a short illustrative example. Do not add it to the saved chapters, Story Bible, continuity ledger or story state.`
+    : ""
+}
 `.trim();
       const planningInput = usesCompactChapterPlan
         ? [
@@ -2597,7 +2625,9 @@ ${JSON.stringify(planningWorkspace, null, 2)}
       );
     }
 
-    const generatedChapter = parsedOutput.generatedChapter ?? null;
+    const generatedChapter = chatOnly
+      ? null
+      : (parsedOutput.generatedChapter ?? null);
 
     const currentChapters = Array.isArray(currentStory.chapters)
       ? currentStory.chapters
