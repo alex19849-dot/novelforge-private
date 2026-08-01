@@ -228,6 +228,22 @@ function cleanExistingLedger(value: unknown): Array<Record<string, unknown>> {
     : [];
 }
 
+function hasStrictClockMarker(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const timeline = (value as Record<string, unknown>).timeline;
+
+  return (
+    Array.isArray(timeline) &&
+    timeline.some(
+      (entry) =>
+        typeof entry === "string" && entry.trim().startsWith("CURRENT CLOCK:"),
+    )
+  );
+}
+
 function cleanStateForAnalysis(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {};
@@ -336,7 +352,9 @@ export async function POST(request: Request) {
         : chapterNumber;
     const requiresFullRebuild =
       !isBatchRebuild &&
-      (existingLedger.length === 0 || chapterNumber < latestChapterNumber);
+      (existingLedger.length === 0 ||
+        chapterNumber < latestChapterNumber ||
+        !hasStrictClockMarker(body.storyState));
     if (requiresFullRebuild) {
       diagnosticStage = "continuity_ledger_backfill";
     }
@@ -393,6 +411,51 @@ Track:
 - the exact relationship shift and furthest intimacy milestone reached;
 - repeated scene constructions, jokes, gestures, attraction observations,
   internal conclusions or phrases future chapters must avoid.
+
+STRICT STORY CLOCK
+
+Reconstruct one chronological clock from the supplied chapters. Treat explicit
+weekday names, dates, displayed clock times, established schedules and precise
+elapsed intervals as stronger evidence than vague words such as later, morning
+or afternoon. Never silently repair accepted prose by inventing an event.
+
+The final timeline item must use exactly this prefix:
+
+CURRENT CLOCK: [weekday or story day], [exact time or narrowest supported time
+range], immediately after [the final on-page event].
+
+If prose contains incompatible time claims, add a concise timeline item using
+the prefix TIME CONFLICT:. State both claims and identify which concrete clock
+or schedule fact future planning must follow. Do not perform faulty clock
+arithmetic. Do not call late morning afternoon, treat a reached deadline as
+future, or confuse hours until tonight with hours until tomorrow.
+
+Every chapter entry endingTime must include the weekday or story day plus the
+exact time, narrowest supported range, or an explicit statement that the prose
+does not establish it. Never return only words such as later, evening or after
+practice when stronger evidence is available. Opening and ending chronology
+must agree with the previous chapter unless the prose makes a forward jump.
+
+REPETITION CONTROL
+
+Track semantic cycles, not merely matching phrases. A repeated internal beat
+includes noticing the same person or object, trying to categorise the reaction,
+recalling the same evidence and reaching the same conclusion again, even when
+the wording and location change. Record the conclusion already completed and
+the new evidence required before it may return.
+
+Track repeated setting introductions and routine choreography, including the
+same corridor, lighting, smell, silence, phone, notebook, shower, drive, meal or
+room inventory when it does not change the situation. Track list-like action
+reporting and repeated sentence openings such as successive sentences beginning
+with I. Do not flag a necessary recurring location or object by itself. Flag the
+reused descriptive treatment or narrative function.
+
+repetitionWarnings must be cumulative, concise instructions for future prose.
+Retain still-relevant existing warnings, merge duplicates and remove a warning
+only when it is no longer useful. repeatedBeats in each chapter entry must name
+that chapter's completed conclusions, exchanges, sensory introductions and
+action patterns that must not be replayed.
 
 CONTINUITY PRECISION
 
@@ -571,13 +634,30 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
       return leftNumber - rightNumber;
     });
     const latestLedgerEntry = chapterLedger.at(-1);
+    const currentClock =
+      typeof latestLedgerEntry?.endingTime === "string" &&
+      latestLedgerEntry.endingTime.trim()
+        ? latestLedgerEntry.endingTime.trim()
+        : "time not established by the accepted prose";
+    const timeline = [
+      ...output.timeline.filter(
+        (entry) =>
+          typeof entry === "string" &&
+          !entry.trim().startsWith("CURRENT CLOCK:"),
+      ),
+      `CURRENT CLOCK: ${currentClock}, immediately after the final on-page event of Chapter ${
+        typeof latestLedgerEntry?.chapterNumber === "number"
+          ? latestLedgerEntry.chapterNumber
+          : chapterNumber
+      }.`,
+    ];
     return NextResponse.json({
       storyState: {
         importantFacts: output.importantFacts,
         characterStates: output.characterStates,
         relationshipStates: output.relationshipStates,
         unresolvedThreads: output.unresolvedThreads,
-        timeline: output.timeline,
+        timeline,
         locations: output.locations,
         activePOV:
           typeof latestLedgerEntry?.povCharacter === "string"
