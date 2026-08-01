@@ -41,6 +41,8 @@ type PendingChapterGeneration = {
 
 type SectionAction = "start" | "continue" | "rewrite";
 
+type DraftWorkspaceView = "draft" | "chat";
+
 type WriterResponse = {
   section: string;
   wordCount: number;
@@ -996,6 +998,9 @@ export default function StoryChatPage() {
 
   const [sectionInstruction, setSectionInstruction] = useState("");
 
+  const [draftWorkspaceView, setDraftWorkspaceView] =
+    useState<DraftWorkspaceView>("draft");
+
   const [stories, setStories] = useState<
     {
       id: string;
@@ -1328,6 +1333,12 @@ undone.`,
       localStorage.removeItem(PENDING_GENERATION_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    if (pendingGeneration?.storyId) {
+      setDraftWorkspaceView("draft");
+    }
+  }, [pendingGeneration?.storyId]);
 
   useEffect(() => {
     const saved = localStorage.getItem("novelforge-reader");
@@ -2121,8 +2132,7 @@ device.`,
     if (
       !story ||
       !trimmedMessage ||
-      isThinking ||
-      (hasPendingChapter && deletionRequest.kind === "none")
+      isThinking
     ) {
       return;
     }
@@ -2290,6 +2300,7 @@ device.`,
       const explicitlyRewritesPlan =
         /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(trimmedMessage);
       const usesSavedPlan =
+        !hasPendingChapter &&
         requestsChapterGeneration(trimmedMessage) &&
         savedPlan !== null &&
         (!existingPlannedChapter ||
@@ -2359,6 +2370,7 @@ device.`,
       }
 
       if (
+        !hasPendingChapter &&
         planningStory.chapters.length > 0 &&
         !planningStory.storyState.chapterLedger?.length
       ) {
@@ -2390,6 +2402,10 @@ device.`,
         body: JSON.stringify({
           stage: "plan",
           story: planningStory,
+          chatOnly: hasPendingChapter,
+          draftContext: hasPendingChapter
+            ? pendingGeneration?.draft ?? ""
+            : "",
         }),
       });
 
@@ -2844,7 +2860,8 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
           </div>
         )}
 
-        {activeTab === "chat" && !pendingForCurrentStory && (
+        {activeTab === "chat" &&
+          (!pendingForCurrentStory || draftWorkspaceView === "chat") && (
           <ChatPanel messages={visibleChatMessages} isThinking={isThinking} />
         )}
 
@@ -2885,11 +2902,41 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
           <footer
             className={`border-t border-white/10 bg-neutral-950/95 px-4 backdrop-blur sm:px-5 ${
               pendingForCurrentStory
-                ? "min-h-0 flex-1 overflow-y-auto py-4 sm:py-5"
+                ? draftWorkspaceView === "draft"
+                  ? "min-h-0 flex-1 overflow-y-auto py-4 sm:py-5"
+                  : "shrink-0 py-3 sm:py-4"
                 : "shrink-0 py-5"
             }`}
           >
-            {currentDiagnostics.length > 0 && (
+            {pendingForCurrentStory && (
+              <div className="mx-auto mb-3 grid max-w-5xl grid-cols-2 rounded-xl border border-white/10 bg-white/5 p-1">
+                <button
+                  type="button"
+                  onClick={() => setDraftWorkspaceView("draft")}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    draftWorkspaceView === "draft"
+                      ? "bg-pink-500 text-white"
+                      : "text-neutral-400 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  Chapter Draft
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDraftWorkspaceView("chat")}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                    draftWorkspaceView === "chat"
+                      ? "bg-pink-500 text-white"
+                      : "text-neutral-400 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  Chat
+                </button>
+              </div>
+            )}
+
+            {currentDiagnostics.length > 0 &&
+              (!pendingForCurrentStory || draftWorkspaceView === "draft") && (
               <details className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
                 <summary className="cursor-pointer font-medium text-neutral-300">
                   {formatGenerationDiagnostics(
@@ -2928,7 +2975,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
               </details>
             )}
 
-            {pendingForCurrentStory && (
+            {pendingForCurrentStory && draftWorkspaceView === "draft" && (
               <div className="mx-auto mb-4 max-w-5xl rounded-xl border border-pink-500/30 bg-pink-500/10 p-3 sm:p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-pink-100">
@@ -3028,7 +3075,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
               </div>
             )}
 
-            {!pendingForCurrentStory && (
+            {(!pendingForCurrentStory || draftWorkspaceView === "chat") && (
             <form onSubmit={sendMessage} className="flex items-end gap-3">
               <textarea
                 value={input}
@@ -3045,8 +3092,12 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
                     event.currentTarget.form?.requestSubmit();
                   }
                 }}
-                placeholder="Tell NovelForge anything..."
-                rows={5}
+                placeholder={
+                  pendingForCurrentStory
+                    ? "Ask NovelForge about the current draft..."
+                    : "Tell NovelForge anything..."
+                }
+                rows={pendingForCurrentStory ? 3 : 5}
                 className="min-h-14 flex-1 resize-none rounded-2xl border
 border-white/10 bg-white/5 px-5 py-4 text-base text-white outline-none
 placeholder:text-neutral-600 focus:border-pink-500
@@ -3057,9 +3108,7 @@ disabled:cursor-not-allowed disabled:opacity-60"
                 type="submit"
                 disabled={
                   !input.trim() ||
-                  isThinking ||
-                  (Boolean(pendingForCurrentStory) &&
-                    getChapterDeletionRequest(input).kind === "none")
+                  isThinking
                 }
                 className="h-14 rounded-2xl bg-pink-500 px-6 font-semibold text-white
 transition hover:bg-pink-400 disabled:cursor-not-allowed
