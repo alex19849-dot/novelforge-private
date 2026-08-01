@@ -72,6 +72,12 @@ function getEndingExcerpt(text: string, maximumWords = 900): string {
   return words.slice(-maximumWords).join(" ");
 }
 
+function getOpeningExcerpt(text: string, maximumWords = 500): string {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+
+  return words.slice(0, maximumWords).join(" ");
+}
+
 const EMPTY_STORY_BIBLE: StoryBible = {
   premise: "",
 
@@ -1236,6 +1242,27 @@ anything in repetitionWarnings, recentChapterLedger or
 completedBeatsToAvoid. Preserve physical positions, objects, knowledge,
 timeline, ages, locations, possessions and family facts.
 
+TIME AND CONTINUATION ARE HARD CONSTRAINTS. Use the explicit clock, weekday,
+relative-time statements and event order in continuityHandoff and
+recentChapterAnchors to establish one current story clock before planning.
+The first event must continue from that clock or name a deliberate forward
+time jump. Every later time reference must move monotonically forward. Include
+the day and time or a precise elapsed interval in startingState, endingState
+and any event that changes time. Never silently change morning to afternoon,
+treat an already reached deadline as future, or perform incorrect clock
+arithmetic. If accepted prose contains conflicting time statements, preserve
+the most concrete on-page clock and schedule facts and do not propagate the
+contradictory calculation.
+
+Repetition includes repeated reasoning, not only repeated phrases. Once a POV
+has reached an internal conclusion, do not plan the same observation,
+categorisation, denial, grievance or decision again in another room or after a
+time jump. A recurring concern may return only when new external evidence
+materially changes it. Do not reintroduce a familiar location through the same
+smell, lighting, corridor, silence or object inventory. Each planned event must
+change the external situation; reflection may respond to that change but may
+not be the event's only purpose.
+
 Every event must create a different action, decision, discovery, complication
 or earned relationship change. Do not manufacture people, rules, procedures,
 messages, documents, schedules, credentials or coincidences.
@@ -2001,6 +2028,18 @@ workspace.`,
         ...entry,
         endingExcerpt: "",
       })),
+      recentChapterAnchors: currentStory.chapters
+        .filter(
+          (chapter) => !rewriteTarget || chapter.number < rewriteTarget.number,
+        )
+        .slice(-3)
+        .map((chapter) => ({
+          chapterNumber: chapter.number,
+          title: chapter.title,
+          povCharacter: chapter.povCharacter,
+          openingExcerpt: getOpeningExcerpt(chapter.content),
+          endingExcerpt: getEndingExcerpt(chapter.content),
+        })),
       rewriteContext: rewriteTarget
         ? {
             targetChapterMetadata: {
@@ -2154,6 +2193,23 @@ decision, discovery, complication or earned relationship change. Record its
 location, exact physical staging, continuity change and relationship change.
 The progression must connect cleanly from the startingState to endingState,
 with the planned chapter hook only at the end.
+
+Establish the current weekday and clock time from the supplied continuity and
+recent chapter anchors before planning. Treat time as a hard constraint. The
+opening must continue from that exact point or identify a deliberate forward
+jump, and every event must remain chronological. State the day and time or
+precise elapsed interval whenever time advances. Prefer an explicit on-page
+clock and established schedule over a contradictory mental calculation. Never
+move the clock backwards, call late morning afternoon, or describe a reached
+deadline as still approaching.
+
+Treat repeated internal reasoning as a repeated beat even when the wording is
+different. Do not plan another cycle in which the POV notices the same person
+or surroundings, tries to categorise the reaction, recalls the same evidence,
+and reaches the same conclusion in a new location. A thought may recur only
+after new external evidence changes its meaning. Do not reintroduce familiar
+settings through the same sensory inventory. Every event must materially alter
+the external situation rather than exist to fill space with reflection.
 
 Respect the Story Bible, single POV, burn pacing, continuity, character
 knowledge and completed beats. Do not invent convenient people, rules,
