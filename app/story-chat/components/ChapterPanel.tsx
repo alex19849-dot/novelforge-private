@@ -44,6 +44,7 @@ type ReaderPage = {
   chapterTitle: string;
   povCharacter: string;
   showHeading: boolean;
+  startWordIndex: number;
   paragraphs: string[];
 };
 
@@ -87,6 +88,29 @@ function progressKey(storyId: string) {
   return `novelforge-reader-page-${storyId}`;
 }
 
+function characterOffsetForWordIndex(
+  content: string,
+  wordIndex: number,
+): number {
+  if (wordIndex <= 0) {
+    return 0;
+  }
+
+  const wordPattern = /\S+/g;
+  let match: RegExpExecArray | null = null;
+  let currentWord = 0;
+
+  while ((match = wordPattern.exec(content)) !== null) {
+    if (currentWord === wordIndex) {
+      return match.index;
+    }
+
+    currentWord += 1;
+  }
+
+  return content.length;
+}
+
 export default function ChapterPanel({
   storyId,
   storyTitle,
@@ -119,10 +143,20 @@ export default function ChapterPanel({
 
   const readerRef = useRef<HTMLDivElement | null>(null);
   const measurementRef = useRef<HTMLDivElement | null>(null);
+  const editContentRef = useRef<HTMLTextAreaElement | null>(null);
   const paginationFrameRef = useRef<number | null>(null);
   const restoredStoryRef = useRef<string | null>(null);
   const currentPageRef = useRef(1);
   const pageCountRef = useRef(1);
+  const editingAnchorRef = useRef<{
+    chapterId: string;
+    wordIndex: number;
+  } | null>(null);
+  const editingSourceContentRef = useRef("");
+  const restoreAfterSaveRef = useRef<{
+    chapterId: string;
+    wordIndex: number;
+  } | null>(null);
 
   const pageCount = Math.max(1, pages.length);
   const currentReaderPage = pages[currentPage - 1] ?? pages[0] ?? null;
@@ -271,6 +305,7 @@ export default function ChapterPanel({
     const nextPages: ReaderPage[] = [];
     let activeChapter: StoryChapter | null = null;
     let activePage: ReaderPage | null = null;
+    let chapterWordCursor = 0;
 
     const resetMeasurement = () => {
       measurement.replaceChildren();
@@ -288,7 +323,11 @@ export default function ChapterPanel({
       }
     };
 
-    const startPage = (chapter: StoryChapter, showHeading: boolean) => {
+    const startPage = (
+      chapter: StoryChapter,
+      showHeading: boolean,
+      startWordIndex = chapterWordCursor,
+    ) => {
       activeChapter = chapter;
       activePage = {
         chapterId: chapter.id,
@@ -296,6 +335,7 @@ export default function ChapterPanel({
         chapterTitle: chapter.title,
         povCharacter: chapter.povCharacter,
         showHeading,
+        startWordIndex,
         paragraphs: [],
       };
       resetMeasurement();
@@ -338,6 +378,8 @@ export default function ChapterPanel({
     );
 
     for (const chapter of orderedChapters) {
+      chapterWordCursor = 0;
+
       if (activePage) {
         finishPage();
       }
@@ -362,6 +404,7 @@ export default function ChapterPanel({
 
           if (!overflows()) {
             activePage.paragraphs.push(remainingText);
+            chapterWordCursor += remainingWords.length;
             remainingWords = [];
             continue;
           }
@@ -373,6 +416,7 @@ export default function ChapterPanel({
             activePage.paragraphs.push(
               remainingWords.slice(0, fittingCount).join(" "),
             );
+            chapterWordCursor += fittingCount;
             remainingWords = remainingWords.slice(fittingCount);
             finishPage();
             continue;
@@ -384,6 +428,7 @@ export default function ChapterPanel({
           }
 
           activePage.paragraphs.push(remainingWords.shift() ?? "");
+          chapterWordCursor += 1;
           finishPage();
         }
       }
@@ -404,7 +449,31 @@ export default function ChapterPanel({
 
     let targetPage = Math.round(previousRatio * (nextPages.length - 1)) + 1;
 
-    if (restoredStoryRef.current !== storyId) {
+    const savedAnchor = restoreAfterSaveRef.current;
+
+    if (savedAnchor) {
+      let anchoredPageIndex = -1;
+
+      for (let index = nextPages.length - 1; index >= 0; index -= 1) {
+        const page = nextPages[index];
+
+        if (
+          page.chapterId === savedAnchor.chapterId &&
+          page.startWordIndex <= savedAnchor.wordIndex
+        ) {
+          anchoredPageIndex = index;
+          break;
+        }
+      }
+
+      if (anchoredPageIndex >= 0) {
+        targetPage = anchoredPageIndex + 1;
+      }
+
+      restoreAfterSaveRef.current = null;
+    }
+
+    if (!savedAnchor && restoredStoryRef.current !== storyId) {
       const savedPage = Number(
         window.localStorage.getItem(progressKey(storyId)) ?? "1",
       );
@@ -537,10 +606,15 @@ export default function ChapterPanel({
   }
 
   function startEditing() {
-    if (!currentChapter) {
+    if (!currentChapter || !currentReaderPage) {
       return;
     }
 
+    editingAnchorRef.current = {
+      chapterId: currentChapter.id,
+      wordIndex: currentReaderPage.startWordIndex,
+    };
+    editingSourceContentRef.current = currentChapter.content;
     setEditTitle(currentChapter.title);
     setEditPovCharacter(currentChapter.povCharacter);
     setEditContent(currentChapter.content);
@@ -549,6 +623,8 @@ export default function ChapterPanel({
   }
 
   function cancelEditing() {
+    editingAnchorRef.current = null;
+    editingSourceContentRef.current = "";
     setIsEditing(false);
   }
 
@@ -562,8 +638,39 @@ export default function ChapterPanel({
       povCharacter: editPovCharacter,
       content: editContent,
     });
+    restoreAfterSaveRef.current = editingAnchorRef.current;
+    editingAnchorRef.current = null;
+    editingSourceContentRef.current = "";
     setIsEditing(false);
   }
+
+  useEffect(() => {
+    if (!isEditing || !editContentRef.current || !editingAnchorRef.current) {
+      return;
+    }
+
+    const textarea = editContentRef.current;
+    const characterOffset = characterOffsetForWordIndex(
+      editingSourceContentRef.current,
+      editingAnchorRef.current.wordIndex,
+    );
+    const frameId = requestAnimationFrame(() => {
+      textarea.focus({ preventScroll: true });
+      textarea.setSelectionRange(characterOffset, characterOffset);
+
+      const availableScroll = Math.max(
+        0,
+        textarea.scrollHeight - textarea.clientHeight,
+      );
+      const progress =
+        editingSourceContentRef.current.length > 0
+          ? characterOffset / editingSourceContentRef.current.length
+          : 0;
+      textarea.scrollTop = Math.max(0, availableScroll * progress - 32);
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [isEditing]);
 
   function renderParagraph(content: string, key: string) {
     const messageMatch = content.match(MESSAGE_PATTERN);
@@ -645,6 +752,7 @@ export default function ChapterPanel({
                   className="w-full rounded-xl border border-neutral-600 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
                 />
                 <textarea
+                  ref={editContentRef}
                   aria-label="Chapter content"
                   value={editContent}
                   onChange={(event) => setEditContent(event.target.value)}
