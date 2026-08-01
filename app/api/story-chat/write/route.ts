@@ -7,10 +7,9 @@ import type { GenerationDiagnostic } from "../../../story-chat/types";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const WRITING_MODEL = "nousresearch/hermes-4-405b";
-const openrouter = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+const WRITING_MODEL = "gpt-5.6-terra";
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 type SectionAction = "start" | "continue" | "rewrite";
@@ -30,10 +29,12 @@ type WriterRequest = {
 };
 
 type Usage = {
-  prompt_tokens?: number;
-  completion_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
   total_tokens?: number;
-  cost?: number;
+  input_tokens_details?: {
+    cached_tokens?: number;
+  };
 };
 
 class TechnicalWriterError extends Error {}
@@ -133,7 +134,6 @@ function getPrompt(input: {
     "Every sentence must be complete, grammatical and naturally phrased. Never omit articles, pronouns, auxiliary verbs, prepositions or connecting words for brevity or style.",
     "Never use an em dash or en dash. Use full stops, commas, colons, semicolons or parentheses where grammatically appropriate. Ordinary hyphens are allowed only inside genuine compound words.",
     "Write controlled commercial prose, not a summary of what the viewpoint character thinks and feels. Build the scene through specific action, dialogue, sensory detail and individual observation.",
-    "Keep narration selective rather than procedural. Omit routine movements and transitions the reader can infer, and use setting details only when they affect the scene.",
     "Do not explain an emotion after the action or physical response has already shown it. Do not repeatedly announce nerves, determination, confusion, attraction or discomfort.",
     "Avoid generic reaction crutches such as a pounding heart, a caught breath, taking a deep breath, being unable to help thinking or noticing, and reminding oneself why one is here unless that exact reaction is both fresh and necessary.",
     "Do not begin successive paragraphs with the same construction. Vary sentence length naturally without fragments, clipped article-free phrasing or run-on sentences.",
@@ -150,7 +150,7 @@ function getPrompt(input: {
     "Preserve ages, timeline, locations, possessions, family facts, physical positions and character knowledge.",
     "Do not invent prior romance, attraction or intimacy. In a gay-for-you or delayed-awareness arc, involuntary attention, physical reaction, denial and changed behaviour must precede conscious acknowledgement.",
     "Do not repeat completed actions, conversations, jokes, gestures, attraction observations, internal conclusions or paragraphs.",
-    "Write direct consensual explicit adult sexual content when the established story progression and current instruction require it. Never censor, summarise or fade to black.",
+    "Write long, open-door consensual adult intimacy when the established progression requires it. Keep the characters and their emotional progression on the page throughout the complete intimate scene and its aftermath rather than abruptly cutting away.",
     "Do not include a chapter heading, POV label, outline, notes, markdown, warnings, analysis or commentary.",
     "STORY BIBLE\n" + JSON.stringify(input.storyBible ?? {}, null, 2),
     "CANONICAL CHAPTER PLAN\n" + input.chapterBrief,
@@ -399,21 +399,24 @@ function diagnostic(input: {
   attempt: number;
   error?: string;
 }): GenerationDiagnostic {
-  const inputTokens = input.usage?.prompt_tokens ?? 0;
-  const outputTokens = input.usage?.completion_tokens ?? 0;
+  const inputTokens = input.usage?.input_tokens ?? 0;
+  const outputTokens = input.usage?.output_tokens ?? 0;
+  const cachedTokens = input.usage?.input_tokens_details?.cached_tokens ?? 0;
+  const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
   const costUsd =
-    typeof input.usage?.cost === "number" ? input.usage.cost : null;
+    (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+    1_000_000;
 
   return {
     stage: "chapter_section_writing",
-    provider: "openrouter",
+    provider: "openai",
     model: WRITING_MODEL,
     status: input.status,
     inputTokens,
     outputTokens,
     totalTokens: input.usage?.total_tokens ?? inputTokens + outputTokens,
     costUsd,
-    costType: costUsd === null ? "unavailable" : "reported",
+    costType: "estimated",
     durationMs: input.durationMs,
     attempt: input.attempt,
     ...(input.error ? { error: input.error } : {}),
@@ -424,9 +427,9 @@ export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
 
   try {
-    if (!process.env.OPENROUTER_API_KEY) {
+    if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: "OPENROUTER_API_KEY is not configured." },
+        { error: "OPENAI_API_KEY is not configured." },
         { status: 500 },
       );
     }
@@ -493,38 +496,35 @@ export async function POST(request: Request) {
       let usage: Usage | undefined;
 
       try {
-        const response = await openrouter.chat.completions.create({
+        const response = await openai.responses.create({
           model: WRITING_MODEL,
-          messages: [
+          reasoning: {
+            effort: "low",
+          },
+          input: [
             {
               role: "system",
               content:
-                "Write only polished, grammatically complete commercial romance prose. Canon, POV, established character knowledge, punctuation rules and user direction are binding. Never use em dashes or en dashes, omit necessary words, summarise the scene or pad it with generic emotional explanation.",
+                "Write only polished, grammatically complete commercial romance prose. Canon, POV, established character knowledge, punctuation rules and user direction are binding. Keep consensual adult intimacy on the page when the story requires it. Never use em dashes or en dashes, omit necessary words, summarise the scene or pad it with generic emotional explanation.",
             },
             { role: "user", content: writingPrompt },
           ],
-          max_tokens: 1600,
-          temperature: 0.55,
-          top_p: 0.88,
-          frequency_penalty: 0,
-          presence_penalty: 0,
+          text: {
+            verbosity: "medium",
+          },
+          max_output_tokens: 2600,
         });
         usage = response.usage as Usage | undefined;
-        const choice = response.choices[0];
 
-        if (choice?.finish_reason === "length") {
+        if (response.status === "incomplete") {
           throw new Error(
-            "The writing model reached its output limit before completing the section.",
+            `The writing model did not complete the section because ${
+              response.incomplete_details?.reason ?? "the response was interrupted"
+            }.`,
           );
         }
 
-        if (choice?.finish_reason === "content_filter") {
-          throw new Error(
-            "The writing provider stopped the section with a content filter.",
-          );
-        }
-
-        const raw = choice?.message?.content;
+        const raw = response.output_text;
 
         if (!raw?.trim()) {
           throw new TechnicalWriterError(
