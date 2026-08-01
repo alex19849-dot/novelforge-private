@@ -2527,11 +2527,15 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
       throw new Error("The model did not return a story bible.");
     }
 
-    if (!parsedOutput.reply) {
-      throw new Error("The model did not return a reply.");
-    }
-
-    const reply = cleanString(parsedOutput.reply);
+    const fallbackChapterNumber =
+      parsedOutput.generatedChapter?.replaceChapterNumber ??
+      Math.max(0, ...currentStory.chapters.map((chapter) => chapter.number)) +
+        1;
+    const reply =
+      cleanString(parsedOutput.reply) ||
+      (isWriterMode
+        ? `Chapter ${fallbackChapterNumber} plan created and ready for drafting.`
+        : "");
 
     if (!reply) {
       throw new Error("The model returned an empty reply.");
