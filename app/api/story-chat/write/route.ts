@@ -133,15 +133,7 @@ function getPrompt(input: {
     "Every sentence must be complete, grammatical and naturally phrased. Never omit articles, pronouns, auxiliary verbs, prepositions or connecting words for brevity or style.",
     "Never use an em dash or en dash. Use full stops, commas, colons, semicolons or parentheses where grammatically appropriate. Ordinary hyphens are allowed only inside genuine compound words.",
     "Write controlled commercial prose, not a summary of what the viewpoint character thinks and feels. Build the scene through specific action, dialogue, sensory detail and individual observation.",
-    "Keep the narration selective rather than procedural. Centre each paragraph on one meaningful beat, and omit routine movements or transitions the reader can infer.",
-    "Use setting details only when they create pressure, reveal character or supply necessary information. Let dialogue and consequential action carry the scene instead of listing everything the POV does or everything present in the room.",
-    "Do not narrate every physical action in sequence. Skip routine handling, walking, sitting, standing, opening, closing, checking, dressing, showering, eating, driving and phone use unless it changes the conflict, reveals character or affects continuity. Readers can infer ordinary transitions.",
-    "Avoid list-like choreography such as I do this, then this, then this. When movement matters, integrate one decisive action with its motive, consequence or interruption. Do not spend a paragraph transporting a character between two useful moments.",
-    "Avoid inventory narration built from there is, there are, I see, I notice, I can hear or lists of several room details. Select at most one or two setting details that this specific POV would notice now for a character-specific reason. Do not redescribe an established location unless something relevant has changed.",
-    "Vary grammatical subjects naturally. Do not build a run of sentences or paragraphs beginning with I, I am, I have, I look, I turn, I walk, I take, I pull or I put. Do not avoid I through awkward fragments, passive voice or artificial sentence inversions.",
-    "Every paragraph must earn its place through new external action, dialogue, information, conflict, decision or consequence. Interior thought may interpret a new development, but it must not replace development.",
-    "Once the POV reaches an internal conclusion, do not replay the same reasoning cycle later. Do not have them notice the same detail, attempt the same categorisation, recall the same evidence and arrive at the same conclusion in another room. Revisit it only after new external evidence changes what it means.",
-    "Trust the reader. Do not explain why a line matters immediately after the dialogue has made its effect clear. Do not summarise the scene's meaning at the end of every exchange or location change.",
+    "Keep narration selective rather than procedural. Omit routine movements and transitions the reader can infer, and use setting details only when they affect the scene.",
     "Do not explain an emotion after the action or physical response has already shown it. Do not repeatedly announce nerves, determination, confusion, attraction or discomfort.",
     "Avoid generic reaction crutches such as a pounding heart, a caught breath, taking a deep breath, being unable to help thinking or noticing, and reminding oneself why one is here unless that exact reaction is both fresh and necessary.",
     "Do not begin successive paragraphs with the same construction. Vary sentence length naturally without fragments, clipped article-free phrasing or run-on sentences.",
@@ -254,14 +246,6 @@ function substantialParagraphs(text: string): string[] {
     .filter((paragraph) => paragraph.split(" ").length >= 12);
 }
 
-function proseSentences(text: string): string[] {
-  return text
-    .replace(/\n+/g, " ")
-    .split(/(?<=[.!?])\s+(?=[“\"']?[A-Z])/u)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
-}
-
 function wordWindows(text: string, size: number): Set<string> {
   const words = normalise(text).split(" ").filter(Boolean);
   const windows = new Set<string>();
@@ -337,46 +321,6 @@ function repetitionWarnings(
   if ((section.match(/:/g) ?? []).length > 3) {
     warnings.push(
       "This section uses colons unusually often for novel prose. Review whether the narration has become list-like or explanatory.",
-    );
-  }
-
-  const sentences = proseSentences(section);
-  const firstPersonOpenings = sentences.filter((sentence) =>
-    /^[“\"']?I(?:\s|['’])/u.test(sentence),
-  ).length;
-
-  if (
-    sentences.length >= 10 &&
-    firstPersonOpenings / sentences.length > 0.38
-  ) {
-    warnings.push(
-      "This section begins too many sentences with I and may read like an action report.",
-    );
-  }
-
-  if (
-    /(?:^|[.!?]\s+)[“\"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b[^.!?]*[.!?]\s+[“\"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b/iu.test(
-      section,
-    )
-  ) {
-    warnings.push(
-      "This section contains consecutive first-person action reporting that may need tightening.",
-    );
-  }
-
-  if ((section.match(/\bthere (?:is|are|was|were)\b/gi) ?? []).length > 3) {
-    warnings.push(
-      "This section repeatedly inventories the setting with there is or there are constructions.",
-    );
-  }
-
-  if (
-    section
-      .split(/\n\s*\n/)
-      .some((paragraph) => countWords(paragraph) > 250)
-  ) {
-    warnings.push(
-      "This section contains an unusually long paragraph that may be combining action, explanation and reflection into one block.",
     );
   }
 
@@ -555,14 +499,14 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "Write only polished, grammatically complete commercial romance prose. Canon, POV, established character knowledge, punctuation rules and user direction are binding. Never use em dashes or en dashes, omit necessary words, summarise the scene, inventory routine actions or pad it with repeated internal reasoning and generic emotional explanation.",
+                "Write only polished, grammatically complete commercial romance prose. Canon, POV, established character knowledge, punctuation rules and user direction are binding. Never use em dashes or en dashes, omit necessary words, summarise the scene or pad it with generic emotional explanation.",
             },
             { role: "user", content: writingPrompt },
           ],
           max_tokens: 1600,
           temperature: 0.55,
           top_p: 0.88,
-          frequency_penalty: 0.12,
+          frequency_penalty: 0,
           presence_penalty: 0,
         });
         usage = response.usage as Usage | undefined;
