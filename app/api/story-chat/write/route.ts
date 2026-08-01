@@ -133,6 +133,8 @@ function getPrompt(input: {
     "Every sentence must be complete, grammatical and naturally phrased. Never omit articles, pronouns, auxiliary verbs, prepositions or connecting words for brevity or style.",
     "Never use an em dash or en dash. Use full stops, commas, colons, semicolons or parentheses where grammatically appropriate. Ordinary hyphens are allowed only inside genuine compound words.",
     "Write controlled commercial prose, not a summary of what the viewpoint character thinks and feels. Build the scene through specific action, dialogue, sensory detail and individual observation.",
+    "Keep the narration selective rather than procedural. Centre each paragraph on one meaningful beat, and omit routine movements or transitions the reader can infer.",
+    "Use setting details only when they create pressure, reveal character or supply necessary information. Let dialogue and consequential action carry the scene instead of listing everything the POV does or everything present in the room.",
     "Do not narrate every physical action in sequence. Skip routine handling, walking, sitting, standing, opening, closing, checking, dressing, showering, eating, driving and phone use unless it changes the conflict, reveals character or affects continuity. Readers can infer ordinary transitions.",
     "Avoid list-like choreography such as I do this, then this, then this. When movement matters, integrate one decisive action with its motive, consequence or interruption. Do not spend a paragraph transporting a character between two useful moments.",
     "Avoid inventory narration built from there is, there are, I see, I notice, I can hear or lists of several room details. Select at most one or two setting details that this specific POV would notice now for a character-specific reason. Do not redescribe an established location unless something relevant has changed.",
@@ -222,6 +224,12 @@ function validateSection(section: string): void {
     );
   }
 
+  if (repeatedWindowOccurrences(section, 16) >= 4) {
+    throw new Error(
+      "The writing model repeated substantial prose within the same section. The duplicated output was discarded.",
+    );
+  }
+
   if (countWords(section) < 120) {
     throw new Error(
       "The writing model returned too little prose to preserve safely.",
@@ -249,7 +257,7 @@ function substantialParagraphs(text: string): string[] {
 function proseSentences(text: string): string[] {
   return text
     .replace(/\n+/g, " ")
-    .split(/(?<=[.!?])\s+(?=[“"']?[A-Z])/u)
+    .split(/(?<=[.!?])\s+(?=[“\"']?[A-Z])/u)
     .map((sentence) => sentence.trim())
     .filter(Boolean);
 }
@@ -263,6 +271,26 @@ function wordWindows(text: string, size: number): Set<string> {
   }
 
   return windows;
+}
+
+function repeatedWindowOccurrences(text: string, size: number): number {
+  const words = normalise(text).split(" ").filter(Boolean);
+  const counts = new Map<string, number>();
+
+  for (let index = 0; index + size <= words.length; index += 1) {
+    const window = words.slice(index, index + size).join(" ");
+    counts.set(window, (counts.get(window) ?? 0) + 1);
+  }
+
+  let repeated = 0;
+
+  for (const count of counts.values()) {
+    if (count > 1) {
+      repeated += count - 1;
+    }
+  }
+
+  return repeated;
 }
 
 function repetitionWarnings(
@@ -314,7 +342,7 @@ function repetitionWarnings(
 
   const sentences = proseSentences(section);
   const firstPersonOpenings = sentences.filter((sentence) =>
-    /^[“"']?I(?:\s|['’])/u.test(sentence),
+    /^[“\"']?I(?:\s|['’])/u.test(sentence),
   ).length;
 
   if (
@@ -327,7 +355,7 @@ function repetitionWarnings(
   }
 
   if (
-    /(?:^|[.!?]\s+)[“"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b[^.!?]*[.!?]\s+[“"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b/iu.test(
+    /(?:^|[.!?]\s+)[“\"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b[^.!?]*[.!?]\s+[“\"']?I\s+(?:look|turn|walk|take|pick|pull|put|open|close|sit|stand|check|grab)\b/iu.test(
       section,
     )
   ) {
