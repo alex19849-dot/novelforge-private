@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -13,6 +14,16 @@ import type { StoryChapter } from "../types";
 
 type ReaderTheme = "light" | "sepia" | "dark";
 type ReaderWidth = "narrow" | "medium" | "wide";
+
+export type ChapterDraftWorkspace = {
+  chapterNumber: number;
+  title: string;
+  povCharacter: string;
+  content: string;
+  guidance: string;
+  isGenerating: boolean;
+  repetitionWarnings?: string[];
+};
 
 type ChapterPanelProps = {
   storyId: string;
@@ -36,19 +47,25 @@ type ChapterPanelProps = {
   setReaderLineHeight: Dispatch<SetStateAction<number>>;
   readerWidth: ReaderWidth;
   setReaderWidth: Dispatch<SetStateAction<ReaderWidth>>;
-};
-
-type ReaderPage = {
-  chapterId: string;
-  chapterNumber: number;
-  chapterTitle: string;
-  povCharacter: string;
-  showHeading: boolean;
-  startWordIndex: number;
-  paragraphs: string[];
+  draftWorkspace?: ChapterDraftWorkspace | null;
+  onDraftContentChange?: (content: string) => void;
+  onDraftGuidanceChange?: (guidance: string) => void;
+  onGenerateNextSection?: () => void;
+  onRewriteLastSection?: () => void;
+  onCompleteDraft?: () => void;
+  onDiscardDraft?: () => void;
+  onOpenChapterPlan?: () => void;
 };
 
 const MESSAGE_PATTERN = /^([A-Za-z][A-Za-z0-9 .'-]{0,30}):\s*([\s\S]+)$/;
+
+function progressKey(storyId: string): string {
+  return `novelforge-reader-scroll-${storyId}`;
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
 
 function getParagraphs(content: string): string[] {
   return content
@@ -57,58 +74,10 @@ function getParagraphs(content: string): string[] {
     .filter(Boolean);
 }
 
-function getReaderPadding(
-  width: ReaderWidth,
-  viewportWidth: number,
-): {
-  horizontal: number;
-  vertical: number;
-  maxContentWidth: number;
-} {
-  if (viewportWidth < 640) {
-    return {
-      horizontal: width === "narrow" ? 28 : width === "medium" ? 20 : 14,
-      vertical: 28,
-      maxContentWidth: viewportWidth,
-    };
-  }
-
-  if (width === "narrow") {
-    return { horizontal: 38, vertical: 36, maxContentWidth: 720 };
-  }
-
-  if (width === "medium") {
-    return { horizontal: 32, vertical: 32, maxContentWidth: 780 };
-  }
-
-  return { horizontal: 28, vertical: 28, maxContentWidth: 850 };
-}
-
-function progressKey(storyId: string) {
-  return `novelforge-reader-page-${storyId}`;
-}
-
-function characterOffsetForWordIndex(
-  content: string,
-  wordIndex: number,
-): number {
-  if (wordIndex <= 0) {
-    return 0;
-  }
-
-  const wordPattern = /\S+/g;
-  let match: RegExpExecArray | null = null;
-  let currentWord = 0;
-
-  while ((match = wordPattern.exec(content)) !== null) {
-    if (currentWord === wordIndex) {
-      return match.index;
-    }
-
-    currentWord += 1;
-  }
-
-  return content.length;
+function widthClass(width: ReaderWidth): string {
+  if (width === "narrow") return "max-w-[720px]";
+  if (width === "wide") return "max-w-[920px]";
+  return "max-w-[800px]";
 }
 
 export default function ChapterPanel({
@@ -126,901 +95,627 @@ export default function ChapterPanel({
   setReaderLineHeight,
   readerWidth,
   setReaderWidth,
+  draftWorkspace = null,
+  onDraftContentChange,
+  onDraftGuidanceChange,
+  onGenerateNextSection,
+  onRewriteLastSection,
+  onCompleteDraft,
+  onDiscardDraft,
+  onOpenChapterPlan,
 }: ChapterPanelProps) {
-  const [pages, setPages] = useState<ReaderPage[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const orderedChapters = useMemo(
+    () => [...chapters].sort((first, second) => first.number - second.number),
+    [chapters],
+  );
   const [controlsVisible, setControlsVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
+  const [guidanceVisible, setGuidanceVisible] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
+  const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editPovCharacter, setEditPovCharacter] = useState("");
   const [editContent, setEditContent] = useState("");
-  const [pageMetrics, setPageMetrics] = useState({
-    horizontalPadding: 32,
-    verticalPadding: 32,
-    contentWidth: 716,
-  });
-
   const readerRef = useRef<HTMLDivElement | null>(null);
-  const measurementRef = useRef<HTMLDivElement | null>(null);
-  const editContentRef = useRef<HTMLTextAreaElement | null>(null);
-  const paginationFrameRef = useRef<number | null>(null);
+  const chapterRefs = useRef(new Map<string, HTMLElement>());
+  const editAreaRef = useRef<HTMLTextAreaElement | null>(null);
+  const savedScrollRef = useRef(0);
   const restoredStoryRef = useRef<string | null>(null);
-  const currentPageRef = useRef(1);
-  const pageCountRef = useRef(1);
-  const editingAnchorRef = useRef<{
-    chapterId: string;
-    wordIndex: number;
-  } | null>(null);
-  const editingSourceContentRef = useRef("");
-  const restoreAfterSaveRef = useRef<{
-    chapterId: string;
-    wordIndex: number;
-  } | null>(null);
+  const previousDraftLengthRef = useRef(draftWorkspace?.content.length ?? 0);
 
-  const pageCount = Math.max(1, pages.length);
-  const currentReaderPage = pages[currentPage - 1] ?? pages[0] ?? null;
-  const currentChapter =
-    chapters.find((chapter) => chapter.id === currentReaderPage?.chapterId) ??
+  const activeChapter =
+    orderedChapters.find((chapter) => chapter.id === activeChapterId) ??
+    orderedChapters[0] ??
     null;
-
-  useEffect(() => {
-    currentPageRef.current = currentPage;
-  }, [currentPage]);
-
-  useEffect(() => {
-    pageCountRef.current = pageCount;
-  }, [pageCount]);
-
-  useEffect(() => {
-    restoredStoryRef.current = null;
-    currentPageRef.current = 1;
-    setCurrentPage(1);
-    setControlsVisible(false);
-    setSettingsVisible(false);
-    setIsEditing(false);
-  }, [storyId]);
+  const editingChapter =
+    orderedChapters.find((chapter) => chapter.id === editingChapterId) ?? null;
+  const editingDraft =
+    editingChapterId === "__draft__" && Boolean(draftWorkspace);
+  const hasReadableContent =
+    orderedChapters.length > 0 || Boolean(draftWorkspace);
 
   const themeClasses =
     readerTheme === "dark"
       ? "bg-[#111111] text-[#f5f5f5]"
       : readerTheme === "light"
-        ? "bg-white text-black"
-        : "bg-[#f4ecd8] text-[#17130d]";
-
+        ? "bg-white text-[#171717]"
+        : "bg-[#f4ecd8] text-[#241d15]";
   const chromeClasses =
     readerTheme === "dark"
       ? "border-white/10 bg-[#111111]/95 text-white"
       : readerTheme === "light"
         ? "border-black/10 bg-white/95 text-black"
-        : "border-black/10 bg-[#f4ecd8]/95 text-[#17130d]";
+        : "border-black/10 bg-[#f4ecd8]/95 text-[#241d15]";
+  const mutedClasses =
+    readerTheme === "dark" ? "text-neutral-400" : "text-[#6f6252]";
 
-  const mutedTextClasses =
-    readerTheme === "dark" ? "text-neutral-400" : "text-neutral-600";
+  const resizeEditArea = useCallback(() => {
+    const area = editAreaRef.current;
+    if (!area) return;
+    area.style.height = "0px";
+    area.style.height = `${area.scrollHeight}px`;
+  }, []);
 
-  const paginateBook = useCallback(() => {
-    const reader = readerRef.current;
-    const measurement = measurementRef.current;
-
-    if (
-      !reader ||
-      !measurement ||
-      !readerOpen ||
-      isEditing ||
-      chapters.length === 0
-    ) {
-      return;
-    }
-
-    const viewportWidth = reader.clientWidth;
-    const viewportHeight = reader.clientHeight;
-
-    if (viewportWidth <= 0 || viewportHeight <= 0) {
-      return;
-    }
-
-    const padding = getReaderPadding(readerWidth, viewportWidth);
-    const contentWidth = Math.max(
-      240,
-      Math.min(
-        viewportWidth - padding.horizontal * 2,
-        padding.maxContentWidth - padding.horizontal * 2,
-      ),
-    );
-    const contentHeight = Math.max(240, viewportHeight - padding.vertical * 2);
-
-    setPageMetrics({
-      horizontalPadding: padding.horizontal,
-      verticalPadding: padding.vertical,
-      contentWidth,
-    });
-
-    measurement.style.width = `${contentWidth}px`;
-    measurement.style.height = `${contentHeight}px`;
-    measurement.style.padding = "0";
-    measurement.style.fontSize = `${readerFontSize}px`;
-    measurement.style.lineHeight = String(readerLineHeight);
-    measurement.replaceChildren();
-
-    const createMeasuredParagraph = (content: string) => {
-      const paragraph = document.createElement("p");
-      paragraph.style.margin = "0 0 1em";
-      paragraph.style.whiteSpace = "pre-wrap";
-      paragraph.style.overflowWrap = "anywhere";
-
-      const messageMatch = content.match(MESSAGE_PATTERN);
-
-      if (messageMatch) {
-        const [, characterName, message] = messageMatch;
-        const name = document.createElement("strong");
-        const text = document.createElement("em");
-        name.textContent = `${characterName}:`;
-        text.textContent = ` ${message}`;
-        paragraph.append(name, text);
-      } else {
-        paragraph.textContent = content;
-      }
-
-      return paragraph;
-    };
-
-    const addMeasuredHeading = (chapter: StoryChapter) => {
-      const wrapper = document.createElement("div");
-      wrapper.style.paddingBottom = "24px";
-
-      const label = document.createElement("p");
-      label.textContent = `Chapter ${chapter.number}`;
-      label.style.margin = "0";
-      label.style.fontFamily = "Arial, sans-serif";
-      label.style.fontSize = "12px";
-      label.style.fontWeight = "600";
-      label.style.lineHeight = "16px";
-      label.style.letterSpacing = "0.2em";
-      label.style.textTransform = "uppercase";
-
-      const title = document.createElement("h1");
-      title.textContent = chapter.title || `Chapter ${chapter.number}`;
-      title.style.margin = "12px 0 0";
-      title.style.fontSize = "30px";
-      title.style.fontWeight = "700";
-      title.style.lineHeight = "1.25";
-      title.style.overflowWrap = "anywhere";
-
-      wrapper.append(label, title);
-
-      if (chapter.povCharacter) {
-        const pov = document.createElement("p");
-        pov.textContent = chapter.povCharacter;
-        pov.style.margin = "8px 0 0";
-        pov.style.fontStyle = "italic";
-        wrapper.appendChild(pov);
-      }
-
-      measurement.appendChild(wrapper);
-    };
-
-    const overflows = () =>
-      measurement.scrollHeight > measurement.clientHeight + 1;
-
-    const nextPages: ReaderPage[] = [];
-    let activeChapter: StoryChapter | null = null;
-    let activePage: ReaderPage | null = null;
-    let chapterWordCursor = 0;
-
-    const resetMeasurement = () => {
-      measurement.replaceChildren();
-
-      if (!activeChapter || !activePage) {
-        return;
-      }
-
-      if (activePage.showHeading) {
-        addMeasuredHeading(activeChapter);
-      }
-
-      for (const paragraph of activePage.paragraphs) {
-        measurement.appendChild(createMeasuredParagraph(paragraph));
-      }
-    };
-
-    const startPage = (
-      chapter: StoryChapter,
-      showHeading: boolean,
-      startWordIndex = chapterWordCursor,
-    ) => {
-      activeChapter = chapter;
-      activePage = {
-        chapterId: chapter.id,
-        chapterNumber: chapter.number,
-        chapterTitle: chapter.title,
-        povCharacter: chapter.povCharacter,
-        showHeading,
-        startWordIndex,
-        paragraphs: [],
-      };
-      resetMeasurement();
-    };
-
-    const finishPage = () => {
-      if (activePage) {
-        nextPages.push(activePage);
-      }
-      activePage = null;
-      measurement.replaceChildren();
-    };
-
-    const largestFittingWordCount = (words: string[]) => {
-      let low = 1;
-      let high = words.length;
-      let best = 0;
-
-      while (low <= high) {
-        const middle = Math.floor((low + high) / 2);
-        const candidate = words.slice(0, middle).join(" ");
-        const paragraph = createMeasuredParagraph(candidate);
-        measurement.appendChild(paragraph);
-        const fits = !overflows();
-        paragraph.remove();
-
-        if (fits) {
-          best = middle;
-          low = middle + 1;
-        } else {
-          high = middle - 1;
-        }
-      }
-
-      return best;
-    };
-
-    const orderedChapters = [...chapters].sort(
-      (first, second) => first.number - second.number,
-    );
-
-    for (const chapter of orderedChapters) {
-      chapterWordCursor = 0;
-
-      if (activePage) {
-        finishPage();
-      }
-
-      startPage(chapter, true);
-
-      for (const originalParagraph of getParagraphs(chapter.content)) {
-        let remainingWords = originalParagraph.split(/\s+/).filter(Boolean);
-
-        while (remainingWords.length > 0) {
-          if (!activePage) {
-            startPage(chapter, false);
-          }
-
-          if (!activePage) {
-            continue;
-          }
-
-          const remainingText = remainingWords.join(" ");
-          const paragraph = createMeasuredParagraph(remainingText);
-          measurement.appendChild(paragraph);
-
-          if (!overflows()) {
-            activePage.paragraphs.push(remainingText);
-            chapterWordCursor += remainingWords.length;
-            remainingWords = [];
-            continue;
-          }
-
-          paragraph.remove();
-          const fittingCount = largestFittingWordCount(remainingWords);
-
-          if (fittingCount > 0) {
-            activePage.paragraphs.push(
-              remainingWords.slice(0, fittingCount).join(" "),
-            );
-            chapterWordCursor += fittingCount;
-            remainingWords = remainingWords.slice(fittingCount);
-            finishPage();
-            continue;
-          }
-
-          if (activePage.paragraphs.length > 0 || activePage.showHeading) {
-            finishPage();
-            continue;
-          }
-
-          activePage.paragraphs.push(remainingWords.shift() ?? "");
-          chapterWordCursor += 1;
-          finishPage();
-        }
-      }
-
-      if (activePage) {
-        finishPage();
-      }
-    }
-
-    if (nextPages.length === 0) {
-      return;
-    }
-
-    const previousRatio =
-      pageCountRef.current > 1
-        ? (currentPageRef.current - 1) / (pageCountRef.current - 1)
-        : 0;
-
-    let targetPage = Math.round(previousRatio * (nextPages.length - 1)) + 1;
-
-    const savedAnchor = restoreAfterSaveRef.current;
-
-    if (savedAnchor) {
-      let anchoredPageIndex = -1;
-
-      for (let index = nextPages.length - 1; index >= 0; index -= 1) {
-        const page = nextPages[index];
-
-        if (
-          page.chapterId === savedAnchor.chapterId &&
-          page.startWordIndex <= savedAnchor.wordIndex
-        ) {
-          anchoredPageIndex = index;
-          break;
-        }
-      }
-
-      if (anchoredPageIndex >= 0) {
-        targetPage = anchoredPageIndex + 1;
-      }
-
-      restoreAfterSaveRef.current = null;
-    }
-
-    if (!savedAnchor && restoredStoryRef.current !== storyId) {
-      const savedPage = Number(
-        window.localStorage.getItem(progressKey(storyId)) ?? "1",
-      );
-      targetPage = Number.isFinite(savedPage) ? savedPage : 1;
-      restoredStoryRef.current = storyId;
-    }
-
-    targetPage = Math.min(nextPages.length, Math.max(1, targetPage));
-    setPages(nextPages);
-    setCurrentPage(targetPage);
-    currentPageRef.current = targetPage;
-    pageCountRef.current = nextPages.length;
-
-    requestAnimationFrame(() => {
-      reader.scrollTo({
-        left: (targetPage - 1) * reader.clientWidth,
-        top: 0,
-      });
-    });
+  useLayoutEffect(() => {
+    if (isEditing) resizeEditArea();
   }, [
-    chapters,
+    editContent,
     isEditing,
     readerFontSize,
     readerLineHeight,
-    readerOpen,
-    readerWidth,
-    storyId,
+    resizeEditArea,
   ]);
 
-  const schedulePagination = useCallback(() => {
-    if (paginationFrameRef.current !== null) {
-      cancelAnimationFrame(paginationFrameRef.current);
-    }
-
-    paginationFrameRef.current = requestAnimationFrame(() => {
-      paginationFrameRef.current = null;
-      paginateBook();
-    });
-  }, [paginateBook]);
-
-  useLayoutEffect(() => {
-    if (!readerOpen || isEditing) {
-      return;
-    }
-
-    schedulePagination();
-    const retry = window.setTimeout(schedulePagination, 180);
-    const reader = readerRef.current;
-    const observer =
-      reader && typeof ResizeObserver !== "undefined"
-        ? new ResizeObserver(schedulePagination)
-        : null;
-
-    if (reader) {
-      observer?.observe(reader);
-    }
-
-    window.addEventListener("resize", schedulePagination);
-
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", schedulePagination);
-      window.clearTimeout(retry);
-
-      if (paginationFrameRef.current !== null) {
-        cancelAnimationFrame(paginationFrameRef.current);
-        paginationFrameRef.current = null;
-      }
-    };
-  }, [isEditing, readerOpen, schedulePagination]);
-
   useEffect(() => {
-    if (!readerOpen) {
-      return;
-    }
-
-    const previousOverflow = document.body.style.overflow;
+    if (!readerOpen) return;
+    const oldOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
     return () => {
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = oldOverflow;
     };
   }, [readerOpen]);
 
-  function updateCurrentPage() {
+  useEffect(() => {
+    restoredStoryRef.current = null;
+    setControlsVisible(false);
+    setSettingsVisible(false);
+    setGuidanceVisible(false);
+    setIsEditing(false);
+    setEditingChapterId(null);
+    setActiveChapterId(orderedChapters[0]?.id ?? null);
+  }, [storyId, orderedChapters]);
+
+  useLayoutEffect(() => {
+    if (!readerOpen || restoredStoryRef.current === storyId) return;
     const reader = readerRef.current;
-
-    if (!reader || reader.clientWidth <= 0) {
-      return;
-    }
-
-    const nextPage = Math.min(
-      pageCount,
-      Math.max(1, Math.round(reader.scrollLeft / reader.clientWidth) + 1),
+    if (!reader) return;
+    const saved = Number(
+      window.localStorage.getItem(progressKey(storyId)) ?? 0,
     );
-
-    setCurrentPage(nextPage);
-    currentPageRef.current = nextPage;
-    window.localStorage.setItem(progressKey(storyId), String(nextPage));
-  }
-
-  function moveToPage(page: number) {
-    const reader = readerRef.current;
-
-    if (!reader) {
-      return;
-    }
-
-    const safePage = Math.min(pageCount, Math.max(1, page));
-    reader.scrollTo({
-      left: (safePage - 1) * reader.clientWidth,
-      behavior: "smooth",
+    requestAnimationFrame(() => {
+      reader.scrollTop = Number.isFinite(saved) ? Math.max(0, saved) : 0;
+      restoredStoryRef.current = storyId;
     });
-    setCurrentPage(safePage);
-    currentPageRef.current = safePage;
-    window.localStorage.setItem(progressKey(storyId), String(safePage));
+  }, [readerOpen, storyId, hasReadableContent]);
+
+  useEffect(() => {
+    const nextLength = draftWorkspace?.content.length ?? 0;
+    if (
+      readerOpen &&
+      draftWorkspace &&
+      nextLength > previousDraftLengthRef.current &&
+      readerRef.current
+    ) {
+      requestAnimationFrame(() => {
+        const draftNode = chapterRefs.current.get("__draft__");
+        const reader = readerRef.current;
+        if (!draftNode || !reader) return;
+        reader.scrollTo({
+          top: Math.max(
+            0,
+            draftNode.scrollHeight + draftNode.offsetTop - reader.clientHeight,
+          ),
+          behavior: "smooth",
+        });
+      });
+    }
+    previousDraftLengthRef.current = nextLength;
+  }, [draftWorkspace, readerOpen]);
+
+  function handleScroll() {
+    const reader = readerRef.current;
+    if (!reader) return;
+    window.localStorage.setItem(progressKey(storyId), String(reader.scrollTop));
+    const marker = reader.scrollTop + reader.clientHeight * 0.3;
+    let closestId = orderedChapters[0]?.id ?? null;
+    for (const chapter of orderedChapters) {
+      const node = chapterRefs.current.get(chapter.id);
+      if (node && node.offsetTop <= marker) closestId = chapter.id;
+    }
+    const draftNode = chapterRefs.current.get("__draft__");
+    if (draftNode && draftNode.offsetTop <= marker) closestId = "__draft__";
+    setActiveChapterId(closestId);
   }
 
   function toggleControls() {
-    if (isEditing) {
-      return;
-    }
-
+    if (isEditing) return;
     setControlsVisible((visible) => {
       if (visible) {
         setSettingsVisible(false);
+        setGuidanceVisible(false);
       }
       return !visible;
     });
   }
 
   function startEditing() {
-    if (!currentChapter || !currentReaderPage) {
+    if (!readerRef.current) return;
+    savedScrollRef.current = readerRef.current.scrollTop;
+    if (activeChapterId === "__draft__" && draftWorkspace) {
+      setEditingChapterId("__draft__");
+      setEditTitle(draftWorkspace.title);
+      setEditPovCharacter(draftWorkspace.povCharacter);
+      setEditContent(draftWorkspace.content);
+    } else if (activeChapter) {
+      setEditingChapterId(activeChapter.id);
+      setEditTitle(activeChapter.title);
+      setEditPovCharacter(activeChapter.povCharacter);
+      setEditContent(activeChapter.content);
+    } else {
       return;
     }
-
-    editingAnchorRef.current = {
-      chapterId: currentChapter.id,
-      wordIndex: currentReaderPage.startWordIndex,
-    };
-    editingSourceContentRef.current = currentChapter.content;
-    setEditTitle(currentChapter.title);
-    setEditPovCharacter(currentChapter.povCharacter);
-    setEditContent(currentChapter.content);
     setSettingsVisible(false);
+    setGuidanceVisible(false);
     setIsEditing(true);
-  }
-
-  function cancelEditing() {
-    editingAnchorRef.current = null;
-    editingSourceContentRef.current = "";
-    setIsEditing(false);
-  }
-
-  function saveChapter() {
-    if (!currentChapter) {
-      return;
-    }
-
-    onSaveChapter(currentChapter.id, {
-      title: editTitle,
-      povCharacter: editPovCharacter,
-      content: editContent,
-    });
-    restoreAfterSaveRef.current = editingAnchorRef.current;
-    editingAnchorRef.current = null;
-    editingSourceContentRef.current = "";
-    setIsEditing(false);
-  }
-
-  useEffect(() => {
-    if (!isEditing || !editContentRef.current || !editingAnchorRef.current) {
-      return;
-    }
-
-    const textarea = editContentRef.current;
-    const characterOffset = characterOffsetForWordIndex(
-      editingSourceContentRef.current,
-      editingAnchorRef.current.wordIndex,
+    requestAnimationFrame(() =>
+      editAreaRef.current?.focus({ preventScroll: true }),
     );
-    const frameId = requestAnimationFrame(() => {
-      textarea.focus({ preventScroll: true });
-      textarea.setSelectionRange(characterOffset, characterOffset);
+  }
 
-      const availableScroll = Math.max(
-        0,
-        textarea.scrollHeight - textarea.clientHeight,
-      );
-      const progress =
-        editingSourceContentRef.current.length > 0
-          ? characterOffset / editingSourceContentRef.current.length
-          : 0;
-      textarea.scrollTop = Math.max(0, availableScroll * progress - 32);
+  function finishEditing(restore: boolean) {
+    setIsEditing(false);
+    setEditingChapterId(null);
+    requestAnimationFrame(() => {
+      if (restore && readerRef.current) {
+        readerRef.current.scrollTop = savedScrollRef.current;
+      }
     });
+  }
 
-    return () => cancelAnimationFrame(frameId);
-  }, [isEditing]);
-
-  function renderParagraph(content: string, key: string) {
-    const messageMatch = content.match(MESSAGE_PATTERN);
-
-    if (messageMatch) {
-      const [, characterName, message] = messageMatch;
-      return (
-        <p
-          key={key}
-          className="mb-[1em] whitespace-pre-wrap [overflow-wrap:anywhere]"
-        >
-          <strong>{characterName}:</strong> <em>{message}</em>
-        </p>
-      );
+  function saveEditing() {
+    if (editingDraft) {
+      onDraftContentChange?.(editContent);
+    } else if (editingChapter) {
+      onSaveChapter(editingChapter.id, {
+        title: editTitle,
+        povCharacter: editPovCharacter,
+        content: editContent,
+      });
+    } else {
+      return;
     }
+    finishEditing(true);
+  }
 
+  function renderParagraph(paragraph: string, key: string) {
+    const message = paragraph.match(MESSAGE_PATTERN);
     return (
       <p
         key={key}
         className="mb-[1em] whitespace-pre-wrap [overflow-wrap:anywhere]"
       >
-        {content}
+        {message ? (
+          <>
+            <strong>{message[1]}:</strong> <em>{message[2]}</em>
+          </>
+        ) : (
+          paragraph
+        )}
       </p>
     );
   }
 
-  if (readerOpen && chapters.length > 0) {
+  function renderHeading(number: number, title: string, pov: string) {
+    return (
+      <div className="pb-8 pt-3 sm:pb-10">
+        <p className="font-sans text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
+          Chapter {number}
+        </p>
+        <h1 className="mt-3 break-words text-3xl font-bold leading-tight sm:text-4xl">
+          {title || `Chapter ${number}`}
+        </h1>
+        {pov && <p className={`mt-2 italic ${mutedClasses}`}>{pov}</p>}
+      </div>
+    );
+  }
+
+  if (readerOpen && hasReadableContent) {
     return (
       <div
         className={`fixed inset-0 z-[2147483647] isolate h-[100dvh] w-screen overflow-hidden ${themeClasses}`}
       >
         <div
-          ref={measurementRef}
-          aria-hidden="true"
-          className="pointer-events-none absolute left-[-99999px] top-0 overflow-hidden"
+          ref={readerRef}
+          onScroll={handleScroll}
+          className={`absolute inset-0 overflow-y-auto overscroll-y-contain px-5 py-12 sm:px-8 sm:py-16 ${
+            controlsVisible || isEditing ? "pb-40 pt-20" : ""
+          }`}
           style={{
-            boxSizing: "border-box",
+            WebkitOverflowScrolling: "touch",
             fontFamily: "Georgia, 'Times New Roman', serif",
-            visibility: "hidden",
+            fontSize: `${readerFontSize}px`,
+            lineHeight: readerLineHeight,
           }}
-        />
+        >
+          <main className={`mx-auto w-full ${widthClass(readerWidth)}`}>
+            {orderedChapters.map((chapter) => {
+              const editingThisChapter =
+                isEditing && editingChapterId === chapter.id;
+              return (
+                <article
+                  key={chapter.id}
+                  ref={(node) => {
+                    if (node) chapterRefs.current.set(chapter.id, node);
+                    else chapterRefs.current.delete(chapter.id);
+                  }}
+                  onClick={editingThisChapter ? undefined : toggleControls}
+                  className="min-h-[60dvh] scroll-mt-20 pb-16 sm:pb-24"
+                >
+                  {editingThisChapter ? (
+                    <>
+                      <div className="pb-8 pt-3 sm:pb-10">
+                        <p className="font-sans text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
+                          Chapter {chapter.number}
+                        </p>
+                        <input
+                          aria-label="Chapter title"
+                          value={editTitle}
+                          onChange={(event) => setEditTitle(event.target.value)}
+                          className="mt-3 w-full border-0 bg-transparent p-0 font-serif text-3xl font-bold leading-tight text-inherit outline-none sm:text-4xl"
+                        />
+                        <input
+                          aria-label="POV character"
+                          value={editPovCharacter}
+                          onChange={(event) =>
+                            setEditPovCharacter(event.target.value)
+                          }
+                          className={`mt-2 w-full border-0 bg-transparent p-0 font-serif italic outline-none ${mutedClasses}`}
+                        />
+                      </div>
+                      <textarea
+                        ref={editAreaRef}
+                        aria-label={`Edit Chapter ${chapter.number}`}
+                        value={editContent}
+                        onChange={(event) => setEditContent(event.target.value)}
+                        className="block min-h-[65dvh] w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-serif text-inherit caret-pink-500 outline-none"
+                        style={{
+                          fontSize: `${readerFontSize}px`,
+                          lineHeight: readerLineHeight,
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      {renderHeading(
+                        chapter.number,
+                        chapter.title,
+                        chapter.povCharacter,
+                      )}
+                      {getParagraphs(chapter.content).map((paragraph, index) =>
+                        renderParagraph(paragraph, `${chapter.id}-${index}`),
+                      )}
+                    </>
+                  )}
+                </article>
+              );
+            })}
 
-        {isEditing && currentChapter ? (
-          <>
-            <header
-              className={`absolute inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b px-3 ${chromeClasses}`}
-            >
-              <button
-                type="button"
-                onClick={cancelEditing}
-                className="rounded-lg px-3 py-2 font-semibold"
+            {draftWorkspace && (
+              <article
+                ref={(node) => {
+                  if (node) chapterRefs.current.set("__draft__", node);
+                  else chapterRefs.current.delete("__draft__");
+                }}
+                onClick={editingDraft ? undefined : toggleControls}
+                className="min-h-[70dvh] scroll-mt-20 pb-28"
               >
-                Cancel
-              </button>
-              <p className="truncate px-2 text-sm font-semibold">
-                Edit Chapter {currentChapter.number}
+                {editingDraft ? (
+                  <>
+                    {renderHeading(
+                      draftWorkspace.chapterNumber,
+                      draftWorkspace.title,
+                      draftWorkspace.povCharacter,
+                    )}
+                    <textarea
+                      ref={editAreaRef}
+                      aria-label={`Edit Chapter ${draftWorkspace.chapterNumber} draft`}
+                      value={editContent}
+                      onChange={(event) => setEditContent(event.target.value)}
+                      className="block min-h-[65dvh] w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-serif text-inherit caret-pink-500 outline-none"
+                      style={{
+                        fontSize: `${readerFontSize}px`,
+                        lineHeight: readerLineHeight,
+                      }}
+                    />
+                  </>
+                ) : (
+                  <>
+                    {renderHeading(
+                      draftWorkspace.chapterNumber,
+                      draftWorkspace.title,
+                      draftWorkspace.povCharacter,
+                    )}
+                    {getParagraphs(draftWorkspace.content).map(
+                      (paragraph, index) =>
+                        renderParagraph(paragraph, `draft-${index}`),
+                    )}
+                    {!draftWorkspace.content.trim() && (
+                      <p className={mutedClasses}>
+                        The chapter draft will appear here.
+                      </p>
+                    )}
+                  </>
+                )}
+              </article>
+            )}
+          </main>
+        </div>
+
+        {(controlsVisible || isEditing) && (
+          <header
+            className={`absolute inset-x-0 top-0 z-40 flex min-h-14 items-center justify-between border-b px-3 py-2 backdrop-blur ${chromeClasses}`}
+          >
+            <button
+              type="button"
+              onClick={isEditing ? () => finishEditing(true) : onCloseReader}
+              className="flex min-h-10 items-center rounded-lg px-3 font-semibold"
+            >
+              {isEditing ? "Cancel" : "‹ Back"}
+            </button>
+            <div className="min-w-0 flex-1 px-2 text-center">
+              <p className="truncate text-sm font-semibold">{storyTitle}</p>
+              <p className="text-xs opacity-60">
+                {draftWorkspace
+                  ? `Chapter ${draftWorkspace.chapterNumber} draft`
+                  : activeChapter
+                    ? `Chapter ${activeChapter.number}`
+                    : "Reader"}
               </p>
+            </div>
+            {isEditing ? (
               <button
                 type="button"
-                onClick={saveChapter}
-                className="rounded-lg bg-pink-500 px-3 py-2 font-semibold text-white"
+                onClick={saveEditing}
+                className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-semibold text-white"
               >
                 Save
               </button>
-            </header>
-
-            <div className="absolute inset-x-0 bottom-0 top-14 overflow-y-auto p-4">
-              <div className="mx-auto max-w-4xl space-y-4 pb-10">
-                <input
-                  aria-label="Chapter title"
-                  value={editTitle}
-                  onChange={(event) => setEditTitle(event.target.value)}
-                  className="w-full rounded-xl border border-neutral-600 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
-                />
-                <input
-                  aria-label="POV character"
-                  value={editPovCharacter}
-                  onChange={(event) => setEditPovCharacter(event.target.value)}
-                  className="w-full rounded-xl border border-neutral-600 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-pink-500"
-                />
-                <textarea
-                  ref={editContentRef}
-                  aria-label="Chapter content"
-                  value={editContent}
-                  onChange={(event) => setEditContent(event.target.value)}
-                  rows={28}
-                  className="w-full resize-y rounded-xl border border-neutral-600 bg-neutral-900 px-4 py-4 text-white outline-none focus:border-pink-500"
-                  style={{
-                    fontSize: `${readerFontSize}px`,
-                    lineHeight: readerLineHeight,
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettingsVisible((visible) => !visible);
+                    setGuidanceVisible(false);
                   }}
-                />
+                  className="flex h-10 min-w-10 items-center justify-center rounded-full px-2 font-semibold"
+                >
+                  Aa
+                </button>
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  disabled={
+                    !activeChapter &&
+                    !(activeChapterId === "__draft__" && draftWorkspace)
+                  }
+                  className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  Edit
+                </button>
               </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div
-              ref={readerRef}
-              onScroll={updateCurrentPage}
-              className="absolute inset-0 flex touch-pan-x snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain"
-              style={{
-                WebkitOverflowScrolling: "touch",
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-              }}
-            >
-              {pages.map((page, pageIndex) => (
-                <article
-                  key={`${page.chapterId}-${pageIndex}`}
-                  onClick={toggleControls}
-                  className="h-full w-full min-w-full shrink-0 snap-start snap-always overflow-hidden"
-                  style={{
-                    boxSizing: "border-box",
-                    padding: `${pageMetrics.verticalPadding}px ${pageMetrics.horizontalPadding}px`,
-                    fontFamily: "Georgia, 'Times New Roman', serif",
-                    fontSize: `${readerFontSize}px`,
-                    lineHeight: readerLineHeight,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${pageMetrics.contentWidth}px`,
-                      maxWidth: "100%",
-                      margin: "0 auto",
-                    }}
-                  >
-                    {page.showHeading && (
-                      <div className="pb-6">
-                        <p className="text-xs font-semibold uppercase leading-4 tracking-[0.2em] text-pink-500">
-                          Chapter {page.chapterNumber}
-                        </p>
-                        <h1 className="mt-3 break-words text-3xl font-bold leading-tight">
-                          {page.chapterTitle || `Chapter ${page.chapterNumber}`}
-                        </h1>
-                        {page.povCharacter && (
-                          <p className={`mt-2 italic ${mutedTextClasses}`}>
-                            {page.povCharacter}
-                          </p>
-                        )}
-                      </div>
-                    )}
+            )}
+          </header>
+        )}
 
-                    {page.paragraphs.map((paragraph, paragraphIndex) =>
-                      renderParagraph(
-                        paragraph,
-                        `${pageIndex}-${paragraphIndex}`,
-                      ),
-                    )}
-                  </div>
-                </article>
-              ))}
-            </div>
-
-            {controlsVisible && (
-              <>
-                <header
-                  className={`absolute inset-x-0 top-0 z-40 flex min-h-14 items-center justify-between border-b px-3 py-2 backdrop-blur ${chromeClasses}`}
-                >
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onCloseReader();
-                    }}
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-2xl"
-                    aria-label="Back to stories"
-                  >
-                    ‹
-                  </button>
-
-                  <div className="min-w-0 flex-1 px-2 text-center">
-                    <p className="truncate text-sm font-semibold">
-                      {storyTitle}
-                    </p>
-                    {currentReaderPage && (
-                      <p className="text-xs opacity-60">
-                        Chapter {currentReaderPage.chapterNumber}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-1">
+        {controlsVisible && !isEditing && (
+          <footer
+            className={`absolute inset-x-0 bottom-0 z-40 border-t px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur ${chromeClasses}`}
+          >
+            {settingsVisible && (
+              <div className="mx-auto mb-2 max-w-2xl space-y-3 rounded-xl border border-current/10 p-3">
+                <div className="flex gap-2">
+                  {(["light", "sepia", "dark"] as const).map((theme) => (
+                    <button
+                      key={theme}
+                      type="button"
+                      onClick={() => setReaderTheme(theme)}
+                      className={`flex-1 rounded-lg border px-2 py-2 text-sm capitalize ${
+                        readerTheme === theme
+                          ? "border-pink-500 bg-pink-500 text-white"
+                          : "border-current/20"
+                      }`}
+                    >
+                      {theme}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between rounded-lg border border-current/10 p-2">
+                    <span className="text-xs">Font</span>
                     <button
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSettingsVisible((visible) => !visible);
-                      }}
-                      className="flex h-10 min-w-10 items-center justify-center rounded-full px-2 font-semibold"
-                      aria-label="Reader settings"
+                      onClick={() =>
+                        setReaderFontSize((size) => Math.max(14, size - 1))
+                      }
+                      className="px-2"
                     >
-                      Aa
+                      A-
                     </button>
+                    <span className="text-sm">{readerFontSize}</span>
                     <button
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        startEditing();
-                      }}
-                      className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white"
+                      onClick={() =>
+                        setReaderFontSize((size) => Math.min(30, size + 1))
+                      }
+                      className="px-2"
                     >
-                      Edit
+                      A+
                     </button>
                   </div>
-                </header>
-
-                <footer
-                  className={`absolute inset-x-0 bottom-0 z-40 border-t px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur ${chromeClasses}`}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {settingsVisible && (
-                    <div className="mx-auto mb-2 max-w-2xl space-y-3 rounded-xl border border-current/10 p-3">
-                      <div className="flex gap-2">
-                        {(["light", "sepia", "dark"] as const).map((theme) => (
-                          <button
-                            key={theme}
-                            type="button"
-                            onClick={() => setReaderTheme(theme)}
-                            className={`flex-1 rounded-lg border px-2 py-2 text-sm capitalize ${
-                              readerTheme === theme
-                                ? "border-pink-500 bg-pink-500 text-white"
-                                : "border-current/20"
-                            }`}
-                          >
-                            {theme}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex items-center justify-between rounded-lg border border-current/10 p-2">
-                          <span className="text-xs">Font</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setReaderFontSize((size) =>
-                                  Math.max(14, size - 1),
-                                )
-                              }
-                              className="px-2 py-1"
-                            >
-                              A-
-                            </button>
-                            <span className="text-sm">{readerFontSize}</span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setReaderFontSize((size) =>
-                                  Math.min(30, size + 1),
-                                )
-                              }
-                              className="px-2 py-1"
-                            >
-                              A+
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between rounded-lg border border-current/10 p-2">
-                          <span className="text-xs">Spacing</span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setReaderLineHeight((height) =>
-                                  Math.max(
-                                    1.3,
-                                    Number((height - 0.1).toFixed(1)),
-                                  ),
-                                )
-                              }
-                              className="px-2 py-1"
-                            >
-                              -
-                            </button>
-                            <span className="text-sm">
-                              {readerLineHeight.toFixed(1)}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setReaderLineHeight((height) =>
-                                  Math.min(
-                                    2.4,
-                                    Number((height + 0.1).toFixed(1)),
-                                  ),
-                                )
-                              }
-                              className="px-2 py-1"
-                            >
-                              +
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2">
-                        {(["narrow", "medium", "wide"] as const).map(
-                          (width) => (
-                            <button
-                              key={width}
-                              type="button"
-                              onClick={() => setReaderWidth(width)}
-                              className={`flex-1 rounded-lg border px-2 py-2 text-sm capitalize ${
-                                readerWidth === width
-                                  ? "border-pink-500 bg-pink-500 text-white"
-                                  : "border-current/20"
-                              }`}
-                            >
-                              {width}
-                            </button>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mx-auto flex max-w-2xl items-center justify-between text-xs">
+                  <div className="flex items-center justify-between rounded-lg border border-current/10 p-2">
+                    <span className="text-xs">Spacing</span>
                     <button
                       type="button"
-                      onClick={() => moveToPage(currentPage - 1)}
-                      disabled={currentPage <= 1}
-                      className="px-3 py-1 text-xl disabled:opacity-20"
+                      onClick={() =>
+                        setReaderLineHeight((height) =>
+                          Math.max(1.3, Number((height - 0.1).toFixed(1))),
+                        )
+                      }
+                      className="px-2"
                     >
-                      ‹
+                      -
                     </button>
-                    <span>
-                      Page {currentPage} of {pageCount}
+                    <span className="text-sm">
+                      {readerLineHeight.toFixed(1)}
                     </span>
                     <button
                       type="button"
-                      onClick={() => moveToPage(currentPage + 1)}
-                      disabled={currentPage >= pageCount}
-                      className="px-3 py-1 text-xl disabled:opacity-20"
+                      onClick={() =>
+                        setReaderLineHeight((height) =>
+                          Math.min(2.4, Number((height + 0.1).toFixed(1))),
+                        )
+                      }
+                      className="px-2"
                     >
-                      ›
+                      +
                     </button>
                   </div>
-                </footer>
-              </>
-            )}
-
-            {!controlsVisible && (
-              <div className="pointer-events-none absolute inset-x-0 bottom-2 z-20 text-center text-[11px] opacity-40">
-                {currentPage} / {pageCount}
+                </div>
+                <div className="flex gap-2">
+                  {(["narrow", "medium", "wide"] as const).map((width) => (
+                    <button
+                      key={width}
+                      type="button"
+                      onClick={() => setReaderWidth(width)}
+                      className={`flex-1 rounded-lg border px-2 py-2 text-sm capitalize ${
+                        readerWidth === width
+                          ? "border-pink-500 bg-pink-500 text-white"
+                          : "border-current/20"
+                      }`}
+                    >
+                      {width}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
-          </>
+
+            {draftWorkspace && guidanceVisible && (
+              <div className="mx-auto mb-2 max-w-3xl">
+                <textarea
+                  value={draftWorkspace.guidance}
+                  disabled={draftWorkspace.isGenerating}
+                  onChange={(event) =>
+                    onDraftGuidanceChange?.(event.target.value)
+                  }
+                  placeholder="Tell NovelForge exactly what must happen in the next section."
+                  rows={3}
+                  className="w-full resize-none rounded-xl border border-current/15 bg-transparent px-4 py-3 text-sm outline-none placeholder:opacity-50 focus:border-pink-500 disabled:opacity-50"
+                />
+                {(draftWorkspace.repetitionWarnings?.length ?? 0) > 0 && (
+                  <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs">
+                    {draftWorkspace.repetitionWarnings?.map((warning) => (
+                      <p key={warning}>{warning}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
+              <p className="min-w-0 flex-1 truncate text-xs opacity-60">
+                {draftWorkspace
+                  ? `Draft, ${countWords(draftWorkspace.content)} words`
+                  : "Continuous reading"}
+              </p>
+              {onOpenChapterPlan && (
+                <button
+                  type="button"
+                  onClick={onOpenChapterPlan}
+                  className="rounded-lg px-3 py-2 text-sm font-semibold"
+                >
+                  Plan
+                </button>
+              )}
+              {draftWorkspace && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGuidanceVisible((visible) => !visible);
+                      setSettingsVisible(false);
+                    }}
+                    className="rounded-lg border border-current/15 px-3 py-2 text-sm font-semibold"
+                  >
+                    Guide
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      draftWorkspace.isGenerating ||
+                      !draftWorkspace.content.trim()
+                    }
+                    onClick={onGenerateNextSection}
+                    className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  >
+                    {draftWorkspace.isGenerating
+                      ? "Writing..."
+                      : "Generate next"}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {draftWorkspace && guidanceVisible && (
+              <div className="mx-auto mt-2 flex max-w-3xl flex-wrap justify-end gap-2 text-xs">
+                {onRewriteLastSection && (
+                  <button
+                    type="button"
+                    onClick={onRewriteLastSection}
+                    disabled={draftWorkspace.isGenerating}
+                    className="rounded-lg border border-current/15 px-3 py-2 disabled:opacity-40"
+                  >
+                    Rewrite last
+                  </button>
+                )}
+                {onDiscardDraft && (
+                  <button
+                    type="button"
+                    onClick={onDiscardDraft}
+                    disabled={draftWorkspace.isGenerating}
+                    className="rounded-lg border border-current/15 px-3 py-2 disabled:opacity-40"
+                  >
+                    Discard
+                  </button>
+                )}
+                {onCompleteDraft && (
+                  <button
+                    type="button"
+                    onClick={onCompleteDraft}
+                    disabled={
+                      draftWorkspace.isGenerating ||
+                      !draftWorkspace.content.trim()
+                    }
+                    className="rounded-lg border border-emerald-600/40 px-3 py-2 text-emerald-700 disabled:opacity-40"
+                  >
+                    Complete chapter
+                  </button>
+                )}
+              </div>
+            )}
+          </footer>
         )}
       </div>
     );
@@ -1035,19 +730,13 @@ export default function ChapterPanel({
         <h2 className="mt-2 text-2xl font-semibold">
           {chapters.length === 0
             ? "No chapters yet"
-            : `${chapters.length} ${
-                chapters.length === 1 ? "chapter" : "chapters"
-              }`}
+            : `${chapters.length} ${chapters.length === 1 ? "chapter" : "chapters"}`}
         </h2>
-        {chapters.length === 0 ? (
-          <p className="mt-3 leading-7 text-neutral-400">
-            Chapters generated through the conversation will appear here.
-          </p>
-        ) : (
-          <p className="mt-3 leading-7 text-neutral-400">
-            Select this story from Your Stories to open the complete book.
-          </p>
-        )}
+        <p className="mt-3 leading-7 text-neutral-400">
+          {chapters.length === 0
+            ? "Chapters generated through the conversation will appear here."
+            : "Select this story from Your Stories to open the complete book."}
+        </p>
       </div>
     </section>
   );
