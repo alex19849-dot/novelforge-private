@@ -51,6 +51,11 @@ type WriterResponse = {
   diagnostics: GenerationDiagnostic[];
 };
 
+type AionPassageResponse = {
+  reply: string;
+  diagnostics: GenerationDiagnostic[];
+};
+
 type LedgerResponse = {
   storyState: StoryWorkspace["storyState"];
   diagnostics: GenerationDiagnostic[];
@@ -881,6 +886,21 @@ function isStoryChatResponse(value: unknown): value is StoryChatResponse {
     typeof response.chapterBrief === "string" &&
     (response.diagnostics === undefined ||
       isDiagnosticArray(response.diagnostics))
+  );
+}
+
+function isAionPassageResponse(value: unknown): value is AionPassageResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const response = value as Partial<AionPassageResponse>;
+
+  return (
+    typeof response.reply === "string" &&
+    Boolean(response.reply.trim()) &&
+    Array.isArray(response.diagnostics) &&
+    isDiagnosticArray(response.diagnostics)
   );
 }
 
@@ -2128,6 +2148,7 @@ device.`,
     const trimmedMessage = input.trim();
     const deletionRequest = getChapterDeletionRequest(trimmedMessage);
     const hasPendingChapter = pendingGeneration?.storyId === story?.id;
+    const isAionRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage);
 
     if (
       !story ||
@@ -2159,6 +2180,66 @@ device.`,
     setIsThinking(true);
 
     try {
+      if (isAionRequest) {
+        const currentPending = hasPendingChapter ? pendingGeneration : null;
+        const latestChapter = requestStory.chapters.at(-1) ?? null;
+        const currentChapterNumber =
+          currentPending?.generatedChapter.replaceChapterNumber ??
+          latestChapter?.number ??
+          null;
+        const currentPlan =
+          currentChapterNumber === null
+            ? null
+            : ((requestStory.storyState.chapterPlans ?? []).find(
+                (plan) => plan.chapterNumber === currentChapterNumber,
+              ) ?? null);
+        const response = await fetch("/api/story-chat/aion", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: trimmedMessage,
+            storyBible: requestStory.storyBible,
+            storyState: requestStory.storyState,
+            chapterBrief:
+              currentPending?.chapterBrief ??
+              (currentPlan ? JSON.stringify(currentPlan) : ""),
+            chapterDraft:
+              currentPending?.draft ?? latestChapter?.content ?? "",
+            povCharacter:
+              currentPending?.generatedChapter.povCharacter ??
+              latestChapter?.povCharacter ??
+              "",
+          }),
+        });
+        const data = await readApiJson(response);
+
+        if (!isAionPassageResponse(data)) {
+          throw new Error("Aion returned an invalid passage response.");
+        }
+
+        const aionStory: StoryWorkspace = {
+          ...requestStory,
+          storyState: {
+            ...requestStory.storyState,
+            lastGenerationDiagnostics: data.diagnostics,
+          },
+          messages: [
+            ...requestStory.messages,
+            {
+              id: Date.now() + 1,
+              role: "assistant",
+              content: `AION\n\n${data.reply}`,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(aionStory);
+        return;
+      }
+
       if (deletionRequest.kind === "ambiguous") {
         const clarificationStory: StoryWorkspace = {
           ...requestStory,
