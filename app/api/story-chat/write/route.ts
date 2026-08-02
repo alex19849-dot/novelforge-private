@@ -39,6 +39,8 @@ type Usage = {
 
 class TechnicalWriterError extends Error {}
 
+class InstructionConflictError extends Error {}
+
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -117,15 +119,27 @@ function getPrompt(input: {
   latestUserMessage: string;
 }): string {
   const draftContext = endingExcerpt(input.chapterDraft, 1400);
+  const mandatoryGuidance =
+    input.sectionInstruction ||
+    input.latestUserMessage ||
+    "Write only the next uncompleted beat of the canonical chapter plan.";
   const actionInstruction =
     input.action === "start"
-      ? "Begin the chapter at the canonical plan's exact opening state."
+      ? "Begin at the canonical plan's exact opening state. Do not skip its opening beat."
       : input.action === "rewrite"
-        ? "Write a replacement for SECTION TO REWRITE only. Preserve the surrounding chapter continuity and satisfy the user's section instruction."
-        : "Continue immediately after CURRENT CHAPTER ENDING. Do not recap, restart or quote its final sentence.";
+        ? "Replace SECTION TO REWRITE only. Preserve what happens immediately before and after it. Do not rewrite or advance any other part of the chapter."
+        : "Continue from the exact final moment of CURRENT CHAPTER ENDING. Do not recap, restart, repeat its final sentence, jump forward without instruction or begin a different scene.";
 
   return [
     "You are NovelForge's commercial adult MM romance prose writer.",
+    "MANDATORY INSTRUCTION CONTRACT",
+    "The canonical chapter plan and the user's current section guidance are requirements, not inspiration, suggestions or optional context.",
+    "Write the events requested by the guidance exactly as part of the canonical plan. Preserve their participants, order, location, timing, emotional stage, intended outcome and stopping point.",
+    "You may invent only the dialogue, physical business, sensory details and connective prose needed to dramatise those specified events.",
+    "Never replace a requested event with a similar event. Never omit, reinterpret, contradict or soften a requirement. Never add an event that changes the plan.",
+    "Do not write later planned beats unless the current guidance explicitly requests them. Do not resolve a conflict, reveal information, create attraction awareness, introduce intimacy or reach the chapter hook early.",
+    "If the current guidance names an exact action, line, fact, location, time or endpoint, it must appear accurately in the prose.",
+    "If the guidance genuinely conflicts with established canon or the canonical plan, return only <INSTRUCTION_CONFLICT> followed by one concise sentence identifying the exact conflict. Do not guess and do not write prose.",
     "Write one polished section of approximately 600 to 1,000 words.",
     "Return only novel prose followed by <END_SECTION> on its own line.",
     "Use the Story Bible's POV and tense. Default to first-person present tense only when the Story Bible does not specify them.",
@@ -145,15 +159,15 @@ function getPrompt(input: {
     "Avoid vague attraction placeholders such as something I cannot name, not anger exactly, an unfamiliar feeling, something tighter, a charged look or an unexplained pull. In delayed-awareness stories, describe only the concrete action the viewpoint character can presently interpret.",
     "Do not repeatedly use eyes, gaze, jaw, teeth, breath, heartbeat, clenched hands or body tension as interchangeable shortcuts for emotion. Any ordinary gesture may appear when apt, but vary the evidence and do not overuse it across the chapter.",
     "Do not invent previous meetings, conversations, opinions, memories or familiarity. A viewpoint character may know only what the Story Bible, continuity, plan or on-page events establish they know.",
-    "The Story Bible, canonical chapter plan and accepted continuity are binding.",
-    "Follow the plan in order, but write only the next useful portion. Do not rush to the chapter's final hook unless the remaining plan and user instruction require it.",
+    "The Story Bible and accepted continuity are fixed facts. They support the plan and guidance but do not give permission to ignore either.",
+    "Follow the canonical plan in order. Write only the beats explicitly permitted by the current guidance. Stop once those beats reach a natural finished moment.",
     "Preserve ages, timeline, locations, possessions, family facts, physical positions and character knowledge.",
     "Do not invent prior romance, attraction or intimacy. In a gay-for-you or delayed-awareness arc, involuntary attention, physical reaction, denial and changed behaviour must precede conscious acknowledgement.",
     "Do not repeat completed actions, conversations, jokes, gestures, attraction observations, internal conclusions or paragraphs.",
     "Write long, open-door consensual adult intimacy when the established progression requires it. Keep the characters and their emotional progression on the page throughout the complete intimate scene and its aftermath rather than abruptly cutting away.",
     "Do not include a chapter heading, POV label, outline, notes, markdown, warnings, analysis or commentary.",
-    "STORY BIBLE\n" + JSON.stringify(input.storyBible ?? {}, null, 2),
-    "CANONICAL CHAPTER PLAN\n" + input.chapterBrief,
+    "STORY BIBLE, FIXED CANON\n" + JSON.stringify(input.storyBible ?? {}, null, 2),
+    "CANONICAL CHAPTER PLAN, MANDATORY\n" + input.chapterBrief,
     "CONTINUITY\n" + JSON.stringify(cleanStoryState(input.storyState), null, 2),
     "RECENT CHAPTER ENDINGS\n" + JSON.stringify(input.recentChapters, null, 2),
     input.chapterDraft
@@ -166,11 +180,13 @@ function getPrompt(input: {
       input.chapterTitle +
       "\nPOV: " +
       input.povCharacter,
-    "USER'S CHAPTER REQUEST\n" +
-      (input.latestUserMessage || "Write the chapter naturally."),
-    "SECTION INSTRUCTION\n" +
-      (input.sectionInstruction || "Write the next planned section."),
-    "ACTION\n" + actionInstruction,
+    "ORIGINAL CHAPTER REQUEST, BINDING WHERE RELEVANT\n" +
+      (input.latestUserMessage || "No separate original request supplied."),
+    "CURRENT GUIDANCE, HIGHEST PRIORITY WRITING REQUIREMENT\n" +
+      mandatoryGuidance,
+    "EXACT ACTION AND BOUNDARY\n" + actionInstruction,
+    "SILENT COMPLIANCE CHECK BEFORE RETURNING PROSE",
+    "Check every sentence against the current guidance and canonical plan. Confirm that every requested beat is present, no requested fact changed, no later beat was pulled forward, continuity begins at the exact prior endpoint, POV remains fixed and the section stops where instructed. Correct any failure silently before returning the prose.",
     "Complete the section on a finished sentence, then output <END_SECTION>. Do not continue after the marker.",
   ]
     .filter(Boolean)
@@ -179,6 +195,17 @@ function getPrompt(input: {
 
 function extractCompletedSection(raw: string): string {
   const trimmed = raw.trim();
+
+  if (/^<INSTRUCTION_CONFLICT>/i.test(trimmed)) {
+    const explanation = trimmed
+      .replace(/^<INSTRUCTION_CONFLICT>\s*/i, "")
+      .trim();
+
+    throw new InstructionConflictError(
+      explanation ||
+        "The current guidance conflicts with the canonical chapter plan or established continuity.",
+    );
+  }
 
   if (!/<END_SECTION>\s*$/i.test(trimmed)) {
     throw new Error(
@@ -371,6 +398,10 @@ function repetitionWarnings(
 }
 
 function isTechnicalFailure(error: unknown): boolean {
+  if (error instanceof InstructionConflictError) {
+    return false;
+  }
+
   if (error instanceof TechnicalWriterError) {
     return true;
   }
@@ -505,7 +536,7 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "Write only polished, grammatically complete commercial romance prose. Use natural contractions by default in narration, thought and dialogue unless an uncontracted form carries deliberate emphasis. Canon, POV, established character knowledge, punctuation rules and user direction are binding. Keep consensual adult intimacy on the page when the story requires it. Never use em dashes or en dashes, omit necessary words, summarise the scene or pad it with generic emotional explanation.",
+                "Obey the canonical chapter plan and CURRENT GUIDANCE as a strict writing contract. The current guidance controls exactly what this section depicts and where it stops. Do not substitute, skip, reinterpret, contradict or advance beyond it. Story canon and continuity are fixed. If guidance truly conflicts with them, return the required conflict marker instead of inventing a compromise. Write only polished, grammatically complete commercial romance prose. Use natural contractions by default. Keep consensual adult intimacy on the page when the established plan requires it. Never switch POV, use em dashes or en dashes, omit necessary words, summarise the requested scene or pad it with generic emotional explanation.",
             },
             { role: "user", content: writingPrompt },
           ],
@@ -574,13 +605,20 @@ export async function POST(request: Request) {
         );
 
         if (!retryable || attempt === 2) {
+          const status =
+            error instanceof InstructionConflictError
+              ? 409
+              : retryable
+                ? 502
+                : 422;
+
           return NextResponse.json(
             {
               error: writerError.message,
               preservedDraft: chapterDraft || null,
               diagnostics,
             },
-            { status: retryable ? 502 : 422 },
+            { status },
           );
         }
       }
