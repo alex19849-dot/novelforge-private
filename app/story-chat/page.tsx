@@ -41,8 +41,6 @@ type PendingChapterGeneration = {
 
 type SectionAction = "start" | "continue" | "rewrite";
 
-type DraftWorkspaceView = "draft" | "chat";
-
 type WriterResponse = {
   section: string;
   wordCount: number;
@@ -185,10 +183,6 @@ function isStringArray(value: unknown): value is string[] {
   return (
     Array.isArray(value) && value.every((item) => typeof item === "string")
   );
-}
-
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
 function getStoryStateBeforeChapter(
@@ -1018,9 +1012,6 @@ export default function StoryChatPage() {
 
   const [sectionInstruction, setSectionInstruction] = useState("");
 
-  const [draftWorkspaceView, setDraftWorkspaceView] =
-    useState<DraftWorkspaceView>("draft");
-
   const [stories, setStories] = useState<
     {
       id: string;
@@ -1061,9 +1052,11 @@ export default function StoryChatPage() {
       }
     }, 5000);
 
-    function applySession(session: {
-      user?: { id?: string } | null;
-    } | null) {
+    function applySession(
+      session: {
+        user?: { id?: string } | null;
+      } | null,
+    ) {
       if (!isActive) {
         return;
       }
@@ -1220,7 +1213,9 @@ export default function StoryChatPage() {
 
     setActiveTab("chapters");
 
-    setReaderOpen((data.chapters ?? []).length > 0);
+    setReaderOpen(
+      (data.chapters ?? []).length > 0 || remotePending?.storyId === data.id,
+    );
 
     setIsMenuOpen(false);
   }
@@ -1353,12 +1348,6 @@ undone.`,
       localStorage.removeItem(PENDING_GENERATION_KEY);
     }
   }, []);
-
-  useEffect(() => {
-    if (pendingGeneration?.storyId) {
-      setDraftWorkspaceView("draft");
-    }
-  }, [pendingGeneration?.storyId]);
 
   useEffect(() => {
     const saved = localStorage.getItem("novelforge-reader");
@@ -1999,6 +1988,8 @@ device.`,
       };
       savePendingGeneration(workingPending);
       setSectionInstruction("");
+      setActiveTab("chapters");
+      setReaderOpen(true);
     } catch (error) {
       if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
         workingPending = {
@@ -2150,11 +2141,7 @@ device.`,
     const hasPendingChapter = pendingGeneration?.storyId === story?.id;
     const isAionRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage);
 
-    if (
-      !story ||
-      !trimmedMessage ||
-      isThinking
-    ) {
+    if (!story || !trimmedMessage || isThinking) {
       return;
     }
 
@@ -2205,8 +2192,7 @@ device.`,
             chapterBrief:
               currentPending?.chapterBrief ??
               (currentPlan ? JSON.stringify(currentPlan) : ""),
-            chapterDraft:
-              currentPending?.draft ?? latestChapter?.content ?? "",
+            chapterDraft: currentPending?.draft ?? latestChapter?.content ?? "",
             povCharacter:
               currentPending?.generatedChapter.povCharacter ??
               latestChapter?.povCharacter ??
@@ -2485,7 +2471,7 @@ device.`,
           story: planningStory,
           chatOnly: hasPendingChapter,
           draftContext: hasPendingChapter
-            ? pendingGeneration?.draft ?? ""
+            ? (pendingGeneration?.draft ?? "")
             : "",
         }),
       });
@@ -2662,6 +2648,10 @@ justify-center px-5"
     pendingForCurrentStory?.diagnostics ??
     story.storyState.lastGenerationDiagnostics ??
     [];
+  const pendingChapterNumber = pendingForCurrentStory
+    ? (pendingForCurrentStory.generatedChapter.replaceChapterNumber ??
+      Math.max(0, ...chapters.map((chapter) => chapter.number)) + 1)
+    : null;
 
   return (
     <main className="h-[100dvh] overflow-hidden bg-neutral-950 text-white">
@@ -2772,7 +2762,9 @@ transition ${
                     onClick={() => {
                       setActiveTab("chapters");
 
-                      setReaderOpen(chapters.length > 0);
+                      setReaderOpen(
+                        chapters.length > 0 || Boolean(pendingForCurrentStory),
+                      );
 
                       setIsMenuOpen(false);
                     }}
@@ -2941,8 +2933,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
           </div>
         )}
 
-        {activeTab === "chat" &&
-          (!pendingForCurrentStory || draftWorkspaceView === "chat") && (
+        {activeTab === "chat" && (
           <ChatPanel messages={visibleChatMessages} isThinking={isThinking} />
         )}
 
@@ -2966,6 +2957,52 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
               setReaderLineHeight={setReaderLineHeight}
               readerWidth={readerWidth}
               setReaderWidth={setReaderWidth}
+              draftWorkspace={
+                pendingForCurrentStory && pendingChapterNumber !== null
+                  ? {
+                      chapterNumber: pendingChapterNumber,
+                      title: pendingForCurrentStory.generatedChapter.title,
+                      povCharacter:
+                        pendingForCurrentStory.generatedChapter.povCharacter,
+                      content: pendingForCurrentStory.draft,
+                      guidance: sectionInstruction,
+                      isGenerating: isThinking,
+                      repetitionWarnings:
+                        pendingForCurrentStory.repetitionWarnings,
+                    }
+                  : null
+              }
+              onDraftContentChange={updatePendingDraft}
+              onDraftGuidanceChange={setSectionInstruction}
+              onGenerateNextSection={
+                pendingForCurrentStory
+                  ? () =>
+                      void writeChapterSection(
+                        pendingForCurrentStory,
+                        story,
+                        "continue",
+                      )
+                  : undefined
+              }
+              onRewriteLastSection={
+                pendingForCurrentStory?.lastSection?.trim()
+                  ? () =>
+                      void writeChapterSection(
+                        pendingForCurrentStory,
+                        story,
+                        "rewrite",
+                      )
+                  : undefined
+              }
+              onCompleteDraft={
+                pendingForCurrentStory
+                  ? () =>
+                      void completePendingChapter(pendingForCurrentStory, story)
+                  : undefined
+              }
+              onDiscardDraft={
+                pendingForCurrentStory ? clearPendingGeneration : undefined
+              }
             />
           </div>
         )}
@@ -2980,44 +3017,8 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
         )}
 
         {activeTab === "chat" && (
-          <footer
-            className={`border-t border-white/10 bg-neutral-950/95 px-4 backdrop-blur sm:px-5 ${
-              pendingForCurrentStory
-                ? draftWorkspaceView === "draft"
-                  ? "min-h-0 flex-1 overflow-y-auto py-4 sm:py-5"
-                  : "shrink-0 py-3 sm:py-4"
-                : "shrink-0 py-5"
-            }`}
-          >
-            {pendingForCurrentStory && (
-              <div className="mx-auto mb-3 grid max-w-5xl grid-cols-2 rounded-xl border border-white/10 bg-white/5 p-1">
-                <button
-                  type="button"
-                  onClick={() => setDraftWorkspaceView("draft")}
-                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                    draftWorkspaceView === "draft"
-                      ? "bg-pink-500 text-white"
-                      : "text-neutral-400 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  Chapter Draft
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDraftWorkspaceView("chat")}
-                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                    draftWorkspaceView === "chat"
-                      ? "bg-pink-500 text-white"
-                      : "text-neutral-400 hover:bg-white/5 hover:text-white"
-                  }`}
-                >
-                  Chat
-                </button>
-              </div>
-            )}
-
-            {currentDiagnostics.length > 0 &&
-              (!pendingForCurrentStory || draftWorkspaceView === "draft") && (
+          <footer className="shrink-0 border-t border-white/10 bg-neutral-950/95 px-4 py-4 backdrop-blur sm:px-5">
+            {currentDiagnostics.length > 0 && (
               <details className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
                 <summary className="cursor-pointer font-medium text-neutral-300">
                   {formatGenerationDiagnostics(
@@ -3056,107 +3057,6 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
               </details>
             )}
 
-            {pendingForCurrentStory && draftWorkspaceView === "draft" && (
-              <div className="mx-auto mb-4 max-w-5xl rounded-xl border border-pink-500/30 bg-pink-500/10 p-3 sm:p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-pink-100">
-                    Editable chapter draft,{" "}
-                    {countWords(pendingForCurrentStory.draft)} words
-                  </p>
-
-                  <button
-                    type="button"
-                    disabled={isThinking}
-                    onClick={clearPendingGeneration}
-                    className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-neutral-300 transition hover:bg-white/5 disabled:opacity-40"
-                  >
-                    Discard
-                  </button>
-                </div>
-
-                <textarea
-                  value={pendingForCurrentStory.draft}
-                  disabled={isThinking}
-                  onChange={(event) => updatePendingDraft(event.target.value)}
-                  placeholder="Your generated chapter prose will appear here."
-                  rows={10}
-                  className="mt-3 h-[clamp(14rem,45dvh,32rem)] w-full resize-y overflow-y-auto rounded-xl border border-amber-900/30 bg-[#f3e5c8] px-4 py-4 text-base leading-7 text-[#2f261d] caret-[#2f261d] outline-none placeholder:text-[#786a58] focus:border-amber-700 disabled:opacity-60 sm:mt-4"
-                />
-
-                {(pendingForCurrentStory.repetitionWarnings?.length ?? 0) >
-                  0 && (
-                  <div className="mt-3 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
-                    {pendingForCurrentStory.repetitionWarnings?.map(
-                      (warning) => (
-                        <p key={warning}>{warning}</p>
-                      ),
-                    )}
-                  </div>
-                )}
-
-                <textarea
-                  value={sectionInstruction}
-                  disabled={isThinking}
-                  onChange={(event) =>
-                    setSectionInstruction(event.target.value)
-                  }
-                  placeholder="Optional guidance for the next section, for example: keep the argument hostile and do not introduce attraction yet."
-                  rows={2}
-                  className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-neutral-600 focus:border-pink-500 disabled:opacity-60"
-                />
-
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
-                  <button
-                    type="button"
-                    disabled={
-                      isThinking || !pendingForCurrentStory.draft.trim()
-                    }
-                    onClick={() =>
-                      void writeChapterSection(
-                        pendingForCurrentStory,
-                        story,
-                        "continue",
-                      )
-                    }
-                    className="w-full rounded-lg bg-pink-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-pink-400 disabled:opacity-40 sm:w-auto sm:py-2"
-                  >
-                    {isThinking ? "Writing..." : "Continue"}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={
-                      isThinking || !pendingForCurrentStory.lastSection?.trim()
-                    }
-                    onClick={() =>
-                      void writeChapterSection(
-                        pendingForCurrentStory,
-                        story,
-                        "rewrite",
-                      )
-                    }
-                    className="w-full rounded-lg border border-pink-500/40 bg-pink-500/10 px-4 py-3 text-sm font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:opacity-40 sm:w-auto sm:py-2"
-                  >
-                    Rewrite Last Section
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={
-                      isThinking || !pendingForCurrentStory.draft.trim()
-                    }
-                    onClick={() =>
-                      void completePendingChapter(pendingForCurrentStory, story)
-                    }
-                    className="w-full rounded-lg border border-emerald-400/40 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-400/20 disabled:opacity-40 sm:w-auto sm:py-2"
-                  >
-                    Complete Chapter
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {(!pendingForCurrentStory || draftWorkspaceView === "chat") && (
             <form onSubmit={sendMessage} className="flex items-end gap-3">
               <textarea
                 value={input}
@@ -3187,10 +3087,7 @@ disabled:cursor-not-allowed disabled:opacity-60"
 
               <button
                 type="submit"
-                disabled={
-                  !input.trim() ||
-                  isThinking
-                }
+                disabled={!input.trim() || isThinking}
                 className="h-14 rounded-2xl bg-pink-500 px-6 font-semibold text-white
 transition hover:bg-pink-400 disabled:cursor-not-allowed
 disabled:opacity-40"
@@ -3199,9 +3096,7 @@ disabled:opacity-40"
               </button>
             </form>
 
-            )}
-
-            <p className={`${pendingForCurrentStory ? "mt-1" : "mt-3"} text-center text-xs text-neutral-600`}>
+            <p className="mt-3 text-center text-xs text-neutral-600">
               Your story workspace saves automatically on this device.
             </p>
           </footer>
