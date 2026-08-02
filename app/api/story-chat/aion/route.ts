@@ -35,17 +35,24 @@ function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function endingExcerpt(text: string, maximumWords: number): string {
-  return text
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(-maximumWords)
-    .join(" ");
-}
-
 function stripAionPrefix(message: string): string {
   return message.replace(/^\s*aion\s*[:,-]?\s*/i, "").trim();
+}
+
+function compactJson(value: unknown, maximumCharacters: number): string {
+  let serialized = "{}";
+
+  try {
+    serialized = JSON.stringify(value ?? {}, null, 2);
+  } catch {
+    return "{}";
+  }
+
+  if (serialized.length <= maximumCharacters) {
+    return serialized;
+  }
+
+  return `${serialized.slice(0, maximumCharacters)}\n[context shortened]`;
 }
 
 function normalise(text: string): string {
@@ -168,7 +175,6 @@ export async function POST(request: Request) {
     const instructionAndPassage = stripAionPrefix(cleanString(body.message));
     const povCharacter = cleanString(body.povCharacter);
     const chapterBrief = cleanString(body.chapterBrief);
-    const chapterDraft = cleanString(body.chapterDraft);
 
     if (!instructionAndPassage) {
       return NextResponse.json(
@@ -207,16 +213,13 @@ POV CHARACTER:
 ${povCharacter || "Use the POV established by the pasted passage."}
 
 STORY BIBLE:
-${JSON.stringify(body.storyBible ?? {}, null, 2)}
+${compactJson(body.storyBible, 7000)}
 
 CANONICAL CHAPTER PLAN:
-${chapterBrief || "No separate plan supplied."}
+${chapterBrief ? chapterBrief.slice(0, 4000) : "No separate plan supplied."}
 
 CURRENT CONTINUITY STATE:
-${JSON.stringify(body.storyState ?? {}, null, 2)}
-
-RECENT CURRENT-DRAFT CONTEXT, READ ONLY:
-${chapterDraft ? endingExcerpt(chapterDraft, 1400) : "No draft context supplied."}
+${compactJson(body.storyState, 5000)}
 
 USER'S INSTRUCTION AND EXACT PASSAGE:
 ${instructionAndPassage}
@@ -237,7 +240,7 @@ ${instructionAndPassage}
             },
             { role: "user", content: prompt },
           ],
-          max_tokens: 2400,
+          max_tokens: 1900,
           temperature: 0.6,
           top_p: 0.9,
           frequency_penalty: 0,
