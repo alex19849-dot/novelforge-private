@@ -120,7 +120,7 @@ export default function ChapterPanel({
   const readerRef = useRef<HTMLDivElement | null>(null);
   const chapterRefs = useRef(new Map<string, HTMLElement>());
   const editAreaRef = useRef<HTMLTextAreaElement | null>(null);
-  const savedScrollRef = useRef(0);
+  const pendingScrollRestoreRef = useRef<number | null>(null);
   const restoredStoryRef = useRef<string | null>(null);
   const previousDraftContentRef = useRef(draftWorkspace?.content ?? "");
 
@@ -179,6 +179,13 @@ export default function ChapterPanel({
 
   useLayoutEffect(() => {
     if (isEditing) resizeEditArea();
+
+    const reader = readerRef.current;
+    const scrollTop = pendingScrollRestoreRef.current;
+    if (reader && scrollTop !== null) {
+      reader.scrollTop = scrollTop;
+      pendingScrollRestoreRef.current = null;
+    }
   }, [
     editContent,
     isEditing,
@@ -298,7 +305,7 @@ export default function ChapterPanel({
 
   function startEditing() {
     if (!readerRef.current) return;
-    savedScrollRef.current = readerRef.current.scrollTop;
+    pendingScrollRestoreRef.current = readerRef.current.scrollTop;
     if (activeChapterId === "__draft__" && draftWorkspace) {
       setEditingChapterId("__draft__");
       setEditTitle(draftWorkspace.title);
@@ -315,19 +322,21 @@ export default function ChapterPanel({
     setSettingsVisible(false);
     setGuidanceVisible(false);
     setIsEditing(true);
-    requestAnimationFrame(() =>
-      editAreaRef.current?.focus({ preventScroll: true }),
-    );
   }
 
   function finishEditing(restore: boolean) {
+    if (restore && readerRef.current) {
+      pendingScrollRestoreRef.current = readerRef.current.scrollTop;
+    }
     setIsEditing(false);
     setEditingChapterId(null);
-    requestAnimationFrame(() => {
-      if (restore && readerRef.current) {
-        readerRef.current.scrollTop = savedScrollRef.current;
-      }
-    });
+  }
+
+  function updateEditContent(content: string) {
+    if (readerRef.current) {
+      pendingScrollRestoreRef.current = readerRef.current.scrollTop;
+    }
+    setEditContent(content);
   }
 
   function saveEditing() {
@@ -395,6 +404,7 @@ export default function ChapterPanel({
           }`}
           style={{
             WebkitOverflowScrolling: "touch",
+            overflowAnchor: "none",
             fontFamily: "Georgia, 'Times New Roman', serif",
             fontSize: `${readerFontSize}px`,
             lineHeight: readerLineHeight,
@@ -439,11 +449,14 @@ export default function ChapterPanel({
                         ref={editAreaRef}
                         aria-label={`Edit Chapter ${chapter.number}`}
                         value={editContent}
-                        onChange={(event) => setEditContent(event.target.value)}
+                        onChange={(event) =>
+                          updateEditContent(event.target.value)
+                        }
                         className="block min-h-[65dvh] w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-serif text-inherit caret-pink-500 outline-none"
                         style={{
                           fontSize: `${readerFontSize}px`,
                           lineHeight: readerLineHeight,
+                          overflowAnchor: "none",
                         }}
                       />
                     </>
@@ -483,11 +496,14 @@ export default function ChapterPanel({
                       ref={editAreaRef}
                       aria-label={`Edit Chapter ${draftWorkspace.chapterNumber} draft`}
                       value={editContent}
-                      onChange={(event) => setEditContent(event.target.value)}
+                      onChange={(event) =>
+                        updateEditContent(event.target.value)
+                      }
                       className="block min-h-[65dvh] w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-serif text-inherit caret-pink-500 outline-none"
                       style={{
                         fontSize: `${readerFontSize}px`,
                         lineHeight: readerLineHeight,
+                        overflowAnchor: "none",
                       }}
                     />
                   </>
