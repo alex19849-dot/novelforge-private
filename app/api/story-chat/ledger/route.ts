@@ -48,6 +48,33 @@ type LedgerModelOutput = {
     internalThoughtPattern: string;
     forbiddenHabits: string[];
   }>;
+  currentScene: {
+    chapterNumber: number;
+    storyClock: string;
+    location: string;
+    presentCharacters: string[];
+    physicalPositions: string[];
+    activeObjects: string[];
+    injuries: string[];
+    clothing: string[];
+  };
+  relationshipProgression: Array<{
+    relationship: string;
+    currentStage: string;
+    characterAwareness: string[];
+    currentTension: string;
+    lastMeaningfulChange: string;
+    lastChangedChapter: number;
+    furthestIntimacy: string;
+  }>;
+  repetitionMemory: {
+    completedInternalBeats: string[];
+    settingTreatments: string[];
+    actionPatterns: string[];
+    dialoguePatterns: string[];
+    repeatedLanguage: string[];
+    sentenceOpeningWarnings: string[];
+  };
   chapterEntries: Array<{
     chapterNumber: number;
     summary: string;
@@ -59,6 +86,14 @@ type LedgerModelOutput = {
     newFacts: string[];
     unresolvedThreads: string[];
     repeatedBeats: string[];
+    openingTime: string;
+    endingPositions: string[];
+    activeObjects: string[];
+    characterKnowledgeChanges: string[];
+    completedInternalBeats: string[];
+    settingTreatments: string[];
+    actionPatterns: string[];
+    repeatedLanguage: string[];
   }>;
 };
 
@@ -76,6 +111,9 @@ const ledgerSchema = {
     "characterKnowledge",
     "repetitionWarnings",
     "voiceProfiles",
+    "currentScene",
+    "relationshipProgression",
+    "repetitionMemory",
     "chapterEntries",
   ],
   properties: {
@@ -156,6 +194,124 @@ const ledgerSchema = {
         },
       },
     },
+    currentScene: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "chapterNumber",
+        "storyClock",
+        "location",
+        "presentCharacters",
+        "physicalPositions",
+        "activeObjects",
+        "injuries",
+        "clothing",
+      ],
+      properties: {
+        chapterNumber: { type: "number" },
+        storyClock: { type: "string" },
+        location: { type: "string" },
+        presentCharacters: {
+          type: "array",
+          maxItems: 20,
+          items: { type: "string" },
+        },
+        physicalPositions: {
+          type: "array",
+          maxItems: 30,
+          items: { type: "string" },
+        },
+        activeObjects: {
+          type: "array",
+          maxItems: 30,
+          items: { type: "string" },
+        },
+        injuries: {
+          type: "array",
+          maxItems: 20,
+          items: { type: "string" },
+        },
+        clothing: {
+          type: "array",
+          maxItems: 20,
+          items: { type: "string" },
+        },
+      },
+    },
+    relationshipProgression: {
+      type: "array",
+      maxItems: 12,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "relationship",
+          "currentStage",
+          "characterAwareness",
+          "currentTension",
+          "lastMeaningfulChange",
+          "lastChangedChapter",
+          "furthestIntimacy",
+        ],
+        properties: {
+          relationship: { type: "string" },
+          currentStage: { type: "string" },
+          characterAwareness: {
+            type: "array",
+            maxItems: 20,
+            items: { type: "string" },
+          },
+          currentTension: { type: "string" },
+          lastMeaningfulChange: { type: "string" },
+          lastChangedChapter: { type: "number" },
+          furthestIntimacy: { type: "string" },
+        },
+      },
+    },
+    repetitionMemory: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "completedInternalBeats",
+        "settingTreatments",
+        "actionPatterns",
+        "dialoguePatterns",
+        "repeatedLanguage",
+        "sentenceOpeningWarnings",
+      ],
+      properties: {
+        completedInternalBeats: {
+          type: "array",
+          maxItems: 80,
+          items: { type: "string" },
+        },
+        settingTreatments: {
+          type: "array",
+          maxItems: 60,
+          items: { type: "string" },
+        },
+        actionPatterns: {
+          type: "array",
+          maxItems: 60,
+          items: { type: "string" },
+        },
+        dialoguePatterns: {
+          type: "array",
+          maxItems: 40,
+          items: { type: "string" },
+        },
+        repeatedLanguage: {
+          type: "array",
+          maxItems: 60,
+          items: { type: "string" },
+        },
+        sentenceOpeningWarnings: {
+          type: "array",
+          maxItems: 40,
+          items: { type: "string" },
+        },
+      },
+    },
     chapterEntries: {
       type: "array",
       maxItems: 100,
@@ -173,6 +329,14 @@ const ledgerSchema = {
           "newFacts",
           "unresolvedThreads",
           "repeatedBeats",
+          "openingTime",
+          "endingPositions",
+          "activeObjects",
+          "characterKnowledgeChanges",
+          "completedInternalBeats",
+          "settingTreatments",
+          "actionPatterns",
+          "repeatedLanguage",
         ],
         properties: {
           chapterNumber: { type: "number" },
@@ -195,6 +359,42 @@ const ledgerSchema = {
           repeatedBeats: {
             type: "array",
             maxItems: 30,
+            items: { type: "string" },
+          },
+          openingTime: { type: "string" },
+          endingPositions: {
+            type: "array",
+            maxItems: 30,
+            items: { type: "string" },
+          },
+          activeObjects: {
+            type: "array",
+            maxItems: 30,
+            items: { type: "string" },
+          },
+          characterKnowledgeChanges: {
+            type: "array",
+            maxItems: 30,
+            items: { type: "string" },
+          },
+          completedInternalBeats: {
+            type: "array",
+            maxItems: 30,
+            items: { type: "string" },
+          },
+          settingTreatments: {
+            type: "array",
+            maxItems: 20,
+            items: { type: "string" },
+          },
+          actionPatterns: {
+            type: "array",
+            maxItems: 20,
+            items: { type: "string" },
+          },
+          repeatedLanguage: {
+            type: "array",
+            maxItems: 20,
             items: { type: "string" },
           },
         },
@@ -457,6 +657,26 @@ only when it is no longer useful. repeatedBeats in each chapter entry must name
 that chapter's completed conclusions, exchanges, sensory introductions and
 action patterns that must not be replayed.
 
+STRUCTURED HANDOFF
+
+currentScene is the exact handoff for the next writer. Record the final story
+clock, location, characters still physically present, their positions, active
+objects, injuries and clothing only when established and still relevant. Do
+not carry a character or object into the scene after they leave.
+
+relationshipProgression records the current stage of each central romantic
+relationship without averaging the two viewpoints together. characterAwareness
+must name each character separately and distinguish what they consciously know
+from what the reader can infer. lastMeaningfulChange is the newest earned
+change, not the relationship premise repeated again.
+
+repetitionMemory is cumulative but selective. Separate completed internal
+conclusions, reused setting treatments, repeated action choreography, recurring
+dialogue exchanges, conspicuous repeated wording and overused sentence
+openings. Store specific warnings future prose can act on. Do not fill these
+lists with ordinary necessary words, locations or actions that have not become
+noticeably repetitive.
+
 CONTINUITY PRECISION
 
 Record concrete before-and-after changes, not broad mood summaries. If a
@@ -531,7 +751,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
           schema: ledgerSchema,
         },
       },
-      max_output_tokens: 6000,
+      max_output_tokens: 8000,
     });
     const usage = response.usage;
     const inputTokens = usage?.input_tokens ?? 0;
@@ -569,39 +789,45 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
     }
 
     const output = JSON.parse(outputText) as LedgerModelOutput;
-   const analysedEntries = output.chapterEntries
-  .map((entry, index) => {
-    const sourceChapter =
-      chaptersToAnalyse.find(
-        (chapter) => chapter.number === entry.chapterNumber,
-      ) ?? chaptersToAnalyse[index];
+    const analysedEntries = output.chapterEntries
+      .map((entry, index) => {
+        const sourceChapter =
+          chaptersToAnalyse.find(
+            (chapter) => chapter.number === entry.chapterNumber,
+          ) ?? chaptersToAnalyse[index];
 
-    if (!sourceChapter) {
-      console.warn(
-        `Skipping invalid continuity entry for chapter ${entry.chapterNumber}.`,
-      );
-      return null;
-    }
+        if (!sourceChapter) {
+          console.warn(
+            `Skipping invalid continuity entry for chapter ${entry.chapterNumber}.`,
+          );
+          return null;
+        }
 
-    return {
-      chapterNumber: sourceChapter.number,
-      title: sourceChapter.title,
-      povCharacter: sourceChapter.povCharacter,
-      summary: cleanString(entry.summary),
-      openingLocation: cleanString(entry.openingLocation),
-      endingLocation: cleanString(entry.endingLocation),
-      endingTime: cleanString(entry.endingTime),
-      endingExcerpt: getEndingExcerpt(sourceChapter.content),
-      relationshipShift: cleanString(entry.relationshipShift),
-      intimacyMilestone: cleanString(entry.intimacyMilestone),
-      newFacts: entry.newFacts,
-      unresolvedThreads: entry.unresolvedThreads,
-      repeatedBeats: entry.repeatedBeats,
-    };
-  })
-  .filter(
-    (entry): entry is NonNullable<typeof entry> => entry !== null,
-  );
+        return {
+          chapterNumber: sourceChapter.number,
+          title: sourceChapter.title,
+          povCharacter: sourceChapter.povCharacter,
+          summary: cleanString(entry.summary),
+          openingLocation: cleanString(entry.openingLocation),
+          endingLocation: cleanString(entry.endingLocation),
+          endingTime: cleanString(entry.endingTime),
+          endingExcerpt: getEndingExcerpt(sourceChapter.content),
+          relationshipShift: cleanString(entry.relationshipShift),
+          intimacyMilestone: cleanString(entry.intimacyMilestone),
+          newFacts: entry.newFacts,
+          unresolvedThreads: entry.unresolvedThreads,
+          repeatedBeats: entry.repeatedBeats,
+          openingTime: cleanString(entry.openingTime),
+          endingPositions: entry.endingPositions,
+          activeObjects: entry.activeObjects,
+          characterKnowledgeChanges: entry.characterKnowledgeChanges,
+          completedInternalBeats: entry.completedInternalBeats,
+          settingTreatments: entry.settingTreatments,
+          actionPatterns: entry.actionPatterns,
+          repeatedLanguage: entry.repeatedLanguage,
+        };
+      })
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
     const analysedNumbers = new Set(
       analysedEntries.map((entry) => entry.chapterNumber),
     );
@@ -671,46 +897,56 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
         characterKnowledge: output.characterKnowledge,
         repetitionWarnings: output.repetitionWarnings,
         voiceProfiles: output.voiceProfiles,
+        currentScene: {
+          ...output.currentScene,
+          chapterNumber:
+            typeof latestLedgerEntry?.chapterNumber === "number"
+              ? latestLedgerEntry.chapterNumber
+              : chapterNumber,
+          storyClock: currentClock,
+        },
+        relationshipProgression: output.relationshipProgression,
+        repetitionMemory: output.repetitionMemory,
       },
       diagnostics: [diagnostic],
     });
-} catch (error) {
-  console.error("CONTINUITY LEDGER FAILED:", error);
+  } catch (error) {
+    console.error("CONTINUITY LEDGER FAILED:", error);
 
-  const message =
-    error instanceof Error
-      ? error.message
-      : "The continuity ledger could not be created.";
+    const message =
+      error instanceof Error
+        ? error.message
+        : "The continuity ledger could not be created.";
 
-  if (diagnostic) {
-    diagnostic = {
-      ...diagnostic,
-      status: "failed",
-      error: message,
-    };
-  } else if (providerCallStartedAt > 0) {
-    diagnostic = {
-      stage: diagnosticStage,
-      provider: "openai",
-      model: "gpt-5.6-terra",
-      status: "failed",
-      inputTokens: 0,
-      outputTokens: 0,
-      totalTokens: 0,
-      costUsd: null,
-      costType: "unavailable",
-      durationMs: Date.now() - providerCallStartedAt,
-      attempt: 1,
-      error: message,
-    };
-  }
+    if (diagnostic) {
+      diagnostic = {
+        ...diagnostic,
+        status: "failed",
+        error: message,
+      };
+    } else if (providerCallStartedAt > 0) {
+      diagnostic = {
+        stage: diagnosticStage,
+        provider: "openai",
+        model: "gpt-5.6-terra",
+        status: "failed",
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        costUsd: null,
+        costType: "unavailable",
+        durationMs: Date.now() - providerCallStartedAt,
+        attempt: 1,
+        error: message,
+      };
+    }
 
-  return NextResponse.json(
-    {
-      error: message,
-      diagnostics: diagnostic ? [diagnostic] : [],
-    },
-    { status: 502 },
-  );
+    return NextResponse.json(
+      {
+        error: message,
+        diagnostics: diagnostic ? [diagnostic] : [],
+      },
+      { status: 502 },
+    );
   }
 }
