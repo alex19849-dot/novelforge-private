@@ -122,7 +122,7 @@ export default function ChapterPanel({
   const editAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const savedScrollRef = useRef(0);
   const restoredStoryRef = useRef<string | null>(null);
-  const previousDraftLengthRef = useRef(draftWorkspace?.content.length ?? 0);
+  const previousDraftContentRef = useRef(draftWorkspace?.content ?? "");
 
   const activeChapter =
     orderedChapters.find((chapter) => chapter.id === activeChapterId) ??
@@ -134,6 +134,26 @@ export default function ChapterPanel({
     editingChapterId === "__draft__" && Boolean(draftWorkspace);
   const hasReadableContent =
     orderedChapters.length > 0 || Boolean(draftWorkspace);
+  const navigationItems = useMemo(
+    () => [
+      ...orderedChapters.map((chapter) => ({
+        id: chapter.id,
+        label: `Chapter ${chapter.number}`,
+      })),
+      ...(draftWorkspace
+        ? [
+            {
+              id: "__draft__",
+              label: `Chapter ${draftWorkspace.chapterNumber} draft`,
+            },
+          ]
+        : []),
+    ],
+    [draftWorkspace, orderedChapters],
+  );
+  const activeNavigationIndex = navigationItems.findIndex(
+    (item) => item.id === activeChapterId,
+  );
 
   const themeClasses =
     readerTheme === "dark"
@@ -200,27 +220,30 @@ export default function ChapterPanel({
   }, [readerOpen, storyId, hasReadableContent]);
 
   useEffect(() => {
-    const nextLength = draftWorkspace?.content.length ?? 0;
-    if (
-      readerOpen &&
-      draftWorkspace &&
-      nextLength > previousDraftLengthRef.current &&
-      readerRef.current
-    ) {
+    const previousContent = previousDraftContentRef.current.trim();
+    const nextContent = draftWorkspace?.content.trim() ?? "";
+    const appendedSection =
+      Boolean(nextContent) &&
+      nextContent.length > previousContent.length &&
+      (!previousContent || nextContent.startsWith(previousContent));
+
+    if (readerOpen && draftWorkspace && appendedSection && readerRef.current) {
+      const firstNewParagraphIndex = getParagraphs(previousContent).length;
       requestAnimationFrame(() => {
-        const draftNode = chapterRefs.current.get("__draft__");
+        const firstNewParagraph = document.querySelector<HTMLElement>(
+          `[data-draft-paragraph-index="${firstNewParagraphIndex}"]`,
+        );
         const reader = readerRef.current;
-        if (!draftNode || !reader) return;
+        if (!firstNewParagraph || !reader) return;
+        const readerTop = reader.getBoundingClientRect().top;
+        const paragraphTop = firstNewParagraph.getBoundingClientRect().top;
         reader.scrollTo({
-          top: Math.max(
-            0,
-            draftNode.scrollHeight + draftNode.offsetTop - reader.clientHeight,
-          ),
+          top: Math.max(0, reader.scrollTop + paragraphTop - readerTop - 82),
           behavior: "smooth",
         });
       });
     }
-    previousDraftLengthRef.current = nextLength;
+    previousDraftContentRef.current = nextContent;
   }, [draftWorkspace, readerOpen]);
 
   function handleScroll() {
@@ -236,6 +259,30 @@ export default function ChapterPanel({
     const draftNode = chapterRefs.current.get("__draft__");
     if (draftNode && draftNode.offsetTop <= marker) closestId = "__draft__";
     setActiveChapterId(closestId);
+  }
+
+  function goToChapter(chapterId: string) {
+    const reader = readerRef.current;
+    const chapter = chapterRefs.current.get(chapterId);
+    if (!reader || !chapter) return;
+    reader.scrollTo({
+      top: Math.max(0, chapter.offsetTop - 72),
+      behavior: "smooth",
+    });
+    setActiveChapterId(chapterId);
+  }
+
+  function moveChapter(direction: -1 | 1) {
+    const currentIndex = navigationItems.findIndex(
+      (item) => item.id === activeChapterId,
+    );
+    const fallbackIndex = direction > 0 ? 0 : navigationItems.length - 1;
+    const nextIndex = Math.min(
+      navigationItems.length - 1,
+      Math.max(0, currentIndex < 0 ? fallbackIndex : currentIndex + direction),
+    );
+    const nextItem = navigationItems[nextIndex];
+    if (nextItem) goToChapter(nextItem.id);
   }
 
   function toggleControls() {
@@ -298,11 +345,16 @@ export default function ChapterPanel({
     finishEditing(true);
   }
 
-  function renderParagraph(paragraph: string, key: string) {
+  function renderParagraph(
+    paragraph: string,
+    key: string,
+    draftParagraphIndex?: number,
+  ) {
     const message = paragraph.match(MESSAGE_PATTERN);
     return (
       <p
         key={key}
+        data-draft-paragraph-index={draftParagraphIndex}
         className="mb-[1em] whitespace-pre-wrap [overflow-wrap:anywhere]"
       >
         {message ? (
@@ -448,7 +500,7 @@ export default function ChapterPanel({
                     )}
                     {getParagraphs(draftWorkspace.content).map(
                       (paragraph, index) =>
-                        renderParagraph(paragraph, `draft-${index}`),
+                        renderParagraph(paragraph, `draft-${index}`, index),
                     )}
                     {!draftWorkspace.content.trim() && (
                       <p className={mutedClasses}>
@@ -475,13 +527,28 @@ export default function ChapterPanel({
             </button>
             <div className="min-w-0 flex-1 px-2 text-center">
               <p className="truncate text-sm font-semibold">{storyTitle}</p>
-              <p className="text-xs opacity-60">
-                {draftWorkspace
-                  ? `Chapter ${draftWorkspace.chapterNumber} draft`
-                  : activeChapter
-                    ? `Chapter ${activeChapter.number}`
-                    : "Reader"}
-              </p>
+              {isEditing ? (
+                <p className="text-xs opacity-60">
+                  {editingDraft
+                    ? `Chapter ${draftWorkspace?.chapterNumber ?? ""} draft`
+                    : editingChapter
+                      ? `Chapter ${editingChapter.number}`
+                      : "Editing"}
+                </p>
+              ) : (
+                <select
+                  aria-label="Select chapter"
+                  value={activeChapterId ?? navigationItems[0]?.id ?? ""}
+                  onChange={(event) => goToChapter(event.target.value)}
+                  className="max-w-full cursor-pointer border-0 bg-transparent text-center text-xs font-semibold text-inherit opacity-70 outline-none"
+                >
+                  {navigationItems.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             {isEditing ? (
               <button
@@ -635,11 +702,36 @@ export default function ChapterPanel({
             )}
 
             <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
-              <p className="min-w-0 flex-1 truncate text-xs opacity-60">
-                {draftWorkspace
-                  ? `Draft, ${countWords(draftWorkspace.content)} words`
-                  : "Continuous reading"}
-              </p>
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Previous chapter"
+                  disabled={activeNavigationIndex <= 0}
+                  onClick={() => moveChapter(-1)}
+                  className="rounded-lg px-2 py-2 text-xl disabled:opacity-20"
+                >
+                  ‹
+                </button>
+                <p className="min-w-0 truncate text-xs opacity-60">
+                  {activeChapterId === "__draft__" && draftWorkspace
+                    ? `Draft, ${countWords(draftWorkspace.content)} words`
+                    : activeChapter
+                      ? `Chapter ${activeChapter.number}`
+                      : "Continuous reading"}
+                </p>
+                <button
+                  type="button"
+                  aria-label="Next chapter"
+                  disabled={
+                    activeNavigationIndex < 0 ||
+                    activeNavigationIndex >= navigationItems.length - 1
+                  }
+                  onClick={() => moveChapter(1)}
+                  className="rounded-lg px-2 py-2 text-xl disabled:opacity-20"
+                >
+                  ›
+                </button>
+              </div>
               {onOpenChapterPlan && (
                 <button
                   type="button"
