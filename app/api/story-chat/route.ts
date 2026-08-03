@@ -8,6 +8,7 @@ import type {
   ChapterPlan,
   GenerationDiagnostic,
   StoryBible,
+  StoryBiblePatch,
   StoryWorkspace,
   StoryChatResponse,
 } from "../../story-chat/types";
@@ -416,6 +417,66 @@ const storyChatSchema = {
   },
 } as const;
 
+const storyBibleEditSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reply", "storyTitle", "patch"],
+  properties: {
+    reply: { type: "string" },
+    storyTitle: { type: "string" },
+    patch: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "scalarChanges",
+        "addTropes",
+        "removeTropes",
+        "upsertCharacters",
+        "removeCharacterNames",
+        "addNotes",
+        "removeNotes",
+      ],
+      properties: {
+        scalarChanges: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "premise",
+            "relationship",
+            "subgenre",
+            "setting",
+            "pov",
+            "heatLevel",
+            "burnPacing",
+          ],
+          properties: {
+            premise: { anyOf: [{ type: "string" }, { type: "null" }] },
+            relationship: {
+              anyOf: [{ type: "string" }, { type: "null" }],
+            },
+            subgenre: { anyOf: [{ type: "string" }, { type: "null" }] },
+            setting: { anyOf: [{ type: "string" }, { type: "null" }] },
+            pov: { anyOf: [{ type: "string" }, { type: "null" }] },
+            heatLevel: { anyOf: [{ type: "string" }, { type: "null" }] },
+            burnPacing: {
+              anyOf: [{ type: "string" }, { type: "null" }],
+            },
+          },
+        },
+        addTropes: { type: "array", items: { type: "string" } },
+        removeTropes: { type: "array", items: { type: "string" } },
+        upsertCharacters: { type: "array", items: { type: "string" } },
+        removeCharacterNames: {
+          type: "array",
+          items: { type: "string" },
+        },
+        addNotes: { type: "array", items: { type: "string" } },
+        removeNotes: { type: "array", items: { type: "string" } },
+      },
+    },
+  },
+} as const;
+
 const canonicalPlanProperties = {
   chapterNumber: { type: "integer" },
   title: { type: "string" },
@@ -555,6 +616,29 @@ type StoryModelOutput = {
   generatedChapter: StoryChatResponse["generatedChapter"];
 
   chapterBrief: string;
+};
+
+type StoryBibleEditOutput = {
+  reply: string;
+  storyTitle: string;
+  patch: {
+    scalarChanges: Record<
+      | "premise"
+      | "relationship"
+      | "subgenre"
+      | "setting"
+      | "pov"
+      | "heatLevel"
+      | "burnPacing",
+      string | null
+    >;
+    addTropes: string[];
+    removeTropes: string[];
+    upsertCharacters: string[];
+    removeCharacterNames: string[];
+    addNotes: string[];
+    removeNotes: string[];
+  };
 };
 
 function cleanString(value: unknown): string {
@@ -1027,9 +1111,100 @@ function mergeStoryBible(
   };
 }
 
-function parseRequestBody(
-  value: unknown,
-): {
+function removeMatching(values: string[], removals: string[]): string[] {
+  const normalisedRemovals = removals
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  return values.filter((value) => {
+    const normalised = value.trim().toLowerCase();
+    return !normalisedRemovals.some(
+      (removal) =>
+        normalised === removal ||
+        normalised.includes(removal) ||
+        removal.includes(normalised),
+    );
+  });
+}
+
+function applyStoryBiblePatch(
+  existingBible: StoryBible,
+  rawPatch: StoryBibleEditOutput["patch"],
+): { storyBible: StoryBible; patch: StoryBiblePatch } {
+  const scalarChanges = Object.fromEntries(
+    Object.entries(rawPatch.scalarChanges)
+      .filter(
+        (entry): entry is [string, string] => typeof entry[1] === "string",
+      )
+      .map(([key, value]) => [key, cleanString(value)]),
+  ) as StoryBiblePatch["scalarChanges"];
+  const addTropes = cleanStringArray(rawPatch.addTropes);
+  const removeTropes = cleanStringArray(rawPatch.removeTropes);
+  const upsertCharacters = cleanStringArray(rawPatch.upsertCharacters);
+  const removeCharacterNames = cleanStringArray(rawPatch.removeCharacterNames);
+  const addNotes = cleanStringArray(rawPatch.addNotes);
+  const removeNotes = cleanStringArray(rawPatch.removeNotes);
+  const retainedCharacters = existingBible.characters.filter((character) => {
+    const existingName = getCharacterName(character);
+    return !removeCharacterNames.some((name) => {
+      const requestedName = name.trim().toLowerCase();
+      return (
+        existingName === requestedName || existingName.includes(requestedName)
+      );
+    });
+  });
+
+  return {
+    storyBible: {
+      premise:
+        scalarChanges.premise !== undefined
+          ? scalarChanges.premise
+          : existingBible.premise,
+      relationship:
+        scalarChanges.relationship !== undefined
+          ? scalarChanges.relationship
+          : existingBible.relationship,
+      subgenre:
+        scalarChanges.subgenre !== undefined
+          ? scalarChanges.subgenre
+          : existingBible.subgenre,
+      setting:
+        scalarChanges.setting !== undefined
+          ? scalarChanges.setting
+          : existingBible.setting,
+      pov:
+        scalarChanges.pov !== undefined ? scalarChanges.pov : existingBible.pov,
+      heatLevel:
+        scalarChanges.heatLevel !== undefined
+          ? scalarChanges.heatLevel
+          : existingBible.heatLevel,
+      burnPacing:
+        scalarChanges.burnPacing !== undefined
+          ? scalarChanges.burnPacing
+          : existingBible.burnPacing,
+      tropes: mergeUniqueStrings(
+        removeMatching(existingBible.tropes, removeTropes),
+        addTropes,
+      ),
+      characters: mergeCharacters(retainedCharacters, upsertCharacters),
+      notes: mergeUniqueStrings(
+        removeMatching(existingBible.notes, removeNotes),
+        addNotes,
+      ),
+    },
+    patch: {
+      scalarChanges,
+      addTropes,
+      removeTropes,
+      upsertCharacters,
+      removeCharacterNames,
+      addNotes,
+      removeNotes,
+    },
+  };
+}
+
+function parseRequestBody(value: unknown): {
   story: StoryWorkspace;
   stage: "complete" | "plan";
   chatOnly: boolean;
@@ -1242,6 +1417,12 @@ anything in repetitionWarnings, recentChapterLedger or
 completedBeatsToAvoid. Preserve physical positions, objects, knowledge,
 timeline, ages, locations, possessions and family facts.
 
+Use storyState.currentScene as the exact physical handoff when present. Use
+storyState.relationshipProgression for each character's current awareness and
+storyState.repetitionMemory as separated lists of completed thoughts, setting
+treatments, action patterns, dialogue patterns and repeated language. Never
+collapse these categories into one vague warning.
+
 TIME AND CONTINUATION ARE HARD CONSTRAINTS. Use the explicit clock, weekday,
 relative-time statements and event order in continuityHandoff and
 recentChapterAnchors to establish one current story clock before planning.
@@ -1271,6 +1452,11 @@ For an awakening or delayed-recognition arc, state what the POV may physically
 notice and what they cannot yet label, imagine or admit. Never invent prior
 romance, sex or attraction. Explicit consensual adult intimacy may be planned
 directly when earned by the Story Bible and chapter position.
+
+Awareness limits describe the intended start and progression of this chapter,
+not an unchangeable rule for all later guided sections. The user's later live
+section guidance may deliberately advance a character beyond the original
+boundary while every unrelated part of the plan remains binding.
 
 All romantic and sexual characters are consenting adults aged eighteen or
 older. Keep the reply brief. Return chapterPlan as a structured object.
@@ -1829,6 +2015,12 @@ export async function POST(request: Request) {
       ) ||
       /\b(?:add|save|put|include|record|update|change|replace|remove|delete|keep)\s+(?:him|her|them|this|that|it|those|these)\b/i.test(
         latestMessage,
+      ) ||
+      /\b(?:is|are|should be|needs? to be|has|have)\b[\s\S]{0,100}\b(?:not|instead|now|actually)\b/i.test(
+        latestMessage,
+      ) ||
+      /\b(?:rename|correct|make)\b[\s\S]{0,120}\b(?:character|setting|trope|pov|heat|pacing|name|age|job|appearance|family|history)\b/i.test(
+        latestMessage,
       );
 
     if (intent !== "rewrite_chapter" && explicitlyUpdatesStoryBible) {
@@ -1858,7 +2050,7 @@ export async function POST(request: Request) {
       intent = "continue_story";
     }
 
-    if (chatOnly) {
+    if (chatOnly && intent !== "update_story") {
       intent = "general_chat";
     }
 
@@ -2075,6 +2267,150 @@ workspace.`,
       createdAt: currentStory.createdAt,
       updatedAt: currentStory.updatedAt,
     };
+
+    if (intent === "update_story" && !isWriterMode) {
+      const startedAt = Date.now();
+      planningAttempt += 1;
+      const bibleResponse = await openai.responses.create({
+        model: "gpt-5.6-terra",
+        reasoning: { effort: "low" },
+        input: [
+          {
+            role: "system",
+            content: `
+You are NovelForge's concise Story Bible editor.
+
+Apply only changes the user has explicitly stated, confirmed or corrected.
+Return mutation operations, never a regenerated Story Bible. A null scalar
+means preserve its current value. An empty scalar string means the user
+explicitly removed that field. Use add and remove arrays only for requested
+changes. When updating a character, return one complete replacement entry in
+upsertCharacters using the same character name. When removing a character,
+return their name in removeCharacterNames. Do not leave both old and corrected
+versions.
+
+Use the recent conversation to resolve short confirmations such as yes, keep
+that, add him or remove it. Never import an idea the user merely considered or
+rejected. Preserve the current title unless the user changes it or the story is
+still Untitled and enough settled information now exists for a specific title.
+
+Reply naturally in 25 to 70 words. During initial setup, briefly acknowledge
+the recorded decision and ask one focused question about the earliest important
+missing Story Bible element. After chapters exist, confirm the requested edit
+without restarting story setup. Never claim the Bible is locked or require a
+different mode.
+
+All romantic and sexual characters are consenting adults aged eighteen or
+older. Explicit consensual adult requirements can be recorded directly. Never
+use em dashes or en dashes. Return only the structured response.
+            `.trim(),
+          },
+          {
+            role: "user",
+            content: `
+CURRENT TITLE
+
+${currentStory.title}
+
+CURRENT STORY BIBLE
+
+${JSON.stringify(currentStory.storyBible, null, 2)}
+
+RECENT CONVERSATION
+
+${JSON.stringify(conversation.slice(-12), null, 2)}
+
+UNFINISHED DRAFT CONTEXT, READ ONLY
+
+${chatOnly && draftContext ? draftContext.slice(-6000) : "No active draft context supplied."}
+
+LATEST USER INSTRUCTION
+
+${latestMessage}
+            `.trim(),
+          },
+        ],
+        text: {
+          verbosity: "low",
+          format: {
+            type: "json_schema",
+            name: "story_bible_mutation",
+            strict: true,
+            schema: storyBibleEditSchema,
+          },
+        },
+        max_output_tokens: 3000,
+      });
+      const usage = bibleResponse.usage;
+      const inputTokens = usage?.input_tokens ?? 0;
+      const outputTokens = usage?.output_tokens ?? 0;
+      const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+      const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+
+      planningDiagnostics.push({
+        stage: "story_bible_update",
+        provider: "openai",
+        model: "gpt-5.6-terra",
+        status: "succeeded",
+        inputTokens,
+        outputTokens,
+        totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+        costUsd:
+          (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+          1_000_000,
+        costType: "estimated",
+        durationMs: Date.now() - startedAt,
+        attempt: planningAttempt,
+      });
+
+      if (bibleResponse.status === "incomplete") {
+        throw new Error(
+          `The Story Bible update was incomplete because ${
+            bibleResponse.incomplete_details?.reason ??
+            "the response was truncated"
+          }.`,
+        );
+      }
+
+      const outputText = bibleResponse.output_text?.trim();
+      if (!outputText) {
+        throw new Error("The Story Bible editor returned no update.");
+      }
+
+      const output = JSON.parse(outputText) as StoryBibleEditOutput;
+      const applied = applyStoryBiblePatch(
+        sanitiseStoryBible(currentStory.storyBible),
+        output.patch,
+      );
+      const reply = cleanString(output.reply);
+      if (!reply) {
+        throw new Error("The Story Bible editor returned an empty reply.");
+      }
+
+      const updatedStory: StoryWorkspace = {
+        ...currentStory,
+        title:
+          cleanString(output.storyTitle) ||
+          cleanString(currentStory.title) ||
+          "Untitled story",
+        storyBible: applied.storyBible,
+        messages: [
+          ...currentStory.messages,
+          { id: Date.now(), role: "assistant", content: reply },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+
+      return NextResponse.json({
+        reply,
+        intent: "update_story",
+        story: updatedStory,
+        generatedChapter: null,
+        chapterBrief: "",
+        storyBiblePatch: applied.patch,
+        diagnostics: planningDiagnostics,
+      });
+    }
 
     if (isChapterPlanConversation && !isWriterMode) {
       const nextChapterNumber =
