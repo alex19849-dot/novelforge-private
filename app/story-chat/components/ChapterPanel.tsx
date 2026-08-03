@@ -121,6 +121,10 @@ export default function ChapterPanel({
   const chapterRefs = useRef(new Map<string, HTMLElement>());
   const editAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const pendingScrollRestoreRef = useRef<number | null>(null);
+  const pendingChapterAnchorRef = useRef<{
+    chapterId: string;
+    progress: number;
+  } | null>(null);
   const restoredStoryRef = useRef<string | null>(null);
   const previousDraftContentRef = useRef(draftWorkspace?.content ?? "");
 
@@ -181,6 +185,17 @@ export default function ChapterPanel({
     if (isEditing) resizeEditArea();
 
     const reader = readerRef.current;
+    const anchor = pendingChapterAnchorRef.current;
+    if (reader && anchor) {
+      const chapter = chapterRefs.current.get(anchor.chapterId);
+      if (chapter) {
+        reader.scrollTop =
+          chapter.offsetTop + anchor.progress * chapter.offsetHeight;
+      }
+      pendingChapterAnchorRef.current = null;
+      pendingScrollRestoreRef.current = null;
+      return;
+    }
     const scrollTop = pendingScrollRestoreRef.current;
     if (reader && scrollTop !== null) {
       reader.scrollTop = scrollTop;
@@ -305,7 +320,23 @@ export default function ChapterPanel({
 
   function startEditing() {
     if (!readerRef.current) return;
-    pendingScrollRestoreRef.current = readerRef.current.scrollTop;
+    const chapterId = activeChapterId ?? activeChapter?.id;
+    const chapter = chapterId ? chapterRefs.current.get(chapterId) : null;
+    if (chapterId && chapter) {
+      pendingChapterAnchorRef.current = {
+        chapterId,
+        progress: Math.max(
+          0,
+          Math.min(
+            1,
+            (readerRef.current.scrollTop - chapter.offsetTop) /
+              Math.max(1, chapter.offsetHeight),
+          ),
+        ),
+      };
+    } else {
+      pendingScrollRestoreRef.current = readerRef.current.scrollTop;
+    }
     if (activeChapterId === "__draft__" && draftWorkspace) {
       setEditingChapterId("__draft__");
       setEditTitle(draftWorkspace.title);
@@ -326,7 +357,23 @@ export default function ChapterPanel({
 
   function finishEditing(restore: boolean) {
     if (restore && readerRef.current) {
-      pendingScrollRestoreRef.current = readerRef.current.scrollTop;
+      const chapterId = editingChapterId;
+      const chapter = chapterId ? chapterRefs.current.get(chapterId) : null;
+      if (chapterId && chapter) {
+        pendingChapterAnchorRef.current = {
+          chapterId,
+          progress: Math.max(
+            0,
+            Math.min(
+              1,
+              (readerRef.current.scrollTop - chapter.offsetTop) /
+                Math.max(1, chapter.offsetHeight),
+            ),
+          ),
+        };
+      } else {
+        pendingScrollRestoreRef.current = readerRef.current.scrollTop;
+      }
     }
     setIsEditing(false);
     setEditingChapterId(null);
