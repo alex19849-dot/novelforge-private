@@ -22,6 +22,25 @@ export type StoryBible = {
   notes: string[];
 };
 
+export type StoryBibleScalarField =
+  | "premise"
+  | "relationship"
+  | "subgenre"
+  | "setting"
+  | "pov"
+  | "heatLevel"
+  | "burnPacing";
+
+export type StoryBiblePatch = {
+  scalarChanges: Partial<Record<StoryBibleScalarField, string>>;
+  addTropes: string[];
+  removeTropes: string[];
+  upsertCharacters: string[];
+  removeCharacterNames: string[];
+  addNotes: string[];
+  removeNotes: string[];
+};
+
 export type StoryChapter = {
   id: string;
   number: number;
@@ -46,6 +65,46 @@ export type ChapterLedgerEntry = {
   newFacts: string[];
   unresolvedThreads: string[];
   repeatedBeats: string[];
+
+  /** Optional structured fields used by the improved continuity system. */
+  openingTime?: string;
+  endingPositions?: string[];
+  activeObjects?: string[];
+  characterKnowledgeChanges?: string[];
+  completedInternalBeats?: string[];
+  settingTreatments?: string[];
+  actionPatterns?: string[];
+  repeatedLanguage?: string[];
+};
+
+export type StorySceneState = {
+  chapterNumber: number;
+  storyClock: string;
+  location: string;
+  presentCharacters: string[];
+  physicalPositions: string[];
+  activeObjects: string[];
+  injuries: string[];
+  clothing: string[];
+};
+
+export type StoryRelationshipProgress = {
+  relationship: string;
+  currentStage: string;
+  characterAwareness: string[];
+  currentTension: string;
+  lastMeaningfulChange: string;
+  lastChangedChapter: number;
+  furthestIntimacy: string;
+};
+
+export type StoryRepetitionMemory = {
+  completedInternalBeats: string[];
+  settingTreatments: string[];
+  actionPatterns: string[];
+  dialoguePatterns: string[];
+  repeatedLanguage: string[];
+  sentenceOpeningWarnings: string[];
 };
 
 export type StoryVoiceProfile = {
@@ -179,6 +238,20 @@ export type StoryState = {
   voiceProfiles?: StoryVoiceProfile[];
   chapterPlans?: ChapterPlan[];
   lastGenerationDiagnostics?: GenerationDiagnostic[];
+
+  /**
+   * Structured continuation memory. Optional so existing saved stories remain
+   * loadable while the ledger and prompts are upgraded one file at a time.
+   */
+  currentScene?: StorySceneState;
+  relationshipProgression?: StoryRelationshipProgress[];
+  repetitionMemory?: StoryRepetitionMemory;
+
+  /**
+   * Set after an accepted chapter is manually edited. The ledger is rebuilt
+   * from this chapter before the next chapter is planned.
+   */
+  continuityDirtyFromChapter?: number;
 };
 
 export type StoryWorkspace = {
@@ -213,4 +286,5 @@ export type StoryChatResponse = {
   generatedChapter: GeneratedChapter | null;
   chapterBrief: string;
   diagnostics?: GenerationDiagnostic[];
+  storyBiblePatch?: StoryBiblePatch | null;
 };
