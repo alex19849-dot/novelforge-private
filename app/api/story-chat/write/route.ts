@@ -77,7 +77,119 @@ function cleanStoryState(value: unknown): unknown {
     characterKnowledge: state.characterKnowledge ?? [],
     repetitionWarnings: state.repetitionWarnings ?? [],
     voiceProfiles: state.voiceProfiles ?? [],
+    currentScene: state.currentScene ?? null,
+    relationshipProgression: state.relationshipProgression ?? [],
+    repetitionMemory: state.repetitionMemory ?? null,
   };
+}
+
+function completeDraftContext(text: string): string {
+  const trimmed = text.trim();
+
+  if (trimmed.length <= 50000) {
+    return trimmed;
+  }
+
+  return [
+    trimmed.slice(0, 15000),
+    "[Middle retained by the application but omitted from this prompt only because the draft exceeds 50,000 characters.]",
+    trimmed.slice(-35000),
+  ].join("\n\n");
+}
+
+function chapterRepetitionReport(text: string): string[] {
+  const normalised = text
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalised) {
+    return [];
+  }
+
+  const warnings: string[] = [];
+  const sentences = normalised
+    .split(/[.!?]+\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  const openingCounts = new Map<string, number>();
+
+  for (const sentence of sentences) {
+    const words = sentence
+      .replace(/^["']+/, "")
+      .toLowerCase()
+      .match(/[a-z']+/g);
+    if (!words?.length) continue;
+    const opening = words.slice(0, Math.min(3, words.length)).join(" ");
+    openingCounts.set(opening, (openingCounts.get(opening) ?? 0) + 1);
+  }
+
+  const repeatedOpenings = [...openingCounts.entries()]
+    .filter(([, count]) => count >= 3)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 8)
+    .map(([opening, count]) => `"${opening}" (${count} sentence openings)`);
+
+  if (repeatedOpenings.length) {
+    warnings.push(
+      `Repeated sentence openings: ${repeatedOpenings.join(", ")}.`,
+    );
+  }
+
+  const phraseWords = normalised.toLowerCase().match(/[a-z']+/g) ?? [];
+  const phraseCounts = new Map<string, number>();
+  const ignoredPhrases = new Set([
+    "one of the",
+    "the other side",
+    "i don't know",
+    "i look at",
+    "he looks at",
+    "i can see",
+  ]);
+
+  for (let index = 0; index + 3 <= phraseWords.length; index += 1) {
+    const phrase = phraseWords.slice(index, index + 3).join(" ");
+    if (!ignoredPhrases.has(phrase)) {
+      phraseCounts.set(phrase, (phraseCounts.get(phrase) ?? 0) + 1);
+    }
+  }
+
+  const repeatedPhrases = [...phraseCounts.entries()]
+    .filter(([, count]) => count >= 4)
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 8)
+    .map(([phrase, count]) => `"${phrase}" (${count})`);
+
+  if (repeatedPhrases.length) {
+    warnings.push(
+      `Repeated three-word phrases: ${repeatedPhrases.join(", ")}.`,
+    );
+  }
+
+  const habitChecks: Array<[string, RegExp, number]> = [
+    ["look/looked/looking", /\blook(?:s|ed|ing)?\b/gi, 10],
+    ["eyes/gaze", /\b(?:eyes?|gaze)\b/gi, 10],
+    ["jaw", /\bjaw\b/gi, 4],
+    ["breath/breathe", /\bbreath(?:e|es|ed|ing)?\b/gi, 5],
+    ["turn/turned/turning", /\bturn(?:s|ed|ing)?\b/gi, 8],
+    ["nod/nodded/nodding", /\bnod(?:s|ded|ding)?\b/gi, 5],
+    ["silence/quiet", /\b(?:silence|silent|quiet|quietly)\b/gi, 7],
+  ];
+  const overusedHabits = habitChecks
+    .map(([label, pattern, maximum]) => {
+      const count = normalised.match(pattern)?.length ?? 0;
+      return count > maximum ? `${label} (${count})` : "";
+    })
+    .filter(Boolean);
+
+  if (overusedHabits.length) {
+    warnings.push(
+      `Potentially overused words or reactions: ${overusedHabits.join(", ")}.`,
+    );
+  }
+
+  return warnings;
 }
 
 function cleanRecentChapters(value: unknown): unknown[] {
@@ -118,7 +230,9 @@ function getPrompt(input: {
   sectionInstruction: string;
   latestUserMessage: string;
 }): string {
-  const draftContext = endingExcerpt(input.chapterDraft, 1400);
+  const fullDraftContext = completeDraftContext(input.chapterDraft);
+  const exactContinuationBoundary = endingExcerpt(input.chapterDraft, 350);
+  const draftRepetitionReport = chapterRepetitionReport(input.chapterDraft);
   const mandatoryGuidance =
     input.sectionInstruction ||
     input.latestUserMessage ||
@@ -128,7 +242,7 @@ function getPrompt(input: {
       ? "Begin at the canonical plan's exact opening state. Do not skip its opening beat."
       : input.action === "rewrite"
         ? "Replace SECTION TO REWRITE only. Preserve what happens immediately before and after it. Do not rewrite or advance any other part of the chapter."
-        : "Continue from the exact final moment of CURRENT CHAPTER ENDING. Do not recap, restart, repeat its final sentence, jump forward without instruction or begin a different scene.";
+        : "Continue from the exact final moment of EXACT CONTINUATION BOUNDARY. Do not recap, restart, repeat its final sentence, jump forward without instruction or begin a different scene.";
 
   return [
     "You are NovelForge's commercial adult MM romance prose writer.",
@@ -136,6 +250,7 @@ function getPrompt(input: {
     "The canonical chapter plan and the user's current section guidance are requirements, not inspiration, suggestions or optional context.",
     "Authority order is strict: CURRENT GUIDANCE comes first, then the canonical chapter plan for everything the guidance does not change, then established continuity and the Story Bible.",
     "The user is allowed to deliberately advance, delay or alter a planned emotional or romantic beat through CURRENT GUIDANCE. When that happens, obey the guidance without treating the change as a conflict. Keep every unrelated planned beat intact.",
+    "Read the complete current chapter draft before writing. Treat every action, thought, conclusion, description and exchange already present anywhere in that draft as completed material, not merely the final paragraphs.",
     "Write the events requested by the guidance exactly as part of the canonical plan. Preserve their participants, order, location, timing, emotional stage, intended outcome and stopping point.",
     "You may invent only the dialogue, physical business, sensory details and connective prose needed to dramatise those specified events.",
     "Never replace a requested event with a similar event. Never omit, reinterpret, contradict or soften a requirement. Never add an event that changes the plan.",
@@ -166,6 +281,7 @@ function getPrompt(input: {
     "Preserve ages, timeline, locations, possessions, family facts, physical positions and character knowledge.",
     "Do not invent prior romance, attraction or intimacy. In a gay-for-you or delayed-awareness arc, involuntary attention, physical reaction, denial and changed behaviour normally precede conscious acknowledgement, but CURRENT GUIDANCE may explicitly move the character into acknowledgement now.",
     "Do not repeat completed actions, conversations, jokes, gestures, attraction observations, internal conclusions or paragraphs.",
+    "Use the chapter-level repetition report as evidence, not as a crude banned-word list. Avoid adding to an overused pattern, but keep ordinary language natural when a word is genuinely needed.",
     "Write long, open-door consensual adult intimacy when the established progression requires it. Keep the characters and their emotional progression on the page throughout the complete intimate scene and its aftermath rather than abruptly cutting away.",
     "Do not include a chapter heading, POV label, outline, notes, markdown, warnings, analysis or commentary.",
     "STORY BIBLE, FIXED CANON\n" +
@@ -174,8 +290,15 @@ function getPrompt(input: {
     "CONTINUITY\n" + JSON.stringify(cleanStoryState(input.storyState), null, 2),
     "RECENT CHAPTER ENDINGS\n" + JSON.stringify(input.recentChapters, null, 2),
     input.chapterDraft
-      ? "CURRENT CHAPTER ENDING, READ ONLY\n" + draftContext
+      ? "COMPLETE CURRENT CHAPTER DRAFT, READ ONLY\n" + fullDraftContext
       : "",
+    input.chapterDraft
+      ? "EXACT CONTINUATION BOUNDARY, READ ONLY\n" + exactContinuationBoundary
+      : "",
+    "CURRENT CHAPTER REPETITION REPORT\n" +
+      (draftRepetitionReport.length
+        ? draftRepetitionReport.join("\n")
+        : "No chapter-level lexical pattern has crossed its review threshold."),
     input.action === "rewrite"
       ? "SECTION TO REWRITE, READ ONLY\n" + input.sectionToRewrite
       : "",
