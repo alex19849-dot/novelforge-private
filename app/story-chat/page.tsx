@@ -131,6 +131,21 @@ const EMPTY_STORY_STATE = {
   chapterPlans: [],
 
   lastGenerationDiagnostics: [],
+
+  currentScene: undefined,
+
+  relationshipProgression: [],
+
+  repetitionMemory: {
+    completedInternalBeats: [],
+    settingTreatments: [],
+    actionPatterns: [],
+    dialoguePatterns: [],
+    repeatedLanguage: [],
+    sentenceOpeningWarnings: [],
+  },
+
+  continuityDirtyFromChapter: undefined,
 };
 
 function createEmptyStory(): StoryWorkspace {
@@ -197,17 +212,71 @@ function getStoryStateBeforeChapter(
     (entry) => entry.chapterNumber < replacementNumber,
   );
   const previousChapter = earlierLedger.at(-1);
+  const unique = (values: string[]) =>
+    Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 
   return {
     ...EMPTY_STORY_STATE,
+    importantFacts: unique(earlierLedger.flatMap((entry) => entry.newFacts)),
+    relationshipStates: previousChapter?.relationshipShift
+      ? [previousChapter.relationshipShift]
+      : [],
+    unresolvedThreads: previousChapter?.unresolvedThreads ?? [],
+    timeline: [
+      ...earlierLedger.map(
+        (entry) => `Chapter ${entry.chapterNumber}: ${entry.summary}`,
+      ),
+      ...(previousChapter?.endingTime
+        ? [
+            `CURRENT CLOCK: ${previousChapter.endingTime}, immediately after Chapter ${previousChapter.chapterNumber}.`,
+          ]
+        : []),
+    ],
+    locations: unique(
+      earlierLedger.flatMap((entry) => [
+        entry.openingLocation,
+        entry.endingLocation,
+      ]),
+    ),
     chapterLedger: earlierLedger,
     latestChapterEnding: previousChapter?.endingExcerpt ?? "",
-    repetitionWarnings: earlierLedger
-      .flatMap((entry) => entry.repeatedBeats)
-      .filter(Boolean)
-      .slice(-30),
+    characterKnowledge: unique(
+      earlierLedger.flatMap((entry) => entry.characterKnowledgeChanges ?? []),
+    ),
+    repetitionWarnings: unique(
+      earlierLedger.flatMap((entry) => entry.repeatedBeats),
+    ).slice(-60),
+    repetitionMemory: {
+      completedInternalBeats: unique(
+        earlierLedger.flatMap((entry) => entry.completedInternalBeats ?? []),
+      ),
+      settingTreatments: unique(
+        earlierLedger.flatMap((entry) => entry.settingTreatments ?? []),
+      ),
+      actionPatterns: unique(
+        earlierLedger.flatMap((entry) => entry.actionPatterns ?? []),
+      ),
+      dialoguePatterns: [],
+      repeatedLanguage: unique(
+        earlierLedger.flatMap((entry) => entry.repeatedLanguage ?? []),
+      ),
+      sentenceOpeningWarnings: [],
+    },
+    currentScene: previousChapter
+      ? {
+          chapterNumber: previousChapter.chapterNumber,
+          storyClock: previousChapter.endingTime,
+          location: previousChapter.endingLocation,
+          presentCharacters: [],
+          physicalPositions: previousChapter.endingPositions ?? [],
+          activeObjects: previousChapter.activeObjects ?? [],
+          injuries: [],
+          clothing: [],
+        }
+      : undefined,
     voiceProfiles: state.voiceProfiles ?? [],
     activePOV: previousChapter?.povCharacter ?? "",
+    chapterPlans: state.chapterPlans ?? [],
   };
 }
 
@@ -694,15 +763,33 @@ async function updateContinuityLedger(input: {
   chapters: StoryChapter[];
   chapter: StoryChapter;
   rebuild: boolean;
+  rebuildFromChapter?: number;
 }): Promise<LedgerResponse> {
-  const batches = input.rebuild
-    ? Array.from({ length: Math.ceil(input.chapters.length / 3) }, (_, index) =>
-        input.chapters.slice(index * 3, index * 3 + 3),
+  const partialRebuildStart = input.rebuild
+    ? undefined
+    : input.rebuildFromChapter;
+  const chaptersToAnalyse = input.rebuild
+    ? input.chapters
+    : partialRebuildStart !== undefined
+      ? input.chapters.filter(
+          (chapter) => chapter.number >= partialRebuildStart,
+        )
+      : [input.chapter];
+  if (chaptersToAnalyse.length === 0) {
+    throw new Error("No chapters were available for continuity rebuilding.");
+  }
+  const usesBatches = input.rebuild || partialRebuildStart !== undefined;
+  const batches = usesBatches
+    ? Array.from(
+        { length: Math.ceil(chaptersToAnalyse.length / 3) },
+        (_, index) => chaptersToAnalyse.slice(index * 3, index * 3 + 3),
       )
-    : [[input.chapter]];
+    : [chaptersToAnalyse];
   let workingState: StoryState = input.rebuild
     ? { ...EMPTY_STORY_STATE }
-    : input.storyState;
+    : partialRebuildStart !== undefined
+      ? getStoryStateBeforeChapter(input.storyState, partialRebuildStart)
+      : input.storyState;
   const diagnostics: GenerationDiagnostic[] = [];
 
   for (const batch of batches) {
@@ -727,7 +814,7 @@ async function updateContinuityLedger(input: {
             storyState: workingState,
             chapters: batch,
             chapter: latestBatchChapter,
-            rebuildMode: input.rebuild ? "batch" : "incremental",
+            rebuildMode: usesBatches ? "batch" : "incremental",
           }),
         });
         const data = await readApiJson(response);
@@ -761,8 +848,14 @@ async function updateContinuityLedger(input: {
     }
   }
 
+  const completedState: StoryState = {
+    ...workingState,
+    chapterPlans: input.storyState.chapterPlans ?? [],
+  };
+  delete completedState.continuityDirtyFromChapter;
+
   return {
-    storyState: workingState,
+    storyState: completedState,
     diagnostics,
   };
 }
@@ -1672,6 +1765,17 @@ device.`,
         return currentStory;
       }
 
+      const editedChapter = currentStory.chapters.find(
+        (chapter) => chapter.id === chapterId,
+      );
+      const existingDirtyChapter =
+        currentStory.storyState.continuityDirtyFromChapter;
+      const dirtyFromChapter = editedChapter
+        ? existingDirtyChapter === undefined
+          ? editedChapter.number
+          : Math.min(existingDirtyChapter, editedChapter.number)
+        : existingDirtyChapter;
+
       return {
         ...currentStory,
 
@@ -1686,6 +1790,11 @@ device.`,
               }
             : chapter,
         ),
+
+        storyState: {
+          ...currentStory.storyState,
+          continuityDirtyFromChapter: dirtyFromChapter,
+        },
 
         updatedAt: new Date().toISOString(),
       };
@@ -2350,6 +2459,51 @@ device.`,
         return;
       }
 
+      const requestsChapterPlanning =
+        requestsChapterGeneration(trimmedMessage) ||
+        /\b(?:plan|outline|map)\b[\s\S]{0,100}\bchapter\b/i.test(
+          trimmedMessage,
+        );
+      const dirtyFromChapter =
+        planningStory.storyState.continuityDirtyFromChapter;
+      const hasContinuityLedger = Boolean(
+        planningStory.storyState.chapterLedger?.length,
+      );
+
+      if (
+        !hasPendingChapter &&
+        requestsChapterPlanning &&
+        planningStory.chapters.length > 0 &&
+        (!hasContinuityLedger || dirtyFromChapter !== undefined)
+      ) {
+        const latestExistingChapter = planningStory.chapters.at(-1);
+        if (!latestExistingChapter) {
+          throw new Error(
+            "The latest chapter could not be prepared for continuity.",
+          );
+        }
+
+        const ledgerData = await updateContinuityLedger({
+          storyBible: planningStory.storyBible,
+          storyState: planningStory.storyState,
+          chapters: planningStory.chapters,
+          chapter: latestExistingChapter,
+          rebuild: !hasContinuityLedger,
+          rebuildFromChapter: hasContinuityLedger
+            ? dirtyFromChapter
+            : undefined,
+        });
+
+        preplanningDiagnostics = ledgerData.diagnostics;
+        planningStory = {
+          ...planningStory,
+          storyState: ledgerData.storyState,
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(planningStory);
+      }
+
       const requestedPlanChapterNumber =
         getChapterNumberFromMessage(trimmedMessage);
       const savedPlan =
@@ -2434,31 +2588,6 @@ device.`,
         savePendingGeneration(pending);
         await writeChapterSection(pending, plannedStory, "start");
         return;
-      }
-
-      if (
-        !hasPendingChapter &&
-        planningStory.chapters.length > 0 &&
-        !planningStory.storyState.chapterLedger?.length
-      ) {
-        const latestExistingChapter =
-          planningStory.chapters[planningStory.chapters.length - 1];
-        const ledgerData = await updateContinuityLedger({
-          storyBible: planningStory.storyBible,
-          storyState: planningStory.storyState,
-          chapters: planningStory.chapters,
-          chapter: latestExistingChapter,
-          rebuild: true,
-        });
-
-        preplanningDiagnostics = ledgerData.diagnostics;
-        planningStory = {
-          ...planningStory,
-          storyState: ledgerData.storyState,
-          updatedAt: new Date().toISOString(),
-        };
-
-        await persistStory(planningStory);
       }
 
       const response = await fetch("/api/story-chat", {
