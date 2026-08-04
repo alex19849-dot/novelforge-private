@@ -1014,40 +1014,41 @@ function applyGeneratedChapter(
   const now = new Date().toISOString();
   const chapterMetadata = pending.generatedChapter;
   const replacementNumber = chapterMetadata.replaceChapterNumber;
+  const nextChapterNumber =
+    story.chapters.length > 0
+      ? Math.max(...story.chapters.map((chapter) => chapter.number)) + 1
+      : 1;
 
   if (replacementNumber !== null) {
     const chapterExists = story.chapters.some(
       (chapter) => chapter.number === replacementNumber,
     );
 
-    if (!chapterExists) {
+    if (!chapterExists && replacementNumber !== nextChapterNumber) {
       throw new Error(
         `Chapter ${replacementNumber} could not be found for rewriting.`,
       );
     }
 
-    return {
-      ...story,
-      chapters: story.chapters.map((chapter) =>
-        chapter.number === replacementNumber
-          ? {
-              ...chapter,
-              title: chapterMetadata.title.trim() || chapter.title,
-              povCharacter:
-                chapterMetadata.povCharacter.trim() || chapter.povCharacter,
-              content: content.trim(),
-              updatedAt: now,
-            }
-          : chapter,
-      ),
-      updatedAt: now,
-    };
+    if (chapterExists) {
+      return {
+        ...story,
+        chapters: story.chapters.map((chapter) =>
+          chapter.number === replacementNumber
+            ? {
+                ...chapter,
+                title: chapterMetadata.title.trim() || chapter.title,
+                povCharacter:
+                  chapterMetadata.povCharacter.trim() || chapter.povCharacter,
+                content: content.trim(),
+                updatedAt: now,
+              }
+            : chapter,
+        ),
+        updatedAt: now,
+      };
+    }
   }
-
-  const nextChapterNumber =
-    story.chapters.length > 0
-      ? Math.max(...story.chapters.map((chapter) => chapter.number)) + 1
-      : 1;
 
   return {
     ...story,
@@ -2631,9 +2632,23 @@ device.`,
       const requestedTarget = requestedWordCount
         ? Math.min(4000, Math.max(2000, requestedWordCount))
         : null;
+      const returnedChapter = data.generatedChapter;
+      const returnedReplacement = returnedChapter.replaceChapterNumber;
+      const nextChapterNumber =
+        Math.max(0, ...plannedStory.chapters.map((chapter) => chapter.number)) +
+        1;
+      const replacementExists =
+        returnedReplacement !== null &&
+        plannedStory.chapters.some(
+          (chapter) => chapter.number === returnedReplacement,
+        );
+      const generatedChapter =
+        returnedReplacement === nextChapterNumber && !replacementExists
+          ? { ...returnedChapter, replaceChapterNumber: null }
+          : returnedChapter;
       const pending: PendingChapterGeneration = {
         storyId: plannedStory.id,
-        generatedChapter: data.generatedChapter,
+        generatedChapter,
         chapterBrief: data.chapterBrief,
         latestUserMessage: trimmedMessage,
         draft: "",
