@@ -240,7 +240,7 @@ ${instructionAndPassage}
             },
             { role: "user", content: prompt },
           ],
-          max_tokens: 1900,
+          max_tokens: 4000,
           temperature: 0.6,
           top_p: 0.9,
           frequency_penalty: 0,
