@@ -1382,8 +1382,8 @@ or prose unless the user explicitly requests chapter or scene writing. In this
 chat route, generatedChapter contains metadata only and its content is always
 an empty string.
 
-All romantic and sexual characters are consenting adults aged eighteen or
-older. High-heat and explicit consensual adult story requirements may be
+All romantic and sexual characters adults aged eighteen or
+older. High-heat and explicit adult story requirements may be
 recorded and planned directly without censorship or moral commentary.
 
 Use first-person present tense as the default only when the user has not chosen
@@ -1450,7 +1450,7 @@ messages, documents, schedules, credentials or coincidences.
 
 For an awakening or delayed-recognition arc, state what the POV may physically
 notice and what they cannot yet label, imagine or admit. Never invent prior
-romance, sex or attraction. Explicit consensual adult intimacy may be planned
+romance, sex or attraction. Explicit adult intimacy may be planned
 directly when earned by the Story Bible and chapter position.
 
 Awareness limits describe the intended start and progression of this chapter,
@@ -1458,7 +1458,7 @@ not an unchangeable rule for all later guided sections. The user's later live
 section guidance may deliberately advance a character beyond the original
 boundary while every unrelated part of the plan remains binding.
 
-All romantic and sexual characters are consenting adults aged eighteen or
+All romantic and sexual characters are adults aged eighteen or
 older. Keep the reply brief. Return chapterPlan as a structured object.
 `.trim();
 
@@ -1728,7 +1728,7 @@ ADULT CONTENT RULES
 All characters involved in romantic or sexual content must be consenting
 adults aged 18 or older.
 
-When the user requests high-heat or explicit consensual adult content, record
+When the user requests high-heat or explicit adult content, record
 it directly and specifically in the Story Bible and chapter plan. Never
 censor, moralise, soften or replace the requested intimacy with fade-to-black
 planning. This route returns planning metadata only. The dedicated Magnum
@@ -2071,7 +2071,7 @@ Use first-person present tense as the eventual default unless the user
 explicitly chooses another tense, but do not force that decision into
 the Bible before the relevant setup step.
 
-All romantic and sexual characters must be consenting adults aged 18 or
+All romantic and sexual characters must be adults aged 18 or
 older.
 
 Do not reuse or merge creative details from another story.`,
@@ -2300,8 +2300,8 @@ missing Story Bible element. After chapters exist, confirm the requested edit
 without restarting story setup. Never claim the Bible is locked or require a
 different mode.
 
-All romantic and sexual characters are consenting adults aged eighteen or
-older. Explicit consensual adult requirements can be recorded directly. Never
+All romantic and sexual characters are adults aged eighteen or
+older. Explicit adult requirements can be recorded directly. Never
 use em dashes or en dashes. Return only the structured response.
             `.trim(),
           },
@@ -2560,9 +2560,8 @@ pressure.
 When an existing plan is supplied, preserve everything the user has not
 asked to change. Apply their requested amendment precisely.
 
-All romantic and sexual characters are consenting adults aged eighteen
-or older. When the established story progression calls for explicit
-consensual adult intimacy, the plan may state that directly and
+All romantic and sexual characters are adults aged eighteen
+or older. When the established story progression calls for explicit adult intimacy, the plan may state that directly and
 specifically without censorship or fade to black.
 
 Keep the conversational reply brief. Do not mention schemas or internal
