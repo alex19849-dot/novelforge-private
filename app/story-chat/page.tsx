@@ -81,6 +81,39 @@ type QualityResponse = {
   diagnostics: GenerationDiagnostic[];
 };
 
+type WorkspaceMetadata = {
+  seriesType: StoryWorkspace["seriesType"];
+  seriesTitle: string;
+  bookNumber: number;
+  lineage?: StoryWorkspace["lineage"];
+};
+
+function getWorkspaceMetadata(value: unknown): WorkspaceMetadata {
+  if (!value || typeof value !== "object") {
+    return { seriesType: "standalone", seriesTitle: "", bookNumber: 1 };
+  }
+
+  const state = value as Record<string, unknown>;
+  const metadata =
+    state.workspaceMetadata && typeof state.workspaceMetadata === "object"
+      ? (state.workspaceMetadata as Record<string, unknown>)
+      : {};
+
+  return {
+    seriesType: metadata.seriesType === "series" ? "series" : "standalone",
+    seriesTitle:
+      typeof metadata.seriesTitle === "string" ? metadata.seriesTitle : "",
+    bookNumber:
+      typeof metadata.bookNumber === "number" && metadata.bookNumber > 0
+        ? metadata.bookNumber
+        : 1,
+    lineage:
+      metadata.lineage && typeof metadata.lineage === "object"
+        ? (metadata.lineage as StoryWorkspace["lineage"])
+        : undefined,
+  };
+}
+
 const EMPTY_STORY_BIBLE: StoryBible = {
   premise: "",
 
@@ -345,7 +378,10 @@ function getChapterNumberFromMessage(message: string): number | null {
 function requestsChapterGeneration(message: string): boolean {
   return (
     /\b(?:write|generate|create)\b[\s\S]{0,100}\bchapter\b/i.test(message) ||
-    /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(message)
+    /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(message) ||
+    /\b(?:write|generate|create|start|continue|rewrite)\b[\s\S]{0,100}\bepilogue\b|\bepilogue\b[\s\S]{0,100}\b(?:write|generate|create|start|continue|rewrite)\b/i.test(
+      message,
+    )
   );
 }
 
@@ -959,6 +995,11 @@ function isStoryChatResponse(value: unknown): value is StoryChatResponse {
       (response.generatedChapter?.replaceChapterNumber === null ||
         typeof response.generatedChapter?.replaceChapterNumber === "number"));
 
+  const createdStoryIsValid =
+    response.createdStory === undefined ||
+    response.createdStory === null ||
+    isStoryWorkspace(response.createdStory);
+
   return (
     typeof response.reply === "string" &&
     Boolean(response.reply.trim()) &&
@@ -970,6 +1011,7 @@ function isStoryChatResponse(value: unknown): value is StoryChatResponse {
       response.intent === "general_chat") &&
     isStoryWorkspace(response.story) &&
     generatedChapterIsValid &&
+    createdStoryIsValid &&
     typeof response.chapterBrief === "string" &&
     (response.diagnostics === undefined ||
       isDiagnosticArray(response.diagnostics))
@@ -1037,6 +1079,7 @@ function applyGeneratedChapter(
           chapter.number === replacementNumber
             ? {
                 ...chapter,
+                kind: chapterMetadata.kind ?? chapter.kind ?? "chapter",
                 title: chapterMetadata.title.trim() || chapter.title,
                 povCharacter:
                   chapterMetadata.povCharacter.trim() || chapter.povCharacter,
@@ -1057,6 +1100,7 @@ function applyGeneratedChapter(
       {
         id: crypto.randomUUID(),
         number: nextChapterNumber,
+        kind: chapterMetadata.kind ?? "chapter",
         title: chapterMetadata.title.trim() || `Chapter ${nextChapterNumber}`,
         povCharacter: chapterMetadata.povCharacter.trim(),
         content: content.trim(),
@@ -1268,16 +1312,20 @@ export default function StoryChatPage() {
       data.id,
     );
 
+    const workspaceMetadata = getWorkspaceMetadata(data.story_state);
+
     setStory({
       id: data.id,
 
       title: data.title,
 
-      seriesType: "standalone",
+      seriesType: workspaceMetadata.seriesType,
 
-      seriesTitle: "",
+      seriesTitle: workspaceMetadata.seriesTitle,
 
-      bookNumber: 1,
+      bookNumber: workspaceMetadata.bookNumber,
+
+      lineage: workspaceMetadata.lineage,
 
       messages: data.messages ?? [],
 
@@ -1530,16 +1578,20 @@ undone.`,
               data.id,
             );
 
+            const workspaceMetadata = getWorkspaceMetadata(data.story_state);
+
             setStory({
               id: data.id,
 
               title: data.title,
 
-              seriesType: "standalone",
+              seriesType: workspaceMetadata.seriesType,
 
-              seriesTitle: "",
+              seriesTitle: workspaceMetadata.seriesTitle,
 
-              bookNumber: 1,
+              bookNumber: workspaceMetadata.bookNumber,
+
+              lineage: workspaceMetadata.lineage,
 
               messages: data.messages ?? [],
 
@@ -1979,7 +2031,15 @@ device.`,
       user_id: userId,
       title: nextStory.title,
       form: nextStory.storyBible,
-      story_state: nextStory.storyState,
+      story_state: {
+        ...nextStory.storyState,
+        workspaceMetadata: {
+          seriesType: nextStory.seriesType,
+          seriesTitle: nextStory.seriesTitle,
+          bookNumber: nextStory.bookNumber,
+          lineage: nextStory.lineage,
+        },
+      },
       chapters: nextStory.chapters,
       messages: nextStory.messages,
       created_at: nextStory.createdAt,
@@ -2204,8 +2264,9 @@ device.`,
             id: Date.now(),
             role: "assistant",
             content:
-              "Chapter " +
-              completedChapterNumber +
+              (completedChapter.kind === "epilogue"
+                ? "Epilogue"
+                : "Chapter " + completedChapterNumber) +
               " completed and continuity updated.",
           },
         ],
@@ -2521,12 +2582,9 @@ device.`,
             ) ?? null);
       const explicitlyRewritesPlan =
         /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(trimmedMessage);
-      const usesSavedPlan =
-        !hasPendingChapter &&
-        requestsChapterGeneration(trimmedMessage) &&
-        savedPlan !== null &&
-        (!existingPlannedChapter ||
-          (explicitlyRewritesPlan && savedPlan.status === "draft"));
+      // Legacy plans remain readable, but generation is now directed one
+      // section at a time by the author's latest instruction.
+      const usesSavedPlan = false;
 
       if (usesSavedPlan && savedPlan) {
         const approvedPlan: ChapterPlan = {
@@ -2623,6 +2681,29 @@ device.`,
       };
 
       await persistStory(plannedStory);
+
+      if (data.createdStory) {
+        const createdStory: StoryWorkspace = {
+          ...data.createdStory,
+          messages: [
+            {
+              id: Date.now() + 2,
+              role: "assistant",
+              content: data.reply,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+        await persistStory(createdStory);
+        window.localStorage.setItem(
+          "novelforge-current-story-id",
+          createdStory.id,
+        );
+        clearPendingGeneration();
+        setActiveTab("chat");
+        setReaderOpen(false);
+        return;
+      }
 
       if (!data.generatedChapter) {
         return;
