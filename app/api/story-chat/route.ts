@@ -7,6 +7,7 @@ import { detectStoryIntent } from "../../../src/lib/detect-story-intent";
 import type {
   ChapterPlan,
   GenerationDiagnostic,
+  SectionWritingBrief,
   StoryBible,
   StoryBiblePatch,
   StoryWorkspace,
@@ -65,6 +66,33 @@ function getRequestedChapterNumber(message: string): number | null {
   const wordIndex = numberWords.indexOf(wordedMatch[1]?.toLowerCase() ?? "");
 
   return wordIndex >= 0 ? wordIndex + 1 : null;
+}
+
+function getExplicitTitleChange(message: string): string | null {
+  const patterns = [
+    /\b(?:change|set|rename)\s+(?:the\s+)?(?:book|story|novel)?\s*title\s+to\s+["“']?([^\n"”']+?)["”']?\s*[.!?]*$/i,
+    /\b(?:call|title)\s+(?:the\s+)?(?:book|story|novel|it)\s+["“']([^"”']+)["”']/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = message.trim().match(pattern);
+    const title = match?.[1]?.trim();
+    if (title) return title;
+  }
+
+  return null;
+}
+
+function requestsEpilogue(message: string): boolean {
+  return /\b(?:write|generate|create|start|continue|rewrite)\b[\s\S]{0,100}\bepilogue\b|\bepilogue\b[\s\S]{0,100}\b(?:write|generate|create|start|continue|rewrite)\b/i.test(
+    message,
+  );
+}
+
+function requestsDerivedBook(message: string): boolean {
+  return /\b(?:create|start|make|set up|plan|build)\b[\s\S]{0,120}\b(?:sequel|spin[ -]?off|next book|book\s*2|series book)\b/i.test(
+    message,
+  );
 }
 
 function getEndingExcerpt(text: string, maximumWords = 900): string {
@@ -477,6 +505,104 @@ const storyBibleEditSchema = {
   },
 } as const;
 
+const directSectionBriefSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reply", "storyTitle", "generatedChapter", "sectionBrief"],
+  properties: {
+    reply: { type: "string" },
+    storyTitle: { type: "string" },
+    generatedChapter: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "kind",
+        "title",
+        "povCharacter",
+        "content",
+        "replaceChapterNumber",
+      ],
+      properties: {
+        kind: { type: "string", enum: ["chapter", "epilogue"] },
+        title: { type: "string" },
+        povCharacter: { type: "string" },
+        content: { type: "string" },
+        replaceChapterNumber: {
+          anyOf: [{ type: "integer" }, { type: "null" }],
+        },
+      },
+    },
+    sectionBrief: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "chapterNumber",
+        "chapterKind",
+        "chapterTitle",
+        "povCharacter",
+        "authorDirection",
+        "continuationBoundary",
+      ],
+      properties: {
+        chapterNumber: { type: "integer" },
+        chapterKind: { type: "string", enum: ["chapter", "epilogue"] },
+        chapterTitle: { type: "string" },
+        povCharacter: { type: "string" },
+        authorDirection: { type: "string" },
+        continuationBoundary: { type: "string" },
+      },
+    },
+  },
+} as const;
+
+const derivedStorySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "reply",
+    "title",
+    "seriesTitle",
+    "relationship",
+    "focusCharacters",
+    "storyBible",
+  ],
+  properties: {
+    reply: { type: "string" },
+    title: { type: "string" },
+    seriesTitle: { type: "string" },
+    relationship: { type: "string", enum: ["sequel", "spinoff"] },
+    focusCharacters: { type: "array", items: { type: "string" } },
+    storyBible: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "premise",
+        "relationship",
+        "subgenre",
+        "setting",
+        "pov",
+        "heatLevel",
+        "burnPacing",
+        "tropes",
+        "characters",
+        "notes",
+      ],
+      properties: {
+        premise: { type: "string" },
+        relationship: { type: "string" },
+        subgenre: { type: "string" },
+        setting: { type: "string" },
+        pov: { type: "string" },
+        heatLevel: { type: "string" },
+        burnPacing: { type: "string" },
+        tropes: { type: "array", items: { type: "string" } },
+        characters: { type: "array", items: { type: "string" } },
+        notes: { type: "array", items: { type: "string" } },
+      },
+    },
+  },
+} as const;
+
 const canonicalPlanProperties = {
   chapterNumber: { type: "integer" },
   title: { type: "string" },
@@ -602,6 +728,22 @@ type DirectChapterPlanOutput = {
   storyTitle: string;
   generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
   chapterPlan: Omit<ChapterPlan, "status" | "updatedAt">;
+};
+
+type DirectSectionBriefOutput = {
+  reply: string;
+  storyTitle: string;
+  generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
+  sectionBrief: SectionWritingBrief;
+};
+
+type DerivedStoryOutput = {
+  reply: string;
+  title: string;
+  seriesTitle: string;
+  relationship: "sequel" | "spinoff";
+  focusCharacters: string[];
+  storyBible: StoryBible;
 };
 
 type StoryModelOutput = {
@@ -1382,8 +1524,8 @@ or prose unless the user explicitly requests chapter or scene writing. In this
 chat route, generatedChapter contains metadata only and its content is always
 an empty string.
 
-All romantic and sexual characters adults aged eighteen or
-older. High-heat and explicit adult story requirements may be
+All romantic and sexual characters are consenting adults aged eighteen or
+older. High-heat and explicit consensual adult story requirements may be
 recorded and planned directly without censorship or moral commentary.
 
 Use first-person present tense as the default only when the user has not chosen
@@ -1392,74 +1534,41 @@ structured response and never describe internal processing.
 `.trim();
 
 const FOCUSED_DIRECT_CHAPTER_PLANNER_PROMPT = `
-You are NovelForge's commercial romance chapter-planning editor.
+You are NovelForge's section-preparation editor for commercial romance.
 
-Return planning metadata only, never novel prose. The Story Bible, continuity,
-character knowledge, voice profiles, burn pacing and completed events are
-binding.
+Return metadata and one SectionWritingBrief only, never novel prose and never a
+full chapter plan. Do not predict, prescribe or prohibit events in later
+sections. The author controls the story one section at a time.
 
-Return one concise canonical chapterPlan using chapterNumber, title,
-povCharacter, chapterGoal, relationshipChange, startingState, endingState,
-knowledgeLimits, premiseLocks, mustNotHappen, plannedEvents and
-completedBeatsToAvoid.
+authorDirection must contain only what the user has asked to happen in the
+section being generated now. Preserve their requested actions, dialogue,
+emotional movement, heat, ending point and deliberate changes exactly. Do not
+add a competing chapter goal, future hook, relationship boundary, awareness
+limit, planned event list or must-not-happen rule.
 
-plannedEvents must contain four to eight chronological events. Each event has
-order, event, location, staging, continuityChange and relationshipChange.
-Together they describe one 2,000 to 4,000-word chapter. They are not scenes,
-writing prompts or technical halves. Do not plan Part 1 and Part 2 separately.
+Use the Story Bible and accepted continuity only to preserve fixed facts such
+as identity, ages, POV, tense, established knowledge, time, location and the
+exact point where accepted prose ends. They may not overrule a deliberate new
+creative direction in the latest user message.
 
-The chapterPlan number, title and single POV must exactly match
-generatedChapter. For a new chapter, replaceChapterNumber is null. For a
-rewrite, it is the exact chapter number. generatedChapter.content stays empty.
+continuationBoundary must briefly state the exact current time, location,
+physical staging and unfinished action from which this section begins. For a
+new chapter with a deliberate time jump, state the jump requested or clearly
+implied by the user. Do not recap prior prose.
 
-Begin after continuityHandoff.exactLatestEnding. Do not recap, restart or repeat
-anything in repetitionWarnings, recentChapterLedger or
-completedBeatsToAvoid. Preserve physical positions, objects, knowledge,
-timeline, ages, locations, possessions and family facts.
+For a normal new chapter, generatedChapter.kind and chapterKind are "chapter".
+When the user asks for an epilogue, both are "epilogue", the title is
+"Epilogue", and its internal chapterNumber is the next available number. For a
+rewrite, replaceChapterNumber is the requested existing number. Otherwise it
+is null. generatedChapter.content is always empty.
 
-Use storyState.currentScene as the exact physical handoff when present. Use
-storyState.relationshipProgression for each character's current awareness and
-storyState.repetitionMemory as separated lists of completed thoughts, setting
-treatments, action patterns, dialogue patterns and repeated language. Never
-collapse these categories into one vague warning.
+If the user's request is broad, such as "write the next chapter", choose only
+the immediate opening section that follows naturally from continuity. Do not
+outline the remainder of the chapter.
 
-TIME AND CONTINUATION ARE HARD CONSTRAINTS. Use the explicit clock, weekday,
-relative-time statements and event order in continuityHandoff and
-recentChapterAnchors to establish one current story clock before planning.
-The first event must continue from that clock or name a deliberate forward
-time jump. Every later time reference must move monotonically forward. Include
-the day and time or a precise elapsed interval in startingState, endingState
-and any event that changes time. Never silently change morning to afternoon,
-treat an already reached deadline as future, or perform incorrect clock
-arithmetic. If accepted prose contains conflicting time statements, preserve
-the most concrete on-page clock and schedule facts and do not propagate the
-contradictory calculation.
-
-Repetition includes repeated reasoning, not only repeated phrases. Once a POV
-has reached an internal conclusion, do not plan the same observation,
-categorisation, denial, grievance or decision again in another room or after a
-time jump. A recurring concern may return only when new external evidence
-materially changes it. Do not reintroduce a familiar location through the same
-smell, lighting, corridor, silence or object inventory. Each planned event must
-change the external situation; reflection may respond to that change but may
-not be the event's only purpose.
-
-Every event must create a different action, decision, discovery, complication
-or earned relationship change. Do not manufacture people, rules, procedures,
-messages, documents, schedules, credentials or coincidences.
-
-For an awakening or delayed-recognition arc, state what the POV may physically
-notice and what they cannot yet label, imagine or admit. Never invent prior
-romance, sex or attraction. Explicit adult intimacy may be planned
-directly when earned by the Story Bible and chapter position.
-
-Awareness limits describe the intended start and progression of this chapter,
-not an unchangeable rule for all later guided sections. The user's later live
-section guidance may deliberately advance a character beyond the original
-boundary while every unrelated part of the plan remains binding.
-
-All romantic and sexual characters are adults aged eighteen or
-older. Keep the reply brief. Return chapterPlan as a structured object.
+All romantic and sexual characters are consenting adults aged eighteen or
+older. Explicit consensual adult direction may be recorded directly. Keep the
+reply brief and return only the structured response.
 `.trim();
 
 const SYSTEM_PROMPT = `
@@ -1728,7 +1837,7 @@ ADULT CONTENT RULES
 All characters involved in romantic or sexual content must be consenting
 adults aged 18 or older.
 
-When the user requests high-heat or explicit adult content, record
+When the user requests high-heat or explicit consensual adult content, record
 it directly and specifically in the Story Bible and chapter plan. Never
 censor, moralise, soften or replace the requested intimacy with fade-to-black
 planning. This route returns planning metadata only. The dedicated Magnum
@@ -1998,6 +2107,9 @@ export async function POST(request: Request) {
       }));
 
     const latestMessage = conversation[conversation.length - 1]?.content ?? "";
+    const explicitTitleChange = getExplicitTitleChange(latestMessage);
+    const epilogueRequested = requestsEpilogue(latestMessage);
+    const derivedBookRequested = requestsDerivedBook(latestMessage);
 
     let intent = detectStoryIntent(latestMessage);
 
@@ -2020,6 +2132,9 @@ export async function POST(request: Request) {
         latestMessage,
       ) ||
       /\b(?:rename|correct|make)\b[\s\S]{0,120}\b(?:character|setting|trope|pov|heat|pacing|name|age|job|appearance|family|history)\b/i.test(
+        latestMessage,
+      ) ||
+      /\b(?:change|set|rename|give|choose|suggest)\b[\s\S]{0,80}\b(?:book|story|novel)?\s*title\b/i.test(
         latestMessage,
       );
 
@@ -2044,7 +2159,8 @@ export async function POST(request: Request) {
       /\bcontinue\s+(?:directly\s+)?from\s+chapter\s+\d+\b/i.test(
         latestMessage,
       ) ||
-      /\bwrite\s+(?:the\s+)?next\s+chapter\b/i.test(latestMessage);
+      /\bwrite\s+(?:the\s+)?next\s+chapter\b/i.test(latestMessage) ||
+      epilogueRequested;
 
     if (intent !== "rewrite_chapter" && explicitlyRequestsChapterProse) {
       intent = "continue_story";
@@ -2071,7 +2187,7 @@ Use first-person present tense as the eventual default unless the user
 explicitly chooses another tense, but do not force that decision into
 the Bible before the relevant setup step.
 
-All romantic and sexual characters must be adults aged 18 or
+All romantic and sexual characters must be consenting adults aged 18 or
 older.
 
 Do not reuse or merge creative details from another story.`,
@@ -2268,6 +2384,138 @@ workspace.`,
       updatedAt: currentStory.updatedAt,
     };
 
+    if (explicitTitleChange && !isWriterMode) {
+      const reply = `Title changed to ${explicitTitleChange}.`;
+      const titledStory: StoryWorkspace = {
+        ...currentStory,
+        title: explicitTitleChange,
+        messages: [
+          ...currentStory.messages,
+          { id: Date.now(), role: "assistant", content: reply },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+
+      return NextResponse.json({
+        reply,
+        intent: "update_story",
+        story: titledStory,
+        generatedChapter: null,
+        chapterBrief: "",
+        createdStory: null,
+        diagnostics: planningDiagnostics,
+      });
+    }
+
+    if (derivedBookRequested && !isWriterMode) {
+      const startedAt = Date.now();
+      planningAttempt += 1;
+      const derivedResponse = await openai.responses.create({
+        model: "gpt-5.6-terra",
+        reasoning: { effort: "low" },
+        input: [
+          {
+            role: "system",
+            content: `You create a separate sequel or spin-off seed from an
+existing commercial romance. Follow the user's requested focus exactly. A
+sequel continues the same central characters. A spin-off promotes the named
+side character or characters into a new central romance. Preserve established
+facts, but do not copy completed plot events as though they still need to
+happen. Return a fresh Story Bible with no chapters, no invented past romance
+and no contamination of the source book. All romantic and sexual characters
+are consenting adults aged eighteen or older. Keep the reply brief.`,
+          },
+          {
+            role: "user",
+            content: `SOURCE TITLE\n${currentStory.title}\n\nSOURCE SERIES\n${currentStory.seriesTitle}\n\nSOURCE STORY BIBLE\n${JSON.stringify(currentStory.storyBible, null, 2)}\n\nFINAL CONTINUITY\n${JSON.stringify(getCompactPlanningStoryState(currentStory.storyState), null, 2)}\n\nUSER REQUEST\n${latestMessage}`,
+          },
+        ],
+        text: {
+          verbosity: "low",
+          format: {
+            type: "json_schema",
+            name: "derived_story_seed",
+            strict: true,
+            schema: derivedStorySchema,
+          },
+        },
+        max_output_tokens: 5000,
+      });
+      const usage = derivedResponse.usage;
+      const inputTokens = usage?.input_tokens ?? 0;
+      const outputTokens = usage?.output_tokens ?? 0;
+      const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+      const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+      planningDiagnostics.push({
+        stage: "derived_story_creation",
+        provider: "openai",
+        model: "gpt-5.6-terra",
+        status: "succeeded",
+        inputTokens,
+        outputTokens,
+        totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+        costUsd:
+          (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+          1_000_000,
+        costType: "estimated",
+        durationMs: Date.now() - startedAt,
+        attempt: planningAttempt,
+      });
+
+      if (derivedResponse.status === "incomplete") {
+        throw new Error("The sequel or spin-off setup was incomplete.");
+      }
+      const outputText = derivedResponse.output_text?.trim();
+      if (!outputText) {
+        throw new Error("The sequel or spin-off setup returned no result.");
+      }
+      const output = JSON.parse(outputText) as DerivedStoryOutput;
+      const now = new Date().toISOString();
+      const reply = cleanString(output.reply) || "The new book is ready.";
+      const createdStory: StoryWorkspace = {
+        id: crypto.randomUUID(),
+        title: cleanString(output.title) || "Untitled story",
+        seriesType: "series",
+        seriesTitle:
+          cleanString(output.seriesTitle) ||
+          cleanString(currentStory.seriesTitle) ||
+          currentStory.title,
+        bookNumber: Math.max(2, currentStory.bookNumber + 1),
+        lineage: {
+          sourceStoryId: currentStory.id,
+          sourceStoryTitle: currentStory.title,
+          relationship: output.relationship,
+          focusCharacters: cleanStringArray(output.focusCharacters),
+        },
+        messages: [],
+        chapters: [],
+        storyBible: sanitiseStoryBible(output.storyBible),
+        storyState: { ...EMPTY_STORY_STATE, chapterPlans: [] },
+        createdAt: now,
+        updatedAt: now,
+      };
+      const sourceStory: StoryWorkspace = {
+        ...currentStory,
+        seriesType: "series",
+        seriesTitle: createdStory.seriesTitle,
+        messages: [
+          ...currentStory.messages,
+          { id: Date.now(), role: "assistant", content: reply },
+        ],
+        updatedAt: now,
+      };
+
+      return NextResponse.json({
+        reply,
+        intent: "create_story",
+        story: sourceStory,
+        generatedChapter: null,
+        chapterBrief: "",
+        createdStory,
+        diagnostics: planningDiagnostics,
+      });
+    }
+
     if (intent === "update_story" && !isWriterMode) {
       const startedAt = Date.now();
       planningAttempt += 1;
@@ -2300,8 +2548,8 @@ missing Story Bible element. After chapters exist, confirm the requested edit
 without restarting story setup. Never claim the Bible is locked or require a
 different mode.
 
-All romantic and sexual characters are adults aged eighteen or
-older. Explicit adult requirements can be recorded directly. Never
+All romantic and sexual characters are consenting adults aged eighteen or
+older. Explicit consensual adult requirements can be recorded directly. Never
 use em dashes or en dashes. Return only the structured response.
             `.trim(),
           },
@@ -2560,8 +2808,9 @@ pressure.
 When an existing plan is supplied, preserve everything the user has not
 asked to change. Apply their requested amendment precisely.
 
-All romantic and sexual characters are adults aged eighteen
-or older. When the established story progression calls for explicit adult intimacy, the plan may state that directly and
+All romantic and sexual characters are consenting adults aged eighteen
+or older. When the established story progression calls for explicit
+consensual adult intimacy, the plan may state that directly and
 specifically without censorship or fade to black.
 
 Keep the conversational reply brief. Do not mention schemas or internal
@@ -2764,13 +3013,13 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
               type: "json_schema",
 
               name: usesCompactChapterPlan
-                ? "direct_chapter_plan"
+                ? "direct_section_brief"
                 : "story_chat_response",
 
               strict: true,
 
               schema: usesCompactChapterPlan
-                ? directChapterPlanSchema
+                ? directSectionBriefSchema
                 : storyChatSchema,
             },
           },
@@ -2862,30 +3111,53 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
         const rawOutput = JSON.parse(outputText) as unknown;
 
         if (usesCompactChapterPlan) {
-          const directOutput = rawOutput as DirectChapterPlanOutput;
-          const cleanPlan = sanitiseEditableChapterPlan(
-            directOutput.chapterPlan,
+          const directOutput = rawOutput as DirectSectionBriefOutput;
+          const expectedChapterNumber =
             directOutput.generatedChapter?.replaceChapterNumber ??
-              Math.max(
-                0,
-                ...currentStory.chapters.map((chapter) => chapter.number),
-              ) + 1,
-          );
+            Math.max(
+              0,
+              ...currentStory.chapters.map((chapter) => chapter.number),
+            ) + 1;
+          const forcedKind = epilogueRequested ? "epilogue" : "chapter";
+          const generatedChapter = {
+            ...directOutput.generatedChapter,
+            kind: forcedKind,
+            title: epilogueRequested
+              ? "Epilogue"
+              : cleanString(directOutput.generatedChapter.title),
+            content: "",
+          } as NonNullable<StoryChatResponse["generatedChapter"]>;
+          const cleanBrief: SectionWritingBrief = {
+            chapterNumber: expectedChapterNumber,
+            chapterKind: forcedKind,
+            chapterTitle: generatedChapter.title,
+            povCharacter: cleanString(generatedChapter.povCharacter),
+            authorDirection:
+              cleanString(directOutput.sectionBrief?.authorDirection) ||
+              latestMessage,
+            continuationBoundary: cleanString(
+              directOutput.sectionBrief?.continuationBoundary,
+            ),
+          };
+
+          if (
+            !cleanBrief.chapterTitle ||
+            !cleanBrief.povCharacter ||
+            !cleanBrief.authorDirection
+          ) {
+            throw new Error("The model returned an incomplete section brief.");
+          }
 
           parsedOutput = {
             reply: directOutput.reply,
             storyTitle: directOutput.storyTitle,
             storyBible: currentStory.storyBible,
             storyState: currentStory.storyState,
-            generatedChapter: directOutput.generatedChapter,
-            chapterBrief: JSON.stringify(cleanPlan),
+            generatedChapter,
+            chapterBrief: JSON.stringify(cleanBrief),
           };
         } else {
           parsedOutput = rawOutput as Partial<StoryModelOutput>;
-        }
-
-        if (isWriterMode) {
-          validateCanonicalChapterPlan(cleanString(parsedOutput.chapterBrief));
         }
 
         break;
@@ -2925,7 +3197,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     const reply =
       cleanString(parsedOutput.reply) ||
       (isWriterMode
-        ? `Chapter ${fallbackChapterNumber} plan created and ready for drafting.`
+        ? `${epilogueRequested ? "Epilogue" : `Chapter ${fallbackChapterNumber}`} section prepared and ready for drafting.`
         : "");
 
     if (!reply) {
@@ -2981,11 +3253,26 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
         Math.max(0, ...currentStory.chapters.map((chapter) => chapter.number)) +
           1;
 
-      validateCanonicalChapterPlan(chapterBrief, {
-        chapterNumber: expectedChapterNumber,
-        title: parsedOutput.generatedChapter.title,
-        povCharacter: parsedOutput.generatedChapter.povCharacter,
-      });
+      let sectionBrief: Partial<SectionWritingBrief>;
+      try {
+        sectionBrief = JSON.parse(chapterBrief) as Partial<SectionWritingBrief>;
+      } catch {
+        throw new Error("The model did not return a valid section brief.");
+      }
+      if (
+        sectionBrief.chapterNumber !== expectedChapterNumber ||
+        cleanString(sectionBrief.chapterTitle).toLowerCase() !==
+          cleanString(parsedOutput.generatedChapter.title).toLowerCase() ||
+        cleanString(sectionBrief.povCharacter).toLowerCase() !==
+          cleanString(
+            parsedOutput.generatedChapter.povCharacter,
+          ).toLowerCase() ||
+        !cleanString(sectionBrief.authorDirection)
+      ) {
+        throw new Error(
+          "The section brief does not match the chapter request.",
+        );
+      }
 
       if (requestStage === "plan") {
         const plannedAt = new Date().toISOString();
