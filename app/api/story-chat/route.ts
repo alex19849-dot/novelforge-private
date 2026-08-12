@@ -70,13 +70,17 @@ function getRequestedChapterNumber(message: string): number | null {
 
 function getExplicitTitleChange(message: string): string | null {
   const patterns = [
-    /\b(?:change|set|rename)\s+(?:the\s+)?(?:book|story|novel)?\s*title\s+to\s+["“']?([^\n"”']+?)["”']?\s*[.!?]*$/i,
+    /\b(?:add|change|set|rename|use|make)\s+(?:the\s+)?(?:book|story|novel)?\s*title\s+(?:as|to)\s+(.+?)\s*$/i,
     /\b(?:call|title)\s+(?:the\s+)?(?:book|story|novel|it)\s+["“']([^"”']+)["”']/i,
   ];
 
   for (const pattern of patterns) {
     const match = message.trim().match(pattern);
-    const title = match?.[1]?.trim();
+    const title = match?.[1]
+      ?.trim()
+      .replace(/^[*_'"“”‘’#\s]+|[*_'"“”‘’#\s]+$/g, "")
+      .replace(/\.$/, "")
+      .trim();
     if (title) return title;
   }
 
@@ -2134,7 +2138,7 @@ export async function POST(request: Request) {
       /\b(?:rename|correct|make)\b[\s\S]{0,120}\b(?:character|setting|trope|pov|heat|pacing|name|age|job|appearance|family|history)\b/i.test(
         latestMessage,
       ) ||
-      /\b(?:change|set|rename|give|choose|suggest)\b[\s\S]{0,80}\b(?:book|story|novel)?\s*title\b/i.test(
+      /\b(?:add|change|set|rename|use|make|give|choose|suggest)\b[\s\S]{0,80}\b(?:book|story|novel)?\s*title\b/i.test(
         latestMessage,
       );
 
