@@ -2,7 +2,10 @@ import OpenAI from "openai";
 
 import { NextResponse } from "next/server";
 
-import type { GenerationDiagnostic } from "../../../story-chat/types";
+import type {
+  GenerationDiagnostic,
+  SectionWritingBrief,
+} from "../../../story-chat/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -39,10 +42,29 @@ type Usage = {
 
 class TechnicalWriterError extends Error {}
 
-class InstructionConflictError extends Error {}
-
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function readSectionBrief(value: string): Partial<SectionWritingBrief> {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    return {
+      chapterNumber:
+        typeof parsed.chapterNumber === "number"
+          ? parsed.chapterNumber
+          : undefined,
+      chapterKind: parsed.chapterKind === "epilogue" ? "epilogue" : "chapter",
+      chapterTitle: cleanString(parsed.chapterTitle || parsed.title),
+      povCharacter: cleanString(parsed.povCharacter),
+      authorDirection: cleanString(parsed.authorDirection),
+      continuationBoundary: cleanString(
+        parsed.continuationBoundary || parsed.startingState,
+      ),
+    };
+  } catch {
+    return {};
+  }
 }
 
 function countWords(text: string): number {
@@ -230,16 +252,31 @@ function getPrompt(input: {
   sectionInstruction: string;
   latestUserMessage: string;
 }): string {
+  const sectionBrief = readSectionBrief(input.chapterBrief);
+  const sectionBriefForPrompt =
+    input.action === "start"
+      ? input.chapterBrief
+      : JSON.stringify({
+          chapterNumber: sectionBrief.chapterNumber,
+          chapterKind: sectionBrief.chapterKind,
+          chapterTitle: input.chapterTitle || sectionBrief.chapterTitle,
+          povCharacter: input.povCharacter,
+        });
   const fullDraftContext = completeDraftContext(input.chapterDraft);
   const exactContinuationBoundary = endingExcerpt(input.chapterDraft, 350);
   const draftRepetitionReport = chapterRepetitionReport(input.chapterDraft);
-  const mandatoryGuidance =
-    input.sectionInstruction ||
-    input.latestUserMessage ||
-    "Write only the next uncompleted beat of the canonical chapter plan.";
+  const mandatoryGuidance = input.sectionInstruction
+    ? input.sectionInstruction
+    : input.action === "start"
+      ? sectionBrief.authorDirection ||
+        input.latestUserMessage ||
+        "Open the chapter from the established continuity boundary."
+      : input.action === "rewrite"
+        ? "Rewrite only the selected passage while preserving its narrative purpose and boundaries."
+        : "Continue directly from the current draft through only the immediate next development. Do not introduce a major new event without author direction.";
   const actionInstruction =
     input.action === "start"
-      ? "Begin at the canonical plan's exact opening state. Do not skip its opening beat."
+      ? `Begin from this section's continuity boundary: ${sectionBrief.continuationBoundary || "the exact accepted ending supplied in continuity"}.`
       : input.action === "rewrite"
         ? "Replace SECTION TO REWRITE only. Preserve what happens immediately before and after it. Do not rewrite or advance any other part of the chapter."
         : "Continue from the exact final moment of EXACT CONTINUATION BOUNDARY. Do not recap, restart, repeat its final sentence, jump forward without instruction or begin a different scene.";
@@ -247,16 +284,15 @@ function getPrompt(input: {
   return [
     "You are NovelForge's commercial adult MM romance prose writer.",
     "MANDATORY INSTRUCTION CONTRACT",
-    "The canonical chapter plan and the user's current section guidance are requirements, not inspiration, suggestions or optional context.",
-    "Authority order is strict: CURRENT GUIDANCE comes first, then the canonical chapter plan for everything the guidance does not change, then established continuity and the Story Bible.",
-    "The user is allowed to deliberately advance, delay or alter a planned emotional or romantic beat through CURRENT GUIDANCE. When that happens, obey the guidance without treating the change as a conflict. Keep every unrelated planned beat intact.",
+    "CURRENT GUIDANCE is the complete creative instruction for this generation call. There is no binding full-chapter plan.",
+    "Authority order is strict: CURRENT GUIDANCE controls what happens now. Accepted continuity and the Story Bible preserve established facts but may not veto a deliberate new direction, pacing change, attraction development, intimacy beat or ending requested by the author.",
+    "Never return a conflict warning. If the author deliberately changes direction, write the new direction and preserve only unrelated established facts.",
     "Read the complete current chapter draft before writing. Treat every action, thought, conclusion, description and exchange already present anywhere in that draft as completed material, not merely the final paragraphs.",
-    "Write the events requested by the guidance exactly as part of the canonical plan. Preserve their participants, order, location, timing, emotional stage, intended outcome and stopping point.",
+    "Write only the events requested by the current guidance. Preserve their participants, order, location, timing, emotional movement, intended outcome and stopping point.",
     "You may invent only the dialogue, physical business, sensory details and connective prose needed to dramatise those specified events.",
-    "Never replace a requested event with a similar event. Never omit, reinterpret, contradict or soften a requirement. Never add an event that changes the plan.",
-    "Do not write later planned beats unless the current guidance explicitly requests them. Do not resolve a conflict, reveal information, create attraction awareness, introduce intimacy or reach the chapter hook early.",
+    "Never replace a requested event with a similar event. Never omit, reinterpret, contradict or soften a requirement. Never add an unrequested major event.",
+    "Do not invent later beats beyond the current section. Stop at the endpoint requested by the author or at a natural completed moment within this section.",
     "If the current guidance names an exact action, line, fact, location, time or endpoint, it must appear accurately in the prose.",
-    "Return <INSTRUCTION_CONFLICT> only when the guidance is impossible to reconcile with a fixed factual continuity detail and does not clearly instruct you to change that detail. A deliberate change to attraction, awareness, pacing, intimacy, dialogue or a future planned beat is not a conflict.",
     "Write one polished section of approximately 600 to 1,000 words.",
     "Return only novel prose followed by <END_SECTION> on its own line.",
     "Use the Story Bible's POV and tense. Default to first-person present tense only when the Story Bible does not specify them.",
@@ -275,9 +311,9 @@ function getPrompt(input: {
     "When recurring side characters speak or perform important actions, introduce and use their established names or roles. Do not repeatedly call them only the man, the woman or another generic label.",
     "Avoid vague attraction placeholders such as something I cannot name, not anger exactly, an unfamiliar feeling, something tighter, a charged look or an unexplained pull. In delayed-awareness stories, describe only what the viewpoint character can presently interpret unless CURRENT GUIDANCE explicitly requires acknowledgement or a new stage of awareness.",
     "Do not repeatedly use eyes, gaze, jaw, teeth, breath, heartbeat, clenched hands or body tension as interchangeable shortcuts for emotion. Any ordinary gesture may appear when apt, but vary the evidence and do not overuse it across the chapter.",
-    "Do not invent previous meetings, conversations, opinions, memories or familiarity. A viewpoint character may know only what the Story Bible, continuity, plan or on-page events establish they know.",
-    "The Story Bible and accepted continuity are fixed facts. They support the plan and guidance but do not give permission to ignore either.",
-    "Follow the canonical plan in order. Write only the beats explicitly permitted by the current guidance. Stop once those beats reach a natural finished moment.",
+    "Do not invent previous meetings, conversations, opinions, memories or familiarity. A viewpoint character may know only what the Story Bible, accepted continuity, current guidance or on-page events establish they know.",
+    "The Story Bible and accepted continuity preserve established facts. They support the current guidance and do not supply a competing plot plan.",
+    "Write the current direction in order and stop once its requested beats reach a natural finished moment.",
     "Preserve ages, timeline, locations, possessions, family facts, physical positions and character knowledge.",
     "Do not invent prior romance, attraction or intimacy. In a gay-for-you or delayed-awareness arc, involuntary attention, physical reaction, denial and changed behaviour normally precede conscious acknowledgement, but CURRENT GUIDANCE may explicitly move the character into acknowledgement now.",
     "Do not repeat completed actions, conversations, jokes, gestures, attraction observations, internal conclusions or paragraphs.",
@@ -286,7 +322,7 @@ function getPrompt(input: {
     "Do not include a chapter heading, POV label, outline, notes, markdown, warnings, analysis or commentary.",
     "STORY BIBLE, FIXED CANON\n" +
       JSON.stringify(input.storyBible ?? {}, null, 2),
-    "CANONICAL CHAPTER PLAN, MANDATORY\n" + input.chapterBrief,
+    "CURRENT SECTION BRIEF, THIS SECTION ONLY\n" + sectionBriefForPrompt,
     "CONTINUITY\n" + JSON.stringify(cleanStoryState(input.storyState), null, 2),
     "RECENT CHAPTER ENDINGS\n" + JSON.stringify(input.recentChapters, null, 2),
     input.chapterDraft
@@ -306,13 +342,15 @@ function getPrompt(input: {
       input.chapterTitle +
       "\nPOV: " +
       input.povCharacter,
-    "ORIGINAL CHAPTER REQUEST, BINDING WHERE RELEVANT\n" +
-      (input.latestUserMessage || "No separate original request supplied."),
+    input.action === "start"
+      ? "ORIGINAL SECTION REQUEST\n" +
+        (input.latestUserMessage || "No separate original request supplied.")
+      : "",
     "CURRENT GUIDANCE, HIGHEST PRIORITY WRITING REQUIREMENT\n" +
       mandatoryGuidance,
     "EXACT ACTION AND BOUNDARY\n" + actionInstruction,
     "SILENT COMPLIANCE CHECK BEFORE RETURNING PROSE",
-    "Check every sentence against the current guidance and canonical plan. Confirm that every requested beat is present, no requested fact changed, no later beat was pulled forward, continuity begins at the exact prior endpoint, POV remains fixed and the section stops where instructed. Correct any failure silently before returning the prose.",
+    "Check every sentence against CURRENT GUIDANCE. Confirm that every requested beat is present, continuity begins at the correct boundary, established factual details remain accurate, POV remains fixed and the section stops where instructed. Correct any failure silently before returning the prose.",
     "Complete the section on a finished sentence, then output <END_SECTION>. Do not continue after the marker.",
   ]
     .filter(Boolean)
@@ -321,17 +359,6 @@ function getPrompt(input: {
 
 function extractCompletedSection(raw: string): string {
   const trimmed = raw.trim();
-
-  if (/^<INSTRUCTION_CONFLICT>/i.test(trimmed)) {
-    const explanation = trimmed
-      .replace(/^<INSTRUCTION_CONFLICT>\s*/i, "")
-      .trim();
-
-    throw new InstructionConflictError(
-      explanation ||
-        "The current guidance conflicts with the canonical chapter plan or established continuity.",
-    );
-  }
 
   if (!/<END_SECTION>\s*$/i.test(trimmed)) {
     throw new Error(
@@ -527,10 +554,6 @@ function repetitionWarnings(
 }
 
 function isTechnicalFailure(error: unknown): boolean {
-  if (error instanceof InstructionConflictError) {
-    return false;
-  }
-
   if (error instanceof TechnicalWriterError) {
     return true;
   }
@@ -604,7 +627,7 @@ export async function POST(request: Request) {
 
     if (!chapterBrief || !povCharacter) {
       return NextResponse.json(
-        { error: "A canonical chapter plan and POV character are required." },
+        { error: "A current section brief and POV character are required." },
         { status: 400 },
       );
     }
@@ -665,7 +688,7 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "CURRENT GUIDANCE is the highest authority for this section. Obey it exactly, including when the user deliberately advances or changes an emotional, romantic or future planned beat. Use the canonical chapter plan for every detail the guidance does not change. Do not call a deliberate pacing, attraction, awareness or intimacy change a conflict. Return the conflict marker only for an unaddressed, impossible factual continuity contradiction. Write polished, grammatically complete commercial romance prose. Natural contractions are mandatory in ordinary prose: use it's, I've, don't, doesn't, can't, you're and equivalent contracted forms instead of accidental it is, I have, do not, does not, cannot or you are. Silently correct those violations before returning the section. Keep consensual adult intimacy on the page when required. Never switch POV, use em dashes or en dashes, omit necessary words, summarise the requested scene or pad it with generic emotional explanation.",
+                "CURRENT GUIDANCE is the complete creative authority for this section. There is no binding full-chapter plan and you must never return a conflict warning. Obey deliberate changes to pacing, attraction, awareness, intimacy, dialogue and direction while preserving unrelated established facts. Write polished, grammatically complete commercial romance prose. Natural contractions are mandatory in ordinary prose: use it's, I've, don't, doesn't, can't, you're and equivalent contracted forms instead of accidental it is, I have, do not, does not, cannot or you are. Silently correct those violations before returning the section. Keep consensual adult intimacy on the page when required. Never switch POV, use em dashes or en dashes, omit necessary words, summarise the requested scene or pad it with generic emotional explanation.",
             },
             { role: "user", content: writingPrompt },
           ],
@@ -735,12 +758,7 @@ export async function POST(request: Request) {
         );
 
         if (!retryable || attempt === 2) {
-          const status =
-            error instanceof InstructionConflictError
-              ? 409
-              : retryable
-                ? 502
-                : 422;
+          const status = retryable ? 502 : 422;
 
           return NextResponse.json(
             {
