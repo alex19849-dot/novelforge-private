@@ -41,9 +41,13 @@ export type StoryBiblePatch = {
   removeNotes: string[];
 };
 
+export type StoryChapterKind = "chapter" | "epilogue";
+
 export type StoryChapter = {
   id: string;
   number: number;
+  /** Missing on older saved stories and therefore treated as "chapter". */
+  kind?: StoryChapterKind;
   title: string;
   povCharacter: string;
   content: string;
@@ -182,6 +186,20 @@ export type ChapterPlan = {
   updatedAt: string;
 };
 
+/**
+ * The only creative direction sent to the prose writer for one generation
+ * call. Unlike a legacy ChapterPlan, this does not prescribe later sections
+ * or prevent the author from changing direction between calls.
+ */
+export type SectionWritingBrief = {
+  chapterNumber: number;
+  chapterKind: StoryChapterKind;
+  chapterTitle: string;
+  povCharacter: string;
+  authorDirection: string;
+  continuationBoundary: string;
+};
+
 export type ChapterWritingPart = "part1" | "part2";
 
 export type ChapterReviewStatus =
@@ -260,6 +278,13 @@ export type StoryWorkspace = {
   seriesType: "standalone" | "series";
   seriesTitle: string;
   bookNumber: number;
+  /** Optional lineage for separately saved sequels and spin-offs. */
+  lineage?: {
+    sourceStoryId: string;
+    sourceStoryTitle: string;
+    relationship: "sequel" | "spinoff";
+    focusCharacters: string[];
+  };
   messages: ChatMessage[];
   chapters: StoryChapter[];
   storyBible: StoryBible;
@@ -273,6 +298,7 @@ export type StoryChatRequest = {
 };
 
 export type GeneratedChapter = {
+  kind?: StoryChapterKind;
   title: string;
   povCharacter: string;
   content: string;
@@ -287,4 +313,6 @@ export type StoryChatResponse = {
   chapterBrief: string;
   diagnostics?: GenerationDiagnostic[];
   storyBiblePatch?: StoryBiblePatch | null;
+  /** A separately saved book seeded from the current story. */
+  createdStory?: StoryWorkspace | null;
 };
