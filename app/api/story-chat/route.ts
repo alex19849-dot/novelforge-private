@@ -99,6 +99,13 @@ function requestsDerivedBook(message: string): boolean {
   );
 }
 
+function removeNegatedChapterProseRequests(message: string): string {
+  return message.replace(
+    /\b(?:do\s+not|don['’]?t|never)\b[^.!?\n]{0,180}\b(?:write|generate|continue|create|start)\b[^.!?\n]{0,120}\bchapter(?:\s+\d+|\s+(?:one|two|three|four|five|six|seven|eight|nine|ten))?\b[^.!?\n]*/gi,
+    " ",
+  );
+}
+
 function getEndingExcerpt(text: string, maximumWords = 900): string {
   const words = text.trim().split(/\s+/).filter(Boolean);
 
@@ -2142,7 +2149,11 @@ export async function POST(request: Request) {
         latestMessage,
       );
 
-    if (intent !== "rewrite_chapter" && explicitlyUpdatesStoryBible) {
+    if (
+      intent !== "rewrite_chapter" &&
+      intent !== "create_story" &&
+      explicitlyUpdatesStoryBible
+    ) {
       intent = "update_story";
     }
 
@@ -2156,14 +2167,15 @@ export async function POST(request: Request) {
       intent = "update_story";
     }
 
+    const chapterRequestText = removeNegatedChapterProseRequests(latestMessage);
     const explicitlyRequestsChapterProse =
       /\b(?:write|generate|continue|create)\b[\s\S]{0,100}\bchapter(?:\s+\d+|\s+(?:one|two|three|four|five|six|seven|eight|nine|ten))?\b/i.test(
-        latestMessage,
+        chapterRequestText,
       ) ||
       /\bcontinue\s+(?:directly\s+)?from\s+chapter\s+\d+\b/i.test(
-        latestMessage,
+        chapterRequestText,
       ) ||
-      /\bwrite\s+(?:the\s+)?next\s+chapter\b/i.test(latestMessage) ||
+      /\bwrite\s+(?:the\s+)?next\s+chapter\b/i.test(chapterRequestText) ||
       epilogueRequested;
 
     if (intent !== "rewrite_chapter" && explicitlyRequestsChapterProse) {
