@@ -2124,12 +2124,16 @@ export async function POST(request: Request) {
 
     const latestMessage = conversation[conversation.length - 1]?.content ?? "";
     const explicitTitleChange = getExplicitTitleChange(latestMessage);
-    const epilogueRequested = requestsEpilogue(latestMessage);
     const derivedBookRequested = requestsDerivedBook(latestMessage);
 
-    let intent = detectStoryIntent(latestMessage);
+    const detectedIntent = detectStoryIntent(latestMessage);
+    const startsNewStory = detectedIntent === "create_story";
+    const epilogueRequested =
+      !startsNewStory && requestsEpilogue(latestMessage);
+    let intent = detectedIntent;
 
     if (
+      !startsNewStory &&
       /\b(rewrite|rewriting|rewrite this|rewrite chapter)\b/i.test(
         latestMessage,
       )
@@ -2155,8 +2159,8 @@ export async function POST(request: Request) {
       );
 
     if (
+      !startsNewStory &&
       intent !== "rewrite_chapter" &&
-      intent !== "create_story" &&
       explicitlyUpdatesStoryBible
     ) {
       intent = "update_story";
@@ -2168,7 +2172,7 @@ export async function POST(request: Request) {
     // question is a Story Bible decision, not disposable small talk.
     // Explicit brainstorming remains brainstorm mode until the user
     // accepts one of the proposed ideas.
-    if (isBuildingStory && intent === "general_chat") {
+    if (!startsNewStory && isBuildingStory && intent === "general_chat") {
       intent = "update_story";
     }
 
@@ -2183,11 +2187,22 @@ export async function POST(request: Request) {
       /\bwrite\s+(?:the\s+)?next\s+chapter\b/i.test(chapterRequestText) ||
       epilogueRequested;
 
-    if (intent !== "rewrite_chapter" && explicitlyRequestsChapterProse) {
+    if (
+      !startsNewStory &&
+      intent !== "rewrite_chapter" &&
+      explicitlyRequestsChapterProse
+    ) {
       intent = "continue_story";
     }
 
-    if (chatOnly && intent !== "update_story") {
+    // A new-story request is a workspace setup operation. Lock that intent
+    // for the whole call so descriptive words such as "chapter", "write"
+    // and "epilogue" inside a detailed Story Bible cannot start the writer.
+    if (startsNewStory) {
+      intent = "create_story";
+    }
+
+    if (!startsNewStory && chatOnly && intent !== "update_story") {
       intent = "general_chat";
     }
 
@@ -2257,12 +2272,13 @@ workspace.`,
     };
 
     const isWriterMode =
-      intent === "continue_story" ||
-      intent === "rewrite_chapter" ||
-      explicitlyRequestsChapterProse ||
-      /\b(?:write|rewrite|rewriting|continue|generate|expand)\b[\s\S]{0,80}\b(?:chapter|scene|prose|passage)\b/i.test(
-        chapterRequestText,
-      );
+      !startsNewStory &&
+      (intent === "continue_story" ||
+        intent === "rewrite_chapter" ||
+        explicitlyRequestsChapterProse ||
+        /\b(?:write|rewrite|rewriting|continue|generate|expand)\b[\s\S]{0,80}\b(?:chapter|scene|prose|passage)\b/i.test(
+          chapterRequestText,
+        ));
     const usesCompactChapterPlan =
       requestStage === "plan" && isWriterMode && intent !== "create_story";
 
