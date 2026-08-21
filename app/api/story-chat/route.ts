@@ -88,8 +88,13 @@ function getExplicitTitleChange(message: string): string | null {
 }
 
 function requestsEpilogue(message: string): boolean {
-  return /\b(?:write|generate|create|start|continue|rewrite)\b[\s\S]{0,100}\bepilogue\b|\bepilogue\b[\s\S]{0,100}\b(?:write|generate|create|start|continue|rewrite)\b/i.test(
-    message,
+  return (
+    /\b(?:write|generate|create|start|continue|rewrite)\s+(?:the\s+|an\s+|my\s+|this\s+)?epilogue\b/i.test(
+      message,
+    ) ||
+    /\bepilogue\s*[,;:]?\s*(?:please\s+)?(?:write|generate|create|start|continue|rewrite)(?:\s+it|\s+this|\s+now)?\b/i.test(
+      message,
+    )
   );
 }
 
@@ -2256,7 +2261,7 @@ workspace.`,
       intent === "rewrite_chapter" ||
       explicitlyRequestsChapterProse ||
       /\b(?:write|rewrite|rewriting|continue|generate|expand)\b[\s\S]{0,80}\b(?:chapter|scene|prose|passage)\b/i.test(
-        latestMessage,
+        chapterRequestText,
       );
     const usesCompactChapterPlan =
       requestStage === "plan" && isWriterMode && intent !== "create_story";
