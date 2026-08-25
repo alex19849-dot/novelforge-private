@@ -38,6 +38,9 @@ type Usage = {
   input_tokens_details?: {
     cached_tokens?: number;
   };
+  output_tokens_details?: {
+    reasoning_tokens?: number;
+  };
 };
 
 class TechnicalWriterError extends Error {}
@@ -706,16 +709,23 @@ export async function POST(request: Request) {
           text: {
             verbosity: "medium",
           },
-          max_output_tokens: 16000,
+          max_output_tokens: 32000,
         });
         usage = response.usage as Usage | undefined;
 
         if (response.status === "incomplete") {
+          const reasoningTokens =
+            usage?.output_tokens_details?.reasoning_tokens ?? 0;
+          const visibleOutputTokens = Math.max(
+            0,
+            (usage?.output_tokens ?? 0) - reasoningTokens,
+          );
+
           throw new Error(
             `The writing model did not complete the section because ${
               response.incomplete_details?.reason ??
               "the response was interrupted"
-            }.`,
+            }. It used ${reasoningTokens.toLocaleString()} hidden reasoning tokens and approximately ${visibleOutputTokens.toLocaleString()} visible output tokens.`,
           );
         }
 
