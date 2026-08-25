@@ -294,6 +294,8 @@ function getPrompt(input: {
     "Do not invent later beats beyond the current section. Stop at the endpoint requested by the author or at a natural completed moment within this section.",
     "If the current guidance names an exact action, line, fact, location, time or endpoint, it must appear accurately in the prose.",
     "Write one polished section of approximately 600 to 1,000 words.",
+    "If CURRENT GUIDANCE asks to finish, complete or end the chapter, write one bounded final section of approximately 800 to 1,400 words. Resolve only the chapter's active immediate beat, land one clear closing hook or settled ending state and stop. Do not expand the request into several new scenes, introduce a new subplot, narrate the rest of the day or keep adding events merely to make the ending feel larger.",
+    "A chapter-completion request is a stopping instruction, not permission to continue indefinitely. Compress any necessary transition, prioritise the established emotional and plot movement already in progress, complete every sentence and output <END_SECTION> before the technical limit.",
     "Return only novel prose followed by <END_SECTION> on its own line.",
     "Use the Story Bible's POV and tense. Default to first-person present tense only when the Story Bible does not specify them.",
     "Remain in " + input.povCharacter + "'s POV. Never switch heads.",
@@ -697,14 +699,14 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "CURRENT GUIDANCE is the complete creative authority for this section. There is no binding full-chapter plan and you must never return a conflict warning. Obey deliberate changes to pacing, attraction, awareness, intimacy, dialogue and direction while preserving unrelated established facts. Sexual awareness never authorises an unrequested kiss or sexual escalation. Write character-specific dialogue with friction and subtext, never repetitive confirmation ladders, therapy-speak or consent checklists. Show willing adult participation naturally through reciprocal behaviour. Write polished, grammatically complete commercial romance prose. Natural contractions are mandatory in ordinary prose: use it's, I've, don't, doesn't, can't, you're and equivalent contracted forms instead of accidental it is, I have, do not, does not, cannot or you are. Silently correct those violations before returning the section. Keep consensual adult intimacy on the page when required. Never switch POV, use em dashes or en dashes, omit necessary words, summarise the requested scene or pad it with generic emotional explanation.",
+                "CURRENT GUIDANCE is the complete creative authority for this section. There is no binding full-chapter plan and you must never return a conflict warning. Obey deliberate changes to pacing, attraction, awareness, intimacy, dialogue and direction while preserving unrelated established facts. When asked to complete the chapter, produce one bounded final section, land the active beat and stop instead of expanding into additional scenes. Sexual awareness never authorises an unrequested kiss or sexual escalation. Write character-specific dialogue with friction and subtext, never repetitive confirmation ladders, therapy-speak or consent checklists. Show willing adult participation naturally through reciprocal behaviour. Write polished, grammatically complete commercial romance prose. Natural contractions are mandatory in ordinary prose: use it's, I've, don't, doesn't, can't, you're and equivalent contracted forms instead of accidental it is, I have, do not, does not, cannot or you are. Silently correct those violations before returning the section. Keep consensual adult intimacy on the page when required. Never switch POV, use em dashes or en dashes, omit necessary words, summarise the requested scene or pad it with generic emotional explanation.",
             },
             { role: "user", content: writingPrompt },
           ],
           text: {
             verbosity: "medium",
           },
-          max_output_tokens: 8000,
+          max_output_tokens: 16000,
         });
         usage = response.usage as Usage | undefined;
 
