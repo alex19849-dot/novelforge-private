@@ -704,7 +704,7 @@ export async function POST(request: Request) {
           text: {
             verbosity: "medium",
           },
-          max_output_tokens: 4000,
+          max_output_tokens: 8000,
         });
         usage = response.usage as Usage | undefined;
 
