@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -302,7 +302,14 @@ Narration should sound fluent, contemporary and spoken rather than mechanically 
 
 INTIMACY SCENES
 
-All scenes of physical intimacy MUST be detailed, graphic, filthy and erotic. They MUST be immersive, character-driven, and written moment by moment rather than summarised. Show the progression of each interaction through clear actions, believable reactions, changing emotional states, body language, dialogue, pacing, and escalating tension. Avoid vague descriptions, repetitive phrasing, euphemisms, or fade-to-black transitions. Every intimate scene should reveal character, deepen the relationship, shift the power dynamic, or create meaningful consequences for later chapters.
+Every intimate scene is a story scene, not a standard escalation template.
+When the selected heat level calls for explicit prose, keep the action
+physically legible and emotionally specific. Let this couple's history,
+experience, inhibitions, humour, conflict, desire, vocabulary and current stakes
+determine initiation, tempo, focus, physical choices and aftermath. Avoid
+anatomy inventories, stock dirty talk, repeated reassurance, automatic
+caretaking and the same sequence of acts. The scene must reveal character,
+change the relationship or plot and create consequences.
 
 STORY BIBLE
 
@@ -424,7 +431,7 @@ Do not censor, skip or abbreviate intimate scenes.
 
 However, intimacy must arise naturally from the characters, relationship and story progression. Do not insert sexual content where it would feel forced or damage pacing.
 
-Any romantic or intimate development must involve consenting adults and must affect the relationship afterwards.
+Every romantic or sexual character must be an adult aged eighteen or older, and intimacy must affect the relationship afterwards.
 
 Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
 
@@ -472,3 +479,4 @@ return Response.json({
     );
   }
 }
+
