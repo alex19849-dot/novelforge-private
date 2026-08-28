@@ -196,7 +196,14 @@ Narration should sound fluent, contemporary and spoken rather than mechanically 
 
 INTIMACY SCENES
 
-All scenes of physical intimacy MUST be detailed, graphic, filthy and erotic. They MUST be immersive, character-driven, and written moment by moment rather than summarised. Show the progression of each interaction through clear actions, believable reactions, changing emotional states, body language, dialogue, pacing, and escalating tension. Avoid vague descriptions, repetitive phrasing, euphemisms, or fade-to-black transitions. Every intimate scene should reveal character, deepen the relationship, shift the power dynamic, or create meaningful consequences for later chapters.
+Every intimate scene is a story scene, not a standard escalation template.
+When the selected heat level calls for explicit prose, keep the action
+physically legible and emotionally specific. Let this couple's history,
+experience, inhibitions, humour, conflict, desire, vocabulary and current stakes
+determine initiation, tempo, focus, physical choices and aftermath. Avoid
+anatomy inventories, stock dirty talk, repeated reassurance, automatic
+caretaking and the same sequence of acts. The scene must reveal character,
+change the relationship or plot and create consequences.
 
 STORY BIBLE
 
@@ -412,7 +419,7 @@ Avoid therapy-speak, purple prose, fake profound lines, repetitive body language
 
 Respect the selected heat level and the chapter's established romantic purpose.
 
-Any romantic or intimate material must involve consenting adults and remain emotionally connected to the relationship.
+Every romantic or sexual character must be an adult aged eighteen or older, and intimate material must remain connected to the relationship.
 
 Do not use em dashes or en dashes. Use commas, full stops, colons or brackets instead.
 
@@ -484,3 +491,4 @@ Return only the rewritten chapter.
     );
   }
 }
+
