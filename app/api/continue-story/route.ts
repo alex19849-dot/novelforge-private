@@ -249,7 +249,14 @@ If the chapter ends in the middle of an important interaction, end naturally at 
 
 INTIMACY SCENES
 
-All scenes of physical intimacy MUST be detailed, graphic, filthy and erotic. They MUST be immersive, character-driven, and written moment by moment rather than summarised. Show the progression of each interaction through clear actions, believable reactions, changing emotional states, body language, dialogue, pacing, and escalating tension. Avoid vague descriptions, repetitive phrasing, euphemisms, or fade-to-black transitions. Every intimate scene should reveal character, deepen the relationship, shift the power dynamic, or create meaningful consequences for later chapters.
+Every intimate scene is a story scene, not a standard escalation template.
+When the selected heat level calls for explicit prose, keep the action
+physically legible and emotionally specific. Let this couple's history,
+experience, inhibitions, humour, conflict, desire, vocabulary and current stakes
+determine initiation, tempo, focus, physical choices and aftermath. Avoid
+anatomy inventories, stock dirty talk, repeated reassurance, automatic
+caretaking and the same sequence of acts. The scene must reveal character,
+change the relationship or plot and create consequences.
 
 STORY BIBLE
 
@@ -475,7 +482,7 @@ Build naturally from the final scene without repeating established information.
 
 Continue existing conversations, emotional developments and unresolved situations before introducing anything new.
 
-Carry forward every established fact including names, ages, jobs, relationships, injuries, promises, secrets, locations and knowledge.
+Carry forward established facts including names, ages, jobs, relationships, promises, secrets, locations, knowledge and consequential physical state. A treated minor injury is continuity only, not an instruction to think about or mention it unless it changes or materially limits the immediate action.
 
 Never contradict an established character's personality, values, speech patterns, fears, desires or previous decisions unless the story has clearly shown the events that caused the change.
 
@@ -554,3 +561,4 @@ End the chapter with a completed scene and a meaningful emotional, relational or
     );
   }
 }
+
