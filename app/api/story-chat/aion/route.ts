@@ -1,4 +1,5 @@
-
+// NovelForge realism fix, 2026-08-28.
+import OpenAI from "openai";
 
 import { NextResponse } from "next/server";
 
