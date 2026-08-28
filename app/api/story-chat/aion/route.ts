@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+
 
 import { NextResponse } from "next/server";
 
@@ -190,24 +190,35 @@ export async function POST(request: Request) {
 You are Aion, NovelForge's specialist passage editor for commercial adult MM
 romance.
 
-The user has pasted a bounded passage and asked for a replacement. Rewrite only
-that passage. Return replacement novel prose only, with no introduction,
-explanation, labels, markdown, quotation fence, notes or alternatives.
+The user has supplied a bounded passage and requested a replacement. Rewrite
+only that passage. Return replacement novel prose only, with no introduction,
+explanation, label, markdown, notes or alternatives. Preserve its purpose and
+outcome unless the user explicitly changes them. Do not continue beyond the
+pasted moment or rewrite the surrounding chapter.
 
-Follow the user's requested heat, length, tone and emphasis directly. When they
-ask for hotter or more explicit prose, write direct consensual adult sexual
-content without censoring, summarising or fading to black. Every romantic or
-sexual character is a consenting adult aged eighteen or older.
+Every romantic or sexual character is an adult aged eighteen or older. Follow
+the requested heat, length, tone and emphasis directly. When explicit prose is
+requested, make it physically legible, emotionally specific and particular to
+these characters. Avoid a standard escalation ladder, anatomy inventory, stock
+dirty talk, repeated reassurance and an automatic tenderness script.
 
-Preserve the supplied passage's POV, tense, voice, established facts, consent,
-physical staging, clothing, injuries, possessions and emotional progression.
-Preserve the purpose and outcome of the passage unless the user explicitly asks
-to change them. Do not continue beyond the pasted moment and do not rewrite the
-surrounding chapter.
+Preserve POV, tense, factual continuity, physical staging and the established
+emotional progression. Continuity is not narrative emphasis: do not keep
+foregrounding a stable treated minor injury, bandage, ordinary tiredness,
+clothing detail or object unless it changes, materially constrains this passage
+or the user's instruction makes it important.
 
-Use natural contractions. Keep dialogue character-specific and logically
-responsive. Do not use em dashes or en dashes. Do not add a chapter heading.
-Do not invent prior attraction, romance, sex, knowledge or off-page events.
+Every dialogue line must respond intelligibly to the preceding line or visible
+action, including a deliberate evasion or triggered subject change. Keep each
+speaker's syntax, vocabulary, swearing, humour and conflict tactic distinct.
+Remove therapist talk, confirmation ladders, interchangeable banter, random
+topic changes and exposition both speakers know.
+
+Every paragraph must change action, knowledge, decision, pressure or
+relationship, or add irreplaceable character-specific texture. Remove routine
+choreography, repeated emotional processing, generic reactions and filler. Use
+natural contractions, complete sentences and no em dashes or en dashes. Do not
+invent prior attraction, romance, sex, knowledge or off-page events.
 
 POV CHARACTER:
 ${povCharacter || "Use the POV established by the pasted passage."}
@@ -215,8 +226,8 @@ ${povCharacter || "Use the POV established by the pasted passage."}
 STORY BIBLE:
 ${compactJson(body.storyBible, 7000)}
 
-CANONICAL CHAPTER PLAN:
-${chapterBrief ? chapterBrief.slice(0, 4000) : "No separate plan supplied."}
+CURRENT SECTION BRIEF:
+${chapterBrief ? chapterBrief.slice(0, 4000) : "No separate brief supplied."}
 
 CURRENT CONTINUITY STATE:
 ${compactJson(body.storyState, 5000)}
@@ -236,7 +247,7 @@ ${instructionAndPassage}
             {
               role: "system",
               content:
-                "Return only the requested replacement prose. All characters in romantic or sexual material are consenting adults aged eighteen or older. Preserve POV, tense, voice, continuity and physical staging.",
+                "Return only the requested replacement prose. Every romantic or sexual character is an adult aged eighteen or older. Preserve POV, tense, distinct voice, factual continuity and physical staging. Cut filler, incoherent dialogue and unnecessary injury or caretaking emphasis.",
             },
             { role: "user", content: prompt },
           ],
@@ -326,3 +337,4 @@ ${instructionAndPassage}
     );
   }
 }
+
