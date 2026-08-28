@@ -370,7 +370,7 @@ function getPrompt(input: {
     "Use the Story Bible's POV and tense. Default to first-person present only when neither is specified. Remain in " +
       input.povCharacter +
       "'s POV and never switch heads.",
-    "Use contractions where natural to this narrator or speaker. Keep sentences complete, grammatical and idiomatic. Never use an em dash or en dash.",
+    "Use contractions by default in both dialogue and first-person narration: I'm, I've, I'll, I'd, it's, isn't, that's, don't, can't, won't, we're, they're, he's and equivalent natural forms. Use an uncontracted form only for deliberate emphasis, contrast, ceremonial or legal formality, or a character-specific speech pattern explicitly established in the Story Bible. Controlled, educated, wealthy, older, authoritative or professional characters must not default to stiff uncontracted speech. Keep sentences complete, grammatical and idiomatic. Never use an em dash or en dash.",
     "Show emotion through specific action, choice, dialogue and perception. Do not explain what has already been shown or lean on stock breath, heartbeat, jaw, gaze, clenched-hand or vague unnamed-feeling reactions.",
     "Track physical positions and movements exactly. Preserve ages, time, locations, possessions, family facts and individual knowledge. Do not invent prior meetings, attraction, romance, sex, memories or off-page solutions.",
     "Attraction, conscious acknowledgement and physical escalation are separate stages. Do not turn awareness into a kiss, confession or sexual contact unless CURRENT GUIDANCE requests that step or accepted on-page progression makes it the immediate established action.",
@@ -409,7 +409,7 @@ function getPrompt(input: {
     "CURRENT GUIDANCE, HIGHEST PRIORITY\n" + mandatoryGuidance,
     "EXACT ACTION AND BOUNDARY\n" + actionInstruction,
     "SILENT FINAL PASS",
-    "Delete any paragraph that adds no change or unique texture. Repair any dialogue line whose connection is unclear. Remove every unnecessary reference to a stable injury or caretaking. Confirm the two leads could not swap dialogue or internal narration without sounding wrong. Verify POV, factual continuity, physical staging, requested endpoint and complete final sentence. Return no analysis.",
+    "Delete any paragraph that adds no change or unique texture. Repair any dialogue line whose connection is unclear. Scan dialogue and first-person narration for accidental clusters of I am, I have, I will, it is, that is, do not, cannot and will not; contract them unless the full form has deliberate emphasis or character-specific purpose. Remove every unnecessary reference to a stable injury or caretaking. Confirm the two leads could not swap dialogue or internal narration without sounding wrong. Verify POV, factual continuity, physical staging, requested endpoint and complete final sentence. Return no analysis.",
     "Complete the section, output <END_SECTION>, then stop.",
   ]
     .filter(Boolean)
@@ -761,7 +761,7 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "Write only the section required by CURRENT GUIDANCE and return complete novel prose followed by <END_SECTION>. Preserve accepted facts, fixed POV, tense and physical staging. Keep character voices distinct, dialogue causally coherent and every paragraph necessary. Treat continuity facts proportionately, never as a demand to foreground stable minor injuries or caretaking. Every romantic or sexual character is an adult aged eighteen or older. When explicit intimacy is requested, make it character-specific, physically legible and consequential. Never use em dashes or en dashes, repeat completed material, pad the scene or add an unrequested escalation.",
+                "Write only the section required by CURRENT GUIDANCE and return complete novel prose followed by <END_SECTION>. Preserve accepted facts, fixed POV, tense and physical staging. Keep character voices distinct, dialogue causally coherent and every paragraph necessary. Use natural contractions by default in dialogue and first-person narration; reserve repeated full forms such as I am, I have, it is, do not and cannot for deliberate emphasis or genuinely formal speech. A controlled or professional character must not sound stiff merely because of his job or temperament. Treat continuity facts proportionately, never as a demand to foreground stable minor injuries or caretaking. Every romantic or sexual character is an adult aged eighteen or older. When explicit intimacy is requested, make it character-specific, physically legible and consequential. Never use em dashes or en dashes, repeat completed material, pad the scene or add an unrequested escalation.",
             },
             { role: "user", content: writingPrompt },
           ],
@@ -864,4 +864,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
