@@ -386,20 +386,30 @@ function requestsChapterGeneration(message: string): boolean {
 }
 
 function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
-  if (!/\b(?:delete|remove)\b/i.test(message)) {
+  const commandText = message.replace(
+    /\b(?:do\s+not|don't|never)\s+(?:delete|remove)\b/gi,
+    "",
+  );
+  const directlyRequestsChapterDeletion =
+    /\b(?:delete|remove)\s+(?:the\s+)?(?:saved\s+)?chapter\b/i.test(
+      commandText,
+    );
+  const directlyRequestsPronounDeletion =
+    /\b(?:delete|remove)\s+(?:that|this|it)\b/i.test(commandText);
+
+  if (!directlyRequestsChapterDeletion && !directlyRequestsPronounDeletion) {
     return { kind: "none" };
   }
 
-  const chapterNumber = getChapterNumberFromMessage(message);
+  const chapterNumber = directlyRequestsChapterDeletion
+    ? getChapterNumberFromMessage(commandText)
+    : null;
 
   if (chapterNumber !== null) {
     return { kind: "exact", chapterNumber };
   }
 
-  if (
-    /\bchapter\b/i.test(message) ||
-    /\b(?:delete|remove)\s+(?:that|this|it)\b/i.test(message)
-  ) {
+  if (directlyRequestsChapterDeletion || directlyRequestsPronounDeletion) {
     return { kind: "ambiguous" };
   }
 
