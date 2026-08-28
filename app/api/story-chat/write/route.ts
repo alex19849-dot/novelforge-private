@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+
 
 import { NextResponse } from "next/server";
 
@@ -101,11 +101,44 @@ function cleanStoryState(value: unknown): unknown {
     latestChapterEnding: state.latestChapterEnding ?? "",
     characterKnowledge: state.characterKnowledge ?? [],
     repetitionWarnings: state.repetitionWarnings ?? [],
-    voiceProfiles: state.voiceProfiles ?? [],
     currentScene: state.currentScene ?? null,
     relationshipProgression: state.relationshipProgression ?? [],
     repetitionMemory: state.repetitionMemory ?? null,
   };
+}
+
+function cleanVoiceProfiles(
+  value: unknown,
+  povCharacter: string,
+): Array<Record<string, unknown>> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return [];
+  }
+
+  const profiles = (value as Record<string, unknown>).voiceProfiles;
+
+  if (!Array.isArray(profiles)) {
+    return [];
+  }
+
+  const normalisedPov = povCharacter.trim().toLowerCase();
+
+  return profiles
+    .filter(
+      (profile): profile is Record<string, unknown> =>
+        Boolean(profile) &&
+        typeof profile === "object" &&
+        !Array.isArray(profile),
+    )
+    .slice(0, 12)
+    .sort((left, right) => {
+      const leftIsPov =
+        cleanString(left.characterName).toLowerCase() === normalisedPov;
+      const rightIsPov =
+        cleanString(right.characterName).toLowerCase() === normalisedPov;
+
+      return Number(rightIsPov) - Number(leftIsPov);
+    });
 }
 
 function completeDraftContext(text: string): string {
@@ -214,6 +247,18 @@ function chapterRepetitionReport(text: string): string[] {
     );
   }
 
+  const injurySentences = sentences.filter((sentence) =>
+    /\b(?:bandag(?:e|ed|es)|dressing|wound|injur(?:y|ed|ies)|stitch(?:es|ed)?|bruise(?:d|s)?|cut|scrape(?:d|s)?|bleed(?:s|ing)?|sore|swollen|swelling)\b/i.test(
+      sentence,
+    ),
+  ).length;
+
+  if (injurySentences >= 3) {
+    warnings.push(
+      `Minor-injury or caretaking language appears in ${injurySentences} sentences. Unless the condition changes or materially constrains the current action, stop foregrounding it.`,
+    );
+  }
+
   return warnings;
 }
 
@@ -268,6 +313,10 @@ function getPrompt(input: {
   const fullDraftContext = completeDraftContext(input.chapterDraft);
   const exactContinuationBoundary = endingExcerpt(input.chapterDraft, 350);
   const draftRepetitionReport = chapterRepetitionReport(input.chapterDraft);
+  const voiceProfiles = cleanVoiceProfiles(
+    input.storyState,
+    input.povCharacter,
+  );
   const mandatoryGuidance = input.sectionInstruction
     ? input.sectionInstruction
     : input.action === "start"
@@ -279,76 +328,72 @@ function getPrompt(input: {
         : "Continue directly from the current draft through only the immediate next development. Do not introduce a major new event without author direction.";
   const actionInstruction =
     input.action === "start"
-      ? `Begin from this section's continuity boundary: ${sectionBrief.continuationBoundary || "the exact accepted ending supplied in continuity"}.`
+      ? "Begin from this section's continuity boundary: " +
+        (sectionBrief.continuationBoundary ||
+          "the exact accepted ending supplied in continuity") +
+        "."
       : input.action === "rewrite"
         ? "Replace SECTION TO REWRITE only. Preserve what happens immediately before and after it. Do not rewrite or advance any other part of the chapter."
         : "Continue from the exact final moment of EXACT CONTINUATION BOUNDARY. Do not recap, restart, repeat its final sentence, jump forward without instruction or begin a different scene.";
 
   return [
-    "You are NovelForge's commercial adult MM romance prose writer.",
-    "MANDATORY INSTRUCTION CONTRACT",
-    "CURRENT GUIDANCE is the complete creative instruction for this generation call. There is no binding full-chapter plan.",
-    "Authority order is strict: CURRENT GUIDANCE controls what happens now. Accepted continuity and the Story Bible preserve established facts but may not veto a deliberate new direction, pacing change, attraction development, intimacy beat or ending requested by the author.",
-    "Never return a conflict warning. If the author deliberately changes direction, write the new direction and preserve only unrelated established facts.",
-    "Read the complete current chapter draft before writing. Treat every action, thought, conclusion, description and exchange already present anywhere in that draft as completed material, not merely the final paragraphs.",
-    "Write only the events requested by the current guidance. Preserve their participants, order, location, timing, emotional movement, intended outcome and stopping point.",
-    "You may invent only the dialogue, physical business, sensory details and connective prose needed to dramatise those specified events.",
-    "Never replace a requested event with a similar event. Never omit, reinterpret, contradict or soften a requirement. Never add an unrequested major event.",
-    "Do not invent later beats beyond the current section. Stop at the endpoint requested by the author or at a natural completed moment within this section.",
-    "If the current guidance names an exact action, line, fact, location, time or endpoint, it must appear accurately in the prose.",
-    "Write one polished section of approximately 600 to 1,000 words.",
-    "If CURRENT GUIDANCE asks to finish, complete or end the chapter, write one bounded final section of approximately 800 to 1,400 words. Resolve only the chapter's active immediate beat, land one clear closing hook or settled ending state and stop. Do not expand the request into several new scenes, introduce a new subplot, narrate the rest of the day or keep adding events merely to make the ending feel larger.",
-    "A chapter-completion request is a stopping instruction, not permission to continue indefinitely. Compress any necessary transition, prioritise the established emotional and plot movement already in progress, complete every sentence and output <END_SECTION> before the technical limit.",
-    "Return only novel prose followed by <END_SECTION> on its own line.",
-    "Use the Story Bible's POV and tense. Default to first-person present tense only when the Story Bible does not specify them.",
-    "Remain in " + input.povCharacter + "'s POV. Never switch heads.",
-    "Natural contractions are mandatory in ordinary narration, internal thought and dialogue. Write I'm, I've, I'd, it's, that's, you're, he's, she's, we're, they're, don't, doesn't, didn't, can't, couldn't, won't and wouldn't wherever a contemporary speaker or narrator would naturally use them. Ordinary uses of I am, I have, I would, it is, that is, you are, he is, she is, we are, they are, do not, does not, did not, cannot, could not, will not and would not are prose violations. Uncontracted wording is allowed only for clear deliberate emphasis, quoted formal language or a Story Bible voice explicitly established as formal. Before returning the section, silently scan the prose and convert every accidental ordinary uncontracted form to its natural contraction. Do not mention this scan or alter meaning.",
-    "Every sentence must be complete, grammatical and naturally phrased. Never omit articles, pronouns, auxiliary verbs, prepositions or connecting words for brevity or style.",
-    "Never use an em dash or en dash. Use full stops, commas, colons, semicolons or parentheses where grammatically appropriate. Ordinary hyphens are allowed only inside genuine compound words.",
-    "Write controlled commercial prose, not a summary of what the viewpoint character thinks and feels. Build the scene through specific action, dialogue, sensory detail and individual observation.",
-    "Do not explain an emotion after the action or physical response has already shown it. Do not repeatedly announce nerves, determination, confusion, attraction or discomfort.",
-    "Avoid generic reaction crutches such as a pounding heart, a caught breath, taking a deep breath, being unable to help thinking or noticing, and reminding oneself why one is here unless that exact reaction is both fresh and necessary.",
-    "Do not begin successive paragraphs with the same construction. Vary sentence length naturally without fragments, clipped article-free phrasing or run-on sentences.",
-    "Use colons sparingly in narration and dialogue. Do not make the prose sound like a report, slide deck, list or essay merely because the viewpoint character is analytical.",
-    "Dialogue must sound like the specific people speaking. Avoid formal exposition disguised as dialogue, generic interview language and speeches that explain facts both characters already know.",
-    "Dialogue must also preserve friction, personality and subtext. Characters do not need to respond neatly to every statement, answer every question directly or demonstrate perfect emotional literacy. Let them interrupt, evade, provoke, misread, deflect, joke badly, go quiet or leave the important implication unsaid when that suits who they are.",
-    "Do not build conversations from repetitive confirmation ladders such as I know, Do you, Yes, I won't, Are you sure, What do you want or repeated versions of the same question and answer. Once a point is established, change the pressure, reveal something new or let an action replace the next reply.",
-    "Do not make adult characters sound like therapists, mediators or workplace training material unless that voice is explicitly established. Avoid clinical explanations of safety, boundaries, communication, emotional processing or what an interaction means. Show the conflict and boundary through the characters' specific words, choices and reactions instead.",
-    "Keep exposition brief enough for the scene to move. When a plan, interview, presentation or explanation has established its purpose, advance to the next planned action instead of supplying more examples and lists.",
-    "Track every character's exact physical position before writing a movement. A standing character cannot stand again, crossed arms cannot simultaneously rest on furniture, and nobody may become physically close without an on-page movement that closes the distance.",
-    "When recurring side characters speak or perform important actions, introduce and use their established names or roles. Do not repeatedly call them only the man, the woman or another generic label.",
-    "Avoid vague attraction placeholders such as something I cannot name, not anger exactly, an unfamiliar feeling, something tighter, a charged look or an unexplained pull. In delayed-awareness stories, describe only what the viewpoint character can presently interpret unless CURRENT GUIDANCE explicitly requires acknowledgement or a new stage of awareness.",
-    "Sexual awareness and physical escalation are separate stages. An instruction to increase awareness, attraction, tension, arousal, noticing or confusion does not authorise a kiss, confession, sexual contact or conscious relationship decision. Show the requested awareness through selective attention, intrusive physical notice, involuntary arousal, disrupted concentration, altered behaviour, denial or sharper conflict, then stop at the instructed boundary.",
-    "A first kiss or new level of sexual contact may occur only when CURRENT GUIDANCE requests it or accepted on-page progression makes that exact action the immediate established beat. Never use a kiss as the first convincing evidence of attraction. Before contact, the scene or accepted continuity must already contain a believable chain of mutual attention, changed behaviour, proximity and restraint so the contact feels like pressure breaking rather than a new idea appearing.",
-    "Do not manufacture escalation with a stock sequence of looking at a mouth, caught breath, stepping closer, neither person moving, asking what the other wants and then kissing. Build escalation from these characters' history, conflict, physical circumstances and individual habits.",
-    "Do not repeatedly use eyes, gaze, jaw, teeth, breath, heartbeat, clenched hands or body tension as interchangeable shortcuts for emotion. Any ordinary gesture may appear when apt, but vary the evidence and do not overuse it across the chapter.",
-    "Do not invent previous meetings, conversations, opinions, memories or familiarity. A viewpoint character may know only what the Story Bible, accepted continuity, current guidance or on-page events establish they know.",
-    "The Story Bible and accepted continuity preserve established facts. They support the current guidance and do not supply a competing plot plan.",
-    "Write the current direction in order and stop once its requested beats reach a natural finished moment.",
-    "Preserve ages, timeline, locations, possessions, family facts, physical positions and character knowledge.",
-    "Do not invent prior romance, attraction or intimacy. In a gay-for-you or delayed-awareness arc, involuntary attention, physical reaction, denial and changed behaviour normally precede conscious acknowledgement, but CURRENT GUIDANCE may explicitly move the character into acknowledgement now.",
-    "Do not repeat completed actions, conversations, jokes, gestures, attraction observations, internal conclusions or paragraphs.",
-    "Use the chapter-level repetition report as evidence, not as a crude banned-word list. Avoid adding to an overused pattern, but keep ordinary language natural when a word is genuinely needed.",
-    "Write long, open-door consensual adult intimacy when the established progression requires it. Keep the characters and their emotional progression on the page throughout the complete intimate scene and its aftermath rather than abruptly cutting away.",
-    "For mutually willing adult intimacy, make consent clear through reciprocal initiation, active participation, responsive touch, the freedom to pull away and immediate respect for any redirection. Do not stop the scene to announce or explain consent when the behaviour already makes willingness clear.",
-    "Do not insert permission checklists, contractual negotiation or repeated reassurance such as if I say no, if I say yes, are you sure, tell me what you want, we can stop, I won't call it a mistake, you won't regret this tomorrow or promises about what the encounter will mean unless CURRENT GUIDANCE, a specific character need or genuine on-page uncertainty explicitly requires those words.",
-    "Do not pause after every flinch, hesitation or change in breathing for a formal verbal check. Read the established physical context. If a character redirects a touch, protects an injury or changes pace, let the partner respond immediately and naturally, using brief in-character words only when needed.",
-    "Do not include a chapter heading, POV label, outline, notes, markdown, warnings, analysis or commentary.",
+    "You are NovelForge's commercial adult MM romance novelist.",
+    "SECTION CONTRACT",
+    "CURRENT GUIDANCE is the complete creative instruction for this call. There is no binding full-chapter plan. Follow its events, participants, order, emotional movement, heat, endpoint and deliberate changes exactly.",
+    "Accepted continuity and the Story Bible preserve established facts. They do not overrule a new direction the author requests. Never return a conflict warning.",
+    "Read the complete current draft as finished material. Write only the immediate requested section, inventing no major event beyond what is needed to dramatise it. Do not repeat or recap completed material.",
+    input.action === "rewrite"
+      ? "Rewrite only the selected passage and preserve its boundaries."
+      : "Begin at the supplied boundary and stop at the requested endpoint or the first natural completed moment within it.",
+    "Write approximately 600 to 1,000 words. If CURRENT GUIDANCE asks to finish the chapter, write one bounded final section of approximately 800 to 1,400 words, resolve only the active immediate beat, land one ending state or hook and stop.",
+    "Return only novel prose followed by <END_SECTION> on its own line. Finish every sentence before the marker.",
+    "CHARACTER CAUSALITY AND VOICE",
+    "Before each meaningful beat, ground the character in an immediate want, pressure, knowledge limit and face-saving strategy. Their action must follow from the person and circumstances, not from a generic romance role or the plot needing them to behave a certain way.",
+    "Write male characters as specific adult men, not interchangeable gruff, dominant, sarcastic, hyper-protective or emotionally polished templates. Let background, work, culture, friendships, habits, pride, fear and experience shape how each man speaks, notices, argues, cares and wants.",
+    "Use CHARACTER VOICE PROFILES as operational instructions. Keep syntax, line length, vocabulary, register, swearing, humour, disclosure, conflict tactics, internal decision speed and sensory attention observably different. If no profile exists yet, derive these differences from each Story Bible character entry without inventing biography.",
+    "Care must be character-specific and proportionate. Do not turn either man into a default nurse, therapist, mind-reader or safety officer. Ordinary discomfort does not automatically become a relationship beat.",
+    "DIALOGUE",
+    "Every line must have an intelligible link to the previous line or visible action: answer it, challenge it, evade it, misread it, redirect it or act on it. A subject change needs a clear trigger. Deliberate evasion may be indirect, but it must still make sense.",
+    "Give each speaker an immediate conversational aim. Let people interrupt, deflect, joke badly, leave implications unsaid or refuse a neat answer when that fits them, while keeping the exchange causally coherent.",
+    "Do not write exposition both speakers know, interview-style question chains, confirmation ladders, therapy-speak, perfect emotional literacy, interchangeable quips, constant sarcasm or speeches that explain the scene.",
+    "NARRATIVE ECONOMY",
+    "Every paragraph must change action, knowledge, decision, pressure or relationship, or add irreplaceable character-specific texture. Cut routine choreography, room inventories, repeated setting introductions, transition waffle and reflection that performs no new work.",
+    "Once an emotion, attraction observation, worry or conclusion has landed, do not notice, interpret, doubt and restate it again unless new external evidence changes its meaning. Trust the reader.",
+    "Continuity is a fact register, not a list of details to foreground. A stable treated minor injury may be mentioned only when it changes, is directly aggravated, materially limits the immediate action or CURRENT GUIDANCE makes it important. After one necessary adjustment, drop it. Do not keep checking, watching, protecting, thinking about or reassuring over a bandage. Apply the same restraint to bruises, tiredness, clothing and ordinary objects.",
+    "EROTIC SCENES",
+    "Every romantic or sexual character is an adult aged eighteen or older.",
+    "Treat an intimate scene as a story scene particular to this couple. Their histories, experience, inhibitions, humour, conflict, desire, vocabulary and current stakes must determine initiation, tempo, focus, physical choices and aftermath.",
+    "When CURRENT GUIDANCE calls for open-door explicit prose, keep it physically legible and emotionally specific without fading out, summarising or replacing the scene with vague sensation. Do not use a standard escalation ladder, anatomy inventory, stock dirty talk, a safety briefing, repeated reassurance or an automatic tenderness script.",
+    "Each intimate scene must reveal character, change understanding, alter the relationship or affect the plot. Do not repeat the same progression, language, power dynamic or aftermath used earlier merely because it is familiar.",
+    "PROSE AND CONTINUITY",
+    "Use the Story Bible's POV and tense. Default to first-person present only when neither is specified. Remain in " +
+      input.povCharacter +
+      "'s POV and never switch heads.",
+    "Use contractions where natural to this narrator or speaker. Keep sentences complete, grammatical and idiomatic. Never use an em dash or en dash.",
+    "Show emotion through specific action, choice, dialogue and perception. Do not explain what has already been shown or lean on stock breath, heartbeat, jaw, gaze, clenched-hand or vague unnamed-feeling reactions.",
+    "Track physical positions and movements exactly. Preserve ages, time, locations, possessions, family facts and individual knowledge. Do not invent prior meetings, attraction, romance, sex, memories or off-page solutions.",
+    "Attraction, conscious acknowledgement and physical escalation are separate stages. Do not turn awareness into a kiss, confession or sexual contact unless CURRENT GUIDANCE requests that step or accepted on-page progression makes it the immediate established action.",
     "STORY BIBLE, FIXED CANON\n" +
       JSON.stringify(input.storyBible ?? {}, null, 2),
-    "CURRENT SECTION BRIEF, THIS SECTION ONLY\n" + sectionBriefForPrompt,
-    "CONTINUITY\n" + JSON.stringify(cleanStoryState(input.storyState), null, 2),
+    "CHARACTER VOICE PROFILES, ACTIVE POV FIRST\n" +
+      (voiceProfiles.length
+        ? JSON.stringify(voiceProfiles, null, 2)
+        : "No persistent profile exists yet. Establish distinct voices from the Story Bible and current prose."),
+    "CONTINUITY, FACTS NOT NARRATIVE PRIORITIES\n" +
+      JSON.stringify(cleanStoryState(input.storyState), null, 2),
     "RECENT CHAPTER ENDINGS\n" + JSON.stringify(input.recentChapters, null, 2),
+    "CURRENT SECTION BRIEF, THIS SECTION ONLY\n" + sectionBriefForPrompt,
     input.chapterDraft
       ? "COMPLETE CURRENT CHAPTER DRAFT, READ ONLY\n" + fullDraftContext
       : "",
     input.chapterDraft
-      ? "EXACT CONTINUATION BOUNDARY, READ ONLY\n" + exactContinuationBoundary
+      ? "EXACT CONTINUATION BOUNDARY, READ ONLY\n" +
+        exactContinuationBoundary
       : "",
     "CURRENT CHAPTER REPETITION REPORT\n" +
       (draftRepetitionReport.length
         ? draftRepetitionReport.join("\n")
-        : "No chapter-level lexical pattern has crossed its review threshold."),
+        : "No tracked pattern has crossed its review threshold."),
     input.action === "rewrite"
       ? "SECTION TO REWRITE, READ ONLY\n" + input.sectionToRewrite
       : "",
@@ -360,12 +405,11 @@ function getPrompt(input: {
       ? "ORIGINAL SECTION REQUEST\n" +
         (input.latestUserMessage || "No separate original request supplied.")
       : "",
-    "CURRENT GUIDANCE, HIGHEST PRIORITY WRITING REQUIREMENT\n" +
-      mandatoryGuidance,
+    "CURRENT GUIDANCE, HIGHEST PRIORITY\n" + mandatoryGuidance,
     "EXACT ACTION AND BOUNDARY\n" + actionInstruction,
-    "SILENT COMPLIANCE CHECK BEFORE RETURNING PROSE",
-    "Check every sentence against CURRENT GUIDANCE. Confirm that every requested beat is present, continuity begins at the correct boundary, established factual details remain accurate, POV remains fixed and the section stops where instructed. Correct any failure silently before returning the prose.",
-    "Complete the section on a finished sentence, then output <END_SECTION>. Do not continue after the marker.",
+    "SILENT FINAL PASS",
+    "Delete any paragraph that adds no change or unique texture. Repair any dialogue line whose connection is unclear. Remove every unnecessary reference to a stable injury or caretaking. Confirm the two leads could not swap dialogue or internal narration without sounding wrong. Verify POV, factual continuity, physical staging, requested endpoint and complete final sentence. Return no analysis.",
+    "Complete the section, output <END_SECTION>, then stop.",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -491,6 +535,20 @@ function repetitionWarnings(
   }
 
   const combinedProse = `${comparisonDraft}\n\n${section}`;
+  const injuryMentions = combinedProse
+    .split(/[.!?]+\s+/)
+    .filter((sentence) =>
+      /\b(?:bandag(?:e|ed|es)|dressing|wound|injur(?:y|ed|ies)|stitch(?:es|ed)?|bruise(?:d|s)?|cut|scrape(?:d|s)?|bleed(?:s|ing)?|sore|swollen|swelling)\b/i.test(
+        sentence,
+      ),
+    ).length;
+
+  if (injuryMentions >= 4) {
+    warnings.push(
+      "This chapter repeatedly foregrounds an injury or caretaking detail. Keep it only if its state changes or it materially constrains the immediate action.",
+    );
+  }
+
   const overuseChecks: { pattern: RegExp; maximum: number }[] = [
     { pattern: /\bmy heart (?:is )?pound(?:s|ing)\b/gi, maximum: 1 },
     { pattern: /\bi (?:take|draw) a deep breath\b/gi, maximum: 1 },
@@ -702,7 +760,7 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "CURRENT GUIDANCE is the complete creative authority for this section. There is no binding full-chapter plan and you must never return a conflict warning. Obey deliberate changes to pacing, attraction, awareness, intimacy, dialogue and direction while preserving unrelated established facts. When asked to complete the chapter, produce one bounded final section, land the active beat and stop instead of expanding into additional scenes. Sexual awareness never authorises an unrequested kiss or sexual escalation. Write character-specific dialogue with friction and subtext, never repetitive confirmation ladders, therapy-speak or consent checklists. Show willing adult participation naturally through reciprocal behaviour. Write polished, grammatically complete commercial romance prose. Natural contractions are mandatory in ordinary prose: use it's, I've, don't, doesn't, can't, you're and equivalent contracted forms instead of accidental it is, I have, do not, does not, cannot or you are. Silently correct those violations before returning the section. Keep consensual adult intimacy on the page when required. Never switch POV, use em dashes or en dashes, omit necessary words, summarise the requested scene or pad it with generic emotional explanation.",
+                "Write only the section required by CURRENT GUIDANCE and return complete novel prose followed by <END_SECTION>. Preserve accepted facts, fixed POV, tense and physical staging. Keep character voices distinct, dialogue causally coherent and every paragraph necessary. Treat continuity facts proportionately, never as a demand to foreground stable minor injuries or caretaking. Every romantic or sexual character is an adult aged eighteen or older. When explicit intimacy is requested, make it character-specific, physically legible and consequential. Never use em dashes or en dashes, repeat completed material, pad the scene or add an unrequested escalation.",
             },
             { role: "user", content: writingPrompt },
           ],
@@ -805,3 +863,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
