@@ -286,9 +286,10 @@ export async function POST(request: Request) {
             "The Story Bible, canonical chapter plan and accepted continuity are binding.",
             "Read both technical halves as one chapter. Check that Part 2 continues rather than restarting Part 1.",
             "Hard-fail contradictory physical staging, impossible movements, repeated events, duplicated paragraphs, malformed prose, markdown, instruction-like text, obvious truncation, wrong POV or tense, invented canon and an unearned ending.",
+            "Hard-fail dialogue with unexplained topic changes or replies that have no intelligible link to the preceding line or action. Fail interchangeable lead voices, repeated emotional conclusions, filler paragraphs and repeated monitoring of a stable minor injury when nothing changes.",
             "Hard-fail premature conscious attraction or invented prior desire in a gay-for-you or delayed-awareness arc. Involuntary attention, physical reaction, denial and changed behaviour may precede conscious acknowledgement.",
             "Do not penalise an earned lack of kissing or sex in a slower chapter. Do require meaningful plot or relationship change.",
-            "Consensual explicit adult MM content is allowed and must not be failed merely for being explicit.",
+            "Explicit adult MM content is allowed and must not be failed merely for being explicit. Every romantic or sexual character must be an adult aged eighteen or older.",
             "Use repairInstructions only to describe possible later human-selected fixes. Do not perform them.",
             "Set passed true only when the chapter is safe to accept unchanged.",
           ].join("\n"),
@@ -437,3 +438,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
