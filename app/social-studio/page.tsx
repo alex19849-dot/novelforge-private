@@ -545,6 +545,185 @@ async function createEditorialCampaignImage(input: {
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
+async function createCleanCoverCampaignImage(input: {
+  book: CatalogueBook;
+  post: GeneratedPost;
+  mediaStyle: MediaStyle;
+}): Promise<string> {
+  const isTikTok = input.post.platform === "tiktok";
+  const width = 1080;
+  const height = isTikTok ? 1920 : 1350;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("This browser could not create the image.");
+
+  const cover = await loadImage(input.book.coverUrl);
+  const base = context.createLinearGradient(0, 0, width, height);
+  base.addColorStop(0, "#050507");
+  base.addColorStop(0.58, "#120812");
+  base.addColorStop(1, "#48082f");
+  context.fillStyle = base;
+  context.fillRect(0, 0, width, height);
+
+  if (input.mediaStyle === "ai-scene") {
+    context.save();
+    context.filter = "blur(52px) saturate(1.25)";
+    context.globalAlpha = 0.34;
+    drawImageCover(context, cover, -110, 180, width + 220, height - 250);
+    context.restore();
+
+    const textureShade = context.createLinearGradient(0, 150, 0, height);
+    textureShade.addColorStop(0, "rgba(5,5,7,0.5)");
+    textureShade.addColorStop(0.55, "rgba(5,5,7,0.7)");
+    textureShade.addColorStop(1, "rgba(5,5,7,0.96)");
+    context.fillStyle = textureShade;
+    context.fillRect(0, 0, width, height);
+  }
+
+  context.fillStyle = "rgba(236,72,153,0.1)";
+  context.beginPath();
+  context.moveTo(width * 0.72, 0);
+  context.lineTo(width, 0);
+  context.lineTo(width, height * 0.58);
+  context.lineTo(width * 0.88, height * 0.7);
+  context.closePath();
+  context.fill();
+
+  context.fillStyle = "rgba(5,5,7,0.97)";
+  context.fillRect(34, 34, width - 68, isTikTok ? 300 : 235);
+
+  const footerTop = isTikTok ? 1430 : 1020;
+  context.fillStyle = "rgba(5,5,7,0.98)";
+  context.fillRect(34, footerTop, width - 68, height - footerTop - 34);
+
+  context.strokeStyle = "rgba(236,72,153,0.9)";
+  context.lineWidth = 5;
+  context.strokeRect(34, 34, width - 68, height - 68);
+
+  context.textBaseline = "alphabetic";
+  context.textAlign = "left";
+  context.fillStyle = "#ec4899";
+  context.fillRect(64, 66, 104, 8);
+  context.fillStyle = "#ffffff";
+  context.font = "800 27px Arial, sans-serif";
+  context.fillText("MARLOW QUINN", 64, 116);
+  context.fillStyle = "#f9a8d4";
+  context.font = "700 17px Arial, sans-serif";
+  context.fillText("BITE  •  HEAT  •  HEART", 64, 146);
+
+  let categoryHook = input.post.title
+    .replace(input.book.title, "")
+    .replace(/book spotlight/gi, "")
+    .replace(/^[\s|:/-]+|[\s|:/-]+$/g, "")
+    .trim();
+
+  if (categoryHook.length < 5 || categoryHook.length > 90) {
+    categoryHook = input.book.subgenre || "M/M ROMANCE";
+  }
+
+  context.fillStyle = "#ffffff";
+  context.font = `800 ${isTikTok ? 54 : 45}px Arial, sans-serif`;
+  const categoryLines = wrappedLines(
+    context,
+    categoryHook.toUpperCase(),
+    width - 128,
+    2,
+  );
+  const categoryTop = isTikTok ? 215 : 190;
+  const categoryGap = isTikTok ? 59 : 50;
+
+  categoryLines.forEach((line, index) => {
+    drawFittedText(
+      context,
+      line,
+      64,
+      categoryTop + index * categoryGap,
+      width - 128,
+      800,
+      isTikTok ? 54 : 45,
+      isTikTok ? 34 : 30,
+    );
+  });
+
+  const maximumCoverHeight = isTikTok ? 980 : 680;
+  const maximumCoverWidth = isTikTok ? 620 : 500;
+  const naturalCoverHeight =
+    maximumCoverWidth * (cover.naturalHeight / cover.naturalWidth);
+  const coverHeight = Math.min(naturalCoverHeight, maximumCoverHeight);
+  const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+  const coverX = (width - coverWidth) / 2;
+  const coverY = isTikTok ? 390 : 300;
+
+  context.save();
+  context.shadowColor = "rgba(236,72,153,0.72)";
+  context.shadowBlur = 62;
+  context.shadowOffsetY = 22;
+  context.fillStyle = "#ffffff";
+  context.fillRect(coverX - 10, coverY - 10, coverWidth + 20, coverHeight + 20);
+  context.drawImage(cover, coverX, coverY, coverWidth, coverHeight);
+  context.restore();
+
+  const tropeText = input.book.tropes.slice(0, 3).join("   •   ");
+  context.textAlign = "center";
+  context.fillStyle = "#f9a8d4";
+  context.font = `700 ${isTikTok ? 34 : 29}px Arial, sans-serif`;
+  const tropeLines = wrappedLines(
+    context,
+    tropeText.toUpperCase(),
+    width - 150,
+    isTikTok ? 3 : 2,
+  );
+  const tropeTop = isTikTok ? 1530 : 1120;
+  const tropeGap = isTikTok ? 49 : 42;
+
+  tropeLines.forEach((line, index) => {
+    drawFittedText(
+      context,
+      line,
+      width / 2,
+      tropeTop + index * tropeGap,
+      width - 150,
+      700,
+      isTikTok ? 34 : 29,
+      isTikTok ? 24 : 21,
+    );
+  });
+
+  context.fillStyle = "#ec4899";
+  context.fillRect(
+    width / 2 - (isTikTok ? 170 : 135),
+    isTikTok ? 1685 : 1195,
+    isTikTok ? 340 : 270,
+    6,
+  );
+
+  if (input.book.kindleUnlimited) {
+    context.textAlign = "center";
+    const badgeX = isTikTok ? 170 : 220;
+    const badgeY = isTikTok ? 1740 : 1230;
+    const badgeWidth = width - badgeX * 2;
+    const badgeHeight = isTikTok ? 86 : 72;
+    context.fillStyle = "#ec4899";
+    context.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
+    context.fillStyle = "#ffffff";
+    drawFittedText(
+      context,
+      "AVAILABLE ON KINDLE UNLIMITED",
+      width / 2,
+      badgeY + (isTikTok ? 56 : 47),
+      badgeWidth - 50,
+      800,
+      isTikTok ? 27 : 24,
+      19,
+    );
+  }
+
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
 function videoRecorderMimeType(): string {
   const candidates = [
     "video/mp4;codecs=avc1.42E01E",
@@ -1419,37 +1598,10 @@ export default function SocialStudioPage() {
     setImageError("");
 
     try {
-      let aiBackground: string | undefined;
-
-      if (mediaStyle === "ai-scene") {
-        const response = await fetch("/api/social-studio/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            book: selectedBook,
-            platform: post.platform,
-            campaignType,
-            visualDirection: post.visualDirection,
-            instructions: instructions.trim(),
-          }),
-        });
-        const result = (await response.json()) as {
-          imageDataUrl?: string;
-          error?: string;
-        };
-
-        if (!response.ok || !result.imageDataUrl) {
-          throw new Error(result.error || "The silhouette scene could not be created.");
-        }
-
-        aiBackground = result.imageDataUrl;
-      }
-
-      const dataUrl = await createEditorialCampaignImage({
+      const dataUrl = await createCleanCoverCampaignImage({
         book: selectedBook,
         post,
         mediaStyle,
-        aiBackground,
       });
 
       setGeneratedMedia((current) => [
@@ -1798,9 +1950,9 @@ export default function SocialStudioPage() {
                       : "border-white/10 bg-white/5 hover:bg-white/10"
                   }`}
                 >
-                  <span className="block font-semibold">Cinematic Silhouettes</span>
+                  <span className="block font-semibold">Book-Matched Editorial</span>
                   <span className="mt-1 block text-sm leading-5 text-neutral-400">
-                    Creates setting-led artwork with two faceless, backlit male silhouettes.
+                    Uses the cover's own colours as a rich abstract background. No generated people.
                   </span>
                 </button>
               </div>
@@ -1960,12 +2112,12 @@ export default function SocialStudioPage() {
                       >
                         {creatingImageFor === post.platform
                           ? mediaStyle === "ai-scene"
-                            ? "Creating silhouette scene and finished image..."
+                            ? "Creating book-matched editorial image..."
                             : "Creating finished image..."
                           : media
                             ? "Create Another Image"
                             : mediaStyle === "ai-scene"
-                              ? "Create Silhouette Image"
+                              ? "Create Editorial Image"
                               : "Create Branded Image"}
                       </button>
 
