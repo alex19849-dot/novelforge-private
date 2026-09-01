@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       model: IMAGE_MODEL,
       prompt,
       n: 1,
-      size: platform === "tiktok" ? "1024x1824" : "1024x1280",
+      size: "1024x1536",
       quality: "medium",
       output_format: "jpeg",
       output_compression: 85,
