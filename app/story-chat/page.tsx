@@ -2973,6 +2973,16 @@ disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
                 Export Book
               </button>
 
+              <a
+                href="/social-studio"
+                onClick={() => setIsMenuOpen(false)}
+                className="mb-3 flex w-full items-center rounded-xl border border-pink-500/40
+bg-pink-500/10 px-4 py-3 text-left font-semibold text-pink-300
+transition hover:bg-pink-500/20"
+              >
+                Social Studio
+              </a>
+
               <div className="mb-6 space-y-2 border-b border-white/10 pb-6">
                 <button
                   type="button"
