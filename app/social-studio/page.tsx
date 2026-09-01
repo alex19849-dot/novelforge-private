@@ -345,6 +345,190 @@ async function createFinishedCampaignImage(input: {
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
+async function createEditorialCampaignImage(input: {
+  book: CatalogueBook;
+  post: GeneratedPost;
+  mediaStyle: MediaStyle;
+  aiBackground?: string;
+}): Promise<string> {
+  const isTikTok = input.post.platform === "tiktok";
+  const hasScene = input.mediaStyle === "ai-scene" && Boolean(input.aiBackground);
+  const width = 1080;
+  const height = isTikTok ? 1920 : 1350;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("This browser could not create the image.");
+
+  const cover = await loadImage(input.book.coverUrl);
+  const scene = input.aiBackground ? await loadImage(input.aiBackground) : null;
+
+  const base = context.createLinearGradient(0, 0, width, height);
+  base.addColorStop(0, "#050507");
+  base.addColorStop(0.62, "#0d0710");
+  base.addColorStop(1, "#3d0928");
+  context.fillStyle = base;
+  context.fillRect(0, 0, width, height);
+
+  if (hasScene && scene) {
+    drawImageCover(context, scene, 34, 255, width - 68, isTikTok ? 1270 : 840);
+
+    const sceneShade = context.createLinearGradient(0, 0, width, 0);
+    sceneShade.addColorStop(0, "rgba(5,5,7,0.18)");
+    sceneShade.addColorStop(0.5, "rgba(5,5,7,0.28)");
+    sceneShade.addColorStop(0.72, "rgba(5,5,7,0.82)");
+    sceneShade.addColorStop(1, "rgba(5,5,7,0.98)");
+    context.fillStyle = sceneShade;
+    context.fillRect(34, 255, width - 68, isTikTok ? 1270 : 840);
+
+    const verticalShade = context.createLinearGradient(0, 255, 0, isTikTok ? 1525 : 1095);
+    verticalShade.addColorStop(0, "rgba(5,5,7,0.08)");
+    verticalShade.addColorStop(0.72, "rgba(5,5,7,0.1)");
+    verticalShade.addColorStop(1, "rgba(5,5,7,0.92)");
+    context.fillStyle = verticalShade;
+    context.fillRect(34, 255, width - 68, isTikTok ? 1270 : 840);
+  }
+
+  context.fillStyle = "rgba(5,5,7,0.97)";
+  context.fillRect(34, 34, width - 68, isTikTok ? 330 : 245);
+
+  const footerTop = isTikTok ? 1515 : 1090;
+  context.fillStyle = "rgba(5,5,7,0.98)";
+  context.fillRect(34, footerTop, width - 68, height - footerTop - 34);
+
+  context.strokeStyle = "rgba(236,72,153,0.88)";
+  context.lineWidth = 5;
+  context.strokeRect(34, 34, width - 68, height - 68);
+
+  context.textBaseline = "alphabetic";
+  context.textAlign = "left";
+  context.fillStyle = "#ec4899";
+  context.fillRect(64, 66, 104, 8);
+  context.fillStyle = "#ffffff";
+  context.font = "800 27px Arial, sans-serif";
+  context.fillText("MARLOW QUINN", 64, 116);
+  context.fillStyle = "#f9a8d4";
+  context.font = "700 17px Arial, sans-serif";
+  context.fillText("BITE  •  HEAT  •  HEART", 64, 146);
+
+  const hook =
+    input.book.tropes.slice(0, 2).join("  ×  ") ||
+    input.book.subgenre ||
+    input.post.title;
+  context.fillStyle = "#ffffff";
+  context.font = `800 ${isTikTok ? 61 : 51}px Arial, sans-serif`;
+  const hookLines = wrappedLines(context, hook.toUpperCase(), width - 128, 2);
+  const hookTop = isTikTok ? 220 : 190;
+  const hookGap = isTikTok ? 68 : 57;
+
+  hookLines.forEach((line, index) => {
+    drawFittedText(
+      context,
+      line,
+      64,
+      hookTop + index * hookGap,
+      width - 128,
+      800,
+      isTikTok ? 61 : 51,
+      isTikTok ? 38 : 34,
+    );
+  });
+
+  const maximumCoverHeight = isTikTok ? 940 : 690;
+  const maximumCoverWidth = hasScene
+    ? isTikTok
+      ? 530
+      : 420
+    : isTikTok
+      ? 610
+      : 500;
+  const naturalCoverHeight =
+    maximumCoverWidth * (cover.naturalHeight / cover.naturalWidth);
+  const coverHeight = Math.min(naturalCoverHeight, maximumCoverHeight);
+  const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+  const coverX = hasScene
+    ? width - 64 - coverWidth
+    : (width - coverWidth) / 2;
+  const coverY = isTikTok ? 500 : 330;
+
+  context.save();
+  context.shadowColor = "rgba(236,72,153,0.7)";
+  context.shadowBlur = 55;
+  context.shadowOffsetY = 20;
+  context.fillStyle = "#ffffff";
+  context.fillRect(coverX - 9, coverY - 9, coverWidth + 18, coverHeight + 18);
+  context.drawImage(cover, coverX, coverY, coverWidth, coverHeight);
+  context.restore();
+
+  const tropes = input.book.tropes.slice(0, 3);
+
+  if (isTikTok) {
+    tropes.forEach((trope, index) => {
+      const x = 64;
+      const y = 1565 + index * 83;
+      const cardWidth = width - 128;
+      context.fillStyle = index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
+      context.fillRect(x, y, cardWidth, 62);
+      context.fillStyle = "#ec4899";
+      context.fillRect(x, y, 8, 62);
+      context.fillStyle = "#ffffff";
+      context.textAlign = "left";
+      drawFittedText(context, trope.toUpperCase(), x + 28, y + 41, cardWidth - 56, 800, 30, 21);
+    });
+  } else {
+    const gap = 16;
+    const cardWidth = (width - 128 - gap * 2) / 3;
+
+    tropes.forEach((trope, index) => {
+      const x = 64 + index * (cardWidth + gap);
+      const y = 1140;
+      context.fillStyle = index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
+      context.fillRect(x, y, cardWidth, 92);
+      context.fillStyle = "#ec4899";
+      context.fillRect(x, y, 7, 92);
+      context.fillStyle = "#ffffff";
+      context.textAlign = "center";
+      context.font = "800 25px Arial, sans-serif";
+      const lines = wrappedLines(context, trope.toUpperCase(), cardWidth - 30, 2);
+      lines.forEach((line, lineIndex) => {
+        drawFittedText(
+          context,
+          line,
+          x + cardWidth / 2,
+          y + 39 + lineIndex * 29,
+          cardWidth - 30,
+          800,
+          25,
+          18,
+        );
+      });
+    });
+  }
+
+  context.textAlign = "center";
+  context.fillStyle = "#f9a8d4";
+  context.font = `700 ${isTikTok ? 25 : 22}px Arial, sans-serif`;
+  context.fillText(input.book.subgenre.toUpperCase(), width / 2, isTikTok ? 1840 : 1275);
+
+  if (input.book.kindleUnlimited) {
+    context.fillStyle = "#ffffff";
+    drawFittedText(
+      context,
+      "AVAILABLE ON KINDLE UNLIMITED",
+      width / 2,
+      isTikTok ? 1885 : 1318,
+      width - 160,
+      800,
+      isTikTok ? 27 : 24,
+      19,
+    );
+  }
+
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
 function videoRecorderMimeType(): string {
   const candidates = [
     "video/mp4;codecs=avc1.42E01E",
@@ -1245,7 +1429,7 @@ export default function SocialStudioPage() {
         aiBackground = result.imageDataUrl;
       }
 
-      const dataUrl = await createFinishedCampaignImage({
+      const dataUrl = await createEditorialCampaignImage({
         book: selectedBook,
         post,
         mediaStyle,
