@@ -35,16 +35,16 @@ function cleanStringArray(value: unknown, maximumItems = 12): string[] {
 }
 
 const CASTING_PROFILES = [
-  "deep brown skin, close-cropped coiled black hair, an angular face, strong cheekbones and a tall athletic build",
-  "fair skin with freckles, tousled auburn hair, a straight nose, expressive eyes and a lean runner's build",
-  "warm olive skin, thick dark curls, a square jaw, heavy brows and a powerful stocky build",
-  "golden tan skin, short sandy-blond hair, a broken-in nose, light stubble and broad swimmer's shoulders",
-  "medium-brown South Asian skin, swept-back black hair, an oval face, neatly trimmed beard and a solid muscular build",
-  "light East Asian skin, straight black undercut hair, a defined jaw, clean-shaven face and a compact athletic build",
-  "pale skin, dark blond buzz cut, a long face, a small eyebrow scar and a tall broad-chested build",
-  "rich brown skin, shoulder-length locs tied back, a rounded jaw, close beard and a lean muscular build",
-  "sun-warmed Latino skin, short wavy brown hair, a cleft chin, dark stubble and a sturdy athletic build",
-  "cool fair skin, collar-length black hair, sharp grey eyes, a narrow face and a wiry build",
+  "very tall with broad shoulders, a close-cropped hair outline and a heavy athletic silhouette",
+  "slightly shorter with a lean runner's build, loose wavy hair and a narrow silhouette",
+  "tall and powerfully stocky with a short curly hair outline and thick forearms",
+  "long-limbed with swimmer's shoulders, a neat undercut outline and an upright stance",
+  "medium height with a solid muscular build, swept-back hair and a relaxed stance",
+  "compact and athletic with straight cropped hair and a sharply defined silhouette",
+  "very tall and broad-chested with a buzz-cut outline and a guarded stance",
+  "lean and muscular with tied-back shoulder-length hair and an open stance",
+  "sturdy and athletic with short wavy hair and a strong squared silhouette",
+  "tall and wiry with collar-length hair and a slightly restless stance",
 ] as const;
 
 function stableTitleNumber(value: string): number {
@@ -105,18 +105,18 @@ export async function POST(request: Request) {
     const secondCasting = CASTING_PROFILES[secondCastingIndex];
 
     const prompt = [
-      "Create a premium cinematic background image for an adult MM romance book promotion.",
+      "Create premium cinematic environmental artwork for an adult MM romance book promotion.",
       "The characters are fictional adult men aged twenty-one or older.",
-      "Show exactly two clearly different men. They must read instantly as two separate people, never twins, clones, brothers, duplicated faces or the same model rendered twice.",
-      "Give them visibly different face shapes, noses, jawlines, hair colour or texture, builds, styling and silhouettes. Do not mirror their hairstyles, poses, clothing or expressions.",
-      "If the supplied blurb contains explicit appearance details, preserve those details. Otherwise use the stable visual casting below so this book has its own recognisable couple.",
-      `Man one: ${firstCasting}.`,
-      `Man two: ${secondCasting}.`,
-      "Keep Man One's exact identity consistent across his face, hair, body and clothing. Keep Man Two's separate exact identity consistent. Do not blend their features together.",
+      "Show exactly two fully clothed adult male silhouettes as secondary elements within the setting. They must be backlit, rim-lit or in deep shadow with no visible facial features, eyes, noses, mouths or realistic skin detail.",
+      "Do not generate portrait faces, close-up faces, handsome catalogue models or photorealistic facial detail. The atmosphere and story setting are the hero, not the men's faces.",
+      "The two silhouettes must be clearly different in height, build, hair outline, clothing outline, stance and body language. Never make them twins, clones or mirrored duplicates.",
+      `Silhouette one: ${firstCasting}.`,
+      `Silhouette two: ${secondCasting}.`,
+      "Keep both figures tasteful and graphic. Their attraction should come through distance, tension, posture and lighting rather than kissing or visible facial expressions.",
       "Keep the image sensual, atmospheric and suitable for a mainstream social media feed. No nudity, explicit sexual action or fetish imagery.",
       "Do not add any words, letters, typography, logos, watermarks, book covers, product mockups or UI elements. NovelForge will add the real book cover and accurate text afterwards.",
       "Do not imitate a living artist, celebrity or identifiable public figure.",
-      "Use strong composition, believable anatomy, natural masculine styling, realistic lighting and enough uncluttered negative space for a cover and promotional hook.",
+      "Use strong composition, believable anatomy, natural masculine styling, dramatic lighting and enough uncluttered negative space for a cover and promotional hook.",
       `Book title for context only: ${book.title}`,
       `Subgenre: ${book.subgenre}`,
       `Tropes: ${book.tropes.join(", ")}`,
