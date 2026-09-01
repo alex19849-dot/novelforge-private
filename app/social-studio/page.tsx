@@ -1102,6 +1102,10 @@ export default function SocialStudioPage() {
   const [creatingVideoFor, setCreatingVideoFor] =
     useState<SocialPlatform | null>(null);
   const [videoError, setVideoError] = useState("");
+  const [testingMakeFor, setTestingMakeFor] =
+    useState<SocialPlatform | null>(null);
+  const [makeTestMessage, setMakeTestMessage] = useState("");
+  const [makeTestError, setMakeTestError] = useState("");
 
   function chooseBook(book: CatalogueBook) {
     setSelectedBook(book);
@@ -1116,6 +1120,8 @@ export default function SocialStudioPage() {
     setImageError("");
     setGeneratedVideos([]);
     setVideoError("");
+    setMakeTestMessage("");
+    setMakeTestError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -1302,6 +1308,54 @@ export default function SocialStudioPage() {
       );
     } finally {
       setCreatingVideoFor(null);
+    }
+  }
+
+  async function sendTestToMake(post: GeneratedPost) {
+    if (!selectedBook) return;
+
+    setTestingMakeFor(post.platform);
+    setMakeTestMessage("");
+    setMakeTestError("");
+
+    try {
+      const response = await fetch("/api/social-studio/publish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          platform: post.platform,
+          bookTitle: selectedBook.title,
+          bookSlug: selectedBook.slug,
+          campaignTitle: post.title,
+          caption: post.caption,
+          hashtags: post.hashtags,
+          mediaUrl: selectedBook.coverUrl,
+          mediaType: "image",
+          amazonUrl: selectedBook.amazonUrl,
+        }),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.error || "Make rejected the test campaign.");
+      }
+
+      setMakeTestMessage(
+        `${post.platform} test received by Make. Nothing has been published.`,
+      );
+    } catch (testError) {
+      setMakeTestError(
+        testError instanceof Error
+          ? testError.message
+          : "The Make webhook test failed.",
+      );
+    } finally {
+      setTestingMakeFor(null);
     }
   }
 
@@ -1644,6 +1698,29 @@ export default function SocialStudioPage() {
                       <p className="mt-4 text-sm leading-6 text-pink-300">
                         {post.hashtags.join(" ")}
                       </p>
+
+                      <button
+                        type="button"
+                        onClick={() => void sendTestToMake(post)}
+                        disabled={testingMakeFor !== null}
+                        className="mt-5 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                      >
+                        {testingMakeFor === post.platform
+                          ? "Sending test to Make..."
+                          : "Send Test to Make"}
+                      </button>
+
+                      {makeTestMessage.startsWith(post.platform) && (
+                        <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                          {makeTestMessage}
+                        </p>
+                      )}
+
+                      {makeTestError && (
+                        <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                          {makeTestError}
+                        </p>
+                      )}
 
                       <button
                         type="button"
