@@ -53,6 +53,13 @@ type GeneratedMedia = {
   dataUrl: string;
 };
 
+type GeneratedVideo = {
+  platform: SocialPlatform;
+  url: string;
+  mimeType: string;
+  extension: "mp4" | "webm";
+};
+
 const CAMPAIGN_OPTIONS: Array<{
   id: CampaignType;
   title: string;
@@ -269,6 +276,192 @@ async function createFinishedCampaignImage(input: {
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
+function videoRecorderMimeType(): string {
+  const candidates = [
+    "video/mp4;codecs=avc1.42E01E",
+    "video/mp4",
+    "video/webm;codecs=vp9",
+    "video/webm;codecs=vp8",
+    "video/webm",
+  ];
+
+  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
+}
+
+function drawContainedImage(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+
+  context.drawImage(
+    image,
+    x + (width - drawWidth) / 2,
+    y + (height - drawHeight) / 2,
+    drawWidth,
+    drawHeight,
+  );
+}
+
+async function createCampaignVideo(input: {
+  book: CatalogueBook;
+  post: GeneratedPost;
+  posterDataUrl: string;
+}): Promise<{ blob: Blob; mimeType: string }> {
+  if (typeof MediaRecorder === "undefined") {
+    throw new Error("This browser cannot create downloadable video files.");
+  }
+
+  const mimeType = videoRecorderMimeType();
+
+  if (!mimeType) {
+    throw new Error("This browser has no supported video recording format.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("This browser could not create the video.");
+
+  const [poster, cover] = await Promise.all([
+    loadImage(input.posterDataUrl),
+    loadImage(input.book.coverUrl),
+  ]);
+  const stream = canvas.captureStream(30);
+  const chunks: BlobPart[] = [];
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: 8_000_000,
+  });
+  const durationMs = 9000;
+
+  const completed = new Promise<Blob>((resolve, reject) => {
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    recorder.onerror = () => reject(new Error("The browser video recorder failed."));
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+  });
+
+  recorder.start(250);
+  const startedAt = performance.now();
+
+  await new Promise<void>((resolve) => {
+    function drawFrame(now: number) {
+      const elapsed = Math.min(durationMs, now - startedAt);
+      const progress = elapsed / durationMs;
+
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.save();
+      context.filter = "blur(28px) brightness(0.35) saturate(1.25)";
+      drawImageCover(context, poster, -60, -60, 1200, 2040);
+      context.restore();
+
+      const posterScale = 0.88 + progress * 0.05;
+      const posterWidth = 1000 * posterScale;
+      const posterHeight = 1780 * posterScale;
+      const posterX = (canvas.width - posterWidth) / 2;
+      const posterY = (canvas.height - posterHeight) / 2 - 10;
+
+      context.save();
+      context.shadowColor = "rgba(0,0,0,0.7)";
+      context.shadowBlur = 45;
+      context.shadowOffsetY = 18;
+      drawContainedImage(
+        context,
+        poster,
+        posterX,
+        posterY,
+        posterWidth,
+        posterHeight,
+      );
+      context.restore();
+
+      const pulse = 0.35 + Math.sin(progress * Math.PI * 4) * 0.08;
+      const glow = context.createRadialGradient(850, 280, 20, 850, 280, 420);
+      glow.addColorStop(0, `rgba(236,72,153,${pulse})`);
+      glow.addColorStop(1, "rgba(236,72,153,0)");
+      context.fillStyle = glow;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (progress > 0.72) {
+        const endProgress = Math.min(1, (progress - 0.72) / 0.18);
+        context.fillStyle = `rgba(5,5,8,${0.88 * endProgress})`;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        context.globalAlpha = endProgress;
+        const coverHeight = 760;
+        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        context.save();
+        context.shadowColor = "rgba(0,0,0,0.8)";
+        context.shadowBlur = 42;
+        context.drawImage(
+          cover,
+          (canvas.width - coverWidth) / 2,
+          260,
+          coverWidth,
+          coverHeight,
+        );
+        context.restore();
+
+        context.textAlign = "center";
+        context.fillStyle = "#ffffff";
+        context.font = "800 62px Arial, sans-serif";
+        context.fillText(input.book.title, canvas.width / 2, 1130);
+        context.fillStyle = "#f9a8d4";
+        context.font = "700 34px Arial, sans-serif";
+        const finalTropes = input.book.tropes.slice(0, 3).join("  •  ");
+        const tropeLines = wrappedLines(context, finalTropes, 920, 2);
+        tropeLines.forEach((line, index) => {
+          context.fillText(line, canvas.width / 2, 1230 + index * 48);
+        });
+
+        if (input.book.kindleUnlimited) {
+          context.fillStyle = "#ffffff";
+          context.font = "700 36px Arial, sans-serif";
+          context.fillText(
+            "AVAILABLE ON KINDLE UNLIMITED",
+            canvas.width / 2,
+            1510,
+          );
+        }
+
+        context.fillStyle = "#ec4899";
+        context.font = "700 30px Arial, sans-serif";
+        context.fillText("MARLOW QUINN", canvas.width / 2, 1610);
+        context.globalAlpha = 1;
+      }
+
+      if (elapsed >= durationMs) {
+        resolve();
+        return;
+      }
+
+      requestAnimationFrame(drawFrame);
+    }
+
+    requestAnimationFrame(drawFrame);
+  });
+
+  recorder.stop();
+  const blob = await completed;
+  stream.getTracks().forEach((track) => track.stop());
+
+  if (blob.size === 0) {
+    throw new Error("The browser returned an empty video file.");
+  }
+
+  return { blob, mimeType };
+}
+
 export default function SocialStudioPage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [error, setError] = useState("");
@@ -294,6 +487,10 @@ export default function SocialStudioPage() {
   const [creatingImageFor, setCreatingImageFor] =
     useState<SocialPlatform | null>(null);
   const [imageError, setImageError] = useState("");
+  const [generatedVideos, setGeneratedVideos] = useState<GeneratedVideo[]>([]);
+  const [creatingVideoFor, setCreatingVideoFor] =
+    useState<SocialPlatform | null>(null);
+  const [videoError, setVideoError] = useState("");
 
   function chooseBook(book: CatalogueBook) {
     setSelectedBook(book);
@@ -306,6 +503,8 @@ export default function SocialStudioPage() {
     setMediaStyle("branded");
     setGeneratedMedia([]);
     setImageError("");
+    setGeneratedVideos([]);
+    setVideoError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -315,6 +514,8 @@ export default function SocialStudioPage() {
     setGenerationError("");
     setGeneratedMedia([]);
     setImageError("");
+    setGeneratedVideos([]);
+    setVideoError("");
   }
 
   function togglePlatform(platform: SocialPlatform) {
@@ -322,6 +523,8 @@ export default function SocialStudioPage() {
     setGenerationError("");
     setGeneratedMedia([]);
     setImageError("");
+    setGeneratedVideos([]);
+    setVideoError("");
     setPlatforms((current) =>
       current.includes(platform)
         ? current.filter((item) => item !== platform)
@@ -365,6 +568,8 @@ export default function SocialStudioPage() {
       setGeneratedPosts(result.posts);
       setGeneratedMedia([]);
       setImageError("");
+      setGeneratedVideos([]);
+      setVideoError("");
     } catch (contentError) {
       setGenerationError(
         contentError instanceof Error
@@ -434,6 +639,10 @@ export default function SocialStudioPage() {
         ...current.filter((item) => item.platform !== post.platform),
         { platform: post.platform, style: mediaStyle, dataUrl },
       ]);
+      setGeneratedVideos((current) =>
+        current.filter((item) => item.platform !== post.platform),
+      );
+      setVideoError("");
     } catch (mediaError) {
       setImageError(
         mediaError instanceof Error
@@ -442,6 +651,46 @@ export default function SocialStudioPage() {
       );
     } finally {
       setCreatingImageFor(null);
+    }
+  }
+
+  async function createVideo(post: GeneratedPost, media: GeneratedMedia) {
+    if (!selectedBook) return;
+
+    setCreatingVideoFor(post.platform);
+    setVideoError("");
+
+    try {
+      const result = await createCampaignVideo({
+        book: selectedBook,
+        post,
+        posterDataUrl: media.dataUrl,
+      });
+      const url = URL.createObjectURL(result.blob);
+      const extension = result.mimeType.includes("mp4") ? "mp4" : "webm";
+
+      setGeneratedVideos((current) => {
+        const previous = current.find((item) => item.platform === post.platform);
+        if (previous) URL.revokeObjectURL(previous.url);
+
+        return [
+          ...current.filter((item) => item.platform !== post.platform),
+          {
+            platform: post.platform,
+            url,
+            mimeType: result.mimeType,
+            extension,
+          },
+        ];
+      });
+    } catch (creationError) {
+      setVideoError(
+        creationError instanceof Error
+          ? creationError.message
+          : "The promotional video could not be created.",
+      );
+    } finally {
+      setCreatingVideoFor(null);
     }
   }
 
@@ -601,6 +850,8 @@ export default function SocialStudioPage() {
                     setMediaStyle("branded");
                     setGeneratedMedia([]);
                     setImageError("");
+                    setGeneratedVideos([]);
+                    setVideoError("");
                   }}
                   className={`rounded-xl border p-4 text-left transition ${
                     mediaStyle === "branded"
@@ -620,6 +871,8 @@ export default function SocialStudioPage() {
                     setMediaStyle("ai-scene");
                     setGeneratedMedia([]);
                     setImageError("");
+                    setGeneratedVideos([]);
+                    setVideoError("");
                   }}
                   className={`rounded-xl border p-4 text-left transition ${
                     mediaStyle === "ai-scene"
@@ -735,6 +988,9 @@ export default function SocialStudioPage() {
                     const media = generatedMedia.find(
                       (item) => item.platform === post.platform,
                     );
+                    const video = generatedVideos.find(
+                      (item) => item.platform === post.platform,
+                    );
 
                     return (
                     <article
@@ -809,6 +1065,40 @@ export default function SocialStudioPage() {
                           >
                             Download Finished Image
                           </a>
+
+                          <button
+                            type="button"
+                            onClick={() => void createVideo(post, media)}
+                            disabled={creatingVideoFor !== null}
+                            className="mt-3 w-full rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                          >
+                            {creatingVideoFor === post.platform
+                              ? "Rendering 9-second video..."
+                              : video
+                                ? "Create Another Video"
+                                : "Create Vertical Video"}
+                          </button>
+
+                          {video && (
+                            <div className="mt-4 rounded-xl border border-white/10 bg-neutral-950 p-3">
+                              <video
+                                src={video.url}
+                                controls
+                                playsInline
+                                className="mx-auto max-h-[720px] w-auto rounded-lg"
+                              />
+                              <a
+                                href={video.url}
+                                download={`${selectedBook?.slug ?? "book"}-${post.platform}-video.${video.extension}`}
+                                className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
+                              >
+                                Download Finished Video
+                              </a>
+                              <p className="mt-3 text-center text-xs leading-5 text-neutral-500">
+                                Add platform music or trending audio when you upload it.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </article>
@@ -820,6 +1110,12 @@ export default function SocialStudioPage() {
               {imageError && (
                 <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
                   {imageError}
+                </p>
+              )}
+
+              {videoError && (
+                <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+                  {videoError}
                 </p>
               )}
             </div>
