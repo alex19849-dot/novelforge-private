@@ -1311,7 +1311,7 @@ export default function SocialStudioPage() {
     }
   }
 
-  async function sendTestToMake(post: GeneratedPost) {
+  async function publishImageToMake(post: GeneratedPost, media: GeneratedMedia) {
     if (!selectedBook) return;
 
     setTestingMakeFor(post.platform);
@@ -1319,6 +1319,57 @@ export default function SocialStudioPage() {
     setMakeTestError("");
 
     try {
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+
+      if (sessionError || !user) {
+        throw new Error("Your NovelForge session has expired. Sign in again.");
+      }
+
+      const mediaResponse = await fetch(media.dataUrl);
+
+      if (!mediaResponse.ok) {
+        throw new Error("The finished campaign image could not be prepared.");
+      }
+
+      const imageBlob = await mediaResponse.blob();
+      const folder = user.id;
+      const filePrefix = `${post.platform}-image-`;
+      const { data: existingFiles, error: listError } = await supabase.storage
+        .from("social-media")
+        .list(folder, { limit: 100, search: filePrefix });
+
+      if (listError) throw new Error(listError.message);
+
+      const oldPaths = (existingFiles ?? [])
+        .filter((file) => file.name.startsWith(filePrefix))
+        .map((file) => `${folder}/${file.name}`);
+
+      if (oldPaths.length > 0) {
+        const { error: removeError } = await supabase.storage
+          .from("social-media")
+          .remove(oldPaths);
+
+        if (removeError) throw new Error(removeError.message);
+      }
+
+      const extension = imageBlob.type.includes("png") ? "png" : "jpg";
+      const objectPath = `${folder}/${filePrefix}${Date.now()}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from("social-media")
+        .upload(objectPath, imageBlob, {
+          cacheControl: "3600",
+          contentType: imageBlob.type || "image/jpeg",
+          upsert: false,
+        });
+
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: publicUrlData } = supabase.storage
+        .from("social-media")
+        .getPublicUrl(objectPath);
+
       const response = await fetch("/api/social-studio/publish", {
         method: "POST",
         headers: {
@@ -1331,7 +1382,7 @@ export default function SocialStudioPage() {
           campaignTitle: post.title,
           caption: post.caption,
           hashtags: post.hashtags,
-          mediaUrl: selectedBook.coverUrl,
+          mediaUrl: publicUrlData.publicUrl,
           mediaType: "image",
           amazonUrl: selectedBook.amazonUrl,
         }),
@@ -1342,17 +1393,19 @@ export default function SocialStudioPage() {
       };
 
       if (!response.ok) {
-        throw new Error(result.error || "Make rejected the test campaign.");
+        throw new Error(result.error || "Make rejected the campaign.");
       }
 
       setMakeTestMessage(
-        `${post.platform} test received by Make. Nothing has been published.`,
+        `${post.platform} image sent to Make for publishing.`,
       );
-    } catch (testError) {
+    } catch (publishError) {
       setMakeTestError(
-        testError instanceof Error
-          ? testError.message
-          : "The Make webhook test failed.",
+        `${post.platform}: ${
+          publishError instanceof Error
+            ? publishError.message
+            : "The image could not be sent to Make."
+        }`,
       );
     } finally {
       setTestingMakeFor(null);
@@ -1701,29 +1754,6 @@ export default function SocialStudioPage() {
 
                       <button
                         type="button"
-                        onClick={() => void sendTestToMake(post)}
-                        disabled={testingMakeFor !== null}
-                        className="mt-5 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
-                      >
-                        {testingMakeFor === post.platform
-                          ? "Sending test to Make..."
-                          : "Send Test to Make"}
-                      </button>
-
-                      {makeTestMessage.startsWith(post.platform) && (
-                        <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                          {makeTestMessage}
-                        </p>
-                      )}
-
-                      {makeTestError && (
-                        <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                          {makeTestError}
-                        </p>
-                      )}
-
-                      <button
-                        type="button"
                         onClick={() => void createImage(post)}
                         disabled={creatingImageFor !== null}
                         className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-semibold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-neutral-500"
@@ -1753,6 +1783,37 @@ export default function SocialStudioPage() {
                           >
                             Download Finished Image
                           </a>
+
+                          <button
+                            type="button"
+                            onClick={() => void publishImageToMake(post, media)}
+                            disabled={
+                              testingMakeFor !== null || post.platform === "tiktok"
+                            }
+                            className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                          >
+                            {testingMakeFor === post.platform
+                              ? "Uploading and sending to Make..."
+                              : post.platform === "tiktok"
+                                ? "TikTok Publishing Comes Next"
+                                : `Publish Image to ${
+                                    post.platform === "facebook"
+                                      ? "Facebook"
+                                      : "Instagram"
+                                  }`}
+                          </button>
+
+                          {makeTestMessage.startsWith(post.platform) && (
+                            <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                              {makeTestMessage}
+                            </p>
+                          )}
+
+                          {makeTestError.startsWith(post.platform) && (
+                            <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                              {makeTestError}
+                            </p>
+                          )}
 
                           <button
                             type="button"
