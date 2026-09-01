@@ -389,6 +389,26 @@ async function createEditorialCampaignImage(input: {
     verticalShade.addColorStop(1, "rgba(5,5,7,0.92)");
     context.fillStyle = verticalShade;
     context.fillRect(34, 255, width - 68, isTikTok ? 1260 : 765);
+
+    const cleanupFadeTop = isTikTok ? 1100 : 690;
+    const cleanupFadeBottom = isTikTok ? 1515 : 1020;
+    const cleanupFade = context.createLinearGradient(
+      0,
+      cleanupFadeTop,
+      0,
+      cleanupFadeBottom,
+    );
+    cleanupFade.addColorStop(0, "rgba(5,5,7,0)");
+    cleanupFade.addColorStop(0.34, "rgba(5,5,7,0.52)");
+    cleanupFade.addColorStop(0.68, "rgba(5,5,7,0.9)");
+    cleanupFade.addColorStop(1, "rgba(5,5,7,1)");
+    context.fillStyle = cleanupFade;
+    context.fillRect(
+      34,
+      cleanupFadeTop,
+      width - 68,
+      cleanupFadeBottom - cleanupFadeTop,
+    );
   }
 
   context.fillStyle = "rgba(5,5,7,0.97)";
