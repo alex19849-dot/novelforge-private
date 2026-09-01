@@ -1987,6 +1987,112 @@ export default function SocialStudioPage() {
     }
   }
 
+  async function publishVideoToMake(post: GeneratedPost, video: GeneratedVideo) {
+    if (!selectedBook) return;
+
+    setTestingMakeFor(post.platform);
+    setMakeTestMessage("");
+    setMakeTestError("");
+
+    try {
+      if (video.extension !== "mp4") {
+        throw new Error(
+          "This browser rendered a WebM video. Create it in the current version of Chrome or Edge so NovelForge produces the MP4 required by Facebook and Instagram.",
+        );
+      }
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+
+      if (sessionError || !user) {
+        throw new Error("Your NovelForge session has expired. Sign in again.");
+      }
+
+      const mediaResponse = await fetch(video.url);
+
+      if (!mediaResponse.ok) {
+        throw new Error("The finished campaign video could not be prepared.");
+      }
+
+      const videoBlob = await mediaResponse.blob();
+      const folder = user.id;
+      const filePrefix = `${post.platform}-video-`;
+      const { data: existingFiles, error: listError } = await supabase.storage
+        .from("social-media")
+        .list(folder, { limit: 100, search: filePrefix });
+
+      if (listError) throw new Error(listError.message);
+
+      const oldPaths = (existingFiles ?? [])
+        .filter((file) => file.name.startsWith(filePrefix))
+        .map((file) => `${folder}/${file.name}`);
+
+      if (oldPaths.length > 0) {
+        const { error: removeError } = await supabase.storage
+          .from("social-media")
+          .remove(oldPaths);
+
+        if (removeError) throw new Error(removeError.message);
+      }
+
+      const objectPath = `${folder}/${filePrefix}${Date.now()}.${video.extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from("social-media")
+        .upload(objectPath, videoBlob, {
+          cacheControl: "3600",
+          contentType: video.mimeType || videoBlob.type || "video/mp4",
+          upsert: false,
+        });
+
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: publicUrlData } = supabase.storage
+        .from("social-media")
+        .getPublicUrl(objectPath);
+
+      const response = await fetch("/api/social-studio/publish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          platform: post.platform,
+          bookTitle: selectedBook.title,
+          bookSlug: selectedBook.slug,
+          campaignTitle: post.title,
+          caption: post.caption,
+          hashtags: post.hashtags,
+          mediaUrl: publicUrlData.publicUrl,
+          mediaType: "video",
+          amazonUrl: selectedBook.amazonUrl,
+        }),
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.error || "Make rejected the campaign video.");
+      }
+
+      setMakeTestMessage(
+        `${post.platform} video sent to Make for publishing.`,
+      );
+    } catch (publishError) {
+      setMakeTestError(
+        `${post.platform}: ${
+          publishError instanceof Error
+            ? publishError.message
+            : "The video could not be sent to Make."
+        }`,
+      );
+    } finally {
+      setTestingMakeFor(null);
+    }
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -2418,6 +2524,23 @@ export default function SocialStudioPage() {
                               >
                                 Download Finished Video
                               </a>
+                              <button
+                                type="button"
+                                onClick={() => void publishVideoToMake(post, video)}
+                                disabled={
+                                  testingMakeFor !== null ||
+                                  post.platform === "tiktok"
+                                }
+                                className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                              >
+                                {testingMakeFor === post.platform
+                                  ? "Uploading and sending video to Make..."
+                                  : post.platform === "tiktok"
+                                    ? "TikTok Publishing Comes Next"
+                                    : post.platform === "facebook"
+                                      ? "Publish Video to Facebook"
+                                      : "Publish Reel to Instagram"}
+                              </button>
                               <p className="mt-3 text-center text-xs leading-5 text-neutral-500">
                                 Add platform music or trending audio when you upload it.
                               </p>
