@@ -373,7 +373,7 @@ async function createEditorialCampaignImage(input: {
   context.fillRect(0, 0, width, height);
 
   if (hasScene && scene) {
-    drawImageCover(context, scene, 34, 255, width - 68, isTikTok ? 1270 : 840);
+    drawImageCover(context, scene, 34, 255, width - 68, isTikTok ? 1260 : 765);
 
     const sceneShade = context.createLinearGradient(0, 0, width, 0);
     sceneShade.addColorStop(0, "rgba(5,5,7,0.18)");
@@ -381,20 +381,20 @@ async function createEditorialCampaignImage(input: {
     sceneShade.addColorStop(0.72, "rgba(5,5,7,0.82)");
     sceneShade.addColorStop(1, "rgba(5,5,7,0.98)");
     context.fillStyle = sceneShade;
-    context.fillRect(34, 255, width - 68, isTikTok ? 1270 : 840);
+    context.fillRect(34, 255, width - 68, isTikTok ? 1260 : 765);
 
-    const verticalShade = context.createLinearGradient(0, 255, 0, isTikTok ? 1525 : 1095);
+    const verticalShade = context.createLinearGradient(0, 255, 0, isTikTok ? 1515 : 1020);
     verticalShade.addColorStop(0, "rgba(5,5,7,0.08)");
     verticalShade.addColorStop(0.72, "rgba(5,5,7,0.1)");
     verticalShade.addColorStop(1, "rgba(5,5,7,0.92)");
     context.fillStyle = verticalShade;
-    context.fillRect(34, 255, width - 68, isTikTok ? 1270 : 840);
+    context.fillRect(34, 255, width - 68, isTikTok ? 1260 : 765);
   }
 
   context.fillStyle = "rgba(5,5,7,0.97)";
   context.fillRect(34, 34, width - 68, isTikTok ? 330 : 245);
 
-  const footerTop = isTikTok ? 1515 : 1090;
+  const footerTop = isTikTok ? 1515 : 1020;
   context.fillStyle = "rgba(5,5,7,0.98)";
   context.fillRect(34, footerTop, width - 68, height - footerTop - 34);
 
@@ -418,7 +418,7 @@ async function createEditorialCampaignImage(input: {
     input.book.subgenre ||
     input.post.title;
   context.fillStyle = "#ffffff";
-  context.font = `800 ${isTikTok ? 61 : 51}px Arial, sans-serif`;
+  context.font = `800 ${isTikTok ? 54 : 45}px Arial, sans-serif`;
   const hookLines = wrappedLines(context, hook.toUpperCase(), width - 128, 2);
   const hookTop = isTikTok ? 220 : 190;
   const hookGap = isTikTok ? 68 : 57;
@@ -431,12 +431,12 @@ async function createEditorialCampaignImage(input: {
       hookTop + index * hookGap,
       width - 128,
       800,
-      isTikTok ? 61 : 51,
-      isTikTok ? 38 : 34,
+      isTikTok ? 54 : 45,
+      isTikTok ? 36 : 32,
     );
   });
 
-  const maximumCoverHeight = isTikTok ? 940 : 690;
+  const maximumCoverHeight = isTikTok ? 900 : 630;
   const maximumCoverWidth = hasScene
     ? isTikTok
       ? 530
@@ -467,7 +467,7 @@ async function createEditorialCampaignImage(input: {
   if (isTikTok) {
     tropes.forEach((trope, index) => {
       const x = 64;
-      const y = 1565 + index * 83;
+      const y = 1550 + index * 79;
       const cardWidth = width - 128;
       context.fillStyle = index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
       context.fillRect(x, y, cardWidth, 62);
@@ -483,11 +483,11 @@ async function createEditorialCampaignImage(input: {
 
     tropes.forEach((trope, index) => {
       const x = 64 + index * (cardWidth + gap);
-      const y = 1140;
+      const y = 1060;
       context.fillStyle = index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
-      context.fillRect(x, y, cardWidth, 92);
+      context.fillRect(x, y, cardWidth, 88);
       context.fillStyle = "#ec4899";
-      context.fillRect(x, y, 7, 92);
+      context.fillRect(x, y, 7, 88);
       context.fillStyle = "#ffffff";
       context.textAlign = "center";
       context.font = "800 25px Arial, sans-serif";
@@ -507,18 +507,14 @@ async function createEditorialCampaignImage(input: {
     });
   }
 
-  context.textAlign = "center";
-  context.fillStyle = "#f9a8d4";
-  context.font = `700 ${isTikTok ? 25 : 22}px Arial, sans-serif`;
-  context.fillText(input.book.subgenre.toUpperCase(), width / 2, isTikTok ? 1840 : 1275);
-
   if (input.book.kindleUnlimited) {
+    context.textAlign = "center";
     context.fillStyle = "#ffffff";
     drawFittedText(
       context,
       "AVAILABLE ON KINDLE UNLIMITED",
       width / 2,
-      isTikTok ? 1885 : 1318,
+      isTikTok ? 1850 : 1268,
       width - 160,
       800,
       isTikTok ? 27 : 24,
@@ -1423,7 +1419,7 @@ export default function SocialStudioPage() {
         };
 
         if (!response.ok || !result.imageDataUrl) {
-          throw new Error(result.error || "The AI scene could not be created.");
+          throw new Error(result.error || "The silhouette scene could not be created.");
         }
 
         aiBackground = result.imageDataUrl;
@@ -1782,9 +1778,9 @@ export default function SocialStudioPage() {
                       : "border-white/10 bg-white/5 hover:bg-white/10"
                   }`}
                 >
-                  <span className="block font-semibold">AI Story Scene</span>
+                  <span className="block font-semibold">Cinematic Silhouettes</span>
                   <span className="mt-1 block text-sm leading-5 text-neutral-400">
-                    Generates new campaign artwork, then adds the real cover and text.
+                    Creates setting-led artwork with two faceless, backlit male silhouettes.
                   </span>
                 </button>
               </div>
@@ -1944,12 +1940,12 @@ export default function SocialStudioPage() {
                       >
                         {creatingImageFor === post.platform
                           ? mediaStyle === "ai-scene"
-                            ? "Creating AI scene and finished image..."
+                            ? "Creating silhouette scene and finished image..."
                             : "Creating finished image..."
                           : media
                             ? "Create Another Image"
                             : mediaStyle === "ai-scene"
-                              ? "Create AI Scene Image"
+                              ? "Create Silhouette Image"
                               : "Create Branded Image"}
                       </button>
 
