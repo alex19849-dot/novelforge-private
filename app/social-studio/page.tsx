@@ -146,6 +146,27 @@ function wrappedLines(
   return lines;
 }
 
+function drawFittedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maximumWidth: number,
+  weight: number,
+  startingSize: number,
+  minimumSize: number,
+) {
+  let fontSize = startingSize;
+  context.font = `${weight} ${fontSize}px Arial, sans-serif`;
+
+  while (fontSize > minimumSize && context.measureText(text).width > maximumWidth) {
+    fontSize -= 1;
+    context.font = `${weight} ${fontSize}px Arial, sans-serif`;
+  }
+
+  context.fillText(text, x, y, maximumWidth);
+}
+
 function drawImageCover(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -255,7 +276,16 @@ async function createFinishedCampaignImage(input: {
   const hookLineHeight = isTikTok ? 82 : 72;
 
   hookLines.forEach((line, index) => {
-    context.fillText(line, 72, 210 + index * hookLineHeight);
+    drawFittedText(
+      context,
+      line,
+      72,
+      210 + index * hookLineHeight,
+      width - 144,
+      800,
+      isTikTok ? 72 : 62,
+      isTikTok ? 44 : 38,
+    );
   });
 
   const coverWidth = isTikTok ? 620 : 500;
@@ -285,16 +315,30 @@ async function createFinishedCampaignImage(input: {
   const tropeLines = wrappedLines(context, displayedTropes, width - 120, 2);
 
   tropeLines.forEach((line, index) => {
-    context.fillText(line, width / 2, footerY + index * 42);
+    drawFittedText(
+      context,
+      line,
+      width / 2,
+      footerY + index * 42,
+      width - 120,
+      700,
+      isTikTok ? 31 : 27,
+      20,
+    );
   });
 
   if (input.book.kindleUnlimited) {
     context.fillStyle = "#ffffff";
     context.font = `700 ${isTikTok ? 30 : 26}px Arial, sans-serif`;
-    context.fillText(
+    drawFittedText(
+      context,
       "AVAILABLE ON KINDLE UNLIMITED",
       width / 2,
       height - (isTikTok ? 120 : 92),
+      width - 140,
+      700,
+      isTikTok ? 30 : 26,
+      20,
     );
   }
 
@@ -873,7 +917,16 @@ async function createCoverFirstCampaignVideo(input: {
         const hookLines = wrappedLines(context, hook.toUpperCase(), 900, 4);
         const hookTop = 345;
         hookLines.forEach((line, index) => {
-          context.fillText(line, canvas.width / 2, hookTop + index * 74);
+          drawFittedText(
+            context,
+            line,
+            canvas.width / 2,
+            hookTop + index * 74,
+            900,
+            800,
+            66,
+            42,
+          );
         });
         context.globalAlpha = 1;
 
@@ -896,8 +949,7 @@ async function createCoverFirstCampaignVideo(input: {
 
         context.textAlign = "left";
         context.fillStyle = "#ffffff";
-        context.font = "800 47px Arial, sans-serif";
-        context.fillText("WHAT YOU GET", 720, 420);
+        drawFittedText(context, "WHAT YOU GET", 720, 420, 296, 800, 47, 30);
         context.fillStyle = "#ec4899";
         context.fillRect(720, 450, 296, 7);
 
@@ -907,7 +959,7 @@ async function createCoverFirstCampaignVideo(input: {
           if (itemProgress <= 0) return;
 
           const y = 555 + index * 300;
-          const x = 720 + (1 - itemProgress) * 80;
+          const x = 720;
           context.globalAlpha = itemProgress;
           context.fillStyle = "rgba(236,72,153,0.18)";
           context.fillRect(x, y, 296, 220);
@@ -917,14 +969,31 @@ async function createCoverFirstCampaignVideo(input: {
           context.font = "800 35px Arial, sans-serif";
           const lines = wrappedLines(context, trope.toUpperCase(), 248, 4);
           lines.forEach((line, lineIndex) => {
-            context.fillText(line, x + 28, y + 64 + lineIndex * 48);
+            drawFittedText(
+              context,
+              line,
+              x + 28,
+              y + 64 + lineIndex * 48,
+              248,
+              800,
+              35,
+              23,
+            );
           });
           context.globalAlpha = 1;
         });
 
         context.fillStyle = "#f9a8d4";
-        context.font = "700 25px Arial, sans-serif";
-        context.fillText(input.book.heat.toUpperCase(), 720, 1535);
+        drawFittedText(
+          context,
+          input.book.heat.toUpperCase(),
+          720,
+          1535,
+          296,
+          700,
+          25,
+          18,
+        );
       } else {
         const scene = eased((progress - 0.69) / 0.23);
         const coverHeight = 980 + scene * 100;
@@ -944,15 +1013,32 @@ async function createCoverFirstCampaignVideo(input: {
         context.font = "800 55px Arial, sans-serif";
         const titleLines = wrappedLines(context, input.book.title.toUpperCase(), 930, 2);
         titleLines.forEach((line, index) => {
-          context.fillText(line, canvas.width / 2, 1465 + index * 65);
+          drawFittedText(
+            context,
+            line,
+            canvas.width / 2,
+            1465 + index * 65,
+            930,
+            800,
+            55,
+            34,
+          );
         });
 
         if (input.book.kindleUnlimited) {
           context.fillStyle = "#ec4899";
           context.fillRect(145, 1620, 790, 104);
           context.fillStyle = "#ffffff";
-          context.font = "800 31px Arial, sans-serif";
-          context.fillText("READ NOW ON KINDLE UNLIMITED", canvas.width / 2, 1686);
+          drawFittedText(
+            context,
+            "READ NOW ON KINDLE UNLIMITED",
+            canvas.width / 2,
+            1686,
+            730,
+            800,
+            31,
+            24,
+          );
         } else {
           context.fillStyle = "#ec4899";
           context.font = "800 34px Arial, sans-serif";
