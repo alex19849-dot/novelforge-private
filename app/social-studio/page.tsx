@@ -724,6 +724,229 @@ async function createCleanCoverCampaignImage(input: {
   return canvas.toDataURL("image/jpeg", 0.92);
 }
 
+function roundedRectanglePath(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const safeRadius = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + safeRadius, y);
+  context.lineTo(x + width - safeRadius, y);
+  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
+  context.lineTo(x + width, y + height - safeRadius);
+  context.quadraticCurveTo(
+    x + width,
+    y + height,
+    x + width - safeRadius,
+    y + height,
+  );
+  context.lineTo(x + safeRadius, y + height);
+  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
+  context.lineTo(x, y + safeRadius);
+  context.quadraticCurveTo(x, y, x + safeRadius, y);
+  context.closePath();
+}
+
+async function createProfessionalCampaignImage(input: {
+  book: CatalogueBook;
+  post: GeneratedPost;
+  mediaStyle: MediaStyle;
+}): Promise<string> {
+  const isTikTok = input.post.platform === "tiktok";
+  const width = 1080;
+  const height = isTikTok ? 1920 : 1350;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("This browser could not create the image.");
+
+  const cover = await loadImage(input.book.coverUrl);
+  context.fillStyle = "#060608";
+  context.fillRect(0, 0, width, height);
+
+  if (input.mediaStyle === "ai-scene") {
+    context.save();
+    context.filter = "blur(70px) saturate(1.2)";
+    context.globalAlpha = 0.3;
+    drawImageCover(context, cover, -150, -120, width + 300, height + 240);
+    context.restore();
+  }
+
+  const backdrop = context.createLinearGradient(0, 0, width, height);
+  backdrop.addColorStop(0, "rgba(6,6,8,0.82)");
+  backdrop.addColorStop(0.52, "rgba(6,6,8,0.92)");
+  backdrop.addColorStop(1, "rgba(45,7,29,0.96)");
+  context.fillStyle = backdrop;
+  context.fillRect(0, 0, width, height);
+
+  context.fillStyle = "rgba(236,72,153,0.11)";
+  context.beginPath();
+  context.arc(isTikTok ? 820 : 220, isTikTok ? 680 : 720, isTikTok ? 520 : 430, 0, Math.PI * 2);
+  context.fill();
+
+  context.textBaseline = "alphabetic";
+  context.textAlign = "left";
+  context.fillStyle = "#ec4899";
+  context.fillRect(64, 58, 92, 7);
+  context.fillStyle = "#ffffff";
+  context.font = "800 27px Arial, sans-serif";
+  context.fillText("MARLOW QUINN", 64, 108);
+  context.fillStyle = "#f9a8d4";
+  context.font = "700 17px Arial, sans-serif";
+  context.fillText("BITE  •  HEAT  •  HEART", 64, 138);
+
+  context.strokeStyle = "rgba(255,255,255,0.14)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(64, isTikTok ? 174 : 166);
+  context.lineTo(width - 64, isTikTok ? 174 : 166);
+  context.stroke();
+
+  let category = input.post.title
+    .replace(input.book.title, "")
+    .replace(/book spotlight/gi, "")
+    .replace(/spotlight/gi, "")
+    .replace(/^[\s|:/-]+|[\s|:/-]+$/g, "")
+    .trim();
+
+  if (category.length < 5 || category.length > 70) {
+    category = input.book.subgenre || "M/M ROMANCE";
+  }
+
+  const deviceWidth = isTikTok ? 560 : 500;
+  const innerWidth = deviceWidth - 54;
+  const innerHeight = innerWidth * (cover.naturalHeight / cover.naturalWidth);
+  const deviceHeight = innerHeight + 70;
+  const deviceX = isTikTok ? (width - deviceWidth) / 2 : 64;
+  const deviceY = isTikTok ? 335 : 245;
+
+  context.save();
+  context.translate(deviceX + deviceWidth / 2, deviceY + deviceHeight / 2);
+  context.rotate(isTikTok ? -0.018 : -0.026);
+  context.translate(-deviceWidth / 2, -deviceHeight / 2);
+  context.shadowColor = "rgba(236,72,153,0.58)";
+  context.shadowBlur = 52;
+  context.shadowOffsetY = 24;
+  roundedRectanglePath(context, 0, 0, deviceWidth, deviceHeight, 28);
+  context.fillStyle = "#111114";
+  context.fill();
+  context.shadowColor = "transparent";
+  roundedRectanglePath(context, 9, 9, deviceWidth - 18, deviceHeight - 18, 22);
+  context.strokeStyle = "rgba(255,255,255,0.24)";
+  context.lineWidth = 2;
+  context.stroke();
+  context.drawImage(cover, 27, 28, innerWidth, innerHeight);
+  context.fillStyle = "rgba(255,255,255,0.35)";
+  roundedRectanglePath(context, deviceWidth / 2 - 24, 12, 48, 4, 2);
+  context.fill();
+  context.restore();
+
+  if (isTikTok) {
+    context.textAlign = "center";
+    context.fillStyle = "#ffffff";
+    context.font = "800 50px Arial, sans-serif";
+    const categoryLines = wrappedLines(context, category.toUpperCase(), width - 128, 2);
+    categoryLines.forEach((line, index) => {
+      drawFittedText(context, line, width / 2, 245 + index * 56, width - 128, 800, 50, 32);
+    });
+
+    context.fillStyle = "#ec4899";
+    context.font = "800 22px Arial, sans-serif";
+    context.fillText("WHAT TO EXPECT", width / 2, 1215);
+
+    input.book.tropes.slice(0, 3).forEach((trope, index) => {
+      const y = 1285 + index * 105;
+      context.textAlign = "left";
+      context.fillStyle = "#ec4899";
+      context.font = "800 25px Arial, sans-serif";
+      context.fillText(String(index + 1).padStart(2, "0"), 110, y);
+      context.fillStyle = "#ffffff";
+      drawFittedText(context, trope.toUpperCase(), 190, y, 780, 800, 34, 23);
+      context.strokeStyle = "rgba(255,255,255,0.12)";
+      context.beginPath();
+      context.moveTo(110, y + 30);
+      context.lineTo(970, y + 30);
+      context.stroke();
+    });
+  } else {
+    const copyX = 625;
+    const copyWidth = 390;
+    context.textAlign = "left";
+    context.fillStyle = "#f9a8d4";
+    context.font = "800 20px Arial, sans-serif";
+    context.fillText("FOR READERS WHO WANT", copyX, 285);
+    context.fillStyle = "#ffffff";
+    context.font = "800 43px Arial, sans-serif";
+    const categoryLines = wrappedLines(context, category.toUpperCase(), copyWidth, 3);
+    categoryLines.forEach((line, index) => {
+      drawFittedText(context, line, copyX, 345 + index * 51, copyWidth, 800, 43, 29);
+    });
+
+    context.fillStyle = "#ec4899";
+    context.font = "800 20px Arial, sans-serif";
+    context.fillText("WHAT TO EXPECT", copyX, 530);
+
+    input.book.tropes.slice(0, 3).forEach((trope, index) => {
+      const y = 615 + index * 145;
+      context.fillStyle = "#ec4899";
+      context.font = "800 22px Arial, sans-serif";
+      context.fillText(String(index + 1).padStart(2, "0"), copyX, y);
+      context.fillStyle = "#ffffff";
+      context.font = "800 31px Arial, sans-serif";
+      const lines = wrappedLines(context, trope.toUpperCase(), copyWidth - 58, 2);
+      lines.forEach((line, lineIndex) => {
+        drawFittedText(
+          context,
+          line,
+          copyX + 58,
+          y + lineIndex * 37,
+          copyWidth - 58,
+          800,
+          31,
+          22,
+        );
+      });
+      context.strokeStyle = "rgba(255,255,255,0.12)";
+      context.beginPath();
+      context.moveTo(copyX, y + 70);
+      context.lineTo(copyX + copyWidth, y + 70);
+      context.stroke();
+    });
+  }
+
+  const badgeX = isTikTok ? 130 : 120;
+  const badgeY = isTikTok ? 1690 : 1150;
+  const badgeWidth = width - badgeX * 2;
+  const badgeHeight = isTikTok ? 94 : 84;
+  roundedRectanglePath(context, badgeX, badgeY, badgeWidth, badgeHeight, badgeHeight / 2);
+  context.fillStyle = "#ec4899";
+  context.fill();
+  context.textAlign = "center";
+  context.fillStyle = "#ffffff";
+  drawFittedText(
+    context,
+    input.book.kindleUnlimited ? "AVAILABLE ON KINDLE UNLIMITED" : "AVAILABLE NOW",
+    width / 2,
+    badgeY + (isTikTok ? 61 : 55),
+    badgeWidth - 60,
+    800,
+    isTikTok ? 29 : 27,
+    20,
+  );
+
+  context.fillStyle = "#f9a8d4";
+  context.font = `700 ${isTikTok ? 23 : 20}px Arial, sans-serif`;
+  context.fillText("MARLOWQUINN.COM", width / 2, isTikTok ? 1845 : 1295);
+
+  return canvas.toDataURL("image/jpeg", 0.94);
+}
+
 function videoRecorderMimeType(): string {
   const candidates = [
     "video/mp4;codecs=avc1.42E01E",
@@ -1598,7 +1821,7 @@ export default function SocialStudioPage() {
     setImageError("");
 
     try {
-      const dataUrl = await createCleanCoverCampaignImage({
+      const dataUrl = await createProfessionalCampaignImage({
         book: selectedBook,
         post,
         mediaStyle,
