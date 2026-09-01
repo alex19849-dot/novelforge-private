@@ -205,17 +205,21 @@ async function createFinishedCampaignImage(input: {
 
   context.save();
   if (input.mediaStyle === "branded") {
-    context.filter = "blur(34px) brightness(0.42) saturate(1.35)";
-    drawImageCover(context, background, -80, -80, width + 160, height + 160);
+    const brandedBackground = context.createLinearGradient(0, 0, width, height);
+    brandedBackground.addColorStop(0, "#050508");
+    brandedBackground.addColorStop(0.58, "#120711");
+    brandedBackground.addColorStop(1, "#4a082e");
+    context.fillStyle = brandedBackground;
+    context.fillRect(0, 0, width, height);
   } else {
     drawImageCover(context, background, 0, 0, width, height);
   }
   context.restore();
 
   const shade = context.createLinearGradient(0, 0, 0, height);
-  shade.addColorStop(0, "rgba(5,5,8,0.76)");
-  shade.addColorStop(0.42, "rgba(5,5,8,0.2)");
-  shade.addColorStop(1, "rgba(5,5,8,0.9)");
+  shade.addColorStop(0, "rgba(5,5,8,0.82)");
+  shade.addColorStop(0.42, "rgba(5,5,8,0.42)");
+  shade.addColorStop(1, "rgba(5,5,8,0.94)");
   context.fillStyle = shade;
   context.fillRect(0, 0, width, height);
 
@@ -254,15 +258,15 @@ async function createFinishedCampaignImage(input: {
     context.fillText(line, 72, 210 + index * hookLineHeight);
   });
 
-  const coverWidth = isTikTok ? 470 : 390;
+  const coverWidth = isTikTok ? 620 : 500;
   const coverHeight = Math.round(coverWidth * (cover.naturalHeight / cover.naturalWidth));
-  const maximumCoverHeight = isTikTok ? 800 : 610;
+  const maximumCoverHeight = isTikTok ? 930 : 720;
   const fittedCoverHeight = Math.min(coverHeight, maximumCoverHeight);
   const fittedCoverWidth = Math.round(
     fittedCoverHeight * (cover.naturalWidth / cover.naturalHeight),
   );
   const coverX = Math.round((width - fittedCoverWidth) / 2);
-  const coverY = isTikTok ? 600 : 455;
+  const coverY = isTikTok ? 570 : 480;
 
   context.save();
   context.shadowColor = "rgba(236,72,153,0.55)";
@@ -273,7 +277,7 @@ async function createFinishedCampaignImage(input: {
   context.drawImage(cover, coverX, coverY, fittedCoverWidth, fittedCoverHeight);
   context.restore();
 
-  const footerY = height - (isTikTok ? 270 : 230);
+  const footerY = height - (isTikTok ? 285 : 175);
   const displayedTropes = input.book.tropes.slice(0, 3).join("   •   ");
   context.textAlign = "center";
   context.fillStyle = "#f9a8d4";
@@ -751,6 +755,238 @@ async function createBrandedCampaignVideo(input: {
   return { blob, mimeType };
 }
 
+async function createCoverFirstCampaignVideo(input: {
+  book: CatalogueBook;
+  post: GeneratedPost;
+  posterDataUrl: string;
+}): Promise<{ blob: Blob; mimeType: string }> {
+  if (typeof MediaRecorder === "undefined") {
+    throw new Error("This browser cannot create downloadable video files.");
+  }
+
+  const mimeType = videoRecorderMimeType();
+
+  if (!mimeType) {
+    throw new Error("This browser has no supported video recording format.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("This browser could not create the video.");
+
+  const cover = await loadImage(input.book.coverUrl);
+  const stream = canvas.captureStream(30);
+  const chunks: BlobPart[] = [];
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: 8_000_000,
+  });
+  const durationMs = 11000;
+
+  const completed = new Promise<Blob>((resolve, reject) => {
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    recorder.onerror = () => reject(new Error("The browser video recorder failed."));
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+  });
+
+  function drawBackground() {
+    const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, "#050508");
+    gradient.addColorStop(0.58, "#0b0710");
+    gradient.addColorStop(1, "#260817");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.fillStyle = "rgba(236,72,153,0.09)";
+    context.beginPath();
+    context.arc(960, 1450, 470, 0, Math.PI * 2);
+    context.fill();
+
+    context.strokeStyle = "rgba(236,72,153,0.78)";
+    context.lineWidth = 5;
+    context.strokeRect(34, 34, canvas.width - 68, canvas.height - 68);
+  }
+
+  function drawBrand() {
+    context.textAlign = "left";
+    context.fillStyle = "#ec4899";
+    context.fillRect(64, 70, 100, 8);
+    context.fillStyle = "#ffffff";
+    context.font = "800 27px Arial, sans-serif";
+    context.fillText("MARLOW QUINN", 64, 120);
+    context.fillStyle = "#f9a8d4";
+    context.font = "700 18px Arial, sans-serif";
+    context.fillText("BITE  •  HEAT  •  HEART", 64, 152);
+  }
+
+  function drawFramedCover(
+    x: number,
+    y: number,
+    height: number,
+    scale = 1,
+    opacity = 1,
+  ) {
+    const drawnHeight = height * scale;
+    const drawnWidth = drawnHeight * (cover.naturalWidth / cover.naturalHeight);
+    const drawnX = x - (drawnWidth - height * (cover.naturalWidth / cover.naturalHeight)) / 2;
+    const drawnY = y - (drawnHeight - height) / 2;
+
+    context.save();
+    context.globalAlpha = opacity;
+    context.shadowColor = "rgba(236,72,153,0.68)";
+    context.shadowBlur = 48;
+    context.shadowOffsetY = 18;
+    context.fillStyle = "#ffffff";
+    context.fillRect(drawnX - 9, drawnY - 9, drawnWidth + 18, drawnHeight + 18);
+    context.drawImage(cover, drawnX, drawnY, drawnWidth, drawnHeight);
+    context.restore();
+  }
+
+  recorder.start(250);
+  const startedAt = performance.now();
+
+  await new Promise<void>((resolve) => {
+    function drawFrame(now: number) {
+      const elapsed = Math.min(durationMs, now - startedAt);
+      const progress = elapsed / durationMs;
+
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      drawBackground();
+      drawBrand();
+
+      if (progress < 0.32) {
+        const scene = eased(progress / 0.32);
+        const hook = input.post.title || input.book.tropes.slice(0, 2).join(" • ");
+
+        context.globalAlpha = scene;
+        context.textAlign = "center";
+        context.fillStyle = "#ec4899";
+        context.font = "800 25px Arial, sans-serif";
+        context.fillText("YOUR NEXT MM ROMANCE", canvas.width / 2, 255);
+        context.fillStyle = "#ffffff";
+        context.font = "800 66px Arial, sans-serif";
+        const hookLines = wrappedLines(context, hook.toUpperCase(), 900, 4);
+        const hookTop = 345;
+        hookLines.forEach((line, index) => {
+          context.fillText(line, canvas.width / 2, hookTop + index * 74);
+        });
+        context.globalAlpha = 1;
+
+        const coverHeight = 980;
+        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        drawFramedCover(
+          (canvas.width - coverWidth) / 2,
+          780 + (1 - scene) * 80,
+          coverHeight,
+          0.96 + scene * 0.04,
+          scene,
+        );
+      } else if (progress < 0.69) {
+        const scene = eased((progress - 0.32) / 0.37);
+        const coverHeight = 980;
+        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        const centredCoverX = (canvas.width - coverWidth) / 2;
+        const coverX = centredCoverX + (58 - centredCoverX) * scene;
+        drawFramedCover(coverX, 780 + (450 - 780) * scene, coverHeight, 1, 1);
+
+        context.textAlign = "left";
+        context.fillStyle = "#ffffff";
+        context.font = "800 47px Arial, sans-serif";
+        context.fillText("WHAT YOU GET", 720, 420);
+        context.fillStyle = "#ec4899";
+        context.fillRect(720, 450, 296, 7);
+
+        const tropes = input.book.tropes.slice(0, 3);
+        tropes.forEach((trope, index) => {
+          const itemProgress = eased((scene - index * 0.16) / 0.45);
+          if (itemProgress <= 0) return;
+
+          const y = 555 + index * 300;
+          const x = 720 + (1 - itemProgress) * 80;
+          context.globalAlpha = itemProgress;
+          context.fillStyle = "rgba(236,72,153,0.18)";
+          context.fillRect(x, y, 296, 220);
+          context.fillStyle = "#ec4899";
+          context.fillRect(x, y, 9, 220);
+          context.fillStyle = "#ffffff";
+          context.font = "800 35px Arial, sans-serif";
+          const lines = wrappedLines(context, trope.toUpperCase(), 248, 4);
+          lines.forEach((line, lineIndex) => {
+            context.fillText(line, x + 28, y + 64 + lineIndex * 48);
+          });
+          context.globalAlpha = 1;
+        });
+
+        context.fillStyle = "#f9a8d4";
+        context.font = "700 25px Arial, sans-serif";
+        context.fillText(input.book.heat.toUpperCase(), 720, 1535);
+      } else {
+        const scene = eased((progress - 0.69) / 0.23);
+        const coverHeight = 980 + scene * 100;
+        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        const centredCoverX = (canvas.width - coverWidth) / 2;
+        drawFramedCover(
+          58 + (centredCoverX - 58) * scene,
+          450 + (260 - 450) * scene,
+          coverHeight,
+          1,
+          1,
+        );
+
+        context.globalAlpha = scene;
+        context.textAlign = "center";
+        context.fillStyle = "#ffffff";
+        context.font = "800 55px Arial, sans-serif";
+        const titleLines = wrappedLines(context, input.book.title.toUpperCase(), 930, 2);
+        titleLines.forEach((line, index) => {
+          context.fillText(line, canvas.width / 2, 1465 + index * 65);
+        });
+
+        if (input.book.kindleUnlimited) {
+          context.fillStyle = "#ec4899";
+          context.fillRect(145, 1620, 790, 104);
+          context.fillStyle = "#ffffff";
+          context.font = "800 31px Arial, sans-serif";
+          context.fillText("READ NOW ON KINDLE UNLIMITED", canvas.width / 2, 1686);
+        } else {
+          context.fillStyle = "#ec4899";
+          context.font = "800 34px Arial, sans-serif";
+          context.fillText("AVAILABLE NOW", canvas.width / 2, 1675);
+        }
+
+        context.fillStyle = "#f9a8d4";
+        context.font = "700 24px Arial, sans-serif";
+        context.fillText("M/M ROMANCE BY MARLOW QUINN", canvas.width / 2, 1800);
+        context.globalAlpha = 1;
+      }
+
+      if (elapsed >= durationMs) {
+        resolve();
+        return;
+      }
+
+      requestAnimationFrame(drawFrame);
+    }
+
+    requestAnimationFrame(drawFrame);
+  });
+
+  recorder.stop();
+  const blob = await completed;
+  stream.getTracks().forEach((track) => track.stop());
+
+  if (blob.size === 0) {
+    throw new Error("The browser returned an empty video file.");
+  }
+
+  return { blob, mimeType };
+}
+
 export default function SocialStudioPage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [error, setError] = useState("");
@@ -950,7 +1186,7 @@ export default function SocialStudioPage() {
     setVideoError("");
 
     try {
-      const result = await createBrandedCampaignVideo({
+      const result = await createCoverFirstCampaignVideo({
         book: selectedBook,
         post,
         posterDataUrl: media.dataUrl,
