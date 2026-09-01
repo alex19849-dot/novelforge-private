@@ -219,10 +219,29 @@ async function createFinishedCampaignImage(input: {
   context.fillStyle = shade;
   context.fillRect(0, 0, width, height);
 
+  context.save();
+  context.globalAlpha = 0.2;
+  context.fillStyle = "#ec4899";
+  context.beginPath();
+  context.moveTo(width * 0.68, 0);
+  context.lineTo(width, 0);
+  context.lineTo(width, height * 0.46);
+  context.closePath();
+  context.fill();
+  context.restore();
+
+  context.strokeStyle = "rgba(236,72,153,0.75)";
+  context.lineWidth = 5;
+  context.strokeRect(34, 34, width - 68, height - 68);
+
   context.fillStyle = "#ec4899";
   context.fillRect(72, 72, 104, 8);
   context.font = "700 28px Arial, sans-serif";
   context.fillText("MARLOW QUINN", 72, 125);
+
+  context.font = "700 18px Arial, sans-serif";
+  context.fillStyle = "#f9a8d4";
+  context.fillText("BITE  •  HEAT  •  HEART", 72, 155);
 
   const hook = input.post.title || input.book.tropes.slice(0, 2).join(" • ");
   context.font = `800 ${isTikTok ? 72 : 62}px Arial, sans-serif`;
@@ -232,7 +251,7 @@ async function createFinishedCampaignImage(input: {
   const hookLineHeight = isTikTok ? 82 : 72;
 
   hookLines.forEach((line, index) => {
-    context.fillText(line, 72, 170 + index * hookLineHeight);
+    context.fillText(line, 72, 210 + index * hookLineHeight);
   });
 
   const coverWidth = isTikTok ? 470 : 390;
@@ -243,12 +262,14 @@ async function createFinishedCampaignImage(input: {
     fittedCoverHeight * (cover.naturalWidth / cover.naturalHeight),
   );
   const coverX = Math.round((width - fittedCoverWidth) / 2);
-  const coverY = isTikTok ? 560 : 415;
+  const coverY = isTikTok ? 600 : 455;
 
   context.save();
-  context.shadowColor = "rgba(0,0,0,0.75)";
-  context.shadowBlur = 38;
+  context.shadowColor = "rgba(236,72,153,0.55)";
+  context.shadowBlur = 48;
   context.shadowOffsetY = 20;
+  context.fillStyle = "#ffffff";
+  context.fillRect(coverX - 8, coverY - 8, fittedCoverWidth + 16, fittedCoverHeight + 16);
   context.drawImage(cover, coverX, coverY, fittedCoverWidth, fittedCoverHeight);
   context.restore();
 
@@ -437,6 +458,274 @@ async function createCampaignVideo(input: {
         context.fillStyle = "#ec4899";
         context.font = "700 30px Arial, sans-serif";
         context.fillText("MARLOW QUINN", canvas.width / 2, 1610);
+        context.globalAlpha = 1;
+      }
+
+      if (elapsed >= durationMs) {
+        resolve();
+        return;
+      }
+
+      requestAnimationFrame(drawFrame);
+    }
+
+    requestAnimationFrame(drawFrame);
+  });
+
+  recorder.stop();
+  const blob = await completed;
+  stream.getTracks().forEach((track) => track.stop());
+
+  if (blob.size === 0) {
+    throw new Error("The browser returned an empty video file.");
+  }
+
+  return { blob, mimeType };
+}
+
+function eased(value: number): number {
+  const clamped = Math.max(0, Math.min(1, value));
+  return 1 - Math.pow(1 - clamped, 3);
+}
+
+async function createBrandedCampaignVideo(input: {
+  book: CatalogueBook;
+  post: GeneratedPost;
+  posterDataUrl: string;
+}): Promise<{ blob: Blob; mimeType: string }> {
+  if (typeof MediaRecorder === "undefined") {
+    throw new Error("This browser cannot create downloadable video files.");
+  }
+
+  const mimeType = videoRecorderMimeType();
+
+  if (!mimeType) {
+    throw new Error("This browser has no supported video recording format.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("This browser could not create the video.");
+
+  const [poster, cover] = await Promise.all([
+    loadImage(input.posterDataUrl),
+    loadImage(input.book.coverUrl),
+  ]);
+  const stream = canvas.captureStream(30);
+  const chunks: BlobPart[] = [];
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: 8_000_000,
+  });
+  const durationMs = 11000;
+
+  const completed = new Promise<Blob>((resolve, reject) => {
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    recorder.onerror = () => reject(new Error("The browser video recorder failed."));
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+  });
+
+  function brandFrame() {
+    context.strokeStyle = "rgba(236,72,153,0.8)";
+    context.lineWidth = 5;
+    context.strokeRect(34, 34, canvas.width - 68, canvas.height - 68);
+    context.textAlign = "left";
+    context.fillStyle = "#ec4899";
+    context.fillRect(64, 64, 96, 8);
+    context.fillStyle = "#ffffff";
+    context.font = "700 25px Arial, sans-serif";
+    context.fillText("MARLOW QUINN", 64, 112);
+    context.fillStyle = "#f9a8d4";
+    context.font = "700 17px Arial, sans-serif";
+    context.fillText("BITE  •  HEAT  •  HEART", 64, 142);
+  }
+
+  function motionBackground(progress: number, darkness: number) {
+    const zoom = 1.03 + progress * 0.08;
+    const backgroundWidth = canvas.width * zoom;
+    const backgroundHeight = canvas.height * zoom;
+    drawImageCover(
+      context,
+      poster,
+      (canvas.width - backgroundWidth) / 2,
+      (canvas.height - backgroundHeight) / 2,
+      backgroundWidth,
+      backgroundHeight,
+    );
+    context.fillStyle = `rgba(5,5,8,${darkness})`;
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  recorder.start(250);
+  const startedAt = performance.now();
+
+  await new Promise<void>((resolve) => {
+    function drawFrame(now: number) {
+      const elapsed = Math.min(durationMs, now - startedAt);
+      const progress = elapsed / durationMs;
+
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = "#050508";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (progress < 0.22) {
+        const scene = eased(progress / 0.22);
+        motionBackground(scene, 0.76);
+
+        context.save();
+        context.globalAlpha = scene;
+        context.fillStyle = "#ec4899";
+        context.fillRect(64, 330, 270, 54);
+        context.fillStyle = "#ffffff";
+        context.font = "800 27px Arial, sans-serif";
+        context.textAlign = "center";
+        context.fillText("MM ROMANCE", 199, 367);
+
+        const hook = input.post.title || input.book.tropes.slice(0, 2).join(" • ");
+        context.font = "800 78px Arial, sans-serif";
+        context.textAlign = "left";
+        const hookLines = wrappedLines(context, hook, 920, 5);
+        const startX = 64 - (1 - scene) * 150;
+        hookLines.forEach((line, index) => {
+          context.fillText(line, startX, 470 + index * 94);
+        });
+        context.fillStyle = "#f9a8d4";
+        context.font = "700 31px Arial, sans-serif";
+        context.fillText(input.book.subgenre.toUpperCase(), startX, 1030);
+        context.restore();
+        brandFrame();
+      } else if (progress < 0.52) {
+        const scene = (progress - 0.22) / 0.3;
+        motionBackground(scene, 0.83);
+        brandFrame();
+
+        context.textAlign = "left";
+        context.fillStyle = "#ffffff";
+        context.font = "800 64px Arial, sans-serif";
+        context.fillText("WHAT TO EXPECT", 64, 330);
+        context.fillStyle = "#ec4899";
+        context.fillRect(64, 365, 320, 8);
+
+        input.book.tropes.slice(0, 4).forEach((trope, index) => {
+          const itemProgress = eased((scene - index * 0.15) / 0.35);
+          if (itemProgress <= 0) return;
+
+          const y = 510 + index * 220;
+          const x = 64 + (1 - itemProgress) * 180;
+          context.globalAlpha = itemProgress;
+          context.fillStyle = index % 2 === 0 ? "#ec4899" : "#ffffff";
+          context.fillRect(x, y, 88, 88);
+          context.fillStyle = index % 2 === 0 ? "#ffffff" : "#050508";
+          context.font = "800 35px Arial, sans-serif";
+          context.textAlign = "center";
+          context.fillText(String(index + 1).padStart(2, "0"), x + 44, y + 58);
+          context.textAlign = "left";
+          context.fillStyle = "#ffffff";
+          context.font = "800 49px Arial, sans-serif";
+          const lines = wrappedLines(context, trope.toUpperCase(), 780, 2);
+          lines.forEach((line, lineIndex) => {
+            context.fillText(line, x + 125, y + 5 + lineIndex * 58);
+          });
+          context.globalAlpha = 1;
+        });
+      } else if (progress < 0.78) {
+        const scene = eased((progress - 0.52) / 0.26);
+        context.fillStyle = "#050508";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+
+        context.fillStyle = "rgba(236,72,153,0.18)";
+        context.beginPath();
+        context.moveTo(600, 0);
+        context.lineTo(1080, 0);
+        context.lineTo(1080, 1920);
+        context.lineTo(830, 1920);
+        context.closePath();
+        context.fill();
+        brandFrame();
+
+        const coverHeight = 850;
+        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        const coverX = 520 + (1 - scene) * 430;
+        const coverY = 430;
+        context.save();
+        context.shadowColor = "rgba(236,72,153,0.65)";
+        context.shadowBlur = 55;
+        context.shadowOffsetY = 20;
+        context.fillStyle = "#ffffff";
+        context.fillRect(coverX - 8, coverY - 8, coverWidth + 16, coverHeight + 16);
+        context.drawImage(cover, coverX, coverY, coverWidth, coverHeight);
+        context.restore();
+
+        context.globalAlpha = scene;
+        context.textAlign = "left";
+        context.fillStyle = "#ec4899";
+        context.font = "800 29px Arial, sans-serif";
+        context.fillText("YOUR NEXT OBSESSION", 64, 510);
+        context.fillStyle = "#ffffff";
+        context.font = "800 66px Arial, sans-serif";
+        const titleLines = wrappedLines(context, input.book.title, 470, 4);
+        titleLines.forEach((line, index) => {
+          context.fillText(line, 64, 590 + index * 78);
+        });
+        context.fillStyle = "#f9a8d4";
+        context.font = "700 32px Arial, sans-serif";
+        context.fillText(input.book.heat, 64, 990);
+        context.globalAlpha = 1;
+      } else {
+        const scene = eased((progress - 0.78) / 0.16);
+        context.fillStyle = "#ec4899";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = "#050508";
+        context.beginPath();
+        context.moveTo(0, 0);
+        context.lineTo(1080, 0);
+        context.lineTo(1080, 420);
+        context.lineTo(0, 720);
+        context.closePath();
+        context.fill();
+
+        context.globalAlpha = scene;
+        const coverHeight = 750;
+        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        context.save();
+        context.shadowColor = "rgba(0,0,0,0.75)";
+        context.shadowBlur = 50;
+        context.drawImage(
+          cover,
+          (canvas.width - coverWidth) / 2,
+          300 - (1 - scene) * 100,
+          coverWidth,
+          coverHeight,
+        );
+        context.restore();
+
+        context.textAlign = "center";
+        context.fillStyle = "#050508";
+        context.font = "800 61px Arial, sans-serif";
+        context.fillText(input.book.title, canvas.width / 2, 1190);
+        context.font = "800 38px Arial, sans-serif";
+        context.fillText("MARLOW QUINN", canvas.width / 2, 1270);
+
+        if (input.book.kindleUnlimited) {
+          context.fillStyle = "#ffffff";
+          context.fillRect(130, 1390, 820, 112);
+          context.fillStyle = "#050508";
+          context.font = "800 34px Arial, sans-serif";
+          context.fillText(
+            "AVAILABLE ON KINDLE UNLIMITED",
+            canvas.width / 2,
+            1460,
+          );
+        }
+
+        context.fillStyle = "#050508";
+        context.font = "700 25px Arial, sans-serif";
+        context.fillText("BITE  •  HEAT  •  HEART", canvas.width / 2, 1605);
         context.globalAlpha = 1;
       }
 
@@ -661,7 +950,7 @@ export default function SocialStudioPage() {
     setVideoError("");
 
     try {
-      const result = await createCampaignVideo({
+      const result = await createBrandedCampaignVideo({
         book: selectedBook,
         post,
         posterDataUrl: media.dataUrl,
@@ -1073,7 +1362,7 @@ export default function SocialStudioPage() {
                             className="mt-3 w-full rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
                           >
                             {creatingVideoFor === post.platform
-                              ? "Rendering 9-second video..."
+                              ? "Rendering 11-second video..."
                               : video
                                 ? "Create Another Video"
                                 : "Create Vertical Video"}
