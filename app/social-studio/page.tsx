@@ -28,11 +28,85 @@ type CatalogueResponse = {
   books: CatalogueBook[];
 };
 
+type CampaignType =
+  | "book-spotlight"
+  | "trope-hook"
+  | "quote-post"
+  | "kindle-unlimited"
+  | "backlist-revival";
+
+type SocialPlatform = "facebook" | "instagram" | "tiktok";
+
+const CAMPAIGN_OPTIONS: Array<{
+  id: CampaignType;
+  title: string;
+  description: string;
+}> = [
+  {
+    id: "book-spotlight",
+    title: "Book Spotlight",
+    description: "A strong general promotion using the cover, blurb and main hooks.",
+  },
+  {
+    id: "trope-hook",
+    title: "Trope Hook",
+    description: "Lead with the tropes readers search for and build the post around them.",
+  },
+  {
+    id: "quote-post",
+    title: "Quote Post",
+    description: "Create a visual and caption around a genuine quote you provide.",
+  },
+  {
+    id: "kindle-unlimited",
+    title: "Kindle Unlimited",
+    description: "Promote the book as available to Kindle Unlimited readers.",
+  },
+  {
+    id: "backlist-revival",
+    title: "Backlist Revival",
+    description: "Give an older title a fresh angle without pretending it is a new release.",
+  },
+];
+
+const PLATFORM_OPTIONS: Array<{
+  id: SocialPlatform;
+  label: string;
+}> = [
+  { id: "facebook", label: "Facebook" },
+  { id: "instagram", label: "Instagram" },
+  { id: "tiktok", label: "TikTok" },
+];
+
 const CATALOGUE_URL = "https://www.marlowquinn.com/api/books";
 
 export default function SocialStudioPage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [error, setError] = useState("");
+  const [selectedBook, setSelectedBook] = useState<CatalogueBook | null>(null);
+  const [campaignType, setCampaignType] = useState<CampaignType>(
+    "book-spotlight",
+  );
+  const [platforms, setPlatforms] = useState<SocialPlatform[]>([
+    "facebook",
+    "instagram",
+    "tiktok",
+  ]);
+
+  function chooseBook(book: CatalogueBook) {
+    setSelectedBook(book);
+    setCampaignType("book-spotlight");
+    setPlatforms(["facebook", "instagram", "tiktok"]);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function togglePlatform(platform: SocialPlatform) {
+    setPlatforms((current) =>
+      current.includes(platform)
+        ? current.filter((item) => item !== platform)
+        : [...current, platform],
+    );
+  }
 
   useEffect(() => {
     let active = true;
@@ -114,6 +188,108 @@ export default function SocialStudioPage() {
           </p>
         </div>
 
+        {selectedBook && (
+          <section className="mb-8 overflow-hidden rounded-2xl border border-pink-500/30 bg-neutral-900 shadow-2xl">
+            <div className="flex flex-col gap-5 border-b border-white/10 p-5 sm:flex-row">
+              <img
+                src={selectedBook.coverUrl}
+                alt={`${selectedBook.title} book cover`}
+                className="h-44 w-28 shrink-0 self-center rounded-lg object-cover shadow-xl sm:self-start"
+              />
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-400">
+                      Campaign setup
+                    </p>
+                    <h2 className="mt-2 text-2xl font-bold">{selectedBook.title}</h2>
+                    <p className="mt-1 text-sm text-neutral-400">
+                      {selectedBook.subgenre}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBook(null)}
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xl text-neutral-300 transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close campaign setup"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {selectedBook.tropes.map((trope) => (
+                    <span
+                      key={trope}
+                      className="rounded-full bg-pink-500/10 px-3 py-1 text-xs text-pink-200"
+                    >
+                      {trope}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5">
+              <h3 className="font-semibold">What are we promoting?</h3>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {CAMPAIGN_OPTIONS.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setCampaignType(option.id)}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      campaignType === option.id
+                        ? "border-pink-500 bg-pink-500/10"
+                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                    }`}
+                  >
+                    <span className="block font-semibold text-white">
+                      {option.title}
+                    </span>
+                    <span className="mt-1 block text-sm leading-5 text-neutral-400">
+                      {option.description}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <h3 className="mt-6 font-semibold">Platforms</h3>
+              <div className="mt-3 flex flex-wrap gap-3">
+                {PLATFORM_OPTIONS.map((platform) => {
+                  const selected = platforms.includes(platform.id);
+
+                  return (
+                    <button
+                      key={platform.id}
+                      type="button"
+                      onClick={() => togglePlatform(platform.id)}
+                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                        selected
+                          ? "border-pink-500 bg-pink-500 text-white"
+                          : "border-white/10 bg-white/5 text-neutral-400 hover:bg-white/10"
+                      }`}
+                    >
+                      {selected ? "✓ " : ""}
+                      {platform.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled
+                className="mt-6 w-full cursor-not-allowed rounded-xl bg-pink-500/30 px-4 py-3 font-semibold text-pink-100/60"
+              >
+                Content generation comes next
+              </button>
+            </div>
+          </section>
+        )}
+
         {!catalogue && !error && (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-neutral-400">
             Loading your books...
@@ -178,10 +354,10 @@ export default function SocialStudioPage() {
 
                     <button
                       type="button"
-                      disabled
-                      className="mt-5 w-full cursor-not-allowed rounded-xl bg-pink-500/30 px-4 py-3 font-semibold text-pink-100/60"
+                      onClick={() => chooseBook(book)}
+                      className="mt-5 w-full rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
                     >
-                      Campaign builder coming next
+                      Create Campaign
                     </button>
                   </div>
                 </article>
