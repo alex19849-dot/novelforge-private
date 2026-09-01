@@ -45,6 +45,14 @@ type GeneratedPost = {
   visualDirection: string;
 };
 
+type MediaStyle = "branded" | "ai-scene";
+
+type GeneratedMedia = {
+  platform: SocialPlatform;
+  style: MediaStyle;
+  dataUrl: string;
+};
+
 const CAMPAIGN_OPTIONS: Array<{
   id: CampaignType;
   title: string;
@@ -88,6 +96,179 @@ const PLATFORM_OPTIONS: Array<{
 
 const CATALOGUE_URL = "https://www.marlowquinn.com/api/books";
 
+function loadImage(source: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("A campaign image asset could not be loaded."));
+    image.src = source;
+  });
+}
+
+function wrappedLines(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maximumWidth: number,
+  maximumLines: number,
+): string[] {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+
+    if (context.measureText(candidate).width <= maximumWidth) {
+      current = candidate;
+      continue;
+    }
+
+    if (current) lines.push(current);
+    current = word;
+
+    if (lines.length === maximumLines - 1) break;
+  }
+
+  if (current && lines.length < maximumLines) lines.push(current);
+
+  if (lines.join(" ").split(/\s+/).length < words.length && lines.length) {
+    lines[lines.length - 1] = `${lines[lines.length - 1].replace(/[.,!?;:]$/, "")}…`;
+  }
+
+  return lines;
+}
+
+function drawImageCover(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const imageRatio = image.naturalWidth / image.naturalHeight;
+  const targetRatio = width / height;
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = image.naturalWidth;
+  let sourceHeight = image.naturalHeight;
+
+  if (imageRatio > targetRatio) {
+    sourceWidth = image.naturalHeight * targetRatio;
+    sourceX = (image.naturalWidth - sourceWidth) / 2;
+  } else {
+    sourceHeight = image.naturalWidth / targetRatio;
+    sourceY = (image.naturalHeight - sourceHeight) / 2;
+  }
+
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceWidth,
+    sourceHeight,
+    x,
+    y,
+    width,
+    height,
+  );
+}
+
+async function createFinishedCampaignImage(input: {
+  book: CatalogueBook;
+  post: GeneratedPost;
+  mediaStyle: MediaStyle;
+  aiBackground?: string;
+}): Promise<string> {
+  const isTikTok = input.post.platform === "tiktok";
+  const width = 1080;
+  const height = isTikTok ? 1920 : 1350;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("This browser could not create the image.");
+
+  const cover = await loadImage(input.book.coverUrl);
+  const background = input.aiBackground
+    ? await loadImage(input.aiBackground)
+    : cover;
+
+  context.save();
+  if (input.mediaStyle === "branded") {
+    context.filter = "blur(34px) brightness(0.42) saturate(1.35)";
+    drawImageCover(context, background, -80, -80, width + 160, height + 160);
+  } else {
+    drawImageCover(context, background, 0, 0, width, height);
+  }
+  context.restore();
+
+  const shade = context.createLinearGradient(0, 0, 0, height);
+  shade.addColorStop(0, "rgba(5,5,8,0.76)");
+  shade.addColorStop(0.42, "rgba(5,5,8,0.2)");
+  shade.addColorStop(1, "rgba(5,5,8,0.9)");
+  context.fillStyle = shade;
+  context.fillRect(0, 0, width, height);
+
+  context.fillStyle = "#ec4899";
+  context.fillRect(72, 72, 104, 8);
+  context.font = "700 28px Arial, sans-serif";
+  context.fillText("MARLOW QUINN", 72, 125);
+
+  const hook = input.post.title || input.book.tropes.slice(0, 2).join(" • ");
+  context.font = `800 ${isTikTok ? 72 : 62}px Arial, sans-serif`;
+  context.fillStyle = "#ffffff";
+  context.textBaseline = "top";
+  const hookLines = wrappedLines(context, hook, width - 144, isTikTok ? 4 : 3);
+  const hookLineHeight = isTikTok ? 82 : 72;
+
+  hookLines.forEach((line, index) => {
+    context.fillText(line, 72, 170 + index * hookLineHeight);
+  });
+
+  const coverWidth = isTikTok ? 470 : 390;
+  const coverHeight = Math.round(coverWidth * (cover.naturalHeight / cover.naturalWidth));
+  const maximumCoverHeight = isTikTok ? 800 : 610;
+  const fittedCoverHeight = Math.min(coverHeight, maximumCoverHeight);
+  const fittedCoverWidth = Math.round(
+    fittedCoverHeight * (cover.naturalWidth / cover.naturalHeight),
+  );
+  const coverX = Math.round((width - fittedCoverWidth) / 2);
+  const coverY = isTikTok ? 560 : 415;
+
+  context.save();
+  context.shadowColor = "rgba(0,0,0,0.75)";
+  context.shadowBlur = 38;
+  context.shadowOffsetY = 20;
+  context.drawImage(cover, coverX, coverY, fittedCoverWidth, fittedCoverHeight);
+  context.restore();
+
+  const footerY = height - (isTikTok ? 270 : 230);
+  const displayedTropes = input.book.tropes.slice(0, 3).join("   •   ");
+  context.textAlign = "center";
+  context.fillStyle = "#f9a8d4";
+  context.font = `700 ${isTikTok ? 31 : 27}px Arial, sans-serif`;
+  const tropeLines = wrappedLines(context, displayedTropes, width - 120, 2);
+
+  tropeLines.forEach((line, index) => {
+    context.fillText(line, width / 2, footerY + index * 42);
+  });
+
+  if (input.book.kindleUnlimited) {
+    context.fillStyle = "#ffffff";
+    context.font = `700 ${isTikTok ? 30 : 26}px Arial, sans-serif`;
+    context.fillText(
+      "AVAILABLE ON KINDLE UNLIMITED",
+      width / 2,
+      height - (isTikTok ? 120 : 92),
+    );
+  }
+
+  return canvas.toDataURL("image/jpeg", 0.92);
+}
+
 export default function SocialStudioPage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [error, setError] = useState("");
@@ -108,6 +289,11 @@ export default function SocialStudioPage() {
   const [copiedPlatform, setCopiedPlatform] = useState<SocialPlatform | null>(
     null,
   );
+  const [mediaStyle, setMediaStyle] = useState<MediaStyle>("branded");
+  const [generatedMedia, setGeneratedMedia] = useState<GeneratedMedia[]>([]);
+  const [creatingImageFor, setCreatingImageFor] =
+    useState<SocialPlatform | null>(null);
+  const [imageError, setImageError] = useState("");
 
   function chooseBook(book: CatalogueBook) {
     setSelectedBook(book);
@@ -117,6 +303,9 @@ export default function SocialStudioPage() {
     setInstructions("");
     setGeneratedPosts([]);
     setGenerationError("");
+    setMediaStyle("branded");
+    setGeneratedMedia([]);
+    setImageError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -124,11 +313,15 @@ export default function SocialStudioPage() {
     setCampaignType(value);
     setGeneratedPosts([]);
     setGenerationError("");
+    setGeneratedMedia([]);
+    setImageError("");
   }
 
   function togglePlatform(platform: SocialPlatform) {
     setGeneratedPosts([]);
     setGenerationError("");
+    setGeneratedMedia([]);
+    setImageError("");
     setPlatforms((current) =>
       current.includes(platform)
         ? current.filter((item) => item !== platform)
@@ -170,6 +363,8 @@ export default function SocialStudioPage() {
       }
 
       setGeneratedPosts(result.posts);
+      setGeneratedMedia([]);
+      setImageError("");
     } catch (contentError) {
       setGenerationError(
         contentError instanceof Error
@@ -193,6 +388,61 @@ export default function SocialStudioPage() {
     await navigator.clipboard.writeText(text);
     setCopiedPlatform(post.platform);
     window.setTimeout(() => setCopiedPlatform(null), 1800);
+  }
+
+  async function createImage(post: GeneratedPost) {
+    if (!selectedBook) return;
+
+    setCreatingImageFor(post.platform);
+    setImageError("");
+
+    try {
+      let aiBackground: string | undefined;
+
+      if (mediaStyle === "ai-scene") {
+        const response = await fetch("/api/social-studio/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book: selectedBook,
+            platform: post.platform,
+            campaignType,
+            visualDirection: post.visualDirection,
+            instructions: instructions.trim(),
+          }),
+        });
+        const result = (await response.json()) as {
+          imageDataUrl?: string;
+          error?: string;
+        };
+
+        if (!response.ok || !result.imageDataUrl) {
+          throw new Error(result.error || "The AI scene could not be created.");
+        }
+
+        aiBackground = result.imageDataUrl;
+      }
+
+      const dataUrl = await createFinishedCampaignImage({
+        book: selectedBook,
+        post,
+        mediaStyle,
+        aiBackground,
+      });
+
+      setGeneratedMedia((current) => [
+        ...current.filter((item) => item.platform !== post.platform),
+        { platform: post.platform, style: mediaStyle, dataUrl },
+      ]);
+    } catch (mediaError) {
+      setImageError(
+        mediaError instanceof Error
+          ? mediaError.message
+          : "The promotional image could not be created.",
+      );
+    } finally {
+      setCreatingImageFor(null);
+    }
   }
 
   useEffect(() => {
@@ -343,6 +593,47 @@ export default function SocialStudioPage() {
                 ))}
               </div>
 
+              <h3 className="mt-6 font-semibold">Image style</h3>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaStyle("branded");
+                    setGeneratedMedia([]);
+                    setImageError("");
+                  }}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    mediaStyle === "branded"
+                      ? "border-pink-500 bg-pink-500/10"
+                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                  }`}
+                >
+                  <span className="block font-semibold">Branded Cover Graphic</span>
+                  <span className="mt-1 block text-sm leading-5 text-neutral-400">
+                    Uses the exact cover with designed typography and campaign hooks.
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMediaStyle("ai-scene");
+                    setGeneratedMedia([]);
+                    setImageError("");
+                  }}
+                  className={`rounded-xl border p-4 text-left transition ${
+                    mediaStyle === "ai-scene"
+                      ? "border-pink-500 bg-pink-500/10"
+                      : "border-white/10 bg-white/5 hover:bg-white/10"
+                  }`}
+                >
+                  <span className="block font-semibold">AI Story Scene</span>
+                  <span className="mt-1 block text-sm leading-5 text-neutral-400">
+                    Generates new campaign artwork, then adds the real cover and text.
+                  </span>
+                </button>
+              </div>
+
               <h3 className="mt-6 font-semibold">Platforms</h3>
               <div className="mt-3 flex flex-wrap gap-3">
                 {PLATFORM_OPTIONS.map((platform) => {
@@ -440,7 +731,12 @@ export default function SocialStudioPage() {
                     </h3>
                   </div>
 
-                  {generatedPosts.map((post) => (
+                  {generatedPosts.map((post) => {
+                    const media = generatedMedia.find(
+                      (item) => item.platform === post.platform,
+                    );
+
+                    return (
                     <article
                       key={post.platform}
                       className="rounded-2xl border border-white/10 bg-neutral-950 p-5"
@@ -482,17 +778,49 @@ export default function SocialStudioPage() {
                         {post.hashtags.join(" ")}
                       </p>
 
-                      <div className="mt-4 rounded-xl bg-white/5 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                          Visual direction
-                        </p>
-                        <p className="mt-2 text-sm leading-6 text-neutral-300">
-                          {post.visualDirection}
-                        </p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void createImage(post)}
+                        disabled={creatingImageFor !== null}
+                        className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-semibold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-neutral-500"
+                      >
+                        {creatingImageFor === post.platform
+                          ? mediaStyle === "ai-scene"
+                            ? "Creating AI scene and finished image..."
+                            : "Creating finished image..."
+                          : media
+                            ? "Create Another Image"
+                            : mediaStyle === "ai-scene"
+                              ? "Create AI Scene Image"
+                              : "Create Branded Image"}
+                      </button>
+
+                      {media && (
+                        <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3">
+                          <img
+                            src={media.dataUrl}
+                            alt={`${post.platform} campaign for ${selectedBook?.title ?? "book"}`}
+                            className="mx-auto max-h-[720px] w-auto rounded-xl object-contain"
+                          />
+                          <a
+                            href={media.dataUrl}
+                            download={`${selectedBook?.slug ?? "book"}-${post.platform}-${media.style}.jpg`}
+                            className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
+                          >
+                            Download Finished Image
+                          </a>
+                        </div>
+                      )}
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
+              )}
+
+              {imageError && (
+                <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+                  {imageError}
+                </p>
               )}
             </div>
           </section>
