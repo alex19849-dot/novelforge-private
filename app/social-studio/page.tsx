@@ -37,6 +37,14 @@ type CampaignType =
 
 type SocialPlatform = "facebook" | "instagram" | "tiktok";
 
+type GeneratedPost = {
+  platform: SocialPlatform;
+  title: string;
+  caption: string;
+  hashtags: string[];
+  visualDirection: string;
+};
+
 const CAMPAIGN_OPTIONS: Array<{
   id: CampaignType;
   title: string;
@@ -92,20 +100,99 @@ export default function SocialStudioPage() {
     "instagram",
     "tiktok",
   ]);
+  const [quote, setQuote] = useState("");
+  const [instructions, setInstructions] = useState("");
+  const [generatedPosts, setGeneratedPosts] = useState<GeneratedPost[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState("");
+  const [copiedPlatform, setCopiedPlatform] = useState<SocialPlatform | null>(
+    null,
+  );
 
   function chooseBook(book: CatalogueBook) {
     setSelectedBook(book);
     setCampaignType("book-spotlight");
     setPlatforms(["facebook", "instagram", "tiktok"]);
+    setQuote("");
+    setInstructions("");
+    setGeneratedPosts([]);
+    setGenerationError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function chooseCampaignType(value: CampaignType) {
+    setCampaignType(value);
+    setGeneratedPosts([]);
+    setGenerationError("");
+  }
+
   function togglePlatform(platform: SocialPlatform) {
+    setGeneratedPosts([]);
+    setGenerationError("");
     setPlatforms((current) =>
       current.includes(platform)
         ? current.filter((item) => item !== platform)
         : [...current, platform],
     );
+  }
+
+  async function generateContent() {
+    if (!selectedBook || platforms.length === 0) return;
+
+    if (campaignType === "quote-post" && !quote.trim()) {
+      setGenerationError("Paste a genuine quote for the quote campaign.");
+      return;
+    }
+
+    setIsGenerating(true);
+    setGenerationError("");
+    setGeneratedPosts([]);
+
+    try {
+      const response = await fetch("/api/social-studio/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          book: selectedBook,
+          campaignType,
+          platforms,
+          quote: quote.trim(),
+          instructions: instructions.trim(),
+        }),
+      });
+      const result = (await response.json()) as {
+        posts?: GeneratedPost[];
+        error?: string;
+      };
+
+      if (!response.ok || !result.posts) {
+        throw new Error(result.error || "The campaign could not be generated.");
+      }
+
+      setGeneratedPosts(result.posts);
+    } catch (contentError) {
+      setGenerationError(
+        contentError instanceof Error
+          ? contentError.message
+          : "The campaign could not be generated.",
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  async function copyPost(post: GeneratedPost) {
+    const text = [
+      post.title,
+      post.caption,
+      post.hashtags.join(" "),
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    await navigator.clipboard.writeText(text);
+    setCopiedPlatform(post.platform);
+    window.setTimeout(() => setCopiedPlatform(null), 1800);
   }
 
   useEffect(() => {
@@ -239,7 +326,7 @@ export default function SocialStudioPage() {
                   <button
                     key={option.id}
                     type="button"
-                    onClick={() => setCampaignType(option.id)}
+                    onClick={() => chooseCampaignType(option.id)}
                     className={`rounded-xl border p-4 text-left transition ${
                       campaignType === option.id
                         ? "border-pink-500 bg-pink-500/10"
@@ -279,13 +366,134 @@ export default function SocialStudioPage() {
                 })}
               </div>
 
+              {campaignType === "quote-post" && (
+                <div className="mt-6">
+                  <label
+                    htmlFor="campaign-quote"
+                    className="block font-semibold"
+                  >
+                    Genuine book quote
+                  </label>
+                  <textarea
+                    id="campaign-quote"
+                    value={quote}
+                    onChange={(event) => {
+                      setQuote(event.target.value);
+                      setGeneratedPosts([]);
+                      setGenerationError("");
+                    }}
+                    rows={4}
+                    placeholder="Paste the exact quote from the book..."
+                    className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
+                  />
+                </div>
+              )}
+
+              <div className="mt-6">
+                <label
+                  htmlFor="campaign-instructions"
+                  className="block font-semibold"
+                >
+                  Anything specific? <span className="text-neutral-500">Optional</span>
+                </label>
+                <textarea
+                  id="campaign-instructions"
+                  value={instructions}
+                  onChange={(event) => {
+                    setInstructions(event.target.value);
+                    setGeneratedPosts([]);
+                    setGenerationError("");
+                  }}
+                  rows={3}
+                  placeholder="For example: focus on the jealousy and forced proximity..."
+                  className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
+                />
+              </div>
+
+              {generationError && (
+                <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+                  {generationError}
+                </p>
+              )}
+
               <button
                 type="button"
-                disabled
-                className="mt-6 w-full cursor-not-allowed rounded-xl bg-pink-500/30 px-4 py-3 font-semibold text-pink-100/60"
+                onClick={() => void generateContent()}
+                disabled={isGenerating || platforms.length === 0}
+                className="mt-6 w-full rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:bg-pink-500/30 disabled:text-pink-100/60"
               >
-                Content generation comes next
+                {isGenerating
+                  ? "Creating platform content..."
+                  : platforms.length === 0
+                    ? "Choose at least one platform"
+                    : "Generate Content"}
               </button>
+
+              {generatedPosts.length > 0 && (
+                <div className="mt-8 space-y-5 border-t border-white/10 pt-6">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-400">
+                      Generated campaign
+                    </p>
+                    <h3 className="mt-2 text-xl font-bold">
+                      Platform-specific content
+                    </h3>
+                  </div>
+
+                  {generatedPosts.map((post) => (
+                    <article
+                      key={post.platform}
+                      className="rounded-2xl border border-white/10 bg-neutral-950 p-5"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <h4 className="text-lg font-bold capitalize">
+                          {post.platform}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => void copyPost(post)}
+                          className="rounded-lg border border-pink-500/40 bg-pink-500/10 px-3 py-2 text-sm font-semibold text-pink-200 transition hover:bg-pink-500/20"
+                        >
+                          {copiedPlatform === post.platform ? "Copied" : "Copy post"}
+                        </button>
+                      </div>
+
+                      {post.title && (
+                        <div className="mt-4">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                            Title or hook
+                          </p>
+                          <p className="mt-1 font-semibold text-white">
+                            {post.title}
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="mt-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                          Caption
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">
+                          {post.caption}
+                        </p>
+                      </div>
+
+                      <p className="mt-4 text-sm leading-6 text-pink-300">
+                        {post.hashtags.join(" ")}
+                      </p>
+
+                      <div className="mt-4 rounded-xl bg-white/5 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                          Visual direction
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-neutral-300">
+                          {post.visualDirection}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         )}
