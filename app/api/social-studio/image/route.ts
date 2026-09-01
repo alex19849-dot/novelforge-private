@@ -34,6 +34,29 @@ function cleanStringArray(value: unknown, maximumItems = 12): string[] {
     : [];
 }
 
+const CASTING_PROFILES = [
+  "deep brown skin, close-cropped coiled black hair, an angular face, strong cheekbones and a tall athletic build",
+  "fair skin with freckles, tousled auburn hair, a straight nose, expressive eyes and a lean runner's build",
+  "warm olive skin, thick dark curls, a square jaw, heavy brows and a powerful stocky build",
+  "golden tan skin, short sandy-blond hair, a broken-in nose, light stubble and broad swimmer's shoulders",
+  "medium-brown South Asian skin, swept-back black hair, an oval face, neatly trimmed beard and a solid muscular build",
+  "light East Asian skin, straight black undercut hair, a defined jaw, clean-shaven face and a compact athletic build",
+  "pale skin, dark blond buzz cut, a long face, a small eyebrow scar and a tall broad-chested build",
+  "rich brown skin, shoulder-length locs tied back, a rounded jaw, close beard and a lean muscular build",
+  "sun-warmed Latino skin, short wavy brown hair, a cleft chin, dark stubble and a sturdy athletic build",
+  "cool fair skin, collar-length black hair, sharp grey eyes, a narrow face and a wiry build",
+] as const;
+
+function stableTitleNumber(value: string): number {
+  let result = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    result = (result * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return result;
+}
+
 export async function POST(request: Request) {
   try {
     if (!process.env.OPENAI_API_KEY) {
@@ -69,9 +92,27 @@ export async function POST(request: Request) {
       );
     }
 
+    const castingNumber = stableTitleNumber(book.title.toLowerCase());
+    const firstCastingIndex = castingNumber % CASTING_PROFILES.length;
+    let secondCastingIndex =
+      (castingNumber * 7 + 3) % CASTING_PROFILES.length;
+
+    if (secondCastingIndex === firstCastingIndex) {
+      secondCastingIndex = (secondCastingIndex + 1) % CASTING_PROFILES.length;
+    }
+
+    const firstCasting = CASTING_PROFILES[firstCastingIndex];
+    const secondCasting = CASTING_PROFILES[secondCastingIndex];
+
     const prompt = [
       "Create a premium cinematic background image for an adult MM romance book promotion.",
       "The characters are fictional adult men aged twenty-one or older.",
+      "Show exactly two clearly different men. They must read instantly as two separate people, never twins, clones, brothers, duplicated faces or the same model rendered twice.",
+      "Give them visibly different face shapes, noses, jawlines, hair colour or texture, builds, styling and silhouettes. Do not mirror their hairstyles, poses, clothing or expressions.",
+      "If the supplied blurb contains explicit appearance details, preserve those details. Otherwise use the stable visual casting below so this book has its own recognisable couple.",
+      `Man one: ${firstCasting}.`,
+      `Man two: ${secondCasting}.`,
+      "Keep Man One's exact identity consistent across his face, hair, body and clothing. Keep Man Two's separate exact identity consistent. Do not blend their features together.",
       "Keep the image sensual, atmospheric and suitable for a mainstream social media feed. No nudity, explicit sexual action or fetish imagery.",
       "Do not add any words, letters, typography, logos, watermarks, book covers, product mockups or UI elements. NovelForge will add the real book cover and accurate text afterwards.",
       "Do not imitate a living artist, celebrity or identifiable public figure.",
@@ -84,8 +125,8 @@ export async function POST(request: Request) {
       `Campaign visual concept: ${cleanString(body.visualDirection, 1200)}`,
       `Additional author direction: ${cleanString(body.instructions, 1000) || "None"}`,
       platform === "tiktok"
-        ? "Compose for a tall 9:16 vertical video frame. Keep important faces and details away from the bottom and right-side interface zones."
-        : "Compose for a portrait 4:5 social media post with a clear central focal point.",
+        ? "Compose for a tall 9:16 vertical frame. Keep both men together in the upper-left and middle-left area. Leave the right side calm and uncluttered for the real book cover. Keep faces away from interface zones."
+        : "Compose for a portrait 4:5 post. Keep both men clearly visible within the left half of the frame. Leave the right half atmospheric and uncluttered for the real book cover. Do not place either face behind the right-side negative space.",
     ].join("\n\n");
 
     const image = await openai.images.generate({
