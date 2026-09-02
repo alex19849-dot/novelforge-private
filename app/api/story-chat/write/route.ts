@@ -415,7 +415,11 @@ function getPrompt(input: {
     .join("\n\n");
 }
 
-function extractCompletedSection(raw: string): string {
+function extractCompletedSection(
+  raw: string,
+  chapterTitle: string,
+  povCharacter: string,
+): string {
   const trimmed = raw.trim();
 
   if (!/<END_SECTION>\s*$/i.test(trimmed)) {
@@ -424,7 +428,41 @@ function extractCompletedSection(raw: string): string {
     );
   }
 
-  const section = trimmed.replace(/\s*<END_SECTION>\s*$/i, "").trim();
+  let section = trimmed.replace(/\s*<END_SECTION>\s*$/i, "").trim();
+
+  if (/^```(?:text|markdown)?\s*/i.test(section) && /```\s*$/i.test(section)) {
+    section = section
+      .replace(/^```(?:text|markdown)?\s*/i, "")
+      .replace(/\s*```\s*$/i, "")
+      .trim();
+  }
+
+  const lines = section.split(/\r?\n/);
+  const normalisedChapterTitle = chapterTitle.trim().toLowerCase();
+  const normalisedPovCharacter = povCharacter.trim().toLowerCase();
+
+  while (lines.length > 0) {
+    const firstLine = lines[0].trim();
+    const withoutMarkdown = firstLine.replace(/^#{1,6}\s*/, "").trim();
+    const withoutLabel = withoutMarkdown
+      .replace(/^(?:title|chapter title|pov|point of view)\s*:\s*/i, "")
+      .trim()
+      .toLowerCase();
+    const isKnownMetadata =
+      !firstLine ||
+      /^#{1,6}\s+\S+/.test(firstLine) ||
+      /^chapter\s+\d+(?:\s*[:.\-]\s*.+)?$/i.test(withoutMarkdown) ||
+      /^(?:title|chapter title|pov|point of view)\s*:/i.test(withoutMarkdown) ||
+      (Boolean(normalisedChapterTitle) &&
+        withoutLabel === normalisedChapterTitle) ||
+      (Boolean(normalisedPovCharacter) &&
+        withoutLabel === normalisedPovCharacter);
+
+    if (!isKnownMetadata) break;
+    lines.shift();
+  }
+
+  section = lines.join("\n").trim();
 
   if (!section) {
     throw new Error("The writing model returned no section prose.");
@@ -795,7 +833,11 @@ export async function POST(request: Request) {
           );
         }
 
-        const section = extractCompletedSection(raw);
+        const section = extractCompletedSection(
+          raw,
+          chapterTitle,
+          povCharacter,
+        );
         validateSection(section);
         const warnings = repetitionWarnings(
           chapterDraft,
