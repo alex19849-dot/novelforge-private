@@ -2912,13 +2912,19 @@ export default function SocialStudioPage() {
     <main className="min-h-[100dvh] bg-neutral-950 text-white">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-4">
-          <a
-            href="/story-chat"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xl transition hover:bg-white/10"
-            aria-label="Back to NovelForge"
+          <button
+            type="button"
+            onClick={() => {
+              window.location.assign(
+                `${window.location.origin}/story-chat`,
+              );
+            }}
+            className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold transition hover:bg-white/10"
+            aria-label="Return to the writing workspace"
           >
-            ←
-          </a>
+            <span aria-hidden="true">←</span>
+            <span>Back to writing</span>
+          </button>
 
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pink-500">
