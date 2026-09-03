@@ -1,3417 +1,3352 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
 
-type CatalogueBook = {
-  slug: string;
-  title: string;
-  subgenre: string;
-  blurb: string;
-  tropes: string[];
-  heat: string;
-  length: string;
-  ending: string;
-  contentWarnings: string[];
-  kindleUnlimited: boolean;
-  asin: string | null;
-  amazonUrl: string;
-  coverUrl: string;
-  bookPageUrl: string;
+import ChatPanel from "./components/ChatPanel";
+
+import ChapterPanel from "./components/ChapterPanel";
+
+import BiblePanel from "./components/BiblePanel";
+
+import type {
+  ActiveTab,
+  ChapterPlan,
+  GenerationDiagnostic,
+  StoryBible,
+  StoryChapter,
+  StoryChatResponse,
+  StoryState,
+  StoryWorkspace,
+} from "./types";
+
+const STORAGE_KEY = "novelforge-current-story";
+
+const PENDING_GENERATION_KEY = "novelforge-pending-chapter-generation";
+
+type PendingChapterGeneration = {
+  storyId: string;
+  savedAt?: string;
+  generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
+  chapterBrief: string;
+  latestUserMessage: string;
+  draft: string;
+  lastSection?: string;
+  repetitionWarnings?: string[];
+  minimumWordCount: number;
+  maximumWordCount: number;
+  diagnostics?: GenerationDiagnostic[];
 };
 
-type CatalogueResponse = {
-  schemaVersion: number;
-  source: string;
-  count: number;
-  books: CatalogueBook[];
+type SectionAction = "start" | "continue" | "rewrite";
+
+type WriterResponse = {
+  section: string;
+  wordCount: number;
+  warnings: string[];
+  action: SectionAction;
+  diagnostics: GenerationDiagnostic[];
 };
 
-type CampaignType =
-  | "book-spotlight"
-  | "trope-hook"
-  | "quote-post"
-  | "kindle-unlimited"
-  | "backlist-revival";
-
-type SocialPlatform = "facebook" | "instagram" | "tiktok";
-
-type GeneratedPost = {
-  platform: SocialPlatform;
-  title: string;
-  caption: string;
-  hashtags: string[];
-  visualDirection: string;
+type AionPassageResponse = {
+  reply: string;
+  diagnostics: GenerationDiagnostic[];
 };
 
-type MediaStyle = "branded" | "ai-scene";
-
-type PosterTemplate =
-  "auto" | "cinematic-quote" | "trope-showcase" | "kindle-hero";
-
-type GeneratedMedia = {
-  platform: SocialPlatform;
-  style: MediaStyle;
-  template: Exclude<PosterTemplate, "auto">;
-  dataUrl: string;
+type LedgerResponse = {
+  storyState: StoryWorkspace["storyState"];
+  diagnostics: GenerationDiagnostic[];
 };
 
-type GeneratedVideo = {
-  platform: SocialPlatform;
-  url: string;
-  mimeType: string;
-  extension: "mp4" | "webm";
+type QualityResponse = {
+  accepted: boolean;
+  chapterContent: string;
+  repaired: boolean;
+  quality: {
+    passed: boolean;
+    hardFailures: string[];
+    repairInstructions: string[];
+    summary: string;
+    scores: {
+      continuity: number;
+      plotMovement: number;
+      relationshipProgression: number;
+      voiceDistinctiveness: number;
+      povAndTense: number;
+      repetitionControl: number;
+      hookStrength: number;
+    };
+  };
+  diagnostics: GenerationDiagnostic[];
 };
 
-const CAMPAIGN_OPTIONS: Array<{
-  id: CampaignType;
-  title: string;
-  description: string;
-}> = [
-  {
-    id: "book-spotlight",
-    title: "Book Spotlight",
-    description:
-      "A strong general promotion using the cover, blurb and main hooks.",
-  },
-  {
-    id: "trope-hook",
-    title: "Trope Hook",
-    description:
-      "Lead with the tropes readers search for and build the post around them.",
-  },
-  {
-    id: "quote-post",
-    title: "Quote Post",
-    description:
-      "Create a visual and caption around a genuine quote you provide.",
-  },
-  {
-    id: "kindle-unlimited",
-    title: "Kindle Unlimited",
-    description: "Promote the book as available to Kindle Unlimited readers.",
-  },
-  {
-    id: "backlist-revival",
-    title: "Backlist Revival",
-    description:
-      "Give an older title a fresh angle without pretending it is a new release.",
-  },
-];
+type WorkspaceMetadata = {
+  seriesType: StoryWorkspace["seriesType"];
+  seriesTitle: string;
+  bookNumber: number;
+  lineage?: StoryWorkspace["lineage"];
+};
 
-const PLATFORM_OPTIONS: Array<{
-  id: SocialPlatform;
-  label: string;
-}> = [
-  { id: "facebook", label: "Facebook" },
-  { id: "instagram", label: "Instagram" },
-  { id: "tiktok", label: "TikTok" },
-];
+function getWorkspaceMetadata(value: unknown): WorkspaceMetadata {
+  if (!value || typeof value !== "object") {
+    return { seriesType: "standalone", seriesTitle: "", bookNumber: 1 };
+  }
 
-const POSTER_OPTIONS: Array<{
-  id: PosterTemplate;
-  title: string;
-  description: string;
-}> = [
-  {
-    id: "auto",
-    title: "Automatic",
-    description: "Matches the poster design to the campaign type.",
-  },
-  {
-    id: "cinematic-quote",
-    title: "Cinematic Quote",
-    description: "Large dramatic quote, atmospheric cover and Kindle hero.",
-  },
-  {
-    id: "trope-showcase",
-    title: "Trope Showcase",
-    description:
-      "Bold selling points, clean reading order and a dominant cover.",
-  },
-  {
-    id: "kindle-hero",
-    title: "Atmospheric Kindle Hero",
-    description:
-      "Cover-led artwork with lighting, depth, glow and reflections.",
-  },
-];
+  const state = value as Record<string, unknown>;
+  const metadata =
+    state.workspaceMetadata && typeof state.workspaceMetadata === "object"
+      ? (state.workspaceMetadata as Record<string, unknown>)
+      : {};
 
-const CATALOGUE_URL = "https://www.marlowquinn.com/api/books";
-
-function loadImage(source: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.onload = () => resolve(image);
-    image.onerror = () =>
-      reject(new Error("A campaign image asset could not be loaded."));
-    image.src = source;
-  });
+  return {
+    seriesType: metadata.seriesType === "series" ? "series" : "standalone",
+    seriesTitle:
+      typeof metadata.seriesTitle === "string" ? metadata.seriesTitle : "",
+    bookNumber:
+      typeof metadata.bookNumber === "number" && metadata.bookNumber > 0
+        ? metadata.bookNumber
+        : 1,
+    lineage:
+      metadata.lineage && typeof metadata.lineage === "object"
+        ? (metadata.lineage as StoryWorkspace["lineage"])
+        : undefined,
+  };
 }
 
-function wrappedLines(
-  context: CanvasRenderingContext2D,
-  text: string,
-  maximumWidth: number,
-  maximumLines: number,
-): string[] {
-  const words = text.trim().split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let current = "";
+const EMPTY_STORY_BIBLE: StoryBible = {
+  premise: "",
 
-  for (const word of words) {
-    const candidate = current ? `${current} ${word}` : word;
+  relationship: "",
 
-    if (context.measureText(candidate).width <= maximumWidth) {
-      current = candidate;
+  subgenre: "",
+
+  setting: "",
+
+  pov: "",
+
+  heatLevel: "",
+
+  burnPacing: "",
+
+  tropes: [],
+
+  characters: [],
+
+  notes: [],
+};
+
+const EMPTY_STORY_STATE = {
+  importantFacts: [],
+
+  characterStates: [],
+
+  relationshipStates: [],
+
+  unresolvedThreads: [],
+
+  timeline: [],
+
+  locations: [],
+
+  activePOV: "",
+
+  chapterLedger: [],
+
+  latestChapterEnding: "",
+
+  characterKnowledge: [],
+
+  repetitionWarnings: [],
+
+  voiceProfiles: [],
+
+  chapterPlans: [],
+
+  lastGenerationDiagnostics: [],
+
+  currentScene: undefined,
+
+  relationshipProgression: [],
+
+  repetitionMemory: {
+    completedInternalBeats: [],
+    settingTreatments: [],
+    actionPatterns: [],
+    dialoguePatterns: [],
+    repeatedLanguage: [],
+    sentenceOpeningWarnings: [],
+  },
+
+  continuityDirtyFromChapter: undefined,
+};
+
+function createEmptyStory(): StoryWorkspace {
+  const now = new Date().toISOString();
+
+  return {
+    id: crypto.randomUUID(),
+
+    title: "Untitled story",
+
+    seriesType: "standalone",
+
+    seriesTitle: "",
+
+    bookNumber: 1,
+
+    messages: [
+      {
+        id: Date.now(),
+
+        role: "assistant",
+
+        content: "Hi Alex. What kind of story are we building this time?",
+      },
+    ],
+
+    chapters: [],
+
+    storyBible: {
+      ...EMPTY_STORY_BIBLE,
+
+      tropes: [],
+
+      characters: [],
+
+      notes: [],
+    },
+
+    storyState: {
+      ...EMPTY_STORY_STATE,
+    },
+
+    createdAt: now,
+
+    updatedAt: now,
+  };
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) && value.every((item) => typeof item === "string")
+  );
+}
+
+function getStoryStateBeforeChapter(
+  state: StoryState,
+  replacementNumber: number | null,
+): StoryState {
+  if (replacementNumber === null) {
+    return state;
+  }
+
+  const earlierLedger = (state.chapterLedger ?? []).filter(
+    (entry) => entry.chapterNumber < replacementNumber,
+  );
+  const previousChapter = earlierLedger.at(-1);
+  const unique = (values: string[]) =>
+    Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+
+  return {
+    ...EMPTY_STORY_STATE,
+    importantFacts: unique(earlierLedger.flatMap((entry) => entry.newFacts)),
+    relationshipStates: previousChapter?.relationshipShift
+      ? [previousChapter.relationshipShift]
+      : [],
+    unresolvedThreads: previousChapter?.unresolvedThreads ?? [],
+    timeline: [
+      ...earlierLedger.map(
+        (entry) => `Chapter ${entry.chapterNumber}: ${entry.summary}`,
+      ),
+      ...(previousChapter?.endingTime
+        ? [
+            `CURRENT CLOCK: ${previousChapter.endingTime}, immediately after Chapter ${previousChapter.chapterNumber}.`,
+          ]
+        : []),
+    ],
+    locations: unique(
+      earlierLedger.flatMap((entry) => [
+        entry.openingLocation,
+        entry.endingLocation,
+      ]),
+    ),
+    chapterLedger: earlierLedger,
+    latestChapterEnding: previousChapter?.endingExcerpt ?? "",
+    characterKnowledge: unique(
+      earlierLedger.flatMap((entry) => entry.characterKnowledgeChanges ?? []),
+    ),
+    repetitionWarnings: unique(
+      earlierLedger.flatMap((entry) => entry.repeatedBeats),
+    ).slice(-60),
+    repetitionMemory: {
+      completedInternalBeats: unique(
+        earlierLedger.flatMap((entry) => entry.completedInternalBeats ?? []),
+      ),
+      settingTreatments: unique(
+        earlierLedger.flatMap((entry) => entry.settingTreatments ?? []),
+      ),
+      actionPatterns: unique(
+        earlierLedger.flatMap((entry) => entry.actionPatterns ?? []),
+      ),
+      dialoguePatterns: [],
+      repeatedLanguage: unique(
+        earlierLedger.flatMap((entry) => entry.repeatedLanguage ?? []),
+      ),
+      sentenceOpeningWarnings: [],
+    },
+    currentScene: previousChapter
+      ? {
+          chapterNumber: previousChapter.chapterNumber,
+          storyClock: previousChapter.endingTime,
+          location: previousChapter.endingLocation,
+          presentCharacters: [],
+          physicalPositions: previousChapter.endingPositions ?? [],
+          activeObjects: previousChapter.activeObjects ?? [],
+          injuries: [],
+          clothing: [],
+        }
+      : undefined,
+    voiceProfiles: state.voiceProfiles ?? [],
+    activePOV: previousChapter?.povCharacter ?? "",
+    chapterPlans: state.chapterPlans ?? [],
+  };
+}
+
+function getRequestedWordCount(message: string): number | null {
+  const match = message.match(/\b(\d{3,5})\s*words?\b/i);
+
+  if (!match) {
+    return null;
+  }
+
+  const wordCount = Number(match[1]);
+
+  return Number.isFinite(wordCount) ? wordCount : null;
+}
+
+type ChapterDeletionRequest =
+  | { kind: "none" }
+  | { kind: "ambiguous" }
+  | { kind: "exact"; chapterNumber: number };
+
+const CHAPTER_NUMBER_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+};
+
+function getChapterNumberFromMessage(message: string): number | null {
+  const numberedChapter = message.match(/\bchapter\s+(?:number\s+)?(\d+)\b/i);
+
+  if (numberedChapter) {
+    const chapterNumber = Number(numberedChapter[1] ?? "");
+
+    return Number.isInteger(chapterNumber) && chapterNumber > 0
+      ? chapterNumber
+      : null;
+  }
+
+  const wordedChapter = message.match(
+    /\bchapter\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\b/i,
+  );
+
+  if (!wordedChapter) {
+    return null;
+  }
+
+  return CHAPTER_NUMBER_WORDS[wordedChapter[1]?.toLowerCase() ?? ""] ?? null;
+}
+
+function requestsChapterGeneration(message: string): boolean {
+  return (
+    /\b(?:write|generate|create)\b[\s\S]{0,100}\bchapter\b/i.test(message) ||
+    /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(message) ||
+    /\b(?:write|generate|create|start|continue|rewrite)\b[\s\S]{0,100}\bepilogue\b|\bepilogue\b[\s\S]{0,100}\b(?:write|generate|create|start|continue|rewrite)\b/i.test(
+      message,
+    )
+  );
+}
+
+function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
+  const commandText = message.replace(
+    /\b(?:do\s+not|don't|never)\s+(?:delete|remove)\b/gi,
+    "",
+  );
+  const directlyRequestsChapterDeletion =
+    /\b(?:delete|remove)\s+(?:the\s+)?(?:saved\s+)?chapter\b/i.test(
+      commandText,
+    );
+  const directlyRequestsPronounDeletion =
+    /\b(?:delete|remove)\s+(?:that|this|it)\b/i.test(commandText);
+
+  if (!directlyRequestsChapterDeletion && !directlyRequestsPronounDeletion) {
+    return { kind: "none" };
+  }
+
+  const chapterNumber = directlyRequestsChapterDeletion
+    ? getChapterNumberFromMessage(commandText)
+    : null;
+
+  if (chapterNumber !== null) {
+    return { kind: "exact", chapterNumber };
+  }
+
+  if (directlyRequestsChapterDeletion || directlyRequestsPronounDeletion) {
+    return { kind: "ambiguous" };
+  }
+
+  return { kind: "none" };
+}
+
+function isGenerationDiagnostic(value: unknown): value is GenerationDiagnostic {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const diagnostic = value as Partial<GenerationDiagnostic>;
+
+  return (
+    typeof diagnostic.stage === "string" &&
+    (diagnostic.provider === "openai" ||
+      diagnostic.provider === "openrouter") &&
+    typeof diagnostic.model === "string" &&
+    (diagnostic.status === undefined ||
+      diagnostic.status === "succeeded" ||
+      diagnostic.status === "failed") &&
+    typeof diagnostic.inputTokens === "number" &&
+    typeof diagnostic.outputTokens === "number" &&
+    typeof diagnostic.totalTokens === "number" &&
+    (diagnostic.costUsd === null || typeof diagnostic.costUsd === "number") &&
+    (diagnostic.costType === undefined ||
+      diagnostic.costType === "reported" ||
+      diagnostic.costType === "estimated" ||
+      diagnostic.costType === "unavailable") &&
+    typeof diagnostic.durationMs === "number" &&
+    typeof diagnostic.attempt === "number" &&
+    (diagnostic.error === undefined || typeof diagnostic.error === "string")
+  );
+}
+
+function isDiagnosticArray(value: unknown): value is GenerationDiagnostic[] {
+  return Array.isArray(value) && value.every(isGenerationDiagnostic);
+}
+
+function getDiagnosticCostType(
+  diagnostic: GenerationDiagnostic,
+): "reported" | "estimated" | "unavailable" {
+  if (diagnostic.costType) {
+    return diagnostic.costType;
+  }
+
+  if (diagnostic.costUsd === null) {
+    return "unavailable";
+  }
+
+  return diagnostic.provider === "openai" ? "estimated" : "reported";
+}
+
+function formatGenerationDiagnostics(
+  diagnostics: GenerationDiagnostic[],
+  pipelineStatus: "succeeded" | "failed" | "in progress",
+): string {
+  const totalTokens = diagnostics.reduce(
+    (sum, diagnostic) => sum + diagnostic.totalTokens,
+    0,
+  );
+  const totalDurationMs = diagnostics.reduce(
+    (sum, diagnostic) => sum + diagnostic.durationMs,
+    0,
+  );
+  const reportedCost = diagnostics.reduce(
+    (sum, diagnostic) =>
+      getDiagnosticCostType(diagnostic) === "reported"
+        ? sum + (diagnostic.costUsd ?? 0)
+        : sum,
+    0,
+  );
+  const estimatedCost = diagnostics.reduce(
+    (sum, diagnostic) =>
+      getDiagnosticCostType(diagnostic) === "estimated"
+        ? sum + (diagnostic.costUsd ?? 0)
+        : sum,
+    0,
+  );
+  const unavailableCostCalls = diagnostics.filter(
+    (diagnostic) => getDiagnosticCostType(diagnostic) === "unavailable",
+  ).length;
+  const failedCalls = diagnostics.filter(
+    (diagnostic) => diagnostic.status === "failed",
+  ).length;
+  const costParts = [];
+
+  if (reportedCost > 0) {
+    costParts.push(`$${reportedCost.toFixed(4)} provider-reported`);
+  }
+
+  if (estimatedCost > 0) {
+    costParts.push(`$${estimatedCost.toFixed(4)} estimated`);
+  }
+
+  if (unavailableCostCalls > 0) {
+    costParts.push(
+      `${unavailableCostCalls} ${
+        unavailableCostCalls === 1 ? "call" : "calls"
+      } with unavailable cost`,
+    );
+  }
+
+  const costText =
+    costParts.length > 0 ? costParts.join(", ") : "$0.0000 recorded";
+
+  return `Generation diagnostics: ${diagnostics.length} model ${
+    diagnostics.length === 1 ? "call" : "calls"
+  }, ${totalTokens.toLocaleString()} tokens, ${(totalDurationMs / 1000).toFixed(
+    1,
+  )} seconds, ${costText}, pipeline ${pipelineStatus}, ${failedCalls} ${
+    failedCalls === 1 ? "provider-call failure" : "provider-call failures"
+  }.`;
+}
+
+function stripGenerationDiagnostics(content: string): string {
+  return content.replace(/\s*Generation diagnostics:[\s\S]*$/i, "").trim();
+}
+
+function isWriterResponse(value: unknown): value is WriterResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const response = value as Partial<WriterResponse>;
+
+  return (
+    typeof response.section === "string" &&
+    Boolean(response.section.trim()) &&
+    typeof response.wordCount === "number" &&
+    isStringArray(response.warnings) &&
+    (response.action === "start" ||
+      response.action === "continue" ||
+      response.action === "rewrite") &&
+    isDiagnosticArray(response.diagnostics)
+  );
+}
+
+function isPendingGeneration(
+  value: unknown,
+): value is PendingChapterGeneration {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const pending = value as Partial<PendingChapterGeneration>;
+  const chapter = pending.generatedChapter;
+
+  return (
+    typeof pending.storyId === "string" &&
+    (pending.savedAt === undefined || typeof pending.savedAt === "string") &&
+    Boolean(chapter) &&
+    typeof chapter?.title === "string" &&
+    typeof chapter?.povCharacter === "string" &&
+    typeof chapter?.content === "string" &&
+    (chapter?.replaceChapterNumber === null ||
+      typeof chapter?.replaceChapterNumber === "number") &&
+    typeof pending.chapterBrief === "string" &&
+    typeof pending.latestUserMessage === "string" &&
+    typeof pending.draft === "string" &&
+    (pending.lastSection === undefined ||
+      typeof pending.lastSection === "string") &&
+    (pending.repetitionWarnings === undefined ||
+      isStringArray(pending.repetitionWarnings)) &&
+    typeof pending.minimumWordCount === "number" &&
+    typeof pending.maximumWordCount === "number" &&
+    (pending.diagnostics === undefined ||
+      isDiagnosticArray(pending.diagnostics))
+  );
+}
+
+function parseRemotePendingGeneration(
+  value: unknown,
+): PendingChapterGeneration | null {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isPendingGeneration(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+class ApiRequestError extends Error {
+  diagnostics: GenerationDiagnostic[];
+
+  constructor(message: string, diagnostics: GenerationDiagnostic[] = []) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.diagnostics = diagnostics;
+  }
+}
+
+async function readApiJson(response: Response): Promise<unknown> {
+  const responseText = await response.text();
+  let data: unknown = null;
+
+  if (responseText) {
+    try {
+      data = JSON.parse(responseText) as unknown;
+    } catch {
+      const preview = responseText.replace(/\s+/g, " ").trim().slice(0, 120);
+
+      throw new Error(
+        `The server returned HTTP ${response.status} with a non-JSON response${
+          preview ? `: ${preview}` : "."
+        }`,
+      );
+    }
+  }
+
+  if (!response.ok) {
+    const errorMessage =
+      data &&
+      typeof data === "object" &&
+      "error" in data &&
+      typeof data.error === "string"
+        ? data.error
+        : `The server returned HTTP ${response.status}.`;
+
+    const diagnostics =
+      data &&
+      typeof data === "object" &&
+      "diagnostics" in data &&
+      isDiagnosticArray(data.diagnostics)
+        ? data.diagnostics
+        : [];
+
+    throw new ApiRequestError(errorMessage, diagnostics);
+  }
+
+  return data;
+}
+
+function isStoryBible(value: unknown): value is StoryBible {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const bible = value as Partial<StoryBible>;
+
+  return (
+    typeof bible.premise === "string" &&
+    typeof bible.relationship === "string" &&
+    typeof bible.subgenre === "string" &&
+    typeof bible.setting === "string" &&
+    typeof bible.pov === "string" &&
+    typeof bible.heatLevel === "string" &&
+    typeof bible.burnPacing === "string" &&
+    isStringArray(bible.tropes) &&
+    isStringArray(bible.characters) &&
+    isStringArray(bible.notes)
+  );
+}
+
+function isChapterPlan(value: unknown): value is ChapterPlan {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const plan = value as Partial<ChapterPlan>;
+
+  return (
+    typeof plan.chapterNumber === "number" &&
+    typeof plan.title === "string" &&
+    typeof plan.povCharacter === "string" &&
+    typeof plan.chapterGoal === "string" &&
+    typeof plan.relationshipChange === "string" &&
+    Array.isArray(plan.scenes) &&
+    plan.scenes.length >= 1 &&
+    plan.scenes.length <= 5 &&
+    plan.scenes.every(
+      (scene) =>
+        Boolean(scene) &&
+        typeof scene === "object" &&
+        typeof scene.order === "number" &&
+        typeof scene.location === "string" &&
+        typeof scene.objective === "string" &&
+        typeof scene.conflict === "string" &&
+        typeof scene.newInformation === "string" &&
+        typeof scene.exitBeat === "string",
+    ) &&
+    isStringArray(plan.completedBeatsToAvoid) &&
+    (plan.status === "draft" || plan.status === "approved") &&
+    typeof plan.updatedAt === "string"
+  );
+}
+
+function getPlannedSceneCount(chapterBrief: string): number {
+  try {
+    const parsed = JSON.parse(chapterBrief) as Record<string, unknown>;
+
+    if (Array.isArray(parsed.scenes)) {
+      return Math.min(5, Math.max(1, parsed.scenes.length));
+    }
+
+    if (parsed.scene1 && parsed.scene2 && parsed.scene3) {
+      return 3;
+    }
+  } catch {
+    return 3;
+  }
+
+  return 3;
+}
+
+function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const state = value as Partial<StoryWorkspace["storyState"]>;
+
+  const chapterLedgerIsValid =
+    state.chapterLedger === undefined ||
+    (Array.isArray(state.chapterLedger) &&
+      state.chapterLedger.every(
+        (entry) =>
+          Boolean(entry) &&
+          typeof entry === "object" &&
+          typeof entry.chapterNumber === "number" &&
+          typeof entry.title === "string" &&
+          typeof entry.povCharacter === "string" &&
+          typeof entry.summary === "string" &&
+          typeof entry.openingLocation === "string" &&
+          typeof entry.endingLocation === "string" &&
+          typeof entry.endingTime === "string" &&
+          typeof entry.endingExcerpt === "string" &&
+          typeof entry.relationshipShift === "string" &&
+          typeof entry.intimacyMilestone === "string" &&
+          isStringArray(entry.newFacts) &&
+          isStringArray(entry.unresolvedThreads) &&
+          isStringArray(entry.repeatedBeats),
+      ));
+  const voiceProfilesAreValid =
+    state.voiceProfiles === undefined ||
+    (Array.isArray(state.voiceProfiles) &&
+      state.voiceProfiles.every(
+        (profile) =>
+          Boolean(profile) &&
+          typeof profile === "object" &&
+          typeof profile.characterName === "string" &&
+          typeof profile.narrativeRhythm === "string" &&
+          typeof profile.vocabulary === "string" &&
+          typeof profile.humourStyle === "string" &&
+          typeof profile.emotionalDeflection === "string" &&
+          typeof profile.sensoryFocus === "string" &&
+          typeof profile.dialoguePattern === "string" &&
+          typeof profile.internalThoughtPattern === "string" &&
+          isStringArray(profile.forbiddenHabits),
+      ));
+  const chapterPlansAreValid =
+    state.chapterPlans === undefined ||
+    (Array.isArray(state.chapterPlans) &&
+      state.chapterPlans.every(isChapterPlan));
+
+  return (
+    isStringArray(state.importantFacts) &&
+    isStringArray(state.characterStates) &&
+    isStringArray(state.relationshipStates) &&
+    isStringArray(state.unresolvedThreads) &&
+    isStringArray(state.timeline) &&
+    isStringArray(state.locations) &&
+    typeof state.activePOV === "string" &&
+    chapterLedgerIsValid &&
+    (state.latestChapterEnding === undefined ||
+      typeof state.latestChapterEnding === "string") &&
+    (state.characterKnowledge === undefined ||
+      isStringArray(state.characterKnowledge)) &&
+    (state.repetitionWarnings === undefined ||
+      isStringArray(state.repetitionWarnings)) &&
+    voiceProfilesAreValid &&
+    chapterPlansAreValid &&
+    (state.lastGenerationDiagnostics === undefined ||
+      isDiagnosticArray(state.lastGenerationDiagnostics))
+  );
+}
+
+function isLedgerResponse(value: unknown): value is LedgerResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const response = value as Partial<LedgerResponse>;
+
+  return (
+    isStoryState(response.storyState) && isDiagnosticArray(response.diagnostics)
+  );
+}
+
+async function updateContinuityLedger(input: {
+  storyBible: StoryBible;
+  storyState: StoryState;
+  chapters: StoryChapter[];
+  chapter: StoryChapter;
+  rebuild: boolean;
+  rebuildFromChapter?: number;
+}): Promise<LedgerResponse> {
+  const partialRebuildStart = input.rebuild
+    ? undefined
+    : input.rebuildFromChapter;
+  const chaptersToAnalyse = input.rebuild
+    ? input.chapters
+    : partialRebuildStart !== undefined
+      ? input.chapters.filter(
+          (chapter) => chapter.number >= partialRebuildStart,
+        )
+      : [input.chapter];
+  if (chaptersToAnalyse.length === 0) {
+    throw new Error("No chapters were available for continuity rebuilding.");
+  }
+  const usesBatches = input.rebuild || partialRebuildStart !== undefined;
+  const batches = usesBatches
+    ? Array.from(
+        { length: Math.ceil(chaptersToAnalyse.length / 3) },
+        (_, index) => chaptersToAnalyse.slice(index * 3, index * 3 + 3),
+      )
+    : [chaptersToAnalyse];
+  let workingState: StoryState = input.rebuild
+    ? { ...EMPTY_STORY_STATE }
+    : partialRebuildStart !== undefined
+      ? getStoryStateBeforeChapter(input.storyState, partialRebuildStart)
+      : input.storyState;
+  const diagnostics: GenerationDiagnostic[] = [];
+
+  for (const batch of batches) {
+    const latestBatchChapter = batch[batch.length - 1];
+
+    if (!latestBatchChapter) {
       continue;
     }
 
-    if (current) lines.push(current);
-    current = word;
-
-    if (lines.length === maximumLines - 1) break;
-  }
-
-  if (current && lines.length < maximumLines) lines.push(current);
-
-  if (lines.join(" ").split(/\s+/).length < words.length && lines.length) {
-    lines[lines.length - 1] =
-      `${lines[lines.length - 1].replace(/[.,!?;:]$/, "")}…`;
-  }
-
-  return lines;
-}
-
-function drawFittedText(
-  context: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maximumWidth: number,
-  weight: number,
-  startingSize: number,
-  minimumSize: number,
-) {
-  let fontSize = startingSize;
-  context.font = `${weight} ${fontSize}px Arial, sans-serif`;
-
-  while (
-    fontSize > minimumSize &&
-    context.measureText(text).width > maximumWidth
-  ) {
-    fontSize -= 1;
-    context.font = `${weight} ${fontSize}px Arial, sans-serif`;
-  }
-
-  context.fillText(text, x, y, maximumWidth);
-}
-
-function drawImageCover(
-  context: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-) {
-  const imageRatio = image.naturalWidth / image.naturalHeight;
-  const targetRatio = width / height;
-  let sourceX = 0;
-  let sourceY = 0;
-  let sourceWidth = image.naturalWidth;
-  let sourceHeight = image.naturalHeight;
-
-  if (imageRatio > targetRatio) {
-    sourceWidth = image.naturalHeight * targetRatio;
-    sourceX = (image.naturalWidth - sourceWidth) / 2;
-  } else {
-    sourceHeight = image.naturalWidth / targetRatio;
-    sourceY = (image.naturalHeight - sourceHeight) / 2;
-  }
-
-  context.drawImage(
-    image,
-    sourceX,
-    sourceY,
-    sourceWidth,
-    sourceHeight,
-    x,
-    y,
-    width,
-    height,
-  );
-}
-
-async function createFinishedCampaignImage(input: {
-  book: CatalogueBook;
-  post: GeneratedPost;
-  mediaStyle: MediaStyle;
-  aiBackground?: string;
-}): Promise<string> {
-  const isTikTok = input.post.platform === "tiktok";
-  const width = 1080;
-  const height = isTikTok ? 1920 : 1350;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-
-  if (!context) throw new Error("This browser could not create the image.");
-
-  const cover = await loadImage(input.book.coverUrl);
-  const background = input.aiBackground
-    ? await loadImage(input.aiBackground)
-    : cover;
-
-  context.save();
-  if (input.mediaStyle === "branded") {
-    const brandedBackground = context.createLinearGradient(0, 0, width, height);
-    brandedBackground.addColorStop(0, "#050508");
-    brandedBackground.addColorStop(0.58, "#120711");
-    brandedBackground.addColorStop(1, "#4a082e");
-    context.fillStyle = brandedBackground;
-    context.fillRect(0, 0, width, height);
-  } else {
-    drawImageCover(context, background, 0, 0, width, height);
-  }
-  context.restore();
-
-  const shade = context.createLinearGradient(0, 0, 0, height);
-  shade.addColorStop(0, "rgba(5,5,8,0.82)");
-  shade.addColorStop(0.42, "rgba(5,5,8,0.42)");
-  shade.addColorStop(1, "rgba(5,5,8,0.94)");
-  context.fillStyle = shade;
-  context.fillRect(0, 0, width, height);
-
-  context.save();
-  context.globalAlpha = 0.2;
-  context.fillStyle = "#ec4899";
-  context.beginPath();
-  context.moveTo(width * 0.68, 0);
-  context.lineTo(width, 0);
-  context.lineTo(width, height * 0.46);
-  context.closePath();
-  context.fill();
-  context.restore();
-
-  context.strokeStyle = "rgba(236,72,153,0.75)";
-  context.lineWidth = 5;
-  context.strokeRect(34, 34, width - 68, height - 68);
-
-  context.fillStyle = "#ec4899";
-  context.fillRect(72, 72, 104, 8);
-  context.font = "700 28px Arial, sans-serif";
-  context.fillText("MARLOW QUINN", 72, 125);
-
-  context.font = "700 18px Arial, sans-serif";
-  context.fillStyle = "#f9a8d4";
-  context.fillText("BITE  •  HEAT  •  HEART", 72, 155);
-
-  const hook = input.post.title || input.book.tropes.slice(0, 2).join(" • ");
-  context.font = `800 ${isTikTok ? 72 : 62}px Arial, sans-serif`;
-  context.fillStyle = "#ffffff";
-  context.textBaseline = "top";
-  const hookLines = wrappedLines(context, hook, width - 144, isTikTok ? 4 : 3);
-  const hookLineHeight = isTikTok ? 82 : 72;
-
-  hookLines.forEach((line, index) => {
-    drawFittedText(
-      context,
-      line,
-      72,
-      210 + index * hookLineHeight,
-      width - 144,
-      800,
-      isTikTok ? 72 : 62,
-      isTikTok ? 44 : 38,
-    );
-  });
-
-  const coverWidth = isTikTok ? 620 : 500;
-  const coverHeight = Math.round(
-    coverWidth * (cover.naturalHeight / cover.naturalWidth),
-  );
-  const maximumCoverHeight = isTikTok ? 930 : 720;
-  const fittedCoverHeight = Math.min(coverHeight, maximumCoverHeight);
-  const fittedCoverWidth = Math.round(
-    fittedCoverHeight * (cover.naturalWidth / cover.naturalHeight),
-  );
-  const coverX = Math.round((width - fittedCoverWidth) / 2);
-  const coverY = isTikTok ? 570 : 480;
-
-  context.save();
-  context.shadowColor = "rgba(236,72,153,0.55)";
-  context.shadowBlur = 48;
-  context.shadowOffsetY = 20;
-  context.fillStyle = "#ffffff";
-  context.fillRect(
-    coverX - 8,
-    coverY - 8,
-    fittedCoverWidth + 16,
-    fittedCoverHeight + 16,
-  );
-  context.drawImage(cover, coverX, coverY, fittedCoverWidth, fittedCoverHeight);
-  context.restore();
-
-  const footerY = height - (isTikTok ? 285 : 175);
-  const displayedTropes = input.book.tropes.slice(0, 3).join("   •   ");
-  context.textAlign = "center";
-  context.fillStyle = "#f9a8d4";
-  context.font = `700 ${isTikTok ? 31 : 27}px Arial, sans-serif`;
-  const tropeLines = wrappedLines(context, displayedTropes, width - 120, 2);
-
-  tropeLines.forEach((line, index) => {
-    drawFittedText(
-      context,
-      line,
-      width / 2,
-      footerY + index * 42,
-      width - 120,
-      700,
-      isTikTok ? 31 : 27,
-      20,
-    );
-  });
-
-  if (input.book.kindleUnlimited) {
-    context.fillStyle = "#ffffff";
-    context.font = `700 ${isTikTok ? 30 : 26}px Arial, sans-serif`;
-    drawFittedText(
-      context,
-      "AVAILABLE ON KINDLE UNLIMITED",
-      width / 2,
-      height - (isTikTok ? 120 : 92),
-      width - 140,
-      700,
-      isTikTok ? 30 : 26,
-      20,
-    );
-  }
-
-  return canvas.toDataURL("image/jpeg", 0.92);
-}
-
-async function createEditorialCampaignImage(input: {
-  book: CatalogueBook;
-  post: GeneratedPost;
-  mediaStyle: MediaStyle;
-  aiBackground?: string;
-}): Promise<string> {
-  const isTikTok = input.post.platform === "tiktok";
-  const hasScene =
-    input.mediaStyle === "ai-scene" && Boolean(input.aiBackground);
-  const width = 1080;
-  const height = isTikTok ? 1920 : 1350;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-
-  if (!context) throw new Error("This browser could not create the image.");
-
-  const cover = await loadImage(input.book.coverUrl);
-  const scene = input.aiBackground ? await loadImage(input.aiBackground) : null;
-
-  const base = context.createLinearGradient(0, 0, width, height);
-  base.addColorStop(0, "#050507");
-  base.addColorStop(0.62, "#0d0710");
-  base.addColorStop(1, "#3d0928");
-  context.fillStyle = base;
-  context.fillRect(0, 0, width, height);
-
-  if (hasScene && scene) {
-    drawImageCover(context, scene, 34, 255, width - 68, isTikTok ? 1260 : 765);
-
-    const sceneShade = context.createLinearGradient(0, 0, width, 0);
-    sceneShade.addColorStop(0, "rgba(5,5,7,0.18)");
-    sceneShade.addColorStop(0.5, "rgba(5,5,7,0.28)");
-    sceneShade.addColorStop(0.72, "rgba(5,5,7,0.82)");
-    sceneShade.addColorStop(1, "rgba(5,5,7,0.98)");
-    context.fillStyle = sceneShade;
-    context.fillRect(34, 255, width - 68, isTikTok ? 1260 : 765);
-
-    const verticalShade = context.createLinearGradient(
-      0,
-      255,
-      0,
-      isTikTok ? 1515 : 1020,
-    );
-    verticalShade.addColorStop(0, "rgba(5,5,7,0.08)");
-    verticalShade.addColorStop(0.72, "rgba(5,5,7,0.1)");
-    verticalShade.addColorStop(1, "rgba(5,5,7,0.92)");
-    context.fillStyle = verticalShade;
-    context.fillRect(34, 255, width - 68, isTikTok ? 1260 : 765);
-
-    const cleanupFadeTop = isTikTok ? 1100 : 690;
-    const cleanupFadeBottom = isTikTok ? 1515 : 1020;
-    const cleanupFade = context.createLinearGradient(
-      0,
-      cleanupFadeTop,
-      0,
-      cleanupFadeBottom,
-    );
-    cleanupFade.addColorStop(0, "rgba(5,5,7,0)");
-    cleanupFade.addColorStop(0.34, "rgba(5,5,7,0.52)");
-    cleanupFade.addColorStop(0.68, "rgba(5,5,7,0.9)");
-    cleanupFade.addColorStop(1, "rgba(5,5,7,1)");
-    context.fillStyle = cleanupFade;
-    context.fillRect(
-      34,
-      cleanupFadeTop,
-      width - 68,
-      cleanupFadeBottom - cleanupFadeTop,
-    );
-  }
-
-  context.fillStyle = "rgba(5,5,7,0.97)";
-  context.fillRect(34, 34, width - 68, isTikTok ? 330 : 245);
-
-  const footerTop = isTikTok ? 1515 : 1020;
-  context.fillStyle = "rgba(5,5,7,0.98)";
-  context.fillRect(34, footerTop, width - 68, height - footerTop - 34);
-
-  context.strokeStyle = "rgba(236,72,153,0.88)";
-  context.lineWidth = 5;
-  context.strokeRect(34, 34, width - 68, height - 68);
-
-  context.textBaseline = "alphabetic";
-  context.textAlign = "left";
-  context.fillStyle = "#ec4899";
-  context.fillRect(64, 66, 104, 8);
-  context.fillStyle = "#ffffff";
-  context.font = "800 27px Arial, sans-serif";
-  context.fillText("MARLOW QUINN", 64, 116);
-  context.fillStyle = "#f9a8d4";
-  context.font = "700 17px Arial, sans-serif";
-  context.fillText("BITE  •  HEAT  •  HEART", 64, 146);
-
-  const hook =
-    input.book.tropes.slice(0, 2).join("  ×  ") ||
-    input.book.subgenre ||
-    input.post.title;
-  context.fillStyle = "#ffffff";
-  context.font = `800 ${isTikTok ? 54 : 45}px Arial, sans-serif`;
-  const hookLines = wrappedLines(context, hook.toUpperCase(), width - 128, 2);
-  const hookTop = isTikTok ? 220 : 190;
-  const hookGap = isTikTok ? 68 : 57;
-
-  hookLines.forEach((line, index) => {
-    drawFittedText(
-      context,
-      line,
-      64,
-      hookTop + index * hookGap,
-      width - 128,
-      800,
-      isTikTok ? 54 : 45,
-      isTikTok ? 36 : 32,
-    );
-  });
-
-  const maximumCoverHeight = isTikTok ? 900 : 630;
-  const maximumCoverWidth = hasScene
-    ? isTikTok
-      ? 530
-      : 420
-    : isTikTok
-      ? 610
-      : 500;
-  const naturalCoverHeight =
-    maximumCoverWidth * (cover.naturalHeight / cover.naturalWidth);
-  const coverHeight = Math.min(naturalCoverHeight, maximumCoverHeight);
-  const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
-  const coverX = hasScene ? width - 64 - coverWidth : (width - coverWidth) / 2;
-  const coverY = isTikTok ? 500 : 330;
-
-  context.save();
-  context.shadowColor = "rgba(236,72,153,0.7)";
-  context.shadowBlur = 55;
-  context.shadowOffsetY = 20;
-  context.fillStyle = "#ffffff";
-  context.fillRect(coverX - 9, coverY - 9, coverWidth + 18, coverHeight + 18);
-  context.drawImage(cover, coverX, coverY, coverWidth, coverHeight);
-  context.restore();
-
-  const tropes = input.book.tropes.slice(0, 3);
-
-  if (isTikTok) {
-    tropes.forEach((trope, index) => {
-      const x = 64;
-      const y = 1550 + index * 79;
-      const cardWidth = width - 128;
-      context.fillStyle =
-        index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
-      context.fillRect(x, y, cardWidth, 62);
-      context.fillStyle = "#ec4899";
-      context.fillRect(x, y, 8, 62);
-      context.fillStyle = "#ffffff";
-      context.textAlign = "left";
-      drawFittedText(
-        context,
-        trope.toUpperCase(),
-        x + 28,
-        y + 41,
-        cardWidth - 56,
-        800,
-        30,
-        21,
-      );
-    });
-  } else {
-    const gap = 16;
-    const cardWidth = (width - 128 - gap * 2) / 3;
-
-    tropes.forEach((trope, index) => {
-      const x = 64 + index * (cardWidth + gap);
-      const y = 1060;
-      context.fillStyle =
-        index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
-      context.fillRect(x, y, cardWidth, 88);
-      context.fillStyle = "#ec4899";
-      context.fillRect(x, y, 7, 88);
-      context.fillStyle = "#ffffff";
-      context.textAlign = "center";
-      context.font = "800 25px Arial, sans-serif";
-      const lines = wrappedLines(
-        context,
-        trope.toUpperCase(),
-        cardWidth - 30,
-        2,
-      );
-      lines.forEach((line, lineIndex) => {
-        drawFittedText(
-          context,
-          line,
-          x + cardWidth / 2,
-          y + 39 + lineIndex * 29,
-          cardWidth - 30,
-          800,
-          25,
-          18,
-        );
-      });
-    });
-  }
-
-  if (input.book.kindleUnlimited) {
-    context.textAlign = "center";
-    context.fillStyle = "#ffffff";
-    drawFittedText(
-      context,
-      "AVAILABLE ON KINDLE UNLIMITED",
-      width / 2,
-      isTikTok ? 1850 : 1268,
-      width - 160,
-      800,
-      isTikTok ? 27 : 24,
-      19,
-    );
-  }
-
-  return canvas.toDataURL("image/jpeg", 0.92);
-}
-
-async function createCleanCoverCampaignImage(input: {
-  book: CatalogueBook;
-  post: GeneratedPost;
-  mediaStyle: MediaStyle;
-}): Promise<string> {
-  const isTikTok = input.post.platform === "tiktok";
-  const width = 1080;
-  const height = isTikTok ? 1920 : 1350;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-
-  if (!context) throw new Error("This browser could not create the image.");
-
-  const cover = await loadImage(input.book.coverUrl);
-  const base = context.createLinearGradient(0, 0, width, height);
-  base.addColorStop(0, "#050507");
-  base.addColorStop(0.58, "#120812");
-  base.addColorStop(1, "#48082f");
-  context.fillStyle = base;
-  context.fillRect(0, 0, width, height);
-
-  if (input.mediaStyle === "ai-scene") {
-    context.save();
-    context.filter = "blur(52px) saturate(1.25)";
-    context.globalAlpha = 0.34;
-    drawImageCover(context, cover, -110, 180, width + 220, height - 250);
-    context.restore();
-
-    const textureShade = context.createLinearGradient(0, 150, 0, height);
-    textureShade.addColorStop(0, "rgba(5,5,7,0.5)");
-    textureShade.addColorStop(0.55, "rgba(5,5,7,0.7)");
-    textureShade.addColorStop(1, "rgba(5,5,7,0.96)");
-    context.fillStyle = textureShade;
-    context.fillRect(0, 0, width, height);
-  }
-
-  context.fillStyle = "rgba(236,72,153,0.1)";
-  context.beginPath();
-  context.moveTo(width * 0.72, 0);
-  context.lineTo(width, 0);
-  context.lineTo(width, height * 0.58);
-  context.lineTo(width * 0.88, height * 0.7);
-  context.closePath();
-  context.fill();
-
-  context.fillStyle = "rgba(5,5,7,0.97)";
-  context.fillRect(34, 34, width - 68, isTikTok ? 300 : 235);
-
-  const footerTop = isTikTok ? 1430 : 1020;
-  context.fillStyle = "rgba(5,5,7,0.98)";
-  context.fillRect(34, footerTop, width - 68, height - footerTop - 34);
-
-  context.strokeStyle = "rgba(236,72,153,0.9)";
-  context.lineWidth = 5;
-  context.strokeRect(34, 34, width - 68, height - 68);
-
-  context.textBaseline = "alphabetic";
-  context.textAlign = "left";
-  context.fillStyle = "#ec4899";
-  context.fillRect(64, 66, 104, 8);
-  context.fillStyle = "#ffffff";
-  context.font = "800 27px Arial, sans-serif";
-  context.fillText("MARLOW QUINN", 64, 116);
-  context.fillStyle = "#f9a8d4";
-  context.font = "700 17px Arial, sans-serif";
-  context.fillText("BITE  •  HEAT  •  HEART", 64, 146);
-
-  let categoryHook = input.post.title
-    .replace(input.book.title, "")
-    .replace(/book spotlight/gi, "")
-    .replace(/^[\s|:/-]+|[\s|:/-]+$/g, "")
-    .trim();
-
-  if (categoryHook.length < 5 || categoryHook.length > 90) {
-    categoryHook = input.book.subgenre || "M/M ROMANCE";
-  }
-
-  context.fillStyle = "#ffffff";
-  context.font = `800 ${isTikTok ? 54 : 45}px Arial, sans-serif`;
-  const categoryLines = wrappedLines(
-    context,
-    categoryHook.toUpperCase(),
-    width - 128,
-    2,
-  );
-  const categoryTop = isTikTok ? 215 : 190;
-  const categoryGap = isTikTok ? 59 : 50;
-
-  categoryLines.forEach((line, index) => {
-    drawFittedText(
-      context,
-      line,
-      64,
-      categoryTop + index * categoryGap,
-      width - 128,
-      800,
-      isTikTok ? 54 : 45,
-      isTikTok ? 34 : 30,
-    );
-  });
-
-  const maximumCoverHeight = isTikTok ? 980 : 680;
-  const maximumCoverWidth = isTikTok ? 620 : 500;
-  const naturalCoverHeight =
-    maximumCoverWidth * (cover.naturalHeight / cover.naturalWidth);
-  const coverHeight = Math.min(naturalCoverHeight, maximumCoverHeight);
-  const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
-  const coverX = (width - coverWidth) / 2;
-  const coverY = isTikTok ? 390 : 300;
-
-  context.save();
-  context.shadowColor = "rgba(236,72,153,0.72)";
-  context.shadowBlur = 62;
-  context.shadowOffsetY = 22;
-  context.fillStyle = "#ffffff";
-  context.fillRect(coverX - 10, coverY - 10, coverWidth + 20, coverHeight + 20);
-  context.drawImage(cover, coverX, coverY, coverWidth, coverHeight);
-  context.restore();
-
-  const tropeText = input.book.tropes.slice(0, 3).join("   •   ");
-  context.textAlign = "center";
-  context.fillStyle = "#f9a8d4";
-  context.font = `700 ${isTikTok ? 34 : 29}px Arial, sans-serif`;
-  const tropeLines = wrappedLines(
-    context,
-    tropeText.toUpperCase(),
-    width - 150,
-    isTikTok ? 3 : 2,
-  );
-  const tropeTop = isTikTok ? 1530 : 1120;
-  const tropeGap = isTikTok ? 49 : 42;
-
-  tropeLines.forEach((line, index) => {
-    drawFittedText(
-      context,
-      line,
-      width / 2,
-      tropeTop + index * tropeGap,
-      width - 150,
-      700,
-      isTikTok ? 34 : 29,
-      isTikTok ? 24 : 21,
-    );
-  });
-
-  context.fillStyle = "#ec4899";
-  context.fillRect(
-    width / 2 - (isTikTok ? 170 : 135),
-    isTikTok ? 1685 : 1195,
-    isTikTok ? 340 : 270,
-    6,
-  );
-
-  if (input.book.kindleUnlimited) {
-    context.textAlign = "center";
-    const badgeX = isTikTok ? 170 : 220;
-    const badgeY = isTikTok ? 1740 : 1230;
-    const badgeWidth = width - badgeX * 2;
-    const badgeHeight = isTikTok ? 86 : 72;
-    context.fillStyle = "#ec4899";
-    context.fillRect(badgeX, badgeY, badgeWidth, badgeHeight);
-    context.fillStyle = "#ffffff";
-    drawFittedText(
-      context,
-      "AVAILABLE ON KINDLE UNLIMITED",
-      width / 2,
-      badgeY + (isTikTok ? 56 : 47),
-      badgeWidth - 50,
-      800,
-      isTikTok ? 27 : 24,
-      19,
-    );
-  }
-
-  return canvas.toDataURL("image/jpeg", 0.92);
-}
-
-function roundedRectanglePath(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-) {
-  const safeRadius = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.moveTo(x + safeRadius, y);
-  context.lineTo(x + width - safeRadius, y);
-  context.quadraticCurveTo(x + width, y, x + width, y + safeRadius);
-  context.lineTo(x + width, y + height - safeRadius);
-  context.quadraticCurveTo(
-    x + width,
-    y + height,
-    x + width - safeRadius,
-    y + height,
-  );
-  context.lineTo(x + safeRadius, y + height);
-  context.quadraticCurveTo(x, y + height, x, y + height - safeRadius);
-  context.lineTo(x, y + safeRadius);
-  context.quadraticCurveTo(x, y, x + safeRadius, y);
-  context.closePath();
-}
-
-type CampaignColour = { red: number; green: number; blue: number };
-
-type CampaignPalette = {
-  primary: CampaignColour;
-  secondary: CampaignColour;
-};
-
-function colourCss(colour: CampaignColour, alpha = 1): string {
-  return `rgba(${colour.red},${colour.green},${colour.blue},${alpha})`;
-}
-
-function colourDistance(left: CampaignColour, right: CampaignColour): number {
-  return Math.sqrt(
-    Math.pow(left.red - right.red, 2) +
-      Math.pow(left.green - right.green, 2) +
-      Math.pow(left.blue - right.blue, 2),
-  );
-}
-
-function vividCampaignColour(
-  colour: CampaignColour,
-  fallback: CampaignColour,
-): CampaignColour {
-  const maximum = Math.max(colour.red, colour.green, colour.blue);
-  const minimum = Math.min(colour.red, colour.green, colour.blue);
-
-  if (maximum < 45 || maximum - minimum < 36) return fallback;
-
-  const range = Math.max(1, maximum - minimum);
-  const channel = (value: number) =>
-    Math.max(
-      18,
-      Math.min(250, Math.round(22 + ((value - minimum) / range) * 228)),
-    );
-
-  return {
-    red: channel(colour.red),
-    green: channel(colour.green),
-    blue: channel(colour.blue),
-  };
-}
-
-function fallbackPalette(seed: string): CampaignPalette {
-  const palettes: CampaignPalette[] = [
-    {
-      primary: { red: 236, green: 72, blue: 153 },
-      secondary: { red: 59, green: 130, blue: 246 },
-    },
-    {
-      primary: { red: 245, green: 158, blue: 11 },
-      secondary: { red: 14, green: 165, blue: 233 },
-    },
-    {
-      primary: { red: 20, green: 184, blue: 166 },
-      secondary: { red: 217, green: 70, blue: 239 },
-    },
-    {
-      primary: { red: 239, green: 68, blue: 68 },
-      secondary: { red: 99, green: 102, blue: 241 },
-    },
-  ];
-  const number = [...seed].reduce(
-    (total, character) => total + character.charCodeAt(0),
-    0,
-  );
-
-  return palettes[number % palettes.length];
-}
-
-function extractCampaignPalette(
-  cover: HTMLImageElement,
-  seed: string,
-): CampaignPalette {
-  const sample = document.createElement("canvas");
-  sample.width = 44;
-  sample.height = 66;
-  const sampleContext = sample.getContext("2d", { willReadFrequently: true });
-
-  if (!sampleContext) return fallbackPalette(seed);
-
-  sampleContext.drawImage(cover, 0, 0, sample.width, sample.height);
-  const pixels = sampleContext.getImageData(
-    0,
-    0,
-    sample.width,
-    sample.height,
-  ).data;
-  const buckets = new Map<
-    string,
-    { colour: CampaignColour; count: number; score: number }
-  >();
-
-  for (let index = 0; index < pixels.length; index += 16) {
-    const red = pixels[index];
-    const green = pixels[index + 1];
-    const blue = pixels[index + 2];
-    const alpha = pixels[index + 3];
-    if (alpha < 180) continue;
-
-    const maximum = Math.max(red, green, blue);
-    const minimum = Math.min(red, green, blue);
-    const brightness = (maximum + minimum) / 2;
-    const saturation = maximum === minimum ? 0 : (maximum - minimum) / 255;
-
-    if (brightness < 34 || brightness > 232 || saturation < 0.16) continue;
-
-    const colour = {
-      red: Math.round(red / 32) * 32,
-      green: Math.round(green / 32) * 32,
-      blue: Math.round(blue / 32) * 32,
-    };
-    const key = `${colour.red}-${colour.green}-${colour.blue}`;
-    const existing = buckets.get(key);
-    const balance = 1 - Math.abs(brightness - 132) / 132;
-    const score = 0.4 + saturation * 1.5 + Math.max(0, balance) * 0.5;
-
-    buckets.set(key, {
-      colour,
-      count: (existing?.count ?? 0) + 1,
-      score: (existing?.score ?? 0) + score,
-    });
-  }
-
-  const ranked = [...buckets.values()].sort(
-    (left, right) => right.score * right.count - left.score * left.count,
-  );
-  const fallback = fallbackPalette(seed);
-  const sampledPrimary = ranked[0]?.colour ?? fallback.primary;
-  const sampledSecondary =
-    ranked.find(
-      (candidate) => colourDistance(candidate.colour, sampledPrimary) > 125,
-    )?.colour ?? fallback.secondary;
-
-  const primary = vividCampaignColour(sampledPrimary, fallback.primary);
-  const secondary = vividCampaignColour(sampledSecondary, fallback.secondary);
-
-  return { primary, secondary };
-}
-
-function seededNumber(seed: string): number {
-  let value = 2166136261;
-
-  for (const character of seed) {
-    value ^= character.charCodeAt(0);
-    value = Math.imul(value, 16777619);
-  }
-
-  return Math.abs(value >>> 0);
-}
-
-function drawAtmosphericBackground(
-  context: CanvasRenderingContext2D,
-  cover: HTMLImageElement,
-  palette: CampaignPalette,
-  width: number,
-  height: number,
-  seed: string,
-  movement = 0,
-  preserveDetail = false,
-) {
-  context.fillStyle = "#030305";
-  context.fillRect(0, 0, width, height);
-
-  context.save();
-  context.globalAlpha = preserveDetail ? 0.92 : 0.4;
-  context.filter = preserveDetail
-    ? "saturate(1.3) contrast(1.08)"
-    : "blur(54px) saturate(1.9) contrast(1.18)";
-  const driftX = Math.sin(movement * Math.PI * 2) * (preserveDetail ? 10 : 34);
-  drawImageCover(
-    context,
-    cover,
-    preserveDetail ? driftX - 10 : -170 + driftX,
-    preserveDetail ? -10 : -150,
-    preserveDetail ? width + 20 : width + 340,
-    preserveDetail ? height + 20 : height + 300,
-  );
-  context.restore();
-
-  const darkLayer = context.createLinearGradient(0, 0, width, height);
-  darkLayer.addColorStop(
-    0,
-    preserveDetail ? "rgba(2,2,4,0.24)" : "rgba(2,2,4,0.48)",
-  );
-  darkLayer.addColorStop(
-    0.48,
-    preserveDetail ? "rgba(3,3,6,0.4)" : "rgba(3,3,6,0.66)",
-  );
-  darkLayer.addColorStop(
-    1,
-    preserveDetail ? "rgba(1,1,3,0.68)" : "rgba(1,1,3,0.84)",
-  );
-  context.fillStyle = darkLayer;
-  context.fillRect(0, 0, width, height);
-
-  const leftGlow = context.createRadialGradient(
-    width * 0.12,
-    height * 0.55,
-    20,
-    width * 0.12,
-    height * 0.55,
-    width * 0.82,
-  );
-  leftGlow.addColorStop(0, colourCss(palette.primary, 0.52));
-  leftGlow.addColorStop(1, colourCss(palette.primary, 0));
-  context.fillStyle = leftGlow;
-  context.fillRect(0, 0, width, height);
-
-  const rightGlow = context.createRadialGradient(
-    width * 0.92,
-    height * 0.3,
-    20,
-    width * 0.92,
-    height * 0.3,
-    width * 0.7,
-  );
-  rightGlow.addColorStop(0, colourCss(palette.secondary, 0.46));
-  rightGlow.addColorStop(1, colourCss(palette.secondary, 0));
-  context.fillStyle = rightGlow;
-  context.fillRect(0, 0, width, height);
-
-  const randomSeed = seededNumber(seed);
-  for (let index = 0; index < 58; index += 1) {
-    const x = (randomSeed * (index + 17) * 37) % width;
-    const baseY = (randomSeed * (index + 31) * 53) % height;
-    const y = (baseY - movement * 190 + height) % height;
-    const radius = 1 + ((randomSeed + index * 19) % 5);
-    context.fillStyle = colourCss(
-      index % 3 === 0 ? palette.secondary : palette.primary,
-      0.08 + ((index * 7) % 18) / 100,
-    );
-    context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
-    context.fill();
-  }
-
-  const vignette = context.createRadialGradient(
-    width / 2,
-    height / 2,
-    Math.min(width, height) * 0.22,
-    width / 2,
-    height / 2,
-    Math.max(width, height) * 0.72,
-  );
-  vignette.addColorStop(0, "rgba(0,0,0,0)");
-  vignette.addColorStop(1, "rgba(0,0,0,0.68)");
-  context.fillStyle = vignette;
-  context.fillRect(0, 0, width, height);
-}
-
-function drawCampaignBrand(
-  context: CanvasRenderingContext2D,
-  palette: CampaignPalette,
-  width: number,
-  compact = false,
-) {
-  const left = compact ? 54 : 68;
-  const top = compact ? 52 : 66;
-  context.textAlign = "left";
-  context.fillStyle = colourCss(palette.primary);
-  context.fillRect(left, top, compact ? 72 : 96, 7);
-  context.fillStyle = "#ffffff";
-  context.font = `800 ${compact ? 23 : 28}px Arial, sans-serif`;
-  context.fillText("MARLOW QUINN", left, top + 48);
-  context.fillStyle = colourCss(palette.primary, 0.92);
-  context.font = `700 ${compact ? 14 : 17}px Arial, sans-serif`;
-  context.fillText("BITE  •  HEAT  •  HEART", left, top + 78);
-  context.strokeStyle = "rgba(255,255,255,0.15)";
-  context.lineWidth = 2;
-  context.beginPath();
-  context.moveTo(left, top + 106);
-  context.lineTo(width - left, top + 106);
-  context.stroke();
-}
-
-function drawKindleMockup(
-  context: CanvasRenderingContext2D,
-  cover: HTMLImageElement,
-  palette: CampaignPalette,
-  centreX: number,
-  top: number,
-  deviceWidth: number,
-  rotation = 0,
-  opacity = 1,
-): number {
-  const frame = Math.max(22, deviceWidth * 0.055);
-  const innerWidth = deviceWidth - frame * 2;
-  const innerHeight = innerWidth * (cover.naturalHeight / cover.naturalWidth);
-  const bottomFrame = Math.max(58, deviceWidth * 0.13);
-  const deviceHeight = innerHeight + frame + bottomFrame;
-
-  context.save();
-  context.globalAlpha = opacity;
-  context.translate(centreX, top + deviceHeight / 2);
-  context.rotate(rotation);
-  context.translate(-deviceWidth / 2, -deviceHeight / 2);
-  context.shadowColor = colourCss(palette.primary, 0.66);
-  context.shadowBlur = Math.max(40, deviceWidth * 0.1);
-  context.shadowOffsetY = Math.max(16, deviceWidth * 0.035);
-  roundedRectanglePath(
-    context,
-    0,
-    0,
-    deviceWidth,
-    deviceHeight,
-    deviceWidth * 0.055,
-  );
-  const frameGradient = context.createLinearGradient(
-    0,
-    0,
-    deviceWidth,
-    deviceHeight,
-  );
-  frameGradient.addColorStop(0, "#27272b");
-  frameGradient.addColorStop(0.45, "#09090b");
-  frameGradient.addColorStop(1, "#17171a");
-  context.fillStyle = frameGradient;
-  context.fill();
-  context.shadowColor = "transparent";
-  roundedRectanglePath(
-    context,
-    7,
-    7,
-    deviceWidth - 14,
-    deviceHeight - 14,
-    deviceWidth * 0.045,
-  );
-  context.strokeStyle = "rgba(255,255,255,0.24)";
-  context.lineWidth = 2;
-  context.stroke();
-  context.drawImage(cover, frame, frame, innerWidth, innerHeight);
-
-  const glass = context.createLinearGradient(
-    frame,
-    frame,
-    deviceWidth - frame,
-    innerHeight,
-  );
-  glass.addColorStop(0, "rgba(255,255,255,0.16)");
-  glass.addColorStop(0.28, "rgba(255,255,255,0)");
-  glass.addColorStop(1, "rgba(255,255,255,0.03)");
-  context.fillStyle = glass;
-  context.fillRect(frame, frame, innerWidth, innerHeight);
-
-  context.textAlign = "center";
-  context.fillStyle = "rgba(255,255,255,0.36)";
-  context.font = `500 ${Math.max(20, deviceWidth * 0.052)}px Arial, sans-serif`;
-  context.fillText(
-    "kindle",
-    deviceWidth / 2,
-    deviceHeight - bottomFrame * 0.32,
-  );
-  context.restore();
-
-  return deviceHeight;
-}
-
-function wrapEveryLine(
-  context: CanvasRenderingContext2D,
-  text: string,
-  maximumWidth: number,
-): string[] {
-  const paragraphs = text.trim().split(/\n+/).filter(Boolean);
-  const lines: string[] = [];
-
-  paragraphs.forEach((paragraph) => {
-    const words = paragraph.trim().split(/\s+/).filter(Boolean);
-    let line = "";
-
-    words.forEach((word) => {
-      const candidate = line ? `${line} ${word}` : word;
-      if (!line || context.measureText(candidate).width <= maximumWidth) {
-        line = candidate;
-      } else {
-        lines.push(line);
-        line = word;
-      }
-    });
-
-    if (line) lines.push(line);
-  });
-
-  return lines;
-}
-
-function fittedMultiline(
-  context: CanvasRenderingContext2D,
-  text: string,
-  maximumWidth: number,
-  maximumLines: number,
-  startingSize: number,
-  minimumSize: number,
-  weight = 800,
-): { lines: string[]; fontSize: number; lineHeight: number } {
-  let fontSize = startingSize;
-  let lines: string[] = [];
-
-  while (fontSize >= minimumSize) {
-    context.font = `${weight} ${fontSize}px "Arial Black", Arial, sans-serif`;
-    lines = wrapEveryLine(context, text, maximumWidth);
-    if (lines.length <= maximumLines) break;
-    fontSize -= 2;
-  }
-
-  if (lines.length > maximumLines) {
-    lines = lines.slice(0, maximumLines);
-    lines[maximumLines - 1] =
-      `${lines[maximumLines - 1].replace(/[.,!?;:]$/, "")}…`;
-  }
-
-  return { lines, fontSize, lineHeight: Math.round(fontSize * 1.08) };
-}
-
-function resolvePosterTemplate(
-  selected: PosterTemplate,
-  campaignType: CampaignType,
-): Exclude<PosterTemplate, "auto"> {
-  if (selected !== "auto") return selected;
-  if (campaignType === "quote-post") return "cinematic-quote";
-  if (campaignType === "trope-hook") return "trope-showcase";
-  return "kindle-hero";
-}
-
-function cleanCampaignHook(book: CatalogueBook, post: GeneratedPost): string {
-  const cleaned = post.title
-    .replace(book.title, "")
-    .replace(/book spotlight/gi, "")
-    .replace(/spotlight/gi, "")
-    .replace(/^[\s|:/-]+|[\s|:/-]+$/g, "")
-    .trim();
-
-  return cleaned.length >= 5 && cleaned.length <= 100
-    ? cleaned
-    : book.subgenre || "M/M ROMANCE";
-}
-
-function drawCallToAction(
-  context: CanvasRenderingContext2D,
-  book: CatalogueBook,
-  palette: CampaignPalette,
-  width: number,
-  y: number,
-  compact = false,
-) {
-  const boxWidth = compact ? width - 128 : width - 150;
-  const centreX = width / 2;
-  context.fillStyle = colourCss(palette.primary);
-  context.fillRect((width - boxWidth) / 2, y, boxWidth, 4);
-  context.textAlign = "center";
-  context.font = `700 ${compact ? 19 : 23}px Arial, sans-serif`;
-  context.fillStyle = "rgba(255,255,255,0.82)";
-  context.fillText("AVAILABLE ON", centreX, y + (compact ? 35 : 42));
-  context.fillStyle = "#ffffff";
-  drawFittedText(
-    context,
-    book.kindleUnlimited ? "KINDLE UNLIMITED" : "AMAZON",
-    centreX,
-    y + (compact ? 83 : 101),
-    boxWidth - 40,
-    900,
-    compact ? 48 : 60,
-    compact ? 34 : 42,
-  );
-  context.fillStyle = colourCss(palette.primary);
-  context.fillRect(
-    (width - boxWidth * 0.62) / 2,
-    y + (compact ? 105 : 128),
-    boxWidth * 0.62,
-    4,
-  );
-}
-
-async function createProfessionalCampaignImage(input: {
-  book: CatalogueBook;
-  post: GeneratedPost;
-  mediaStyle: MediaStyle;
-  campaignType: CampaignType;
-  quote: string;
-  template: PosterTemplate;
-  aiBackground?: string;
-}): Promise<{ dataUrl: string; template: Exclude<PosterTemplate, "auto"> }> {
-  const isTikTok = input.post.platform === "tiktok";
-  const width = 1080;
-  const height = isTikTok ? 1920 : 1350;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-
-  if (!context) throw new Error("This browser could not create the image.");
-
-  const cover = await loadImage(input.book.coverUrl);
-  const background = input.aiBackground
-    ? await loadImage(input.aiBackground)
-    : cover;
-  const palette = extractCampaignPalette(cover, input.book.slug);
-  const template = resolvePosterTemplate(input.template, input.campaignType);
-  const hook = cleanCampaignHook(input.book, input.post);
-
-  drawAtmosphericBackground(
-    context,
-    background,
-    palette,
-    width,
-    height,
-    `${input.book.slug}-${template}`,
-    0,
-    Boolean(input.aiBackground),
-  );
-  drawCampaignBrand(context, palette, width, !isTikTok);
-
-  if (template === "cinematic-quote") {
-    const quote =
-      input.quote.trim() || input.post.caption.split(/\n+/)[0] || hook;
-    const textWidth = isTikTok ? 930 : 950;
-    const quoteBlock = fittedMultiline(
-      context,
-      `“${quote.replace(/^[“"]|[”"]$/g, "")}”`,
-      textWidth,
-      isTikTok ? 6 : 5,
-      isTikTok ? 106 : 82,
-      isTikTok ? 66 : 52,
-    );
-    const quoteX = isTikTok ? 74 : 64;
-    const quoteY = isTikTok ? 285 : 260;
-    context.textAlign = "left";
-    quoteBlock.lines.forEach((line, index) => {
-      context.fillStyle =
-        index >= quoteBlock.lines.length - 2
-          ? colourCss(palette.primary)
-          : "#ffffff";
-      context.font = `900 ${quoteBlock.fontSize}px "Arial Black", Arial, sans-serif`;
-      context.shadowColor = "rgba(0,0,0,0.76)";
-      context.shadowBlur = 16;
-      context.fillText(
-        line,
-        quoteX,
-        quoteY + index * quoteBlock.lineHeight,
-        textWidth,
-      );
-    });
-
-    context.fillStyle = colourCss(palette.primary);
-    context.fillRect(
-      quoteX,
-      quoteY + quoteBlock.lines.length * quoteBlock.lineHeight + 24,
-      Math.min(textWidth * 0.62, 540),
-      11,
-    );
-    context.shadowColor = "transparent";
-
-    if (isTikTok) {
-      drawKindleMockup(context, cover, palette, 650, 870, 515, -0.035);
-      context.textAlign = "left";
-      input.book.tropes.slice(0, 3).forEach((trope, index) => {
-        const y = 1110 + index * 150;
-        context.strokeStyle = colourCss(palette.primary, 0.92);
-        context.lineWidth = 4;
-        context.beginPath();
-        context.arc(88, y - 10, 24, 0, Math.PI * 2);
-        context.stroke();
-        context.fillStyle = "#ffffff";
-        context.font = "800 21px Arial, sans-serif";
-        context.fillText(String(index + 1).padStart(2, "0"), 73, y - 2);
-        drawFittedText(context, trope.toUpperCase(), 130, y, 350, 900, 33, 23);
-        context.strokeStyle = colourCss(palette.primary, 0.36);
-        context.beginPath();
-        context.moveTo(64, y + 35);
-        context.lineTo(420, y + 35);
-        context.stroke();
-      });
-      drawCallToAction(context, input.book, palette, width, 1730);
-    } else {
-      drawKindleMockup(context, cover, palette, 790, 635, 360, -0.035);
-      context.textAlign = "left";
-      input.book.tropes.slice(0, 3).forEach((trope, index) => {
-        const y = 815 + index * 105;
-        context.fillStyle =
-          index === 1 ? colourCss(palette.primary) : "#ffffff";
-        drawFittedText(context, trope.toUpperCase(), 64, y, 430, 900, 34, 24);
-        context.fillStyle = colourCss(palette.primary, 0.8);
-        context.fillRect(64, y + 19, 330, 3);
-      });
-      drawCallToAction(context, input.book, palette, width, 1198, true);
-    }
-  } else if (template === "trope-showcase") {
-    const accent = { red: 236, green: 72, blue: 153 };
-
-    context.save();
-    const colourWash = context.createLinearGradient(0, 0, width, height);
-    colourWash.addColorStop(0, colourCss(palette.secondary, 0.22));
-    colourWash.addColorStop(0.48, "rgba(0,0,0,0)");
-    colourWash.addColorStop(1, colourCss(accent, 0.22));
-    context.fillStyle = colourWash;
-    context.fillRect(0, 0, width, height);
-    context.globalAlpha = 0.9;
-    context.fillStyle = colourCss(accent, 0.72);
-    context.beginPath();
-    context.moveTo(width * 0.72, 0);
-    context.lineTo(width, 0);
-    context.lineTo(width, height * 0.34);
-    context.lineTo(width * 0.9, height * 0.26);
-    context.closePath();
-    context.fill();
-    context.restore();
-
-    context.textAlign = "left";
-    context.fillStyle = "#ffffff";
-    const headline = fittedMultiline(
-      context,
-      input.campaignType === "backlist-revival"
-        ? "WORTH THE OBSESSION"
-        : "YOUR NEXT OBSESSION",
-      isTikTok ? width - 130 : 690,
-      isTikTok ? 3 : 2,
-      isTikTok ? 112 : 86,
-      isTikTok ? 68 : 54,
-    );
-    headline.lines.forEach((line, index) => {
-      context.font = `900 ${headline.fontSize}px "Arial Black", Arial, sans-serif`;
-      context.fillText(
-        line,
-        62,
-        (isTikTok ? 265 : 238) + index * headline.lineHeight,
-      );
-    });
-    context.fillStyle = colourCss(accent);
-    context.fillRect(62, isTikTok ? 555 : 398, isTikTok ? 430 : 330, 12);
-
-    const deviceCentreX = isTikTok ? 715 : 770;
-    const deviceTop = isTikTok ? 585 : 335;
-    const deviceWidth = isTikTok ? 625 : 565;
-    drawKindleMockup(
-      context,
-      cover,
-      { primary: accent, secondary: palette.secondary },
-      deviceCentreX,
-      deviceTop,
-      deviceWidth,
-      0.025,
-    );
-
-    const tropes = input.book.tropes.slice(0, 4);
-    const startY = isTikTok ? 760 : 540;
-    const step = isTikTok ? 190 : 166;
-    const textWidth = isTikTok ? 330 : 390;
-    tropes.forEach((trope, index) => {
-      const y = startY + index * step;
-      context.strokeStyle = colourCss(accent, 0.78);
-      context.lineWidth = 3;
-      context.beginPath();
-      context.moveTo(62, y + (isTikTok ? 104 : 92));
-      context.lineTo(62 + textWidth, y + (isTikTok ? 104 : 92));
-      context.stroke();
-      context.fillStyle = colourCss(accent);
-      context.beginPath();
-      context.arc(78, y + 28, isTikTok ? 20 : 17, 0, Math.PI * 2);
-      context.fill();
-      context.fillStyle = "#07070a";
-      context.textAlign = "center";
-      context.font = `900 ${isTikTok ? 21 : 18}px Arial, sans-serif`;
-      context.fillText(String(index + 1), 78, y + (isTikTok ? 35 : 34));
-      context.textAlign = "left";
-      context.fillStyle = "#ffffff";
-      const tropeBlock = fittedMultiline(
-        context,
-        trope.toUpperCase(),
-        textWidth - 58,
-        2,
-        isTikTok ? 45 : 38,
-        isTikTok ? 31 : 27,
-      );
-      tropeBlock.lines.forEach((line, lineIndex) => {
-        context.font = `900 ${tropeBlock.fontSize}px "Arial Black", Arial, sans-serif`;
-        context.fillText(
-          line,
-          112,
-          y + (isTikTok ? 39 : 38) + lineIndex * tropeBlock.lineHeight,
-        );
-      });
-    });
-
-    if (isTikTok) {
-      drawCallToAction(
-        context,
-        input.book,
-        { primary: accent, secondary: palette.secondary },
-        width,
-        1710,
-      );
-    } else {
-      drawCallToAction(
-        context,
-        input.book,
-        { primary: accent, secondary: palette.secondary },
-        width,
-        1195,
-        true,
-      );
-    }
-  } else {
-    context.save();
-    const heroWash = context.createLinearGradient(0, 0, width, 0);
-    heroWash.addColorStop(0, colourCss(palette.primary, 0.34));
-    heroWash.addColorStop(0.48, "rgba(0,0,0,0)");
-    heroWash.addColorStop(1, colourCss(palette.secondary, 0.34));
-    context.fillStyle = heroWash;
-    context.fillRect(0, 0, width, height);
-    context.restore();
-    context.textAlign = "center";
-    context.fillStyle = "#ffffff";
-    context.font = `700 ${isTikTok ? 33 : 25}px Arial, sans-serif`;
-    context.fillText(
-      input.campaignType === "kindle-unlimited"
-        ? "AVAILABLE ON"
-        : "FOR READERS WHO WANT",
-      width / 2,
-      isTikTok ? 270 : 235,
-    );
-    const heroHeading =
-      input.campaignType === "kindle-unlimited"
-        ? "KINDLE UNLIMITED"
-        : hook.toUpperCase();
-    const hero = fittedMultiline(
-      context,
-      heroHeading,
-      width - 140,
-      2,
-      isTikTok ? 108 : 82,
-      isTikTok ? 68 : 54,
-    );
-    hero.lines.forEach((line, index) => {
-      context.fillStyle =
-        index === hero.lines.length - 1
-          ? colourCss(palette.primary)
-          : "#ffffff";
-      context.font = `900 ${hero.fontSize}px "Arial Black", Arial, sans-serif`;
-      context.fillText(
-        line,
-        width / 2,
-        (isTikTok ? 370 : 325) + index * hero.lineHeight,
-      );
-    });
-    context.fillStyle = colourCss(palette.primary);
-    context.fillRect(width / 2 - 210, isTikTok ? 480 : 420, 420, 9);
-
-    drawKindleMockup(
-      context,
-      cover,
-      palette,
-      width / 2,
-      isTikTok ? 520 : 410,
-      isTikTok ? 560 : 465,
-      -0.028,
-    );
-
-    if (isTikTok) {
-      const chipY = 1505;
-      const chipGap = 300;
-      const chipStart = width / 2 - chipGap;
-      context.textAlign = "center";
-      input.book.tropes.slice(0, 3).forEach((trope, index) => {
-        const x = chipStart + index * chipGap;
-        context.strokeStyle = colourCss(palette.primary, 0.85);
-        context.lineWidth = 4;
-        context.beginPath();
-        context.arc(x, chipY, 35, 0, Math.PI * 2);
-        context.stroke();
-        context.fillStyle = colourCss(palette.primary);
-        context.font = "800 28px Arial, sans-serif";
-        context.fillText("✓", x, chipY + 10);
-        context.fillStyle = "#ffffff";
-        const block = fittedMultiline(
-          context,
-          trope.toUpperCase(),
-          250,
-          2,
-          25,
-          18,
-        );
-        block.lines.forEach((line, lineIndex) => {
-          context.font = `800 ${block.fontSize}px Arial, sans-serif`;
-          context.fillText(line, x, chipY + 75 + lineIndex * block.lineHeight);
-        });
-      });
-    }
-    drawCallToAction(
-      context,
-      input.book,
-      palette,
-      width,
-      isTikTok ? 1740 : 1210,
-      !isTikTok,
-    );
-  }
-
-  context.textAlign = "center";
-  context.fillStyle = "rgba(255,255,255,0.74)";
-  context.font = `700 ${isTikTok ? 22 : 17}px Arial, sans-serif`;
-  context.fillText("MARLOWQUINN.COM", width / 2, height - (isTikTok ? 42 : 24));
-
-  return {
-    dataUrl: canvas.toDataURL("image/jpeg", 0.95),
-    template,
-  };
-}
-
-function videoRecorderMimeType(): string {
-  const candidates = [
-    "video/mp4;codecs=avc1.42E01E",
-    "video/mp4",
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
-  ];
-
-  return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
-}
-
-function drawContainedImage(
-  context: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-) {
-  const scale = Math.min(
-    width / image.naturalWidth,
-    height / image.naturalHeight,
-  );
-  const drawWidth = image.naturalWidth * scale;
-  const drawHeight = image.naturalHeight * scale;
-
-  context.drawImage(
-    image,
-    x + (width - drawWidth) / 2,
-    y + (height - drawHeight) / 2,
-    drawWidth,
-    drawHeight,
-  );
-}
-
-async function createCampaignVideo(input: {
-  book: CatalogueBook;
-  post: GeneratedPost;
-  posterDataUrl: string;
-}): Promise<{ blob: Blob; mimeType: string }> {
-  if (typeof MediaRecorder === "undefined") {
-    throw new Error("This browser cannot create downloadable video files.");
-  }
-
-  const mimeType = videoRecorderMimeType();
-
-  if (!mimeType) {
-    throw new Error("This browser has no supported video recording format.");
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = 1080;
-  canvas.height = 1920;
-  const context = canvas.getContext("2d");
-
-  if (!context) throw new Error("This browser could not create the video.");
-
-  const [poster, cover] = await Promise.all([
-    loadImage(input.posterDataUrl),
-    loadImage(input.book.coverUrl),
-  ]);
-  const stream = canvas.captureStream(30);
-  const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream, {
-    mimeType,
-    videoBitsPerSecond: 8_000_000,
-  });
-  const durationMs = 9000;
-
-  const completed = new Promise<Blob>((resolve, reject) => {
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
-    };
-    recorder.onerror = () =>
-      reject(new Error("The browser video recorder failed."));
-    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
-  });
-
-  recorder.start(250);
-  const startedAt = performance.now();
-
-  await new Promise<void>((resolve) => {
-    function drawFrame(now: number) {
-      const elapsed = Math.min(durationMs, now - startedAt);
-      const progress = elapsed / durationMs;
-
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.save();
-      context.filter = "blur(28px) brightness(0.35) saturate(1.25)";
-      drawImageCover(context, poster, -60, -60, 1200, 2040);
-      context.restore();
-
-      const posterScale = 0.88 + progress * 0.05;
-      const posterWidth = 1000 * posterScale;
-      const posterHeight = 1780 * posterScale;
-      const posterX = (canvas.width - posterWidth) / 2;
-      const posterY = (canvas.height - posterHeight) / 2 - 10;
-
-      context.save();
-      context.shadowColor = "rgba(0,0,0,0.7)";
-      context.shadowBlur = 45;
-      context.shadowOffsetY = 18;
-      drawContainedImage(
-        context,
-        poster,
-        posterX,
-        posterY,
-        posterWidth,
-        posterHeight,
-      );
-      context.restore();
-
-      const pulse = 0.35 + Math.sin(progress * Math.PI * 4) * 0.08;
-      const glow = context.createRadialGradient(850, 280, 20, 850, 280, 420);
-      glow.addColorStop(0, `rgba(236,72,153,${pulse})`);
-      glow.addColorStop(1, "rgba(236,72,153,0)");
-      context.fillStyle = glow;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      if (progress > 0.72) {
-        const endProgress = Math.min(1, (progress - 0.72) / 0.18);
-        context.fillStyle = `rgba(5,5,8,${0.88 * endProgress})`;
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        context.globalAlpha = endProgress;
-        const coverHeight = 760;
-        const coverWidth =
-          coverHeight * (cover.naturalWidth / cover.naturalHeight);
-        context.save();
-        context.shadowColor = "rgba(0,0,0,0.8)";
-        context.shadowBlur = 42;
-        context.drawImage(
-          cover,
-          (canvas.width - coverWidth) / 2,
-          260,
-          coverWidth,
-          coverHeight,
-        );
-        context.restore();
-
-        context.textAlign = "center";
-        context.fillStyle = "#ffffff";
-        context.font = "800 62px Arial, sans-serif";
-        context.fillText(input.book.title, canvas.width / 2, 1130);
-        context.fillStyle = "#f9a8d4";
-        context.font = "700 34px Arial, sans-serif";
-        const finalTropes = input.book.tropes.slice(0, 3).join("  •  ");
-        const tropeLines = wrappedLines(context, finalTropes, 920, 2);
-        tropeLines.forEach((line, index) => {
-          context.fillText(line, canvas.width / 2, 1230 + index * 48);
-        });
-
-        if (input.book.kindleUnlimited) {
-          context.fillStyle = "#ffffff";
-          context.font = "700 36px Arial, sans-serif";
-          context.fillText(
-            "AVAILABLE ON KINDLE UNLIMITED",
-            canvas.width / 2,
-            1510,
-          );
-        }
-
-        context.fillStyle = "#ec4899";
-        context.font = "700 30px Arial, sans-serif";
-        context.fillText("MARLOW QUINN", canvas.width / 2, 1610);
-        context.globalAlpha = 1;
-      }
-
-      if (elapsed >= durationMs) {
-        resolve();
-        return;
-      }
-
-      requestAnimationFrame(drawFrame);
-    }
-
-    requestAnimationFrame(drawFrame);
-  });
-
-  recorder.stop();
-  const blob = await completed;
-  stream.getTracks().forEach((track) => track.stop());
-
-  if (blob.size === 0) {
-    throw new Error("The browser returned an empty video file.");
-  }
-
-  return { blob, mimeType };
-}
-
-function eased(value: number): number {
-  const clamped = Math.max(0, Math.min(1, value));
-  return 1 - Math.pow(1 - clamped, 3);
-}
-
-async function createBrandedCampaignVideo(input: {
-  book: CatalogueBook;
-  post: GeneratedPost;
-  posterDataUrl: string;
-}): Promise<{ blob: Blob; mimeType: string }> {
-  if (typeof MediaRecorder === "undefined") {
-    throw new Error("This browser cannot create downloadable video files.");
-  }
-
-  const mimeType = videoRecorderMimeType();
-
-  if (!mimeType) {
-    throw new Error("This browser has no supported video recording format.");
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = 1080;
-  canvas.height = 1920;
-  const context = canvas.getContext("2d");
-
-  if (!context) throw new Error("This browser could not create the video.");
-
-  const [poster, cover] = await Promise.all([
-    loadImage(input.posterDataUrl),
-    loadImage(input.book.coverUrl),
-  ]);
-  const stream = canvas.captureStream(30);
-  const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream, {
-    mimeType,
-    videoBitsPerSecond: 8_000_000,
-  });
-  const durationMs = 11000;
-
-  const completed = new Promise<Blob>((resolve, reject) => {
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
-    };
-    recorder.onerror = () =>
-      reject(new Error("The browser video recorder failed."));
-    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
-  });
-
-  function brandFrame() {
-    context.strokeStyle = "rgba(236,72,153,0.8)";
-    context.lineWidth = 5;
-    context.strokeRect(34, 34, canvas.width - 68, canvas.height - 68);
-    context.textAlign = "left";
-    context.fillStyle = "#ec4899";
-    context.fillRect(64, 64, 96, 8);
-    context.fillStyle = "#ffffff";
-    context.font = "700 25px Arial, sans-serif";
-    context.fillText("MARLOW QUINN", 64, 112);
-    context.fillStyle = "#f9a8d4";
-    context.font = "700 17px Arial, sans-serif";
-    context.fillText("BITE  •  HEAT  •  HEART", 64, 142);
-  }
-
-  function motionBackground(progress: number, darkness: number) {
-    const zoom = 1.03 + progress * 0.08;
-    const backgroundWidth = canvas.width * zoom;
-    const backgroundHeight = canvas.height * zoom;
-    drawImageCover(
-      context,
-      poster,
-      (canvas.width - backgroundWidth) / 2,
-      (canvas.height - backgroundHeight) / 2,
-      backgroundWidth,
-      backgroundHeight,
-    );
-    context.fillStyle = `rgba(5,5,8,${darkness})`;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  recorder.start(250);
-  const startedAt = performance.now();
-
-  await new Promise<void>((resolve) => {
-    function drawFrame(now: number) {
-      const elapsed = Math.min(durationMs, now - startedAt);
-      const progress = elapsed / durationMs;
-
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = "#050508";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-
-      if (progress < 0.22) {
-        const scene = eased(progress / 0.22);
-        motionBackground(scene, 0.76);
-
-        context.save();
-        context.globalAlpha = scene;
-        context.fillStyle = "#ec4899";
-        context.fillRect(64, 330, 270, 54);
-        context.fillStyle = "#ffffff";
-        context.font = "800 27px Arial, sans-serif";
-        context.textAlign = "center";
-        context.fillText("MM ROMANCE", 199, 367);
-
-        const hook =
-          input.post.title || input.book.tropes.slice(0, 2).join(" • ");
-        context.font = "800 78px Arial, sans-serif";
-        context.textAlign = "left";
-        const hookLines = wrappedLines(context, hook, 920, 5);
-        const startX = 64 - (1 - scene) * 150;
-        hookLines.forEach((line, index) => {
-          context.fillText(line, startX, 470 + index * 94);
-        });
-        context.fillStyle = "#f9a8d4";
-        context.font = "700 31px Arial, sans-serif";
-        context.fillText(input.book.subgenre.toUpperCase(), startX, 1030);
-        context.restore();
-        brandFrame();
-      } else if (progress < 0.52) {
-        const scene = (progress - 0.22) / 0.3;
-        motionBackground(scene, 0.83);
-        brandFrame();
-
-        context.textAlign = "left";
-        context.fillStyle = "#ffffff";
-        context.font = "800 64px Arial, sans-serif";
-        context.fillText("WHAT TO EXPECT", 64, 330);
-        context.fillStyle = "#ec4899";
-        context.fillRect(64, 365, 320, 8);
-
-        input.book.tropes.slice(0, 4).forEach((trope, index) => {
-          const itemProgress = eased((scene - index * 0.15) / 0.35);
-          if (itemProgress <= 0) return;
-
-          const y = 510 + index * 220;
-          const x = 64 + (1 - itemProgress) * 180;
-          context.globalAlpha = itemProgress;
-          context.fillStyle = index % 2 === 0 ? "#ec4899" : "#ffffff";
-          context.fillRect(x, y, 88, 88);
-          context.fillStyle = index % 2 === 0 ? "#ffffff" : "#050508";
-          context.font = "800 35px Arial, sans-serif";
-          context.textAlign = "center";
-          context.fillText(String(index + 1).padStart(2, "0"), x + 44, y + 58);
-          context.textAlign = "left";
-          context.fillStyle = "#ffffff";
-          context.font = "800 49px Arial, sans-serif";
-          const lines = wrappedLines(context, trope.toUpperCase(), 780, 2);
-          lines.forEach((line, lineIndex) => {
-            context.fillText(line, x + 125, y + 5 + lineIndex * 58);
-          });
-          context.globalAlpha = 1;
-        });
-      } else if (progress < 0.78) {
-        const scene = eased((progress - 0.52) / 0.26);
-        context.fillStyle = "#050508";
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        context.fillStyle = "rgba(236,72,153,0.18)";
-        context.beginPath();
-        context.moveTo(600, 0);
-        context.lineTo(1080, 0);
-        context.lineTo(1080, 1920);
-        context.lineTo(830, 1920);
-        context.closePath();
-        context.fill();
-        brandFrame();
-
-        const coverHeight = 850;
-        const coverWidth =
-          coverHeight * (cover.naturalWidth / cover.naturalHeight);
-        const coverX = 520 + (1 - scene) * 430;
-        const coverY = 430;
-        context.save();
-        context.shadowColor = "rgba(236,72,153,0.65)";
-        context.shadowBlur = 55;
-        context.shadowOffsetY = 20;
-        context.fillStyle = "#ffffff";
-        context.fillRect(
-          coverX - 8,
-          coverY - 8,
-          coverWidth + 16,
-          coverHeight + 16,
-        );
-        context.drawImage(cover, coverX, coverY, coverWidth, coverHeight);
-        context.restore();
-
-        context.globalAlpha = scene;
-        context.textAlign = "left";
-        context.fillStyle = "#ec4899";
-        context.font = "800 29px Arial, sans-serif";
-        context.fillText("YOUR NEXT OBSESSION", 64, 510);
-        context.fillStyle = "#ffffff";
-        context.font = "800 66px Arial, sans-serif";
-        const titleLines = wrappedLines(context, input.book.title, 470, 4);
-        titleLines.forEach((line, index) => {
-          context.fillText(line, 64, 590 + index * 78);
-        });
-        context.fillStyle = "#f9a8d4";
-        context.font = "700 32px Arial, sans-serif";
-        context.fillText(input.book.heat, 64, 990);
-        context.globalAlpha = 1;
-      } else {
-        const scene = eased((progress - 0.78) / 0.16);
-        context.fillStyle = "#ec4899";
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        context.fillStyle = "#050508";
-        context.beginPath();
-        context.moveTo(0, 0);
-        context.lineTo(1080, 0);
-        context.lineTo(1080, 420);
-        context.lineTo(0, 720);
-        context.closePath();
-        context.fill();
-
-        context.globalAlpha = scene;
-        const coverHeight = 750;
-        const coverWidth =
-          coverHeight * (cover.naturalWidth / cover.naturalHeight);
-        context.save();
-        context.shadowColor = "rgba(0,0,0,0.75)";
-        context.shadowBlur = 50;
-        context.drawImage(
-          cover,
-          (canvas.width - coverWidth) / 2,
-          300 - (1 - scene) * 100,
-          coverWidth,
-          coverHeight,
-        );
-        context.restore();
-
-        context.textAlign = "center";
-        context.fillStyle = "#050508";
-        context.font = "800 61px Arial, sans-serif";
-        context.fillText(input.book.title, canvas.width / 2, 1190);
-        context.font = "800 38px Arial, sans-serif";
-        context.fillText("MARLOW QUINN", canvas.width / 2, 1270);
-
-        if (input.book.kindleUnlimited) {
-          context.fillStyle = "#ffffff";
-          context.fillRect(130, 1390, 820, 112);
-          context.fillStyle = "#050508";
-          context.font = "800 34px Arial, sans-serif";
-          context.fillText(
-            "AVAILABLE ON KINDLE UNLIMITED",
-            canvas.width / 2,
-            1460,
-          );
-        }
-
-        context.fillStyle = "#050508";
-        context.font = "700 25px Arial, sans-serif";
-        context.fillText("BITE  •  HEAT  •  HEART", canvas.width / 2, 1605);
-        context.globalAlpha = 1;
-      }
-
-      if (elapsed >= durationMs) {
-        resolve();
-        return;
-      }
-
-      requestAnimationFrame(drawFrame);
-    }
-
-    requestAnimationFrame(drawFrame);
-  });
-
-  recorder.stop();
-  const blob = await completed;
-  stream.getTracks().forEach((track) => track.stop());
-
-  if (blob.size === 0) {
-    throw new Error("The browser returned an empty video file.");
-  }
-
-  return { blob, mimeType };
-}
-
-async function createCoverFirstCampaignVideo(input: {
-  book: CatalogueBook;
-  post: GeneratedPost;
-  campaignType: CampaignType;
-  quote: string;
-  template: Exclude<PosterTemplate, "auto">;
-}): Promise<{ blob: Blob; mimeType: string }> {
-  if (typeof MediaRecorder === "undefined") {
-    throw new Error("This browser cannot create downloadable video files.");
-  }
-
-  const mimeType = videoRecorderMimeType();
-
-  if (!mimeType) {
-    throw new Error("This browser has no supported video recording format.");
-  }
-
-  const canvas = document.createElement("canvas");
-  canvas.width = 1080;
-  canvas.height = 1920;
-  const context = canvas.getContext("2d");
-
-  if (!context) throw new Error("This browser could not create the video.");
-
-  const cover = await loadImage(input.book.coverUrl);
-  const palette = extractCampaignPalette(cover, input.book.slug);
-  const stream = canvas.captureStream(30);
-  const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream, {
-    mimeType,
-    videoBitsPerSecond: 8_000_000,
-  });
-  const durationMs = 11000;
-
-  const completed = new Promise<Blob>((resolve, reject) => {
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
-    };
-    recorder.onerror = () =>
-      reject(new Error("The browser video recorder failed."));
-    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
-  });
-
-  function windowOpacity(
-    progress: number,
-    start: number,
-    fullyVisible: number,
-    fadeAt: number,
-    end: number,
-  ): number {
-    if (progress <= start || progress >= end) return 0;
-    if (progress < fullyVisible) {
-      return eased((progress - start) / (fullyVisible - start));
-    }
-    if (progress <= fadeAt) return 1;
-    return 1 - eased((progress - fadeAt) / (end - fadeAt));
-  }
-
-  function drawVideoHeading(
-    text: string,
-    y: number,
-    maximumWidth: number,
-    maximumLines: number,
-    startingSize: number,
-    minimumSize: number,
-    accentLastLines = 1,
-    opacity = 1,
-    lineReveal = 1,
-  ) {
-    const block = fittedMultiline(
-      context,
-      text,
-      maximumWidth,
-      maximumLines,
-      startingSize,
-      minimumSize,
-    );
-    context.textAlign = "center";
-
-    block.lines.forEach((line, index) => {
-      const reveal = eased((lineReveal - index * 0.1) / 0.35);
-      if (reveal <= 0) return;
-      context.globalAlpha = opacity * reveal;
-      context.fillStyle =
-        index >= block.lines.length - accentLastLines
-          ? colourCss(palette.primary)
-          : "#ffffff";
-      context.font = `800 ${block.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
-      context.fillText(
-        line,
-        canvas.width / 2,
-        y + index * block.lineHeight,
-        maximumWidth,
-      );
-    });
-    context.globalAlpha = 1;
-  }
-
-  recorder.start(250);
-  const startedAt = performance.now();
-
-  await new Promise<void>((resolve) => {
-    function drawFrame(now: number) {
-      const elapsed = Math.min(durationMs, now - startedAt);
-      const progress = elapsed / durationMs;
-
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      drawAtmosphericBackground(
-        context,
-        cover,
-        palette,
-        canvas.width,
-        canvas.height,
-        `${input.book.slug}-video`,
-        progress,
-      );
-      drawCampaignBrand(context, palette, canvas.width);
-
-      const hookOpacity = windowOpacity(progress, 0, 0.055, 0.22, 0.3);
-      if (hookOpacity > 0) {
-        context.globalAlpha = hookOpacity;
-        context.textAlign = "center";
-        context.fillStyle = colourCss(palette.primary);
-        context.font = "800 25px Arial, sans-serif";
-        const eyebrow =
-          input.template === "cinematic-quote"
-            ? "FROM THE PAGES OF"
-            : input.campaignType === "kindle-unlimited"
-              ? "AVAILABLE ON KINDLE UNLIMITED"
-              : "YOUR NEXT M/M ROMANCE";
-        context.fillText(eyebrow, canvas.width / 2, 300);
-        context.fillStyle = colourCss(palette.primary);
-        context.fillRect(370, 330, 340, 8);
-        context.globalAlpha = 1;
-
-        const hook =
-          input.template === "cinematic-quote" && input.quote.trim()
-            ? `“${input.quote.trim().replace(/^[“"]|[”"]$/g, "")}”`
-            : input.template === "trope-showcase"
-              ? input.book.tropes.slice(0, 2).join(" × ")
-              : cleanCampaignHook(input.book, input.post);
-        drawVideoHeading(
-          hook.toUpperCase(),
-          455,
-          900,
-          input.template === "cinematic-quote" ? 8 : 5,
-          input.template === "cinematic-quote" ? 76 : 92,
-          input.template === "cinematic-quote" ? 43 : 54,
-          input.template === "cinematic-quote" ? 2 : 1,
-          hookOpacity,
-          eased(progress / 0.2),
-        );
-      }
-
-      const coverOpacity = windowOpacity(progress, 0.23, 0.31, 0.48, 0.58);
-      if (coverOpacity > 0) {
-        const scene = eased((progress - 0.23) / 0.23);
-        const top = 380 + (1 - scene) * 170;
-        const scale = 620 + scene * 55;
-        drawKindleMockup(
-          context,
-          cover,
-          palette,
-          canvas.width / 2,
-          top,
-          scale,
-          -0.07 + scene * 0.045,
-          coverOpacity,
-        );
-        context.globalAlpha = coverOpacity;
-        context.textAlign = "center";
-        context.fillStyle = "#ffffff";
-        context.font = "700 29px Arial, sans-serif";
-        context.fillText(
-          input.book.subgenre.toUpperCase(),
-          canvas.width / 2,
-          1640,
-        );
-        context.fillStyle = colourCss(palette.primary);
-        context.fillRect(390, 1680, 300, 7);
-        context.globalAlpha = 1;
-      }
-
-      const tropeOpacity = windowOpacity(progress, 0.51, 0.59, 0.73, 0.82);
-      if (tropeOpacity > 0) {
-        const scene = eased((progress - 0.51) / 0.2);
-        context.globalAlpha = tropeOpacity;
-        context.textAlign = "left";
-        context.fillStyle = "#ffffff";
-        context.font = "800 54px Impact, Arial, sans-serif";
-        context.fillText("WHAT TO EXPECT", 64, 310);
-        context.fillStyle = colourCss(palette.primary);
-        context.fillRect(64, 342, 310, 8);
-        context.globalAlpha = 1;
-
-        drawKindleMockup(
-          context,
-          cover,
-          palette,
-          300 - (1 - scene) * 160,
-          430,
-          455,
-          -0.045,
-          tropeOpacity,
-        );
-
-        input.book.tropes.slice(0, 4).forEach((trope, index) => {
-          const itemProgress = eased((scene - index * 0.12) / 0.42);
-          if (itemProgress <= 0) return;
-          const x = 585 + (1 - itemProgress) * 150;
-          const y = 500 + index * 245;
-          context.globalAlpha = tropeOpacity * itemProgress;
-          context.fillStyle = "rgba(0,0,0,0.58)";
-          roundedRectanglePath(context, x, y, 430, 178, 18);
-          context.fill();
-          context.strokeStyle = colourCss(palette.primary, 0.8);
-          context.lineWidth = 4;
-          context.stroke();
-          context.fillStyle = colourCss(palette.primary);
-          context.font = "800 24px Arial, sans-serif";
-          context.fillText(String(index + 1).padStart(2, "0"), x + 28, y + 48);
-          context.fillStyle = "#ffffff";
-          const block = fittedMultiline(
-            context,
-            trope.toUpperCase(),
-            368,
-            2,
-            37,
-            25,
-          );
-          block.lines.forEach((line, lineIndex) => {
-            context.font = `800 ${block.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
-            context.fillText(
-              line,
-              x + 28,
-              y + 98 + lineIndex * block.lineHeight,
-            );
-          });
-          context.globalAlpha = 1;
-        });
-      }
-
-      const finalOpacity = eased((progress - 0.76) / 0.14);
-      if (finalOpacity > 0) {
-        const rise = (1 - finalOpacity) * 110;
-        drawKindleMockup(
-          context,
-          cover,
-          palette,
-          canvas.width / 2,
-          260 + rise,
-          570,
-          -0.018 + (1 - finalOpacity) * 0.04,
-          finalOpacity,
-        );
-
-        context.globalAlpha = finalOpacity;
-        context.textAlign = "center";
-        context.fillStyle = "#ffffff";
-        const title = fittedMultiline(
-          context,
-          input.book.title.toUpperCase(),
-          900,
-          2,
-          68,
-          42,
-        );
-        title.lines.forEach((line, index) => {
-          context.font = `800 ${title.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
-          context.fillText(
-            line,
-            canvas.width / 2,
-            1350 + index * title.lineHeight,
-          );
-        });
-        context.fillStyle = colourCss(palette.primary);
-        context.font = "800 28px Arial, sans-serif";
-        context.fillText("M/M ROMANCE BY MARLOW QUINN", canvas.width / 2, 1490);
-        context.globalAlpha = finalOpacity;
-        drawCallToAction(context, input.book, palette, canvas.width, 1560);
-        context.fillStyle = "rgba(255,255,255,0.78)";
-        context.font = "700 24px Arial, sans-serif";
-        context.fillText("MARLOWQUINN.COM", canvas.width / 2, 1735);
-        context.globalAlpha = 1;
-      }
-
-      if (elapsed >= durationMs) {
-        resolve();
-        return;
-      }
-
-      requestAnimationFrame(drawFrame);
-    }
-
-    requestAnimationFrame(drawFrame);
-  });
-
-  recorder.stop();
-  const blob = await completed;
-  stream.getTracks().forEach((track) => track.stop());
-
-  if (blob.size === 0) {
-    throw new Error("The browser returned an empty video file.");
-  }
-
-  return { blob, mimeType };
-}
-
-export default function SocialStudioPage() {
-  const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
-  const [error, setError] = useState("");
-  const [selectedBook, setSelectedBook] = useState<CatalogueBook | null>(null);
-  const [campaignType, setCampaignType] =
-    useState<CampaignType>("book-spotlight");
-  const [platforms, setPlatforms] = useState<SocialPlatform[]>([
-    "facebook",
-    "instagram",
-    "tiktok",
-  ]);
-  const [quote, setQuote] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [generatedPosts, setGeneratedPosts] = useState<GeneratedPost[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState("");
-  const [copiedPlatform, setCopiedPlatform] = useState<SocialPlatform | null>(
-    null,
-  );
-  const [mediaStyle] = useState<MediaStyle>("ai-scene");
-  const [posterTemplate, setPosterTemplate] = useState<PosterTemplate>("auto");
-  const [generatedMedia, setGeneratedMedia] = useState<GeneratedMedia[]>([]);
-  const [creatingImageFor, setCreatingImageFor] =
-    useState<SocialPlatform | null>(null);
-  const [imageError, setImageError] = useState("");
-  const [generatedVideos, setGeneratedVideos] = useState<GeneratedVideo[]>([]);
-  const [creatingVideoFor, setCreatingVideoFor] =
-    useState<SocialPlatform | null>(null);
-  const [videoError, setVideoError] = useState("");
-  const [testingMakeFor, setTestingMakeFor] = useState<SocialPlatform | null>(
-    null,
-  );
-  const [makeTestMessage, setMakeTestMessage] = useState("");
-  const [makeTestError, setMakeTestError] = useState("");
-
-  function chooseBook(book: CatalogueBook) {
-    setSelectedBook(book);
-    setCampaignType("book-spotlight");
-    setPlatforms(["facebook", "instagram", "tiktok"]);
-    setQuote("");
-    setInstructions("");
-    setGeneratedPosts([]);
-    setGenerationError("");
-    setPosterTemplate("auto");
-    setGeneratedMedia([]);
-    setImageError("");
-    setGeneratedVideos([]);
-    setVideoError("");
-    setMakeTestMessage("");
-    setMakeTestError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function chooseCampaignType(value: CampaignType) {
-    setCampaignType(value);
-    setGeneratedPosts([]);
-    setGenerationError("");
-    setGeneratedMedia([]);
-    setImageError("");
-    setGeneratedVideos([]);
-    setVideoError("");
-  }
-
-  function togglePlatform(platform: SocialPlatform) {
-    setGeneratedPosts([]);
-    setGenerationError("");
-    setGeneratedMedia([]);
-    setImageError("");
-    setGeneratedVideos([]);
-    setVideoError("");
-    setPlatforms((current) =>
-      current.includes(platform)
-        ? current.filter((item) => item !== platform)
-        : [...current, platform],
-    );
-  }
-
-  async function generateContent() {
-    if (!selectedBook || platforms.length === 0) return;
-
-    if (campaignType === "quote-post" && !quote.trim()) {
-      setGenerationError("Paste a genuine quote for the quote campaign.");
-      return;
-    }
-
-    setIsGenerating(true);
-    setGenerationError("");
-    setGeneratedPosts([]);
-
-    try {
-      const response = await fetch("/api/social-studio/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          book: selectedBook,
-          campaignType,
-          platforms,
-          quote: quote.trim(),
-          instructions: instructions.trim(),
-        }),
-      });
-      const result = (await response.json()) as {
-        posts?: GeneratedPost[];
-        error?: string;
-      };
-
-      if (!response.ok || !result.posts) {
-        throw new Error(result.error || "The campaign could not be generated.");
-      }
-
-      setGeneratedPosts(result.posts);
-      setGeneratedMedia([]);
-      setImageError("");
-      setGeneratedVideos([]);
-      setVideoError("");
-    } catch (contentError) {
-      setGenerationError(
-        contentError instanceof Error
-          ? contentError.message
-          : "The campaign could not be generated.",
-      );
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  async function copyPost(post: GeneratedPost) {
-    const text = [post.title, post.caption, post.hashtags.join(" ")]
-      .filter(Boolean)
-      .join("\n\n");
-
-    await navigator.clipboard.writeText(text);
-    setCopiedPlatform(post.platform);
-    window.setTimeout(() => setCopiedPlatform(null), 1800);
-  }
-
-  async function createImage(post: GeneratedPost) {
-    if (!selectedBook) return;
-
-    setCreatingImageFor(post.platform);
-    setImageError("");
-
-    try {
-      const resolvedTemplate = resolvePosterTemplate(
-        posterTemplate,
-        campaignType,
-      );
-      const backgroundResponse = await fetch("/api/social-studio/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          book: selectedBook,
-          platform: post.platform,
-          campaignType,
-          template: resolvedTemplate,
-          visualDirection: post.visualDirection,
-          instructions: instructions.trim(),
-        }),
-      });
-      const backgroundResult = (await backgroundResponse.json()) as {
-        imageDataUrl?: string;
-        error?: string;
-      };
-
-      if (!backgroundResponse.ok || !backgroundResult.imageDataUrl) {
-        throw new Error(
-          backgroundResult.error ||
-            "The cinematic poster background could not be created.",
-        );
-      }
-
-      const image = await createProfessionalCampaignImage({
-        book: selectedBook,
-        post,
-        mediaStyle,
-        campaignType,
-        quote,
-        template: posterTemplate,
-        aiBackground: backgroundResult.imageDataUrl,
-      });
-
-      setGeneratedMedia((current) => [
-        ...current.filter((item) => item.platform !== post.platform),
-        {
-          platform: post.platform,
-          style: mediaStyle,
-          template: image.template,
-          dataUrl: image.dataUrl,
-        },
-      ]);
-      setGeneratedVideos((current) =>
-        current.filter((item) => item.platform !== post.platform),
-      );
-      setVideoError("");
-    } catch (mediaError) {
-      setImageError(
-        mediaError instanceof Error
-          ? mediaError.message
-          : "The promotional image could not be created.",
-      );
-    } finally {
-      setCreatingImageFor(null);
-    }
-  }
-
-  async function createVideo(post: GeneratedPost, media: GeneratedMedia) {
-    if (!selectedBook) return;
-
-    setCreatingVideoFor(post.platform);
-    setVideoError("");
-
-    try {
-      const result = await createCoverFirstCampaignVideo({
-        book: selectedBook,
-        post,
-        campaignType,
-        quote,
-        template: media.template,
-      });
-      const url = URL.createObjectURL(result.blob);
-      const extension = result.mimeType.includes("mp4") ? "mp4" : "webm";
-
-      setGeneratedVideos((current) => {
-        const previous = current.find(
-          (item) => item.platform === post.platform,
-        );
-        if (previous) URL.revokeObjectURL(previous.url);
-
-        return [
-          ...current.filter((item) => item.platform !== post.platform),
-          {
-            platform: post.platform,
-            url,
-            mimeType: result.mimeType,
-            extension,
+    let batchCompleted = false;
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const response = await fetch("/api/story-chat/ledger", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        ];
-      });
-    } catch (creationError) {
-      setVideoError(
-        creationError instanceof Error
-          ? creationError.message
-          : "The promotional video could not be created.",
-      );
-    } finally {
-      setCreatingVideoFor(null);
-    }
-  }
-
-  async function publishImageToMake(
-    post: GeneratedPost,
-    media: GeneratedMedia,
-  ) {
-    if (!selectedBook) return;
-
-    setTestingMakeFor(post.platform);
-    setMakeTestMessage("");
-    setMakeTestError("");
-
-    try {
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      const user = sessionData.session?.user;
-
-      if (sessionError || !user) {
-        throw new Error("Your NovelForge session has expired. Sign in again.");
-      }
-
-      const mediaResponse = await fetch(media.dataUrl);
-
-      if (!mediaResponse.ok) {
-        throw new Error("The finished campaign image could not be prepared.");
-      }
-
-      const imageBlob = await mediaResponse.blob();
-      const folder = user.id;
-      const filePrefix = `${post.platform}-image-`;
-      const { data: existingFiles, error: listError } = await supabase.storage
-        .from("social-media")
-        .list(folder, { limit: 100, search: filePrefix });
-
-      if (listError) throw new Error(listError.message);
-
-      const oldPaths = (existingFiles ?? [])
-        .filter((file) => file.name.startsWith(filePrefix))
-        .map((file) => `${folder}/${file.name}`);
-
-      if (oldPaths.length > 0) {
-        const { error: removeError } = await supabase.storage
-          .from("social-media")
-          .remove(oldPaths);
-
-        if (removeError) throw new Error(removeError.message);
-      }
-
-      const extension = imageBlob.type.includes("png") ? "png" : "jpg";
-      const objectPath = `${folder}/${filePrefix}${Date.now()}.${extension}`;
-      const { error: uploadError } = await supabase.storage
-        .from("social-media")
-        .upload(objectPath, imageBlob, {
-          cacheControl: "3600",
-          contentType: imageBlob.type || "image/jpeg",
-          upsert: false,
+          body: JSON.stringify({
+            storyBible: input.storyBible,
+            storyState: workingState,
+            chapters: batch,
+            chapter: latestBatchChapter,
+            rebuildMode: usesBatches ? "batch" : "incremental",
+          }),
         });
+        const data = await readApiJson(response);
 
-      if (uploadError) throw new Error(uploadError.message);
+        if (!isLedgerResponse(data)) {
+          throw new Error(
+            "The continuity endpoint returned an invalid story ledger.",
+          );
+        }
 
-      const { data: publicUrlData } = supabase.storage
-        .from("social-media")
-        .getPublicUrl(objectPath);
+        workingState = data.storyState;
+        diagnostics.push(...data.diagnostics);
+        batchCompleted = true;
+        break;
+      } catch (error) {
+        lastError = error;
 
-      const response = await fetch("/api/social-studio/publish", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          platform: post.platform,
-          bookTitle: selectedBook.title,
-          bookSlug: selectedBook.slug,
-          campaignTitle: post.title,
-          caption: post.caption,
-          hashtags: post.hashtags,
-          mediaUrl: publicUrlData.publicUrl,
-          mediaType: "image",
-          amazonUrl: selectedBook.amazonUrl,
-        }),
-      });
-      const result = (await response.json()) as {
-        error?: string;
-        message?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(result.error || "Make rejected the campaign.");
+        if (error instanceof ApiRequestError) {
+          diagnostics.push(...error.diagnostics);
+        }
       }
+    }
 
-      setMakeTestMessage(`${post.platform} image sent to Make for publishing.`);
-    } catch (publishError) {
-      setMakeTestError(
-        `${post.platform}: ${
-          publishError instanceof Error
-            ? publishError.message
-            : "The image could not be sent to Make."
-        }`,
+    if (!batchCompleted) {
+      throw new ApiRequestError(
+        lastError instanceof Error
+          ? lastError.message
+          : "The continuity ledger failed twice.",
+        diagnostics,
       );
-    } finally {
-      setTestingMakeFor(null);
     }
   }
 
-  async function publishVideoToMake(
-    post: GeneratedPost,
-    video: GeneratedVideo,
-  ) {
-    if (!selectedBook) return;
+  const completedState: StoryState = {
+    ...workingState,
+    chapterPlans: input.storyState.chapterPlans ?? [],
+  };
+  delete completedState.continuityDirtyFromChapter;
 
-    setTestingMakeFor(post.platform);
-    setMakeTestMessage("");
-    setMakeTestError("");
+  return {
+    storyState: completedState,
+    diagnostics,
+  };
+}
 
-    try {
-      if (video.extension !== "mp4") {
-        throw new Error(
-          "This browser rendered a WebM video. Create it in the current version of Chrome or Edge so NovelForge produces the MP4 required by Facebook and Instagram.",
-        );
-      }
+function isQualityResponse(value: unknown): value is QualityResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
 
-      const { data: sessionData, error: sessionError } =
-        await supabase.auth.getSession();
-      const user = sessionData.session?.user;
+  const response = value as Partial<QualityResponse>;
+  const quality = response.quality;
+  const scores = quality?.scores;
 
-      if (sessionError || !user) {
-        throw new Error("Your NovelForge session has expired. Sign in again.");
-      }
+  return (
+    typeof response.accepted === "boolean" &&
+    typeof response.chapterContent === "string" &&
+    Boolean(response.chapterContent.trim()) &&
+    typeof response.repaired === "boolean" &&
+    Boolean(quality) &&
+    typeof quality?.passed === "boolean" &&
+    isStringArray(quality?.hardFailures) &&
+    isStringArray(quality?.repairInstructions) &&
+    typeof quality?.summary === "string" &&
+    Boolean(scores) &&
+    typeof scores?.continuity === "number" &&
+    typeof scores?.plotMovement === "number" &&
+    typeof scores?.relationshipProgression === "number" &&
+    typeof scores?.voiceDistinctiveness === "number" &&
+    typeof scores?.povAndTense === "number" &&
+    typeof scores?.repetitionControl === "number" &&
+    typeof scores?.hookStrength === "number" &&
+    isDiagnosticArray(response.diagnostics)
+  );
+}
 
-      const mediaResponse = await fetch(video.url);
+function isStoryChapter(
+  value: unknown,
+): value is StoryWorkspace["chapters"][number] {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
 
-      if (!mediaResponse.ok) {
-        throw new Error("The finished campaign video could not be prepared.");
-      }
+  const chapter = value as Partial<StoryWorkspace["chapters"][number]>;
 
-      const videoBlob = await mediaResponse.blob();
-      const folder = user.id;
-      const filePrefix = `${post.platform}-video-`;
-      const { data: existingFiles, error: listError } = await supabase.storage
-        .from("social-media")
-        .list(folder, { limit: 100, search: filePrefix });
+  return (
+    typeof chapter.id === "string" &&
+    typeof chapter.number === "number" &&
+    typeof chapter.title === "string" &&
+    typeof chapter.povCharacter === "string" &&
+    typeof chapter.content === "string" &&
+    typeof chapter.createdAt === "string" &&
+    typeof chapter.updatedAt === "string"
+  );
+}
 
-      if (listError) throw new Error(listError.message);
+function isStoryWorkspace(value: unknown): value is StoryWorkspace {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
 
-      const oldPaths = (existingFiles ?? [])
-        .filter((file) => file.name.startsWith(filePrefix))
-        .map((file) => `${folder}/${file.name}`);
+  const candidate = value as Partial<StoryWorkspace>;
 
-      if (oldPaths.length > 0) {
-        const { error: removeError } = await supabase.storage
-          .from("social-media")
-          .remove(oldPaths);
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.title === "string" &&
+    (candidate.seriesType === "standalone" ||
+      candidate.seriesType === "series") &&
+    typeof candidate.seriesTitle === "string" &&
+    typeof candidate.bookNumber === "number" &&
+    Array.isArray(candidate.messages) &&
+    candidate.messages.every(
+      (message) =>
+        Boolean(message) &&
+        typeof message === "object" &&
+        typeof message.id === "number" &&
+        (message.role === "user" || message.role === "assistant") &&
+        typeof message.content === "string",
+    ) &&
+    Array.isArray(candidate.chapters) &&
+    candidate.chapters.every(isStoryChapter) &&
+    isStoryBible(candidate.storyBible) &&
+    isStoryState(candidate.storyState) &&
+    typeof candidate.createdAt === "string" &&
+    typeof candidate.updatedAt === "string"
+  );
+}
 
-        if (removeError) throw new Error(removeError.message);
-      }
+function isStoryChatResponse(value: unknown): value is StoryChatResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
 
-      const objectPath = `${folder}/${filePrefix}${Date.now()}.${video.extension}`;
-      const { error: uploadError } = await supabase.storage
-        .from("social-media")
-        .upload(objectPath, videoBlob, {
-          cacheControl: "3600",
-          contentType: video.mimeType || videoBlob.type || "video/mp4",
-          upsert: false,
-        });
+  const response = value as Partial<StoryChatResponse>;
 
-      if (uploadError) throw new Error(uploadError.message);
+  const generatedChapterIsValid =
+    response.generatedChapter === null ||
+    (Boolean(response.generatedChapter) &&
+      typeof response.generatedChapter?.title === "string" &&
+      typeof response.generatedChapter?.povCharacter === "string" &&
+      typeof response.generatedChapter?.content === "string" &&
+      (response.generatedChapter?.replaceChapterNumber === null ||
+        typeof response.generatedChapter?.replaceChapterNumber === "number"));
 
-      const { data: publicUrlData } = supabase.storage
-        .from("social-media")
-        .getPublicUrl(objectPath);
+  const createdStoryIsValid =
+    response.createdStory === undefined ||
+    response.createdStory === null ||
+    isStoryWorkspace(response.createdStory);
 
-      const response = await fetch("/api/social-studio/publish", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          platform: post.platform,
-          bookTitle: selectedBook.title,
-          bookSlug: selectedBook.slug,
-          campaignTitle: post.title,
-          caption: post.caption,
-          hashtags: post.hashtags,
-          mediaUrl: publicUrlData.publicUrl,
-          mediaType: "video",
-          amazonUrl: selectedBook.amazonUrl,
-        }),
-      });
-      const result = (await response.json()) as {
-        error?: string;
-        message?: string;
-      };
+  return (
+    typeof response.reply === "string" &&
+    Boolean(response.reply.trim()) &&
+    (response.intent === "create_story" ||
+      response.intent === "continue_story" ||
+      response.intent === "rewrite_chapter" ||
+      response.intent === "update_story" ||
+      response.intent === "brainstorm" ||
+      response.intent === "general_chat") &&
+    isStoryWorkspace(response.story) &&
+    generatedChapterIsValid &&
+    createdStoryIsValid &&
+    typeof response.chapterBrief === "string" &&
+    (response.diagnostics === undefined ||
+      isDiagnosticArray(response.diagnostics))
+  );
+}
 
-      if (!response.ok) {
-        throw new Error(result.error || "Make rejected the campaign video.");
-      }
+function isAionPassageResponse(value: unknown): value is AionPassageResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
 
-      setMakeTestMessage(`${post.platform} video sent to Make for publishing.`);
-    } catch (publishError) {
-      setMakeTestError(
-        `${post.platform}: ${
-          publishError instanceof Error
-            ? publishError.message
-            : "The video could not be sent to Make."
-        }`,
+  const response = value as Partial<AionPassageResponse>;
+
+  return (
+    typeof response.reply === "string" &&
+    Boolean(response.reply.trim()) &&
+    Array.isArray(response.diagnostics) &&
+    isDiagnosticArray(response.diagnostics)
+  );
+}
+
+function hasStoryBibleContent(storyBible: StoryBible): boolean {
+  return Boolean(
+    storyBible.premise.trim() ||
+      storyBible.relationship.trim() ||
+      storyBible.subgenre.trim() ||
+      storyBible.setting.trim() ||
+      storyBible.pov.trim() ||
+      storyBible.heatLevel.trim() ||
+      storyBible.burnPacing.trim() ||
+      storyBible.tropes.length ||
+      storyBible.characters.length ||
+      storyBible.notes.length,
+  );
+}
+
+function applyGeneratedChapter(
+  story: StoryWorkspace,
+  pending: PendingChapterGeneration,
+  content: string,
+): StoryWorkspace {
+  const now = new Date().toISOString();
+  const chapterMetadata = pending.generatedChapter;
+  const replacementNumber = chapterMetadata.replaceChapterNumber;
+  const nextChapterNumber =
+    story.chapters.length > 0
+      ? Math.max(...story.chapters.map((chapter) => chapter.number)) + 1
+      : 1;
+
+  if (replacementNumber !== null) {
+    const chapterExists = story.chapters.some(
+      (chapter) => chapter.number === replacementNumber,
+    );
+
+    if (!chapterExists && replacementNumber !== nextChapterNumber) {
+      throw new Error(
+        `Chapter ${replacementNumber} could not be found for rewriting.`,
       );
-    } finally {
-      setTestingMakeFor(null);
+    }
+
+    if (chapterExists) {
+      return {
+        ...story,
+        chapters: story.chapters.map((chapter) =>
+          chapter.number === replacementNumber
+            ? {
+                ...chapter,
+                kind: chapterMetadata.kind ?? chapter.kind ?? "chapter",
+                title: chapterMetadata.title.trim() || chapter.title,
+                povCharacter:
+                  chapterMetadata.povCharacter.trim() || chapter.povCharacter,
+                content: content.trim(),
+                updatedAt: now,
+              }
+            : chapter,
+        ),
+        updatedAt: now,
+      };
     }
   }
+
+  return {
+    ...story,
+    chapters: [
+      ...story.chapters,
+      {
+        id: crypto.randomUUID(),
+        number: nextChapterNumber,
+        kind: chapterMetadata.kind ?? "chapter",
+        title: chapterMetadata.title.trim() || `Chapter ${nextChapterNumber}`,
+        povCharacter: chapterMetadata.povCharacter.trim(),
+        content: content.trim(),
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    updatedAt: now,
+  };
+}
+
+export default function StoryChatPage() {
+  const [story, setStory] = useState<StoryWorkspace | null>(null);
+
+  const [userId, setUserId] = useState<string | null>(null);
+
+  const [email, setEmail] = useState("");
+
+  const [authMessage, setAuthMessage] = useState("");
+
+  const [authChecked, setAuthChecked] = useState(false);
+
+  const [hasLoadedRemoteStory, setHasLoadedRemoteStory] = useState(false);
+
+  const [input, setInput] = useState("");
+
+  const [isThinking, setIsThinking] = useState(false);
+
+  const [hasLoaded, setHasLoaded] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>("chat");
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const [readerOpen, setReaderOpen] = useState(false);
+
+  const [isExportOpen, setIsExportOpen] = useState(false);
+
+  const [exportWarnings, setExportWarnings] = useState("");
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const [exportError, setExportError] = useState("");
+
+  const [pendingGeneration, setPendingGeneration] =
+    useState<PendingChapterGeneration | null>(null);
+
+  const [sectionInstruction, setSectionInstruction] = useState("");
+
+  const [stories, setStories] = useState<
+    {
+      id: string;
+
+      title: string;
+
+      createdAt: string;
+
+      updatedAt: string;
+    }[]
+  >([]);
+
+  const [readerTheme, setReaderTheme] = useState<"light" | "dark" | "sepia">(
+    "sepia",
+  );
+
+  const [readerFontSize, setReaderFontSize] = useState(18);
+
+  const [readerLineHeight, setReaderLineHeight] = useState(2);
+
+  const [readerWidth, setReaderWidth] = useState<"narrow" | "medium" | "wide">(
+    "medium",
+  );
+
+  const messages = story?.messages ?? [];
+
+  const storyTitle = story?.title ?? "Untitled story";
+
+  const chapters = story?.chapters ?? [];
+
+  const storyBible = story?.storyBible ?? EMPTY_STORY_BIBLE;
 
   useEffect(() => {
-    let active = true;
+    let isActive = true;
+    const authTimeoutId = window.setTimeout(() => {
+      if (isActive) {
+        setAuthChecked(true);
+      }
+    }, 5000);
 
-    async function loadCatalogue() {
-      const { data } = await supabase.auth.getSession();
-
-      if (!data.session) {
-        window.location.replace("/story-chat");
+    function applySession(
+      session: {
+        user?: { id?: string } | null;
+      } | null,
+    ) {
+      if (!isActive) {
         return;
       }
 
-      try {
-        const response = await fetch(CATALOGUE_URL, {
-          cache: "no-store",
-        });
+      const id = session?.user?.id ?? null;
 
-        if (!response.ok) {
-          throw new Error(`The website catalogue returned ${response.status}.`);
-        }
+      window.clearTimeout(authTimeoutId);
+      setUserId(id);
+      setAuthChecked(true);
 
-        const result = (await response.json()) as CatalogueResponse;
+      if (id) {
+        window.setTimeout(() => {
+          if (!isActive) {
+            return;
+          }
 
-        if (!Array.isArray(result.books)) {
-          throw new Error("The website catalogue returned invalid book data.");
-        }
-
-        if (active) {
-          setCatalogue(result);
-        }
-      } catch (catalogueError) {
-        if (active) {
-          setError(
-            catalogueError instanceof Error
-              ? catalogueError.message
-              : "The website catalogue could not be loaded.",
-          );
-        }
+          void loadStoryList(id).catch((error) => {
+            console.error("Failed to load stories:", error);
+          });
+        }, 0);
       }
     }
 
-    void loadCatalogue();
+    async function loadUser() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        applySession(session);
+      } catch (error) {
+        console.error("Failed to check login:", error);
+
+        applySession(null);
+      }
+    }
+
+    void loadUser();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      applySession(session);
+    });
 
     return () => {
-      active = false;
+      isActive = false;
+      window.clearTimeout(authTimeoutId);
+      subscription.unsubscribe();
     };
   }, []);
 
-  return (
-    <main className="min-h-[100dvh] bg-neutral-950 text-white">
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/95 px-5 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-4">
-          <button
-            type="button"
-            onClick={() => {
-              window.location.assign(
-                `${window.location.origin}/story-chat`,
+  async function loadStoryList(currentUserId: string) {
+    const { data, error } = await supabase
+
+      .from("stories")
+
+      .select("id, title, created_at, updated_at")
+
+      .eq("user_id", currentUserId)
+
+      .order("updated_at", {
+        ascending: false,
+      });
+
+    if (error) {
+      console.error(
+        "Could not load story list:",
+
+        error,
+      );
+
+      return;
+    }
+
+    setStories(
+      (data ?? []).map((item) => ({
+        id: item.id,
+
+        title: item.title || "Untitled Story",
+
+        createdAt: item.created_at,
+
+        updatedAt: item.updated_at,
+      })),
+    );
+  }
+
+  async function openStory(storyId: string) {
+    if (!userId) {
+      return;
+    }
+
+    const { data, error } = await supabase
+
+      .from("stories")
+
+      .select("*")
+
+      .eq("id", storyId)
+
+      .eq("user_id", userId)
+
+      .single();
+
+    if (error || !data) {
+      console.error("Could not open story:", error);
+
+      return;
+    }
+
+    window.localStorage.setItem(
+      "novelforge-current-story-id",
+
+      data.id,
+    );
+
+    const workspaceMetadata = getWorkspaceMetadata(data.story_state);
+
+    setStory({
+      id: data.id,
+
+      title: data.title,
+
+      seriesType: workspaceMetadata.seriesType,
+
+      seriesTitle: workspaceMetadata.seriesTitle,
+
+      bookNumber: workspaceMetadata.bookNumber,
+
+      lineage: workspaceMetadata.lineage,
+
+      messages: data.messages ?? [],
+
+      chapters: data.chapters ?? [],
+
+      storyBible: data.form ?? EMPTY_STORY_BIBLE,
+
+      storyState: data.story_state ?? {},
+
+      createdAt: data.created_at,
+
+      updatedAt: data.updated_at,
+    });
+
+    const remotePending = parseRemotePendingGeneration(data.custom_rewrite);
+
+    if (remotePending?.storyId === data.id) {
+      setPendingGeneration(remotePending);
+      window.localStorage.setItem(
+        PENDING_GENERATION_KEY,
+        JSON.stringify(remotePending),
+      );
+    } else {
+      setPendingGeneration(null);
+      window.localStorage.removeItem(PENDING_GENERATION_KEY);
+    }
+
+    setActiveTab("chapters");
+
+    setReaderOpen(
+      (data.chapters ?? []).length > 0 || remotePending?.storyId === data.id,
+    );
+
+    setIsMenuOpen(false);
+  }
+
+  async function createNewStory() {
+    const newStory = createEmptyStory();
+
+    window.localStorage.setItem(
+      "novelforge-current-story-id",
+
+      newStory.id,
+    );
+
+    window.localStorage.setItem(
+      STORAGE_KEY,
+
+      JSON.stringify(newStory),
+    );
+
+    setStory(newStory);
+
+    setInput("");
+
+    setActiveTab("chat");
+
+    setReaderOpen(false);
+
+    setIsThinking(false);
+
+    setIsMenuOpen(false);
+
+    if (!userId) {
+      return;
+    }
+
+    const { error } = await supabase
+
+      .from("stories")
+
+      .insert({
+        id: newStory.id,
+
+        user_id: userId,
+
+        title: newStory.title,
+
+        form: newStory.storyBible,
+
+        chapters: newStory.chapters,
+
+        messages: newStory.messages,
+
+        story_state: newStory.storyState,
+
+        active_chapter_index: 0,
+
+        custom_rewrite: "",
+
+        created_at: newStory.createdAt,
+
+        updated_at: newStory.updatedAt,
+      });
+
+    if (error) {
+      console.error("Could not create story:", error);
+
+      return;
+    }
+
+    await loadStoryList(userId);
+  }
+
+  async function deleteStory(storyId: string) {
+    if (!userId) {
+      return;
+    }
+
+    const storyToDelete = stories.find((item) => item.id === storyId);
+
+    const confirmed = window.confirm(
+      `Delete "${storyToDelete?.title ?? "this story"}"? This cannot be
+undone.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const { error } = await supabase
+
+      .from("stories")
+
+      .delete()
+
+      .eq("id", storyId)
+
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Could not delete story:", error);
+
+      return;
+    }
+
+    if (story?.id === storyId) {
+      await createNewStory();
+
+      return;
+    }
+
+    await loadStoryList(userId);
+  }
+
+  useEffect(() => {
+    const savedPending = localStorage.getItem(PENDING_GENERATION_KEY);
+
+    if (!savedPending) {
+      return;
+    }
+
+    try {
+      const parsedPending: unknown = JSON.parse(savedPending);
+
+      if (isPendingGeneration(parsedPending)) {
+        setPendingGeneration(parsedPending);
+      } else {
+        localStorage.removeItem(PENDING_GENERATION_KEY);
+      }
+    } catch {
+      localStorage.removeItem(PENDING_GENERATION_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("novelforge-reader");
+
+    if (!saved) return;
+
+    try {
+      const settings = JSON.parse(saved);
+
+      if (settings.theme) setReaderTheme(settings.theme);
+
+      if (settings.fontSize) setReaderFontSize(settings.fontSize);
+
+      if (settings.lineHeight) setReaderLineHeight(settings.lineHeight);
+
+      if (settings.width) setReaderWidth(settings.width);
+    } catch {
+      // Ignore invalid settings
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(
+      "novelforge-reader",
+
+      JSON.stringify({
+        theme: readerTheme,
+
+        fontSize: readerFontSize,
+
+        lineHeight: readerLineHeight,
+
+        width: readerWidth,
+      }),
+    );
+  }, [readerTheme, readerFontSize, readerLineHeight, readerWidth]);
+
+  useEffect(() => {
+    async function loadStory() {
+      try {
+        const currentStoryId = window.localStorage.getItem(
+          "novelforge-current-story-id",
+        );
+
+        if (userId) {
+          let data = null;
+
+          if (currentStoryId) {
+            const { data: current } = await supabase
+
+              .from("stories")
+
+              .select("*")
+
+              .eq("id", currentStoryId)
+
+              .eq("user_id", userId)
+
+              .maybeSingle();
+
+            data = current;
+          }
+
+          if (!data) {
+            const { data: latest } = await supabase
+
+              .from("stories")
+
+              .select("*")
+
+              .eq("user_id", userId)
+
+              .order("updated_at", { ascending: false })
+
+              .limit(1)
+
+              .maybeSingle();
+
+            data = latest;
+          }
+
+          if (data) {
+            window.localStorage.setItem(
+              "novelforge-current-story-id",
+
+              data.id,
+            );
+
+            const workspaceMetadata = getWorkspaceMetadata(data.story_state);
+
+            setStory({
+              id: data.id,
+
+              title: data.title,
+
+              seriesType: workspaceMetadata.seriesType,
+
+              seriesTitle: workspaceMetadata.seriesTitle,
+
+              bookNumber: workspaceMetadata.bookNumber,
+
+              lineage: workspaceMetadata.lineage,
+
+              messages: data.messages ?? [],
+
+              chapters: data.chapters ?? [],
+
+              storyBible: data.form ?? EMPTY_STORY_BIBLE,
+
+              storyState: data.story_state ?? {},
+
+              createdAt: data.created_at,
+
+              updatedAt: data.updated_at,
+            });
+
+            const remotePending = parseRemotePendingGeneration(
+              data.custom_rewrite,
+            );
+
+            if (remotePending?.storyId === data.id) {
+              setPendingGeneration(remotePending);
+              window.localStorage.setItem(
+                PENDING_GENERATION_KEY,
+                JSON.stringify(remotePending),
               );
-            }}
-            className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-semibold transition hover:bg-white/10"
-            aria-label="Return to the writing workspace"
+            }
+
+            setHasLoaded(true);
+
+            setHasLoadedRemoteStory(true);
+
+            return;
+          }
+        }
+
+        const savedStory = window.localStorage.getItem(STORAGE_KEY);
+
+        if (!savedStory) {
+          setStory(createEmptyStory());
+        } else {
+          const parsedStory = JSON.parse(savedStory);
+
+          if (isStoryWorkspace(parsedStory)) {
+            setStory(parsedStory);
+          } else {
+            setStory(createEmptyStory());
+          }
+        }
+      } catch (error) {
+        console.error(
+          "Could not load the saved story:",
+
+          error,
+        );
+
+        setStory(createEmptyStory());
+      } finally {
+        setHasLoaded(true);
+
+        setHasLoadedRemoteStory(true);
+      }
+    }
+
+    loadStory();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!hasLoaded || !hasLoadedRemoteStory || !story || isThinking) {
+      return;
+    }
+
+    try {
+      window.localStorage.setItem(
+        "novelforge-current-story-id",
+
+        story.id,
+      );
+
+      window.localStorage.setItem(
+        STORAGE_KEY,
+
+        JSON.stringify(story),
+      );
+    } catch (error) {
+      console.error("Could not save the story:", error);
+    }
+
+    if (!userId) {
+      return;
+    }
+
+    const storyToSave = story;
+
+    const userIdToSave = userId;
+
+    async function saveStoryToSupabase() {
+      const { error } = await supabase
+
+        .from("stories")
+
+        .upsert(
+          {
+            id: storyToSave.id,
+
+            user_id: userIdToSave,
+
+            title: storyToSave.title,
+
+            form: storyToSave.storyBible,
+
+            story_state: storyToSave.storyState,
+
+            chapters: storyToSave.chapters,
+
+            messages: storyToSave.messages,
+
+            updated_at: storyToSave.updatedAt,
+          },
+
+          {
+            onConflict: "id",
+          },
+        );
+
+      if (error) {
+        console.error(
+          "Could not save Story Chat to Supabase:",
+
+          error,
+        );
+      } else {
+        await loadStoryList(userIdToSave);
+      }
+    }
+
+    saveStoryToSupabase();
+  }, [story, hasLoaded, hasLoadedRemoteStory, userId, isThinking]);
+
+  useEffect(() => {
+    if (
+      !hasLoadedRemoteStory ||
+      !userId ||
+      !story ||
+      !pendingGeneration ||
+      pendingGeneration.storyId !== story.id
+    ) {
+      return;
+    }
+
+    const pendingToSave = pendingGeneration;
+    const timeoutId = window.setTimeout(async () => {
+      const { error } = await supabase
+        .from("stories")
+        .update({
+          custom_rewrite: JSON.stringify(pendingToSave),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", pendingToSave.storyId)
+        .eq("user_id", userId);
+
+      if (error) {
+        console.error("Could not sync the unfinished chapter draft:", error);
+      }
+    }, 800);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [pendingGeneration, story, userId, hasLoadedRemoteStory]);
+
+  function startNewStory() {
+    const confirmed = window.confirm(
+      `Start a new story? This will replace the current story on this
+device.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const newStory = createEmptyStory();
+
+    setStory(newStory);
+
+    if (userId) {
+      void supabase.from("stories").upsert({
+        id: newStory.id,
+
+        user_id: userId,
+
+        title: newStory.title,
+
+        form: newStory.storyBible,
+
+        story_state: newStory.storyState,
+
+        chapters: newStory.chapters,
+
+        messages: newStory.messages,
+
+        created_at: newStory.createdAt,
+
+        updated_at: newStory.updatedAt,
+      });
+    }
+
+    setInput("");
+
+    setActiveTab("chat");
+
+    setIsThinking(false);
+  }
+
+  function updateChapter(
+    chapterId: string,
+
+    updates: {
+      title: string;
+
+      povCharacter: string;
+
+      content: string;
+    },
+  ) {
+    setStory((currentStory) => {
+      if (!currentStory) {
+        return currentStory;
+      }
+
+      const editedChapter = currentStory.chapters.find(
+        (chapter) => chapter.id === chapterId,
+      );
+      const existingDirtyChapter =
+        currentStory.storyState.continuityDirtyFromChapter;
+      const dirtyFromChapter = editedChapter
+        ? existingDirtyChapter === undefined
+          ? editedChapter.number
+          : Math.min(existingDirtyChapter, editedChapter.number)
+        : existingDirtyChapter;
+
+      return {
+        ...currentStory,
+
+        chapters: currentStory.chapters.map((chapter) =>
+          chapter.id === chapterId
+            ? {
+                ...chapter,
+
+                ...updates,
+
+                updatedAt: new Date().toISOString(),
+              }
+            : chapter,
+        ),
+
+        storyState: {
+          ...currentStory.storyState,
+          continuityDirtyFromChapter: dirtyFromChapter,
+        },
+
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  function updateStoryTitle(value: string) {
+    setStory((currentStory) => {
+      if (!currentStory) {
+        return currentStory;
+      }
+
+      return {
+        ...currentStory,
+
+        title: value,
+
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  async function exportWordDocument() {
+    if (!story || story.chapters.length === 0 || isExporting) {
+      return;
+    }
+
+    setIsExporting(true);
+    setExportError("");
+
+    try {
+      const contentWarnings = exportWarnings
+        .split(/\n|,/)
+        .map((warning) => warning.trim())
+        .filter(Boolean);
+
+      const response = await fetch("/api/export-docx", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: story.title,
+          author: "Marlow Quinn",
+          chapters: story.chapters,
+          contentWarnings,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData: unknown = await response.json().catch(() => null);
+        const message =
+          errorData &&
+          typeof errorData === "object" &&
+          "error" in errorData &&
+          typeof errorData.error === "string"
+            ? errorData.error
+            : "The Word export failed.";
+
+        throw new Error(message);
+      }
+
+      const documentBlob = await response.blob();
+      const downloadUrl = URL.createObjectURL(documentBlob);
+      const downloadLink = document.createElement("a");
+      const filename =
+        story.title.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") ||
+        "NovelForge_Book";
+
+      downloadLink.href = downloadUrl;
+      downloadLink.download = `${filename}.docx`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      downloadLink.remove();
+      window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+
+      setIsExportOpen(false);
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error.message : "The Word export failed.",
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function sendLoginLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const trimmedEmail = email.trim();
+
+    if (!trimmedEmail) {
+      setAuthMessage("Enter your email address.");
+
+      return;
+    }
+
+    setAuthMessage("Sending login link...");
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: trimmedEmail,
+
+      options: {
+        emailRedirectTo: `${window.location.origin}/story-chat`,
+      },
+    });
+
+    if (error) {
+      console.error("Could not send login link:", error);
+
+      setAuthMessage(error.message);
+
+      return;
+    }
+
+    setAuthMessage("Check your email and open the login link.");
+  }
+
+  function restoreDefaultTitle() {
+    setStory((currentStory) => {
+      if (!currentStory || currentStory.title.trim()) {
+        return currentStory;
+      }
+
+      return {
+        ...currentStory,
+
+        title: "Untitled story",
+
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  function savePendingGeneration(pending: PendingChapterGeneration) {
+    const pendingWithTimestamp = {
+      ...pending,
+      savedAt: new Date().toISOString(),
+    };
+
+    setPendingGeneration(pendingWithTimestamp);
+    localStorage.setItem(
+      PENDING_GENERATION_KEY,
+      JSON.stringify(pendingWithTimestamp),
+    );
+  }
+
+  function clearPendingGeneration() {
+    const pendingStoryId = pendingGeneration?.storyId;
+
+    setPendingGeneration(null);
+    localStorage.removeItem(PENDING_GENERATION_KEY);
+
+    if (userId && pendingStoryId) {
+      void supabase
+        .from("stories")
+        .update({
+          custom_rewrite: "",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", pendingStoryId)
+        .eq("user_id", userId)
+        .then(({ error }) => {
+          if (error) {
+            console.error("Could not clear the synced chapter draft:", error);
+          }
+        });
+    }
+  }
+
+  async function persistStory(nextStory: StoryWorkspace) {
+    setStory(nextStory);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStory));
+
+    if (!userId) {
+      return;
+    }
+
+    const { error } = await supabase.from("stories").upsert({
+      id: nextStory.id,
+      user_id: userId,
+      title: nextStory.title,
+      form: nextStory.storyBible,
+      story_state: {
+        ...nextStory.storyState,
+        workspaceMetadata: {
+          seriesType: nextStory.seriesType,
+          seriesTitle: nextStory.seriesTitle,
+          bookNumber: nextStory.bookNumber,
+          lineage: nextStory.lineage,
+        },
+      },
+      chapters: nextStory.chapters,
+      messages: nextStory.messages,
+      created_at: nextStory.createdAt,
+      updated_at: nextStory.updatedAt,
+    });
+
+    if (error) {
+      throw new Error(`The story could not be saved: ${error.message}`);
+    }
+
+    await loadStoryList(userId);
+  }
+
+  function updatePendingDraft(content: string) {
+    if (!pendingGeneration) {
+      return;
+    }
+
+    savePendingGeneration({
+      ...pendingGeneration,
+      draft: content,
+      lastSection:
+        pendingGeneration.lastSection &&
+        content.includes(pendingGeneration.lastSection)
+          ? pendingGeneration.lastSection
+          : undefined,
+    });
+  }
+
+  async function writeChapterSection(
+    initialPending: PendingChapterGeneration,
+    baseStory: StoryWorkspace,
+    action: SectionAction,
+  ) {
+    setIsThinking(true);
+    let workingPending = initialPending;
+    savePendingGeneration(workingPending);
+
+    try {
+      if (action === "continue" && !workingPending.draft.trim()) {
+        throw new Error("There is no chapter draft to continue.");
+      }
+
+      if (action === "rewrite" && !workingPending.lastSection?.trim()) {
+        throw new Error("There is no previous generated section to rewrite.");
+      }
+
+      const replacementNumber =
+        workingPending.generatedChapter.replaceChapterNumber;
+      const writingStoryState = getStoryStateBeforeChapter(
+        baseStory.storyState,
+        replacementNumber,
+      );
+      const recentChapters =
+        replacementNumber === null
+          ? baseStory.chapters.slice(-2)
+          : baseStory.chapters
+              .filter((chapter) => chapter.number < replacementNumber)
+              .slice(-2);
+      const response = await fetch("/api/story-chat/write", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          storyBible: baseStory.storyBible,
+          storyState: writingStoryState,
+          recentChapters,
+          chapterBrief: workingPending.chapterBrief,
+          chapterTitle: workingPending.generatedChapter.title,
+          povCharacter: workingPending.generatedChapter.povCharacter,
+          chapterDraft: workingPending.draft,
+          sectionToRewrite:
+            action === "rewrite" ? (workingPending.lastSection ?? "") : "",
+          sectionInstruction,
+          latestUserMessage: workingPending.latestUserMessage,
+        }),
+      });
+      const data = await readApiJson(response);
+
+      if (!isWriterResponse(data) || data.action !== action) {
+        throw new Error("The writer returned an invalid chapter section.");
+      }
+
+      let nextDraft = workingPending.draft.trim();
+
+      if (action === "start") {
+        nextDraft = data.section.trim();
+      } else if (action === "continue") {
+        nextDraft = (nextDraft + "\n\n" + data.section.trim()).trim();
+      } else {
+        const oldSection = workingPending.lastSection ?? "";
+        const sectionStart = nextDraft.lastIndexOf(oldSection);
+
+        if (sectionStart < 0) {
+          throw new Error(
+            "The previous section changed and could not be replaced safely.",
+          );
+        }
+
+        nextDraft =
+          nextDraft.slice(0, sectionStart) +
+          data.section.trim() +
+          nextDraft.slice(sectionStart + oldSection.length);
+        nextDraft = nextDraft.trim();
+      }
+
+      workingPending = {
+        ...workingPending,
+        draft: nextDraft,
+        lastSection: data.section.trim(),
+        repetitionWarnings: data.warnings,
+        diagnostics: [
+          ...(workingPending.diagnostics ?? []),
+          ...data.diagnostics,
+        ],
+      };
+      savePendingGeneration(workingPending);
+      setSectionInstruction("");
+      setActiveTab("chapters");
+      setReaderOpen(true);
+    } catch (error) {
+      if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
+        workingPending = {
+          ...workingPending,
+          diagnostics: [
+            ...(workingPending.diagnostics ?? []),
+            ...error.diagnostics,
+          ],
+        };
+        savePendingGeneration(workingPending);
+      }
+
+      const message =
+        error instanceof Error ? error.message : "The section writer failed.";
+      const failedStory: StoryWorkspace = {
+        ...baseStory,
+        storyState: {
+          ...baseStory.storyState,
+          lastGenerationDiagnostics: workingPending.diagnostics ?? [],
+        },
+        messages: [
+          ...baseStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content:
+              "I couldn't write that section: " +
+              message +
+              " Your existing chapter draft has been preserved.",
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+
+      setStory(failedStory);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(failedStory));
+    } finally {
+      setIsThinking(false);
+    }
+  }
+
+  async function completePendingChapter(
+    pending: PendingChapterGeneration,
+    baseStory: StoryWorkspace,
+  ) {
+    if (!pending.draft.trim()) {
+      return;
+    }
+
+    setIsThinking(true);
+
+    try {
+      const replacementNumber = pending.generatedChapter.replaceChapterNumber;
+      const chapterStory = applyGeneratedChapter(
+        baseStory,
+        pending,
+        pending.draft,
+      );
+      const completedChapterNumber =
+        replacementNumber ??
+        Math.max(0, ...baseStory.chapters.map((chapter) => chapter.number)) + 1;
+      const completedChapter = chapterStory.chapters.find(
+        (chapter) => chapter.number === completedChapterNumber,
+      );
+
+      if (!completedChapter) {
+        throw new Error("The chapter could not be prepared for continuity.");
+      }
+
+      const latestExistingChapterNumber = Math.max(
+        0,
+        ...baseStory.chapters.map((chapter) => chapter.number),
+      );
+      const needsLedgerRebuild =
+        !baseStory.storyState.chapterLedger?.length ||
+        (replacementNumber !== null &&
+          replacementNumber < latestExistingChapterNumber);
+      const ledgerData = await updateContinuityLedger({
+        storyBible: chapterStory.storyBible,
+        storyState: baseStory.storyState,
+        chapters: chapterStory.chapters,
+        chapter: completedChapter,
+        rebuild: needsLedgerRebuild,
+      });
+      const allDiagnostics = [
+        ...(pending.diagnostics ?? []),
+        ...ledgerData.diagnostics,
+      ];
+      const completedStory: StoryWorkspace = {
+        ...chapterStory,
+        storyState: {
+          ...ledgerData.storyState,
+          chapterPlans:
+            chapterStory.storyState.chapterPlans ??
+            baseStory.storyState.chapterPlans ??
+            [],
+          lastGenerationDiagnostics: allDiagnostics,
+        },
+        messages: [
+          ...chapterStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content:
+              (completedChapter.kind === "epilogue"
+                ? "Epilogue"
+                : "Chapter " + completedChapterNumber) +
+              " completed and continuity updated.",
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+
+      await persistStory(completedStory);
+      clearPendingGeneration();
+      setSectionInstruction("");
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "The chapter could not be completed.";
+      const failedStory: StoryWorkspace = {
+        ...baseStory,
+        messages: [
+          ...baseStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content:
+              "I couldn't complete the chapter: " +
+              message +
+              " The editable draft has been preserved.",
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+
+      setStory(failedStory);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(failedStory));
+    } finally {
+      setIsThinking(false);
+    }
+  }
+
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const trimmedMessage = input.trim();
+    const deletionRequest = getChapterDeletionRequest(trimmedMessage);
+    const hasPendingChapter = pendingGeneration?.storyId === story?.id;
+    const isAionRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage);
+
+    if (!story || !trimmedMessage || isThinking) {
+      return;
+    }
+
+    const userMessage = {
+      id: Date.now(),
+
+      role: "user" as const,
+
+      content: trimmedMessage,
+    };
+
+    const requestStory: StoryWorkspace = {
+      ...story,
+      messages: [...story.messages, userMessage],
+      updatedAt: new Date().toISOString(),
+    };
+    let planningStory = requestStory;
+    let preplanningDiagnostics: GenerationDiagnostic[] = [];
+
+    setStory(requestStory);
+
+    setInput("");
+    setIsThinking(true);
+
+    try {
+      if (isAionRequest) {
+        const currentPending = hasPendingChapter ? pendingGeneration : null;
+        const latestChapter = requestStory.chapters.at(-1) ?? null;
+        const currentChapterNumber =
+          currentPending?.generatedChapter.replaceChapterNumber ??
+          latestChapter?.number ??
+          null;
+        const currentPlan =
+          currentChapterNumber === null
+            ? null
+            : ((requestStory.storyState.chapterPlans ?? []).find(
+                (plan) => plan.chapterNumber === currentChapterNumber,
+              ) ?? null);
+        const response = await fetch("/api/story-chat/aion", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: trimmedMessage,
+            storyBible: requestStory.storyBible,
+            storyState: requestStory.storyState,
+            chapterBrief:
+              currentPending?.chapterBrief ??
+              (currentPlan ? JSON.stringify(currentPlan) : ""),
+            chapterDraft: currentPending?.draft ?? latestChapter?.content ?? "",
+            povCharacter:
+              currentPending?.generatedChapter.povCharacter ??
+              latestChapter?.povCharacter ??
+              "",
+          }),
+        });
+        const data = await readApiJson(response);
+
+        if (!isAionPassageResponse(data)) {
+          throw new Error("Aion returned an invalid passage response.");
+        }
+
+        const aionStory: StoryWorkspace = {
+          ...requestStory,
+          storyState: {
+            ...requestStory.storyState,
+            lastGenerationDiagnostics: data.diagnostics,
+          },
+          messages: [
+            ...requestStory.messages,
+            {
+              id: Date.now() + 1,
+              role: "assistant",
+              content: `AION\n\n${data.reply}`,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(aionStory);
+        return;
+      }
+
+      if (deletionRequest.kind === "ambiguous") {
+        const clarificationStory: StoryWorkspace = {
+          ...requestStory,
+          messages: [
+            ...requestStory.messages,
+            {
+              id: Date.now() + 1,
+              role: "assistant",
+              content:
+                "Which saved chapter number do you want me to delete? If you mean a Story Bible entry instead, name that entry.",
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(clarificationStory);
+        return;
+      }
+
+      if (deletionRequest.kind === "exact") {
+        const chapterNumber = deletionRequest.chapterNumber;
+        const chapterExists = requestStory.chapters.some(
+          (chapter) => chapter.number === chapterNumber,
+        );
+        const pendingTargetNumber =
+          pendingGeneration?.storyId === requestStory.id
+            ? (pendingGeneration.generatedChapter.replaceChapterNumber ??
+              Math.max(
+                0,
+                ...requestStory.chapters.map((chapter) => chapter.number),
+              ) + 1)
+            : null;
+        const clearsPendingDraft = pendingTargetNumber === chapterNumber;
+
+        if (!chapterExists) {
+          const missingChapterStory: StoryWorkspace = {
+            ...requestStory,
+            messages: [
+              ...requestStory.messages,
+              {
+                id: Date.now() + 1,
+                role: "assistant",
+                content: clearsPendingDraft
+                  ? `Chapter ${chapterNumber} was not saved, but its preserved draft has been cleared.`
+                  : `Chapter ${chapterNumber} does not exist, so nothing was deleted.`,
+              },
+            ],
+            updatedAt: new Date().toISOString(),
+          };
+
+          await persistStory(missingChapterStory);
+
+          if (clearsPendingDraft) {
+            clearPendingGeneration();
+          }
+
+          return;
+        }
+
+        const remainingChapters = requestStory.chapters.filter(
+          (chapter) => chapter.number !== chapterNumber,
+        );
+        let rebuiltStoryState: StoryState = {
+          ...EMPTY_STORY_STATE,
+        };
+        let deletionDiagnostics: GenerationDiagnostic[] = [];
+
+        if (remainingChapters.length > 0) {
+          const latestRemainingChapter = remainingChapters.at(-1);
+
+          if (!latestRemainingChapter) {
+            throw new Error(
+              "The remaining chapters could not be prepared for continuity.",
+            );
+          }
+
+          const ledgerData = await updateContinuityLedger({
+            storyBible: requestStory.storyBible,
+            storyState: {
+              ...EMPTY_STORY_STATE,
+            },
+            chapters: remainingChapters,
+            chapter: latestRemainingChapter,
+            rebuild: true,
+          });
+
+          rebuiltStoryState = ledgerData.storyState;
+          deletionDiagnostics = ledgerData.diagnostics;
+        }
+
+        const deletedChapterStory: StoryWorkspace = {
+          ...requestStory,
+          chapters: remainingChapters,
+          storyState: {
+            ...rebuiltStoryState,
+            chapterPlans: (requestStory.storyState.chapterPlans ?? []).filter(
+              (plan) => plan.chapterNumber !== chapterNumber,
+            ),
+            lastGenerationDiagnostics: deletionDiagnostics,
+          },
+          messages: [
+            ...requestStory.messages,
+            {
+              id: Date.now() + 1,
+              role: "assistant",
+              content: `Chapter ${chapterNumber} has been deleted${
+                clearsPendingDraft
+                  ? " and its preserved draft has been cleared"
+                  : ""
+              }. Continuity has been rebuilt from the remaining chapters. Later chapter numbers were left unchanged.`,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(deletedChapterStory);
+
+        if (clearsPendingDraft) {
+          clearPendingGeneration();
+        }
+
+        return;
+      }
+
+      const requestsChapterPlanning =
+        requestsChapterGeneration(trimmedMessage) ||
+        /\b(?:plan|outline|map)\b[\s\S]{0,100}\bchapter\b/i.test(
+          trimmedMessage,
+        );
+      const dirtyFromChapter =
+        planningStory.storyState.continuityDirtyFromChapter;
+      const hasContinuityLedger = Boolean(
+        planningStory.storyState.chapterLedger?.length,
+      );
+
+      if (
+        !hasPendingChapter &&
+        requestsChapterPlanning &&
+        planningStory.chapters.length > 0 &&
+        (!hasContinuityLedger || dirtyFromChapter !== undefined)
+      ) {
+        const latestExistingChapter = planningStory.chapters.at(-1);
+        if (!latestExistingChapter) {
+          throw new Error(
+            "The latest chapter could not be prepared for continuity.",
+          );
+        }
+
+        const ledgerData = await updateContinuityLedger({
+          storyBible: planningStory.storyBible,
+          storyState: planningStory.storyState,
+          chapters: planningStory.chapters,
+          chapter: latestExistingChapter,
+          rebuild: !hasContinuityLedger,
+          rebuildFromChapter: hasContinuityLedger
+            ? dirtyFromChapter
+            : undefined,
+        });
+
+        preplanningDiagnostics = ledgerData.diagnostics;
+        planningStory = {
+          ...planningStory,
+          storyState: ledgerData.storyState,
+          updatedAt: new Date().toISOString(),
+        };
+
+        await persistStory(planningStory);
+      }
+
+      const requestedPlanChapterNumber =
+        getChapterNumberFromMessage(trimmedMessage);
+      const savedPlan =
+        requestedPlanChapterNumber === null
+          ? null
+          : ((planningStory.storyState.chapterPlans ?? []).find(
+              (plan) => plan.chapterNumber === requestedPlanChapterNumber,
+            ) ?? null);
+      const existingPlannedChapter =
+        requestedPlanChapterNumber === null
+          ? null
+          : (planningStory.chapters.find(
+              (chapter) => chapter.number === requestedPlanChapterNumber,
+            ) ?? null);
+      const explicitlyRewritesPlan =
+        /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(trimmedMessage);
+      // Legacy plans remain readable, but generation is now directed one
+      // section at a time by the author's latest instruction.
+      const usesSavedPlan = false;
+
+      if (usesSavedPlan && savedPlan) {
+        const approvedPlan: ChapterPlan = {
+          ...savedPlan,
+          status: "approved",
+          updatedAt: new Date().toISOString(),
+        };
+        const reply = `Chapter ${approvedPlan.chapterNumber} plan locked. Writing ${approvedPlan.scenes.length} ${
+          approvedPlan.scenes.length === 1 ? "scene" : "scenes"
+        } now.`;
+        const plannedStory: StoryWorkspace = {
+          ...planningStory,
+          storyState: {
+            ...planningStory.storyState,
+            chapterPlans: [
+              ...(planningStory.storyState.chapterPlans ?? []).filter(
+                (plan) => plan.chapterNumber !== approvedPlan.chapterNumber,
+              ),
+              approvedPlan,
+            ].sort((left, right) => left.chapterNumber - right.chapterNumber),
+          },
+          messages: [
+            ...planningStory.messages,
+            {
+              id: Date.now() + 1,
+              role: "assistant",
+              content: reply,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+        const requestedWordCount = getRequestedWordCount(trimmedMessage);
+        const requestedTarget = requestedWordCount
+          ? Math.min(4000, Math.max(2000, requestedWordCount))
+          : null;
+        const pending: PendingChapterGeneration = {
+          storyId: plannedStory.id,
+          generatedChapter: {
+            title: approvedPlan.title,
+            povCharacter: approvedPlan.povCharacter,
+            content: "",
+            replaceChapterNumber:
+              explicitlyRewritesPlan && existingPlannedChapter
+                ? approvedPlan.chapterNumber
+                : null,
+          },
+          chapterBrief: JSON.stringify(approvedPlan),
+          latestUserMessage: trimmedMessage,
+          draft: "",
+          minimumWordCount: requestedTarget
+            ? Math.max(2000, Math.floor(requestedTarget * 0.95))
+            : 2000,
+          maximumWordCount: requestedTarget
+            ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
+            : 4000,
+          diagnostics: [],
+        };
+
+        await persistStory(plannedStory);
+        savePendingGeneration(pending);
+        await writeChapterSection(pending, plannedStory, "start");
+        return;
+      }
+
+      const response = await fetch("/api/story-chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          stage: "plan",
+          story: planningStory,
+          chatOnly: hasPendingChapter,
+          draftContext: hasPendingChapter
+            ? (pendingGeneration?.draft ?? "")
+            : "",
+        }),
+      });
+
+      const data = await readApiJson(response);
+
+      if (!isStoryChatResponse(data)) {
+        throw new Error("The planning endpoint returned an invalid response.");
+      }
+
+      const plannedStory: StoryWorkspace = {
+        ...planningStory,
+        ...data.story,
+        messages: data.story.messages,
+        chapters: data.story.chapters,
+        storyBible: data.story.storyBible,
+        storyState: data.story.storyState,
+        updatedAt: data.story.updatedAt,
+      };
+
+      await persistStory(plannedStory);
+
+      if (data.createdStory) {
+        const createdStory: StoryWorkspace = {
+          ...data.createdStory,
+          messages: [
+            {
+              id: Date.now() + 2,
+              role: "assistant",
+              content: data.reply,
+            },
+          ],
+          updatedAt: new Date().toISOString(),
+        };
+        await persistStory(createdStory);
+        window.localStorage.setItem(
+          "novelforge-current-story-id",
+          createdStory.id,
+        );
+        clearPendingGeneration();
+        setActiveTab("chat");
+        setReaderOpen(false);
+        return;
+      }
+
+      if (!data.generatedChapter) {
+        return;
+      }
+
+      const requestedWordCount = getRequestedWordCount(trimmedMessage);
+      const requestedTarget = requestedWordCount
+        ? Math.min(4000, Math.max(2000, requestedWordCount))
+        : null;
+      const returnedChapter = data.generatedChapter;
+      const returnedReplacement = returnedChapter.replaceChapterNumber;
+      const nextChapterNumber =
+        Math.max(0, ...plannedStory.chapters.map((chapter) => chapter.number)) +
+        1;
+      const replacementExists =
+        returnedReplacement !== null &&
+        plannedStory.chapters.some(
+          (chapter) => chapter.number === returnedReplacement,
+        );
+      const generatedChapter =
+        returnedReplacement === nextChapterNumber && !replacementExists
+          ? { ...returnedChapter, replaceChapterNumber: null }
+          : returnedChapter;
+      const pending: PendingChapterGeneration = {
+        storyId: plannedStory.id,
+        generatedChapter,
+        chapterBrief: data.chapterBrief,
+        latestUserMessage: trimmedMessage,
+        draft: "",
+        minimumWordCount: requestedTarget
+          ? Math.max(2000, Math.floor(requestedTarget * 0.95))
+          : 2000,
+        maximumWordCount: requestedTarget
+          ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
+          : 4000,
+        diagnostics: [...preplanningDiagnostics, ...(data.diagnostics ?? [])],
+      };
+
+      savePendingGeneration(pending);
+      await writeChapterSection(pending, plannedStory, "start");
+    } catch (error) {
+      console.error(
+        "Story chat request failed:",
+
+        error,
+      );
+
+      const errorMessage =
+        error instanceof Error && error.message.trim()
+          ? `I couldn't complete that: ${error.message}`
+          : "Something went wrong while I was thinking. Try sending that again.";
+      const failureDiagnostics = [
+        ...preplanningDiagnostics,
+        ...(error instanceof ApiRequestError ? error.diagnostics : []),
+      ];
+
+      const failedStory: StoryWorkspace = {
+        ...planningStory,
+        storyState: {
+          ...planningStory.storyState,
+          lastGenerationDiagnostics: failureDiagnostics,
+        },
+        messages: [
+          ...planningStory.messages,
+          {
+            id: Date.now(),
+            role: "assistant",
+            content: errorMessage,
+          },
+        ],
+        updatedAt: new Date().toISOString(),
+      };
+
+      setStory(failedStory);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(failedStory));
+    } finally {
+      setIsThinking(false);
+    }
+  }
+
+  if (!authChecked) {
+    return (
+      <main
+        className="flex min-h-screen items-center justify-center
+bg-neutral-950 px-5 text-white"
+      >
+        <p className="text-sm text-neutral-500">Checking login...</p>
+      </main>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <main
+        className="flex min-h-screen items-center justify-center
+bg-neutral-950 px-5 text-white"
+      >
+        <div
+          className="w-full max-w-md rounded-2xl border border-white/10
+bg-neutral-900 p-6"
+        >
+          <p
+            className="text-xs font-semibold uppercase tracking-[0.3em]
+text-pink-500"
           >
-            <span aria-hidden="true">←</span>
-            <span>Back to writing</span>
-          </button>
-
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pink-500">
-              NovelForge
-            </p>
-            <h1 className="truncate text-2xl font-semibold">Social Studio</h1>
-          </div>
-        </div>
-      </header>
-
-      <section className="mx-auto max-w-6xl px-5 py-8">
-        <div className="mb-8 rounded-2xl border border-white/10 bg-neutral-900 p-5">
-          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-400">
-            Website catalogue
+            NovelForge
           </p>
-          <h2 className="mt-2 text-2xl font-bold">Choose a book to promote</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
-            This catalogue is read directly from marlowquinn.com. Book changes
-            made on the website will appear here automatically.
+
+          <h1 className="mt-3 text-2xl font-semibold">Sign in</h1>
+
+          <p className="mt-2 text-sm text-neutral-400">
+            Sign in with the same email on every device to access your stories.
           </p>
+
+          <form onSubmit={sendLoginLink} className="mt-6 space-y-4">
+            <input
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Email address"
+              autoComplete="email"
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3
+text-white outline-none placeholder:text-neutral-600
+focus:border-pink-500"
+            />
+
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-pink-500 px-4 py-3 font-semibold
+text-white transition hover:bg-pink-400"
+            >
+              Send login link
+            </button>
+          </form>
+
+          {authMessage && (
+            <p className="mt-4 text-sm text-neutral-300">{authMessage}</p>
+          )}
         </div>
+      </main>
+    );
+  }
 
-        {selectedBook && (
-          <section className="mb-8 overflow-hidden rounded-2xl border border-pink-500/30 bg-neutral-900 shadow-2xl">
-            <div className="flex flex-col gap-5 border-b border-white/10 p-5 sm:flex-row">
-              <img
-                src={selectedBook.coverUrl}
-                alt={`${selectedBook.title} book cover`}
-                className="h-44 w-28 shrink-0 self-center rounded-lg object-cover shadow-xl sm:self-start"
-              />
+  if (!hasLoaded || !story) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white">
+        <div
+          className="mx-auto flex min-h-screen max-w-5xl items-center
+justify-center px-5"
+        >
+          <p className="text-sm text-neutral-500">Loading NovelForge...</p>
+        </div>
+      </main>
+    );
+  }
 
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-400">
-                      Campaign setup
-                    </p>
-                    <h2 className="mt-2 text-2xl font-bold">
-                      {selectedBook.title}
-                    </h2>
-                    <p className="mt-1 text-sm text-neutral-400">
-                      {selectedBook.subgenre}
-                    </p>
-                  </div>
+  const bibleHasContent = hasStoryBibleContent(storyBible);
+  const pendingForCurrentStory =
+    pendingGeneration?.storyId === story.id ? pendingGeneration : null;
+  const visibleChatMessages = messages
+    .map((message) => ({
+      ...message,
+      content: stripGenerationDiagnostics(message.content),
+    }))
+    .filter((message) => Boolean(message.content));
+  const currentDiagnostics =
+    pendingForCurrentStory?.diagnostics ??
+    story.storyState.lastGenerationDiagnostics ??
+    [];
+  const pendingChapterNumber = pendingForCurrentStory
+    ? (pendingForCurrentStory.generatedChapter.replaceChapterNumber ??
+      Math.max(0, ...chapters.map((chapter) => chapter.number)) + 1)
+    : null;
 
-                  <button
-                    type="button"
-                    onClick={() => setSelectedBook(null)}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xl text-neutral-300 transition hover:bg-white/10 hover:text-white"
-                    aria-label="Close campaign setup"
-                  >
-                    ✕
-                  </button>
-                </div>
+  return (
+    <main className="h-[100dvh] overflow-hidden bg-neutral-950 text-white">
+      <div className="mx-auto flex h-full min-h-0 max-w-5xl flex-col">
+        <header className="z-30 shrink-0 border-b border-white/10 bg-neutral-950/95 px-5 py-5 backdrop-blur">
+          <div className="flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => setIsMenuOpen(true)}
+              aria-label="Open menu"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border
+border-white/10 bg-white/5 text-2xl text-white transition
+hover:bg-white/10"
+            >
+              ☰
+            </button>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {selectedBook.tropes.map((trope) => (
-                    <span
-                      key={trope}
-                      className="rounded-full bg-pink-500/10 px-3 py-1 text-xs text-pink-200"
-                    >
-                      {trope}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5">
-              <h3 className="font-semibold">What are we promoting?</h3>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {CAMPAIGN_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => chooseCampaignType(option.id)}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      campaignType === option.id
-                        ? "border-pink-500 bg-pink-500/10"
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
-                    }`}
-                  >
-                    <span className="block font-semibold text-white">
-                      {option.title}
-                    </span>
-                    <span className="mt-1 block text-sm leading-5 text-neutral-400">
-                      {option.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <h3 className="mt-6 font-semibold">Poster design</h3>
-              <p className="mt-2 text-sm leading-5 text-neutral-400">
-                Every design uses the real cover, book-matched colours and
-                cinematic effects. No generated people.
+            <div className="min-w-0 flex-1">
+              <p
+                className="text-xs font-semibold uppercase tracking-[0.3em]
+text-pink-500"
+              >
+                NovelForge
               </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {POSTER_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      setPosterTemplate(option.id);
-                      setGeneratedMedia([]);
-                      setImageError("");
-                      setGeneratedVideos([]);
-                      setVideoError("");
-                    }}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      posterTemplate === option.id
-                        ? "border-pink-500 bg-pink-500/10"
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
-                    }`}
-                  >
-                    <span className="block font-semibold">{option.title}</span>
-                    <span className="mt-1 block text-sm leading-5 text-neutral-400">
-                      {option.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
 
-              <h3 className="mt-6 font-semibold">Platforms</h3>
-              <div className="mt-3 flex flex-wrap gap-3">
-                {PLATFORM_OPTIONS.map((platform) => {
-                  const selected = platforms.includes(platform.id);
+              <input
+                type="text"
+                value={storyTitle}
+                onChange={(event) => updateStoryTitle(event.target.value)}
+                onBlur={restoreDefaultTitle}
+                aria-label="Story title"
+                className="mt-1 w-full max-w-xl border-none bg-transparent text-2xl
+font-semibold text-white outline-none placeholder:text-neutral-600"
+              />
+            </div>
+          </div>
+        </header>
 
-                  return (
-                    <button
-                      key={platform.id}
-                      type="button"
-                      onClick={() => togglePlatform(platform.id)}
-                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                        selected
-                          ? "border-pink-500 bg-pink-500 text-white"
-                          : "border-white/10 bg-white/5 text-neutral-400 hover:bg-white/10"
-                      }`}
-                    >
-                      {selected ? "✓ " : ""}
-                      {platform.label}
-                    </button>
-                  );
-                })}
-              </div>
+        {isMenuOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+              onClick={() => setIsMenuOpen(false)}
+            />
 
-              {campaignType === "quote-post" && (
-                <div className="mt-6">
-                  <label
-                    htmlFor="campaign-quote"
-                    className="block font-semibold"
-                  >
-                    Genuine book quote
-                  </label>
-                  <textarea
-                    id="campaign-quote"
-                    value={quote}
-                    onChange={(event) => {
-                      setQuote(event.target.value);
-                      setGeneratedPosts([]);
-                      setGenerationError("");
-                    }}
-                    rows={4}
-                    placeholder="Paste the exact quote from the book..."
-                    className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
-                  />
-                </div>
-              )}
+            <aside
+              className="fixed inset-y-0 left-0 z-50 w-80 max-w-[90vw] border-r
+border-white/10 bg-neutral-900 p-6 shadow-2xl overflow-y-auto"
+            >
+              <div className="mb-6 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">NovelForge</h2>
 
-              <div className="mt-6">
-                <label
-                  htmlFor="campaign-instructions"
-                  className="block font-semibold"
+                <button
+                  type="button"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="text-2xl text-neutral-400 hover:text-white"
                 >
-                  Anything specific?{" "}
-                  <span className="text-neutral-500">Optional</span>
-                </label>
-                <textarea
-                  id="campaign-instructions"
-                  value={instructions}
-                  onChange={(event) => {
-                    setInstructions(event.target.value);
-                    setGeneratedPosts([]);
-                    setGenerationError("");
-                  }}
-                  rows={3}
-                  placeholder="For example: focus on the jealousy and forced proximity..."
-                  className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
-                />
+                  ✕
+                </button>
               </div>
-
-              {generationError && (
-                <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-                  {generationError}
-                </p>
-              )}
 
               <button
                 type="button"
-                onClick={() => void generateContent()}
-                disabled={isGenerating || platforms.length === 0}
-                className="mt-6 w-full rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:bg-pink-500/30 disabled:text-pink-100/60"
+                onClick={createNewStory}
+                className="mb-3 w-full rounded-xl bg-pink-500 px-4 py-3 text-left
+font-semibold text-white"
               >
-                {isGenerating
-                  ? "Creating platform content..."
-                  : platforms.length === 0
-                    ? "Choose at least one platform"
-                    : "Generate Content"}
+                + New Story
               </button>
 
-              {generatedPosts.length > 0 && (
-                <div className="mt-8 space-y-5 border-t border-white/10 pt-6">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-400">
-                      Generated campaign
-                    </p>
-                    <h3 className="mt-2 text-xl font-bold">
-                      Platform-specific content
-                    </h3>
-                  </div>
+              <button
+                type="button"
+                disabled={chapters.length === 0}
+                onClick={() => {
+                  setExportError("");
+                  setIsExportOpen(true);
+                  setIsMenuOpen(false);
+                }}
+                className="mb-3 w-full rounded-xl border border-pink-500/40
+bg-pink-500/10 px-4 py-3 text-left font-semibold text-pink-300
+transition hover:bg-pink-500/20 disabled:cursor-not-allowed
+disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+              >
+                Export Book
+              </button>
 
-                  {generatedPosts.map((post) => {
-                    const media = generatedMedia.find(
-                      (item) => item.platform === post.platform,
-                    );
-                    const video = generatedVideos.find(
-                      (item) => item.platform === post.platform,
-                    );
+              <a
+                href="/social-studio"
+                onClick={() => setIsMenuOpen(false)}
+                className="mb-3 flex w-full items-center rounded-xl border border-pink-500/40
+bg-pink-500/10 px-4 py-3 text-left font-semibold text-pink-300
+transition hover:bg-pink-500/20"
+              >
+                Social Studio
+              </a>
 
-                    return (
-                      <article
-                        key={post.platform}
-                        className="rounded-2xl border border-white/10 bg-neutral-950 p-5"
+              <div className="mb-6 space-y-2 border-b border-white/10 pb-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("chat");
+
+                    setIsMenuOpen(false);
+                  }}
+                  className={`w-full rounded-xl px-4 py-3 text-left font-semibold
+transition ${
+                    activeTab === "chat"
+                      ? "bg-white/10 text-white"
+                      : "text-neutral-400 hover:bg-white/5 hover:text-white"
+                  }`}
+                >
+                  Chat
+                </button>
+
+                {story && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("chapters");
+
+                      setReaderOpen(
+                        chapters.length > 0 || Boolean(pendingForCurrentStory),
+                      );
+
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full rounded-xl px-4 py-3 text-left font-semibold
+transition ${
+                      activeTab === "chapters"
+                        ? "bg-white/10 text-white"
+                        : "text-neutral-400 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    Chapters
+                  </button>
+                )}
+
+                {story && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("bible");
+
+                      setIsMenuOpen(false);
+                    }}
+                    className={`w-full rounded-xl px-4 py-3 text-left font-semibold
+transition ${
+                      activeTab === "bible"
+                        ? "bg-white/10 text-white"
+                        : "text-neutral-400 hover:bg-white/5 hover:text-white"
+                    }`}
+                  >
+                    Story Bible
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-6">
+                <p
+                  className="mb-3 text-xs font-semibold uppercase tracking-widest
+text-neutral-500"
+                >
+                  Your Stories
+                </p>
+
+                <div className="space-y-2">
+                  {stories.length === 0 ? (
+                    <div
+                      className="rounded-xl border border-white/10 bg-white/5 p-4
+text-neutral-400"
+                    >
+                      No stories found.
+                    </div>
+                  ) : (
+                    stories.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`flex items-center gap-2 rounded-xl border p-2 transition ${
+                          story?.id === item.id
+                            ? "border-pink-500 bg-pink-500/10"
+                            : "border-white/10 bg-white/5 hover:bg-white/10"
+                        }`}
                       >
-                        <div className="flex items-center justify-between gap-4">
-                          <h4 className="text-lg font-bold capitalize">
-                            {post.platform}
-                          </h4>
-                          <button
-                            type="button"
-                            onClick={() => void copyPost(post)}
-                            className="rounded-lg border border-pink-500/40 bg-pink-500/10 px-3 py-2 text-sm font-semibold text-pink-200 transition hover:bg-pink-500/20"
-                          >
-                            {copiedPlatform === post.platform
-                              ? "Copied"
-                              : "Copy post"}
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await openStory(item.id);
 
-                        {post.title && (
-                          <div className="mt-4">
-                            <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                              Title or hook
-                            </p>
-                            <p className="mt-1 font-semibold text-white">
-                              {post.title}
-                            </p>
-                          </div>
-                        )}
-
-                        <div className="mt-4">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                            Caption
+                            setIsMenuOpen(false);
+                          }}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <p className="truncate font-semibold text-white">
+                            {item.title}
                           </p>
-                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">
-                            {post.caption}
-                          </p>
-                        </div>
 
-                        <p className="mt-4 text-sm leading-6 text-pink-300">
-                          {post.hashtags.join(" ")}
-                        </p>
+                          <p className="mt-1 text-xs text-neutral-500">
+                            Updated{" "}
+                            {new Date(item.updatedAt).toLocaleDateString()}
+                          </p>
+                        </button>
 
                         <button
                           type="button"
-                          onClick={() => void createImage(post)}
-                          disabled={creatingImageFor !== null}
-                          className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-semibold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-neutral-500"
+                          onClick={() => void deleteStory(item.id)}
+                          className="rounded-lg p-2 text-red-400 transition hover:bg-red-500/10
+hover:text-red-300"
+                          aria-label="Delete story"
                         >
-                          {creatingImageFor === post.platform
-                            ? "Designing professional campaign poster..."
-                            : media
-                              ? "Create Another Poster"
-                              : "Create Professional Poster"}
+                          🗑️
                         </button>
-
-                        {media && (
-                          <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3">
-                            <img
-                              src={media.dataUrl}
-                              alt={`${post.platform} campaign for ${selectedBook?.title ?? "book"}`}
-                              className="mx-auto max-h-[720px] w-auto rounded-xl object-contain"
-                            />
-                            <a
-                              href={media.dataUrl}
-                              download={`${selectedBook?.slug ?? "book"}-${post.platform}-${media.style}.jpg`}
-                              className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
-                            >
-                              Download Finished Image
-                            </a>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void publishImageToMake(post, media)
-                              }
-                              disabled={
-                                testingMakeFor !== null ||
-                                post.platform === "tiktok"
-                              }
-                              className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
-                            >
-                              {testingMakeFor === post.platform
-                                ? "Uploading and sending to Make..."
-                                : post.platform === "tiktok"
-                                  ? "TikTok Publishing Comes Next"
-                                  : `Publish Image to ${
-                                      post.platform === "facebook"
-                                        ? "Facebook"
-                                        : "Instagram"
-                                    }`}
-                            </button>
-
-                            {makeTestMessage.startsWith(post.platform) && (
-                              <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                                {makeTestMessage}
-                              </p>
-                            )}
-
-                            {makeTestError.startsWith(post.platform) && (
-                              <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                                {makeTestError}
-                              </p>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => void createVideo(post, media)}
-                              disabled={creatingVideoFor !== null}
-                              className="mt-3 w-full rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
-                            >
-                              {creatingVideoFor === post.platform
-                                ? "Rendering 11-second video..."
-                                : video
-                                  ? "Create Another Video"
-                                  : "Create Vertical Video"}
-                            </button>
-
-                            {video && (
-                              <div className="mt-4 rounded-xl border border-white/10 bg-neutral-950 p-3">
-                                <video
-                                  src={video.url}
-                                  controls
-                                  playsInline
-                                  className="mx-auto max-h-[720px] w-auto rounded-lg"
-                                />
-                                <a
-                                  href={video.url}
-                                  download={`${selectedBook?.slug ?? "book"}-${post.platform}-video.${video.extension}`}
-                                  className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
-                                >
-                                  Download Finished Video
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void publishVideoToMake(post, video)
-                                  }
-                                  disabled={
-                                    testingMakeFor !== null ||
-                                    post.platform === "tiktok"
-                                  }
-                                  className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
-                                >
-                                  {testingMakeFor === post.platform
-                                    ? "Uploading and sending video to Make..."
-                                    : post.platform === "tiktok"
-                                      ? "TikTok Publishing Comes Next"
-                                      : post.platform === "facebook"
-                                        ? "Publish Video to Facebook"
-                                        : "Publish Reel to Instagram"}
-                                </button>
-                                <p className="mt-3 text-center text-xs leading-5 text-neutral-500">
-                                  Add platform music or trending audio when you
-                                  upload it.
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </article>
-                    );
-                  })}
+                      </div>
+                    ))
+                  )}
                 </div>
-              )}
-
-              {imageError && (
-                <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-                  {imageError}
-                </p>
-              )}
-
-              {videoError && (
-                <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-                  {videoError}
-                </p>
-              )}
-            </div>
-          </section>
-        )}
-
-        {!catalogue && !error && (
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center text-neutral-400">
-            Loading your books...
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5">
-            <p className="font-semibold text-red-200">Catalogue unavailable</p>
-            <p className="mt-2 text-sm text-red-100/80">{error}</p>
-          </div>
-        )}
-
-        {catalogue && (
-          <>
-            <p className="mb-4 text-sm text-neutral-500">
-              {catalogue.count} {catalogue.count === 1 ? "book" : "books"} found
-            </p>
-
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {catalogue.books.map((book) => (
-                <article
-                  key={book.slug}
-                  className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-900 shadow-xl"
-                >
-                  <div className="aspect-[16/11] bg-neutral-800 p-4">
-                    <img
-                      src={book.coverUrl}
-                      alt={`${book.title} book cover`}
-                      className="h-full w-full object-contain drop-shadow-2xl"
-                      loading="lazy"
-                    />
-                  </div>
-
-                  <div className="p-5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-pink-400">
-                      {book.subgenre}
-                    </p>
-                    <h2 className="mt-2 text-xl font-bold">{book.title}</h2>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {book.tropes.map((trope) => (
-                        <span
-                          key={trope}
-                          className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-neutral-300"
-                        >
-                          {trope}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4 text-sm">
-                      <span className="text-amber-300" aria-label="Heat level">
-                        {book.heat}
-                      </span>
-                      {book.kindleUnlimited && (
-                        <span className="font-semibold text-neutral-300">
-                          Kindle Unlimited
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => chooseBook(book)}
-                      className="mt-5 w-full rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
-                    >
-                      Create Campaign
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
+              </div>
+            </aside>
           </>
         )}
-      </section>
+
+        {isExportOpen && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 px-5 backdrop-blur-sm">
+            <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-neutral-900 p-6 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-500">
+                    Export Book
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">
+                    KDP-ready Word document
+                  </h2>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={() => setIsExportOpen(false)}
+                  aria-label="Close export"
+                  className="text-2xl text-neutral-400 transition hover:text-white disabled:opacity-40"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="mt-3 text-sm leading-6 text-neutral-400">
+                Enter one content warning per line. Leave this blank to use the
+                standard mature-content warning.
+              </p>
+
+              <textarea
+                value={exportWarnings}
+                disabled={isExporting}
+                onChange={(event) => setExportWarnings(event.target.value)}
+                placeholder={
+                  "Explicit adult content\nStrong language\nViolence"
+                }
+                rows={6}
+                className="mt-4 w-full resize-none rounded-xl border border-white/10
+bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600
+focus:border-pink-500 disabled:opacity-60"
+              />
+
+              {exportError && (
+                <p className="mt-3 text-sm text-red-400">{exportError}</p>
+              )}
+
+              <div className="mt-5 flex justify-end gap-3">
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={() => setIsExportOpen(false)}
+                  className="rounded-xl border border-white/10 px-4 py-3 font-semibold
+text-neutral-300 transition hover:bg-white/5 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isExporting}
+                  onClick={() => void exportWordDocument()}
+                  className="rounded-xl bg-pink-500 px-5 py-3 font-semibold text-white
+transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isExporting ? "Creating..." : "Download Word"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "chat" && (
+          <ChatPanel messages={visibleChatMessages} isThinking={isThinking} />
+        )}
+
+        {activeTab === "chapters" && (
+          <div className="flex-1 overflow-y-auto px-4 py-5 pb-32 sm:px-6">
+            <ChapterPanel
+              storyId={story.id}
+              storyTitle={storyTitle}
+              chapters={chapters}
+              readerOpen={readerOpen}
+              onCloseReader={() => {
+                setReaderOpen(false);
+                setIsMenuOpen(true);
+              }}
+              onSaveChapter={updateChapter}
+              readerTheme={readerTheme}
+              setReaderTheme={setReaderTheme}
+              readerFontSize={readerFontSize}
+              setReaderFontSize={setReaderFontSize}
+              readerLineHeight={readerLineHeight}
+              setReaderLineHeight={setReaderLineHeight}
+              readerWidth={readerWidth}
+              setReaderWidth={setReaderWidth}
+              draftWorkspace={
+                pendingForCurrentStory && pendingChapterNumber !== null
+                  ? {
+                      chapterNumber: pendingChapterNumber,
+                      title: pendingForCurrentStory.generatedChapter.title,
+                      povCharacter:
+                        pendingForCurrentStory.generatedChapter.povCharacter,
+                      content: pendingForCurrentStory.draft,
+                      guidance: sectionInstruction,
+                      isGenerating: isThinking,
+                      repetitionWarnings:
+                        pendingForCurrentStory.repetitionWarnings,
+                    }
+                  : null
+              }
+              onDraftContentChange={updatePendingDraft}
+              onDraftGuidanceChange={setSectionInstruction}
+              onGenerateNextSection={
+                pendingForCurrentStory
+                  ? () =>
+                      void writeChapterSection(
+                        pendingForCurrentStory,
+                        story,
+                        "continue",
+                      )
+                  : undefined
+              }
+              onRewriteLastSection={
+                pendingForCurrentStory?.lastSection?.trim()
+                  ? () =>
+                      void writeChapterSection(
+                        pendingForCurrentStory,
+                        story,
+                        "rewrite",
+                      )
+                  : undefined
+              }
+              onCompleteDraft={
+                pendingForCurrentStory
+                  ? () =>
+                      void completePendingChapter(pendingForCurrentStory, story)
+                  : undefined
+              }
+              onDiscardDraft={
+                pendingForCurrentStory ? clearPendingGeneration : undefined
+              }
+            />
+          </div>
+        )}
+
+        {activeTab === "bible" && (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <BiblePanel
+              storyBible={storyBible}
+              bibleHasContent={bibleHasContent}
+            />
+          </div>
+        )}
+
+        {activeTab === "chat" && (
+          <footer className="shrink-0 border-t border-white/10 bg-neutral-950/95 px-4 py-4 backdrop-blur sm:px-5">
+            {currentDiagnostics.length > 0 && (
+              <details className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
+                <summary className="cursor-pointer font-medium text-neutral-300">
+                  {formatGenerationDiagnostics(
+                    currentDiagnostics,
+                    pendingForCurrentStory
+                      ? isThinking
+                        ? "in progress"
+                        : "failed"
+                      : "succeeded",
+                  )}
+                </summary>
+
+                <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+                  {currentDiagnostics.map((diagnostic, index) => (
+                    <p
+                      key={`${diagnostic.stage}-${diagnostic.attempt}-${index}`}
+                      className={
+                        diagnostic.status === "failed"
+                          ? "text-red-300"
+                          : "text-neutral-400"
+                      }
+                    >
+                      {diagnostic.stage.replaceAll("_", " ")},{" "}
+                      {diagnostic.status ?? "succeeded"},{" "}
+                      {diagnostic.totalTokens.toLocaleString()} tokens,{" "}
+                      {(diagnostic.durationMs / 1000).toFixed(1)} seconds,{" "}
+                      {diagnostic.costUsd === null
+                        ? "cost unavailable"
+                        : `$${diagnostic.costUsd.toFixed(4)} ${getDiagnosticCostType(
+                            diagnostic,
+                          )}`}
+                      {diagnostic.error ? `, ${diagnostic.error}` : ""}
+                    </p>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            <form onSubmit={sendMessage} className="flex items-end gap-3">
+              <textarea
+                value={input}
+                disabled={isThinking}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (
+                    event.key === "Enter" &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing
+                  ) {
+                    event.preventDefault();
+
+                    event.currentTarget.form?.requestSubmit();
+                  }
+                }}
+                placeholder={
+                  pendingForCurrentStory
+                    ? "Ask NovelForge about the current draft..."
+                    : "Tell NovelForge anything..."
+                }
+                rows={pendingForCurrentStory ? 3 : 5}
+                className="min-h-14 flex-1 resize-none rounded-2xl border
+border-white/10 bg-white/5 px-5 py-4 text-base text-white outline-none
+placeholder:text-neutral-600 focus:border-pink-500
+disabled:cursor-not-allowed disabled:opacity-60"
+              />
+
+              <button
+                type="submit"
+                disabled={!input.trim() || isThinking}
+                className="h-14 rounded-2xl bg-pink-500 px-6 font-semibold text-white
+transition hover:bg-pink-400 disabled:cursor-not-allowed
+disabled:opacity-40"
+              >
+                {isThinking ? "Thinking..." : "Send"}
+              </button>
+            </form>
+
+            <p className="mt-3 text-center text-xs text-neutral-600">
+              Your story workspace saves automatically on this device.
+            </p>
+          </footer>
+        )}
+      </div>
     </main>
   );
 }
