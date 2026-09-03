@@ -48,10 +48,7 @@ type GeneratedPost = {
 type MediaStyle = "branded" | "ai-scene";
 
 type PosterTemplate =
-  | "auto"
-  | "cinematic-quote"
-  | "trope-showcase"
-  | "kindle-hero";
+  "auto" | "cinematic-quote" | "trope-showcase" | "kindle-hero";
 
 type GeneratedMedia = {
   platform: SocialPlatform;
@@ -75,17 +72,20 @@ const CAMPAIGN_OPTIONS: Array<{
   {
     id: "book-spotlight",
     title: "Book Spotlight",
-    description: "A strong general promotion using the cover, blurb and main hooks.",
+    description:
+      "A strong general promotion using the cover, blurb and main hooks.",
   },
   {
     id: "trope-hook",
     title: "Trope Hook",
-    description: "Lead with the tropes readers search for and build the post around them.",
+    description:
+      "Lead with the tropes readers search for and build the post around them.",
   },
   {
     id: "quote-post",
     title: "Quote Post",
-    description: "Create a visual and caption around a genuine quote you provide.",
+    description:
+      "Create a visual and caption around a genuine quote you provide.",
   },
   {
     id: "kindle-unlimited",
@@ -95,7 +95,8 @@ const CAMPAIGN_OPTIONS: Array<{
   {
     id: "backlist-revival",
     title: "Backlist Revival",
-    description: "Give an older title a fresh angle without pretending it is a new release.",
+    description:
+      "Give an older title a fresh angle without pretending it is a new release.",
   },
 ];
 
@@ -126,12 +127,14 @@ const POSTER_OPTIONS: Array<{
   {
     id: "trope-showcase",
     title: "Trope Showcase",
-    description: "Bold selling points, clean reading order and a dominant cover.",
+    description:
+      "Bold selling points, clean reading order and a dominant cover.",
   },
   {
     id: "kindle-hero",
     title: "Atmospheric Kindle Hero",
-    description: "Cover-led artwork with lighting, depth, glow and reflections.",
+    description:
+      "Cover-led artwork with lighting, depth, glow and reflections.",
   },
 ];
 
@@ -142,7 +145,8 @@ function loadImage(source: string): Promise<HTMLImageElement> {
     const image = new Image();
     image.crossOrigin = "anonymous";
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("A campaign image asset could not be loaded."));
+    image.onerror = () =>
+      reject(new Error("A campaign image asset could not be loaded."));
     image.src = source;
   });
 }
@@ -174,7 +178,8 @@ function wrappedLines(
   if (current && lines.length < maximumLines) lines.push(current);
 
   if (lines.join(" ").split(/\s+/).length < words.length && lines.length) {
-    lines[lines.length - 1] = `${lines[lines.length - 1].replace(/[.,!?;:]$/, "")}…`;
+    lines[lines.length - 1] =
+      `${lines[lines.length - 1].replace(/[.,!?;:]$/, "")}…`;
   }
 
   return lines;
@@ -193,7 +198,10 @@ function drawFittedText(
   let fontSize = startingSize;
   context.font = `${weight} ${fontSize}px Arial, sans-serif`;
 
-  while (fontSize > minimumSize && context.measureText(text).width > maximumWidth) {
+  while (
+    fontSize > minimumSize &&
+    context.measureText(text).width > maximumWidth
+  ) {
     fontSize -= 1;
     context.font = `${weight} ${fontSize}px Arial, sans-serif`;
   }
@@ -323,7 +331,9 @@ async function createFinishedCampaignImage(input: {
   });
 
   const coverWidth = isTikTok ? 620 : 500;
-  const coverHeight = Math.round(coverWidth * (cover.naturalHeight / cover.naturalWidth));
+  const coverHeight = Math.round(
+    coverWidth * (cover.naturalHeight / cover.naturalWidth),
+  );
   const maximumCoverHeight = isTikTok ? 930 : 720;
   const fittedCoverHeight = Math.min(coverHeight, maximumCoverHeight);
   const fittedCoverWidth = Math.round(
@@ -337,7 +347,12 @@ async function createFinishedCampaignImage(input: {
   context.shadowBlur = 48;
   context.shadowOffsetY = 20;
   context.fillStyle = "#ffffff";
-  context.fillRect(coverX - 8, coverY - 8, fittedCoverWidth + 16, fittedCoverHeight + 16);
+  context.fillRect(
+    coverX - 8,
+    coverY - 8,
+    fittedCoverWidth + 16,
+    fittedCoverHeight + 16,
+  );
   context.drawImage(cover, coverX, coverY, fittedCoverWidth, fittedCoverHeight);
   context.restore();
 
@@ -386,7 +401,8 @@ async function createEditorialCampaignImage(input: {
   aiBackground?: string;
 }): Promise<string> {
   const isTikTok = input.post.platform === "tiktok";
-  const hasScene = input.mediaStyle === "ai-scene" && Boolean(input.aiBackground);
+  const hasScene =
+    input.mediaStyle === "ai-scene" && Boolean(input.aiBackground);
   const width = 1080;
   const height = isTikTok ? 1920 : 1350;
   const canvas = document.createElement("canvas");
@@ -417,7 +433,12 @@ async function createEditorialCampaignImage(input: {
     context.fillStyle = sceneShade;
     context.fillRect(34, 255, width - 68, isTikTok ? 1260 : 765);
 
-    const verticalShade = context.createLinearGradient(0, 255, 0, isTikTok ? 1515 : 1020);
+    const verticalShade = context.createLinearGradient(
+      0,
+      255,
+      0,
+      isTikTok ? 1515 : 1020,
+    );
     verticalShade.addColorStop(0, "rgba(5,5,7,0.08)");
     verticalShade.addColorStop(0.72, "rgba(5,5,7,0.1)");
     verticalShade.addColorStop(1, "rgba(5,5,7,0.92)");
@@ -502,9 +523,7 @@ async function createEditorialCampaignImage(input: {
     maximumCoverWidth * (cover.naturalHeight / cover.naturalWidth);
   const coverHeight = Math.min(naturalCoverHeight, maximumCoverHeight);
   const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
-  const coverX = hasScene
-    ? width - 64 - coverWidth
-    : (width - coverWidth) / 2;
+  const coverX = hasScene ? width - 64 - coverWidth : (width - coverWidth) / 2;
   const coverY = isTikTok ? 500 : 330;
 
   context.save();
@@ -523,13 +542,23 @@ async function createEditorialCampaignImage(input: {
       const x = 64;
       const y = 1550 + index * 79;
       const cardWidth = width - 128;
-      context.fillStyle = index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
+      context.fillStyle =
+        index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
       context.fillRect(x, y, cardWidth, 62);
       context.fillStyle = "#ec4899";
       context.fillRect(x, y, 8, 62);
       context.fillStyle = "#ffffff";
       context.textAlign = "left";
-      drawFittedText(context, trope.toUpperCase(), x + 28, y + 41, cardWidth - 56, 800, 30, 21);
+      drawFittedText(
+        context,
+        trope.toUpperCase(),
+        x + 28,
+        y + 41,
+        cardWidth - 56,
+        800,
+        30,
+        21,
+      );
     });
   } else {
     const gap = 16;
@@ -538,14 +567,20 @@ async function createEditorialCampaignImage(input: {
     tropes.forEach((trope, index) => {
       const x = 64 + index * (cardWidth + gap);
       const y = 1060;
-      context.fillStyle = index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
+      context.fillStyle =
+        index % 2 === 0 ? "rgba(236,72,153,0.2)" : "rgba(255,255,255,0.08)";
       context.fillRect(x, y, cardWidth, 88);
       context.fillStyle = "#ec4899";
       context.fillRect(x, y, 7, 88);
       context.fillStyle = "#ffffff";
       context.textAlign = "center";
       context.font = "800 25px Arial, sans-serif";
-      const lines = wrappedLines(context, trope.toUpperCase(), cardWidth - 30, 2);
+      const lines = wrappedLines(
+        context,
+        trope.toUpperCase(),
+        cardWidth - 30,
+        2,
+      );
       lines.forEach((line, lineIndex) => {
         drawFittedText(
           context,
@@ -804,6 +839,29 @@ function colourDistance(left: CampaignColour, right: CampaignColour): number {
   );
 }
 
+function vividCampaignColour(
+  colour: CampaignColour,
+  fallback: CampaignColour,
+): CampaignColour {
+  const maximum = Math.max(colour.red, colour.green, colour.blue);
+  const minimum = Math.min(colour.red, colour.green, colour.blue);
+
+  if (maximum < 45 || maximum - minimum < 36) return fallback;
+
+  const range = Math.max(1, maximum - minimum);
+  const channel = (value: number) =>
+    Math.max(
+      18,
+      Math.min(250, Math.round(22 + ((value - minimum) / range) * 228)),
+    );
+
+  return {
+    red: channel(colour.red),
+    green: channel(colour.green),
+    blue: channel(colour.blue),
+  };
+}
+
 function fallbackPalette(seed: string): CampaignPalette {
   const palettes: CampaignPalette[] = [
     {
@@ -889,10 +947,14 @@ function extractCampaignPalette(
     (left, right) => right.score * right.count - left.score * left.count,
   );
   const fallback = fallbackPalette(seed);
-  const primary = ranked[0]?.colour ?? fallback.primary;
-  const secondary =
-    ranked.find((candidate) => colourDistance(candidate.colour, primary) > 125)
-      ?.colour ?? fallback.secondary;
+  const sampledPrimary = ranked[0]?.colour ?? fallback.primary;
+  const sampledSecondary =
+    ranked.find(
+      (candidate) => colourDistance(candidate.colour, sampledPrimary) > 125,
+    )?.colour ?? fallback.secondary;
+
+  const primary = vividCampaignColour(sampledPrimary, fallback.primary);
+  const secondary = vividCampaignColour(sampledSecondary, fallback.secondary);
 
   return { primary, secondary };
 }
@@ -921,8 +983,8 @@ function drawAtmosphericBackground(
   context.fillRect(0, 0, width, height);
 
   context.save();
-  context.globalAlpha = 0.24;
-  context.filter = "blur(72px) saturate(1.55) contrast(1.15)";
+  context.globalAlpha = 0.4;
+  context.filter = "blur(54px) saturate(1.9) contrast(1.18)";
   const driftX = Math.sin(movement * Math.PI * 2) * 34;
   drawImageCover(
     context,
@@ -935,9 +997,9 @@ function drawAtmosphericBackground(
   context.restore();
 
   const darkLayer = context.createLinearGradient(0, 0, width, height);
-  darkLayer.addColorStop(0, "rgba(2,2,4,0.72)");
-  darkLayer.addColorStop(0.48, "rgba(3,3,6,0.84)");
-  darkLayer.addColorStop(1, "rgba(1,1,3,0.94)");
+  darkLayer.addColorStop(0, "rgba(2,2,4,0.48)");
+  darkLayer.addColorStop(0.48, "rgba(3,3,6,0.66)");
+  darkLayer.addColorStop(1, "rgba(1,1,3,0.84)");
   context.fillStyle = darkLayer;
   context.fillRect(0, 0, width, height);
 
@@ -949,7 +1011,7 @@ function drawAtmosphericBackground(
     height * 0.55,
     width * 0.82,
   );
-  leftGlow.addColorStop(0, colourCss(palette.primary, 0.34));
+  leftGlow.addColorStop(0, colourCss(palette.primary, 0.52));
   leftGlow.addColorStop(1, colourCss(palette.primary, 0));
   context.fillStyle = leftGlow;
   context.fillRect(0, 0, width, height);
@@ -962,7 +1024,7 @@ function drawAtmosphericBackground(
     height * 0.3,
     width * 0.7,
   );
-  rightGlow.addColorStop(0, colourCss(palette.secondary, 0.28));
+  rightGlow.addColorStop(0, colourCss(palette.secondary, 0.46));
   rightGlow.addColorStop(1, colourCss(palette.secondary, 0));
   context.fillStyle = rightGlow;
   context.fillRect(0, 0, width, height);
@@ -1045,8 +1107,20 @@ function drawKindleMockup(
   context.shadowColor = colourCss(palette.primary, 0.66);
   context.shadowBlur = Math.max(40, deviceWidth * 0.1);
   context.shadowOffsetY = Math.max(16, deviceWidth * 0.035);
-  roundedRectanglePath(context, 0, 0, deviceWidth, deviceHeight, deviceWidth * 0.055);
-  const frameGradient = context.createLinearGradient(0, 0, deviceWidth, deviceHeight);
+  roundedRectanglePath(
+    context,
+    0,
+    0,
+    deviceWidth,
+    deviceHeight,
+    deviceWidth * 0.055,
+  );
+  const frameGradient = context.createLinearGradient(
+    0,
+    0,
+    deviceWidth,
+    deviceHeight,
+  );
   frameGradient.addColorStop(0, "#27272b");
   frameGradient.addColorStop(0.45, "#09090b");
   frameGradient.addColorStop(1, "#17171a");
@@ -1066,7 +1140,12 @@ function drawKindleMockup(
   context.stroke();
   context.drawImage(cover, frame, frame, innerWidth, innerHeight);
 
-  const glass = context.createLinearGradient(frame, frame, deviceWidth - frame, innerHeight);
+  const glass = context.createLinearGradient(
+    frame,
+    frame,
+    deviceWidth - frame,
+    innerHeight,
+  );
   glass.addColorStop(0, "rgba(255,255,255,0.16)");
   glass.addColorStop(0.28, "rgba(255,255,255,0)");
   glass.addColorStop(1, "rgba(255,255,255,0.03)");
@@ -1076,7 +1155,11 @@ function drawKindleMockup(
   context.textAlign = "center";
   context.fillStyle = "rgba(255,255,255,0.36)";
   context.font = `500 ${Math.max(20, deviceWidth * 0.052)}px Arial, sans-serif`;
-  context.fillText("kindle", deviceWidth / 2, deviceHeight - bottomFrame * 0.32);
+  context.fillText(
+    "kindle",
+    deviceWidth / 2,
+    deviceHeight - bottomFrame * 0.32,
+  );
   context.restore();
 
   return deviceHeight;
@@ -1123,7 +1206,7 @@ function fittedMultiline(
   let lines: string[] = [];
 
   while (fontSize >= minimumSize) {
-    context.font = `${weight} ${fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
+    context.font = `${weight} ${fontSize}px "Arial Black", Arial, sans-serif`;
     lines = wrapEveryLine(context, text, maximumWidth);
     if (lines.length <= maximumLines) break;
     fontSize -= 2;
@@ -1131,7 +1214,8 @@ function fittedMultiline(
 
   if (lines.length > maximumLines) {
     lines = lines.slice(0, maximumLines);
-    lines[maximumLines - 1] = `${lines[maximumLines - 1].replace(/[.,!?;:]$/, "")}…`;
+    lines[maximumLines - 1] =
+      `${lines[maximumLines - 1].replace(/[.,!?;:]$/, "")}…`;
   }
 
   return { lines, fontSize, lineHeight: Math.round(fontSize * 1.08) };
@@ -1168,23 +1252,31 @@ function drawCallToAction(
   y: number,
   compact = false,
 ) {
-  const boxWidth = compact ? width - 128 : width - 180;
-  const boxHeight = compact ? 76 : 92;
-  const x = (width - boxWidth) / 2;
-  roundedRectanglePath(context, x, y, boxWidth, boxHeight, 14);
+  const boxWidth = compact ? width - 128 : width - 150;
+  const centreX = width / 2;
   context.fillStyle = colourCss(palette.primary);
-  context.fill();
+  context.fillRect((width - boxWidth) / 2, y, boxWidth, 4);
   context.textAlign = "center";
+  context.font = `700 ${compact ? 19 : 23}px Arial, sans-serif`;
+  context.fillStyle = "rgba(255,255,255,0.82)";
+  context.fillText("AVAILABLE ON", centreX, y + (compact ? 35 : 42));
   context.fillStyle = "#ffffff";
   drawFittedText(
     context,
-    book.kindleUnlimited ? "AVAILABLE ON KINDLE UNLIMITED" : "AVAILABLE NOW",
-    width / 2,
-    y + boxHeight * 0.64,
-    boxWidth - 54,
-    800,
-    compact ? 25 : 31,
-    19,
+    book.kindleUnlimited ? "KINDLE UNLIMITED" : "AMAZON",
+    centreX,
+    y + (compact ? 83 : 101),
+    boxWidth - 40,
+    900,
+    compact ? 48 : 60,
+    compact ? 34 : 42,
+  );
+  context.fillStyle = colourCss(palette.primary);
+  context.fillRect(
+    (width - boxWidth * 0.62) / 2,
+    y + (compact ? 105 : 128),
+    boxWidth * 0.62,
+    4,
   );
 }
 
@@ -1222,25 +1314,28 @@ async function createProfessionalCampaignImage(input: {
   drawCampaignBrand(context, palette, width, !isTikTok);
 
   if (template === "cinematic-quote") {
-    const quote = input.quote.trim() || input.post.caption.split(/\n+/)[0] || hook;
-    const textWidth = isTikTok ? 920 : 490;
+    const quote =
+      input.quote.trim() || input.post.caption.split(/\n+/)[0] || hook;
+    const textWidth = isTikTok ? 930 : 950;
     const quoteBlock = fittedMultiline(
       context,
       `“${quote.replace(/^[“"]|[”"]$/g, "")}”`,
       textWidth,
-      isTikTok ? 6 : 8,
-      isTikTok ? 76 : 56,
-      isTikTok ? 46 : 34,
+      isTikTok ? 6 : 5,
+      isTikTok ? 106 : 82,
+      isTikTok ? 66 : 52,
     );
-    const quoteX = isTikTok ? 80 : 64;
-    const quoteY = isTikTok ? 270 : 270;
+    const quoteX = isTikTok ? 74 : 64;
+    const quoteY = isTikTok ? 285 : 260;
     context.textAlign = "left";
     quoteBlock.lines.forEach((line, index) => {
       context.fillStyle =
         index >= quoteBlock.lines.length - 2
           ? colourCss(palette.primary)
           : "#ffffff";
-      context.font = `800 ${quoteBlock.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
+      context.font = `900 ${quoteBlock.fontSize}px "Arial Black", Arial, sans-serif`;
+      context.shadowColor = "rgba(0,0,0,0.76)";
+      context.shadowBlur = 16;
       context.fillText(
         line,
         quoteX,
@@ -1253,15 +1348,16 @@ async function createProfessionalCampaignImage(input: {
     context.fillRect(
       quoteX,
       quoteY + quoteBlock.lines.length * quoteBlock.lineHeight + 24,
-      Math.min(textWidth * 0.58, 360),
-      8,
+      Math.min(textWidth * 0.62, 540),
+      11,
     );
+    context.shadowColor = "transparent";
 
     if (isTikTok) {
-      drawKindleMockup(context, cover, palette, 700, 850, 470, 0.035);
+      drawKindleMockup(context, cover, palette, 650, 870, 515, -0.035);
       context.textAlign = "left";
       input.book.tropes.slice(0, 3).forEach((trope, index) => {
-        const y = 1100 + index * 145;
+        const y = 1110 + index * 150;
         context.strokeStyle = colourCss(palette.primary, 0.92);
         context.lineWidth = 4;
         context.beginPath();
@@ -1270,121 +1366,151 @@ async function createProfessionalCampaignImage(input: {
         context.fillStyle = "#ffffff";
         context.font = "800 21px Arial, sans-serif";
         context.fillText(String(index + 1).padStart(2, "0"), 73, y - 2);
-        drawFittedText(
-          context,
-          trope.toUpperCase(),
-          130,
-          y,
-          300,
-          800,
-          27,
-          18,
-        );
+        drawFittedText(context, trope.toUpperCase(), 130, y, 350, 900, 33, 23);
         context.strokeStyle = colourCss(palette.primary, 0.36);
         context.beginPath();
         context.moveTo(64, y + 35);
         context.lineTo(420, y + 35);
         context.stroke();
       });
-      drawCallToAction(context, input.book, palette, width, 1710);
+      drawCallToAction(context, input.book, palette, width, 1730);
     } else {
-      drawKindleMockup(context, cover, palette, 800, 255, 470, 0.035);
+      drawKindleMockup(context, cover, palette, 790, 635, 360, -0.035);
       context.textAlign = "left";
-      context.fillStyle = colourCss(palette.primary);
-      context.font = "800 18px Arial, sans-serif";
-      context.fillText("WHAT TO EXPECT", 64, 930);
       input.book.tropes.slice(0, 3).forEach((trope, index) => {
-        const y = 990 + index * 58;
-        context.fillStyle = index === 1 ? colourCss(palette.primary) : "#ffffff";
-        drawFittedText(context, trope.toUpperCase(), 64, y, 500, 800, 28, 20);
+        const y = 815 + index * 105;
+        context.fillStyle =
+          index === 1 ? colourCss(palette.primary) : "#ffffff";
+        drawFittedText(context, trope.toUpperCase(), 64, y, 430, 900, 34, 24);
+        context.fillStyle = colourCss(palette.primary, 0.8);
+        context.fillRect(64, y + 19, 330, 3);
       });
-      drawCallToAction(context, input.book, palette, width, 1190, true);
+      drawCallToAction(context, input.book, palette, width, 1198, true);
     }
   } else if (template === "trope-showcase") {
+    const accent = { red: 236, green: 72, blue: 153 };
+
+    context.save();
+    const colourWash = context.createLinearGradient(0, 0, width, height);
+    colourWash.addColorStop(0, colourCss(palette.secondary, 0.22));
+    colourWash.addColorStop(0.48, "rgba(0,0,0,0)");
+    colourWash.addColorStop(1, colourCss(accent, 0.22));
+    context.fillStyle = colourWash;
+    context.fillRect(0, 0, width, height);
+    context.globalAlpha = 0.9;
+    context.fillStyle = colourCss(accent, 0.72);
+    context.beginPath();
+    context.moveTo(width * 0.72, 0);
+    context.lineTo(width, 0);
+    context.lineTo(width, height * 0.34);
+    context.lineTo(width * 0.9, height * 0.26);
+    context.closePath();
+    context.fill();
+    context.restore();
+
     context.textAlign = "left";
     context.fillStyle = "#ffffff";
     const headline = fittedMultiline(
       context,
       input.campaignType === "backlist-revival"
         ? "YOUR NEXT BACKLIST OBSESSION"
-        : "WHAT TO EXPECT",
-      width - 136,
-      2,
-      isTikTok ? 94 : 69,
-      isTikTok ? 58 : 46,
+        : hook.toUpperCase(),
+      isTikTok ? width - 130 : 690,
+      isTikTok ? 3 : 2,
+      isTikTok ? 112 : 86,
+      isTikTok ? 68 : 54,
     );
     headline.lines.forEach((line, index) => {
-      context.font = `800 ${headline.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
-      context.fillText(line, 68, (isTikTok ? 280 : 245) + index * headline.lineHeight);
+      context.font = `900 ${headline.fontSize}px "Arial Black", Arial, sans-serif`;
+      context.fillText(
+        line,
+        62,
+        (isTikTok ? 265 : 238) + index * headline.lineHeight,
+      );
     });
-    context.fillStyle = colourCss(palette.primary);
-    context.fillRect(68, isTikTok ? 435 : 365, 310, 10);
+    context.fillStyle = colourCss(accent);
+    context.fillRect(62, isTikTok ? 555 : 398, isTikTok ? 430 : 330, 12);
 
-    const deviceCentreX = isTikTok ? 715 : 785;
-    const deviceTop = isTikTok ? 430 : 300;
-    const deviceWidth = isTikTok ? 590 : 500;
+    const deviceCentreX = isTikTok ? 715 : 770;
+    const deviceTop = isTikTok ? 585 : 335;
+    const deviceWidth = isTikTok ? 625 : 565;
     drawKindleMockup(
       context,
       cover,
-      palette,
+      { primary: accent, secondary: palette.secondary },
       deviceCentreX,
       deviceTop,
       deviceWidth,
-      0.045,
+      0.025,
     );
 
     const tropes = input.book.tropes.slice(0, 4);
-    const startY = isTikTok ? 600 : 520;
-    const step = isTikTok ? 210 : 168;
-    const cardWidth = isTikTok ? 380 : 430;
+    const startY = isTikTok ? 760 : 540;
+    const step = isTikTok ? 190 : 166;
+    const textWidth = isTikTok ? 330 : 390;
     tropes.forEach((trope, index) => {
       const y = startY + index * step;
-      context.fillStyle = "rgba(0,0,0,0.54)";
-      roundedRectanglePath(context, 54, y, cardWidth, isTikTok ? 150 : 116, 16);
-      context.fill();
-      context.strokeStyle = colourCss(palette.primary, 0.72);
-      context.lineWidth = 4;
+      context.strokeStyle = colourCss(accent, 0.78);
+      context.lineWidth = 3;
+      context.beginPath();
+      context.moveTo(62, y + (isTikTok ? 104 : 92));
+      context.lineTo(62 + textWidth, y + (isTikTok ? 104 : 92));
       context.stroke();
-      context.fillStyle = colourCss(palette.primary);
-      context.font = `800 ${isTikTok ? 28 : 22}px Arial, sans-serif`;
-      context.fillText(String(index + 1).padStart(2, "0"), 82, y + 47);
+      context.fillStyle = colourCss(accent);
+      context.beginPath();
+      context.arc(78, y + 28, isTikTok ? 20 : 17, 0, Math.PI * 2);
+      context.fill();
+      context.fillStyle = "#07070a";
+      context.textAlign = "center";
+      context.font = `900 ${isTikTok ? 21 : 18}px Arial, sans-serif`;
+      context.fillText(String(index + 1), 78, y + (isTikTok ? 35 : 34));
+      context.textAlign = "left";
       context.fillStyle = "#ffffff";
       const tropeBlock = fittedMultiline(
         context,
         trope.toUpperCase(),
-        cardWidth - 94,
+        textWidth - 58,
         2,
-        isTikTok ? 37 : 31,
-        isTikTok ? 25 : 21,
+        isTikTok ? 45 : 38,
+        isTikTok ? 31 : 27,
       );
       tropeBlock.lines.forEach((line, lineIndex) => {
-        context.font = `800 ${tropeBlock.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
+        context.font = `900 ${tropeBlock.fontSize}px "Arial Black", Arial, sans-serif`;
         context.fillText(
           line,
-          82,
-          y + (isTikTok ? 92 : 76) + lineIndex * tropeBlock.lineHeight,
+          112,
+          y + (isTikTok ? 39 : 38) + lineIndex * tropeBlock.lineHeight,
         );
       });
     });
 
     if (isTikTok) {
-      context.textAlign = "center";
-      context.fillStyle = "#ffffff";
-      drawFittedText(
+      drawCallToAction(
         context,
-        hook.toUpperCase(),
-        width / 2,
-        1630,
-        width - 150,
-        800,
-        38,
-        25,
+        input.book,
+        { primary: accent, secondary: palette.secondary },
+        width,
+        1710,
       );
-      drawCallToAction(context, input.book, palette, width, 1715);
     } else {
-      drawCallToAction(context, input.book, palette, width, 1195, true);
+      drawCallToAction(
+        context,
+        input.book,
+        { primary: accent, secondary: palette.secondary },
+        width,
+        1195,
+        true,
+      );
     }
   } else {
+    context.save();
+    const heroWash = context.createLinearGradient(0, 0, width, 0);
+    heroWash.addColorStop(0, colourCss(palette.primary, 0.34));
+    heroWash.addColorStop(0.48, "rgba(0,0,0,0)");
+    heroWash.addColorStop(1, colourCss(palette.secondary, 0.34));
+    context.fillStyle = heroWash;
+    context.fillRect(0, 0, width, height);
+    context.restore();
     context.textAlign = "center";
     context.fillStyle = "#ffffff";
     context.font = `700 ${isTikTok ? 33 : 25}px Arial, sans-serif`;
@@ -1404,14 +1530,20 @@ async function createProfessionalCampaignImage(input: {
       heroHeading,
       width - 140,
       2,
-      isTikTok ? 88 : 64,
-      isTikTok ? 54 : 42,
+      isTikTok ? 108 : 82,
+      isTikTok ? 68 : 54,
     );
     hero.lines.forEach((line, index) => {
       context.fillStyle =
-        index === hero.lines.length - 1 ? colourCss(palette.primary) : "#ffffff";
-      context.font = `800 ${hero.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
-      context.fillText(line, width / 2, (isTikTok ? 370 : 325) + index * hero.lineHeight);
+        index === hero.lines.length - 1
+          ? colourCss(palette.primary)
+          : "#ffffff";
+      context.font = `900 ${hero.fontSize}px "Arial Black", Arial, sans-serif`;
+      context.fillText(
+        line,
+        width / 2,
+        (isTikTok ? 370 : 325) + index * hero.lineHeight,
+      );
     });
     context.fillStyle = colourCss(palette.primary);
     context.fillRect(width / 2 - 210, isTikTok ? 480 : 420, 420, 9);
@@ -1421,8 +1553,8 @@ async function createProfessionalCampaignImage(input: {
       cover,
       palette,
       width / 2,
-      isTikTok ? 500 : 420,
-      isTikTok ? 590 : 430,
+      isTikTok ? 520 : 410,
+      isTikTok ? 560 : 465,
       -0.028,
     );
 
@@ -1497,7 +1629,10 @@ function drawContainedImage(
   width: number,
   height: number,
 ) {
-  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const scale = Math.min(
+    width / image.naturalWidth,
+    height / image.naturalHeight,
+  );
   const drawWidth = image.naturalWidth * scale;
   const drawHeight = image.naturalHeight * scale;
 
@@ -1548,7 +1683,8 @@ async function createCampaignVideo(input: {
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data);
     };
-    recorder.onerror = () => reject(new Error("The browser video recorder failed."));
+    recorder.onerror = () =>
+      reject(new Error("The browser video recorder failed."));
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
@@ -1600,7 +1736,8 @@ async function createCampaignVideo(input: {
 
         context.globalAlpha = endProgress;
         const coverHeight = 760;
-        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        const coverWidth =
+          coverHeight * (cover.naturalWidth / cover.naturalHeight);
         context.save();
         context.shadowColor = "rgba(0,0,0,0.8)";
         context.shadowBlur = 42;
@@ -1706,7 +1843,8 @@ async function createBrandedCampaignVideo(input: {
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data);
     };
-    recorder.onerror = () => reject(new Error("The browser video recorder failed."));
+    recorder.onerror = () =>
+      reject(new Error("The browser video recorder failed."));
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
@@ -1766,7 +1904,8 @@ async function createBrandedCampaignVideo(input: {
         context.textAlign = "center";
         context.fillText("MM ROMANCE", 199, 367);
 
-        const hook = input.post.title || input.book.tropes.slice(0, 2).join(" • ");
+        const hook =
+          input.post.title || input.book.tropes.slice(0, 2).join(" • ");
         context.font = "800 78px Arial, sans-serif";
         context.textAlign = "left";
         const hookLines = wrappedLines(context, hook, 920, 5);
@@ -1829,7 +1968,8 @@ async function createBrandedCampaignVideo(input: {
         brandFrame();
 
         const coverHeight = 850;
-        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        const coverWidth =
+          coverHeight * (cover.naturalWidth / cover.naturalHeight);
         const coverX = 520 + (1 - scene) * 430;
         const coverY = 430;
         context.save();
@@ -1837,7 +1977,12 @@ async function createBrandedCampaignVideo(input: {
         context.shadowBlur = 55;
         context.shadowOffsetY = 20;
         context.fillStyle = "#ffffff";
-        context.fillRect(coverX - 8, coverY - 8, coverWidth + 16, coverHeight + 16);
+        context.fillRect(
+          coverX - 8,
+          coverY - 8,
+          coverWidth + 16,
+          coverHeight + 16,
+        );
         context.drawImage(cover, coverX, coverY, coverWidth, coverHeight);
         context.restore();
 
@@ -1871,7 +2016,8 @@ async function createBrandedCampaignVideo(input: {
 
         context.globalAlpha = scene;
         const coverHeight = 750;
-        const coverWidth = coverHeight * (cover.naturalWidth / cover.naturalHeight);
+        const coverWidth =
+          coverHeight * (cover.naturalWidth / cover.naturalHeight);
         context.save();
         context.shadowColor = "rgba(0,0,0,0.75)";
         context.shadowBlur = 50;
@@ -1969,7 +2115,8 @@ async function createCoverFirstCampaignVideo(input: {
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data);
     };
-    recorder.onerror = () => reject(new Error("The browser video recorder failed."));
+    recorder.onerror = () =>
+      reject(new Error("The browser video recorder failed."));
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
@@ -2199,7 +2346,11 @@ async function createCoverFirstCampaignVideo(input: {
         );
         title.lines.forEach((line, index) => {
           context.font = `800 ${title.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
-          context.fillText(line, canvas.width / 2, 1350 + index * title.lineHeight);
+          context.fillText(
+            line,
+            canvas.width / 2,
+            1350 + index * title.lineHeight,
+          );
         });
         context.fillStyle = colourCss(palette.primary);
         context.font = "800 28px Arial, sans-serif";
@@ -2238,9 +2389,8 @@ export default function SocialStudioPage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [error, setError] = useState("");
   const [selectedBook, setSelectedBook] = useState<CatalogueBook | null>(null);
-  const [campaignType, setCampaignType] = useState<CampaignType>(
-    "book-spotlight",
-  );
+  const [campaignType, setCampaignType] =
+    useState<CampaignType>("book-spotlight");
   const [platforms, setPlatforms] = useState<SocialPlatform[]>([
     "facebook",
     "instagram",
@@ -2255,8 +2405,7 @@ export default function SocialStudioPage() {
     null,
   );
   const [mediaStyle] = useState<MediaStyle>("ai-scene");
-  const [posterTemplate, setPosterTemplate] =
-    useState<PosterTemplate>("auto");
+  const [posterTemplate, setPosterTemplate] = useState<PosterTemplate>("auto");
   const [generatedMedia, setGeneratedMedia] = useState<GeneratedMedia[]>([]);
   const [creatingImageFor, setCreatingImageFor] =
     useState<SocialPlatform | null>(null);
@@ -2265,8 +2414,9 @@ export default function SocialStudioPage() {
   const [creatingVideoFor, setCreatingVideoFor] =
     useState<SocialPlatform | null>(null);
   const [videoError, setVideoError] = useState("");
-  const [testingMakeFor, setTestingMakeFor] =
-    useState<SocialPlatform | null>(null);
+  const [testingMakeFor, setTestingMakeFor] = useState<SocialPlatform | null>(
+    null,
+  );
   const [makeTestMessage, setMakeTestMessage] = useState("");
   const [makeTestError, setMakeTestError] = useState("");
 
@@ -2362,11 +2512,7 @@ export default function SocialStudioPage() {
   }
 
   async function copyPost(post: GeneratedPost) {
-    const text = [
-      post.title,
-      post.caption,
-      post.hashtags.join(" "),
-    ]
+    const text = [post.title, post.caption, post.hashtags.join(" ")]
       .filter(Boolean)
       .join("\n\n");
 
@@ -2433,7 +2579,9 @@ export default function SocialStudioPage() {
       const extension = result.mimeType.includes("mp4") ? "mp4" : "webm";
 
       setGeneratedVideos((current) => {
-        const previous = current.find((item) => item.platform === post.platform);
+        const previous = current.find(
+          (item) => item.platform === post.platform,
+        );
         if (previous) URL.revokeObjectURL(previous.url);
 
         return [
@@ -2457,7 +2605,10 @@ export default function SocialStudioPage() {
     }
   }
 
-  async function publishImageToMake(post: GeneratedPost, media: GeneratedMedia) {
+  async function publishImageToMake(
+    post: GeneratedPost,
+    media: GeneratedMedia,
+  ) {
     if (!selectedBook) return;
 
     setTestingMakeFor(post.platform);
@@ -2542,9 +2693,7 @@ export default function SocialStudioPage() {
         throw new Error(result.error || "Make rejected the campaign.");
       }
 
-      setMakeTestMessage(
-        `${post.platform} image sent to Make for publishing.`,
-      );
+      setMakeTestMessage(`${post.platform} image sent to Make for publishing.`);
     } catch (publishError) {
       setMakeTestError(
         `${post.platform}: ${
@@ -2558,7 +2707,10 @@ export default function SocialStudioPage() {
     }
   }
 
-  async function publishVideoToMake(post: GeneratedPost, video: GeneratedVideo) {
+  async function publishVideoToMake(
+    post: GeneratedPost,
+    video: GeneratedVideo,
+  ) {
     if (!selectedBook) return;
 
     setTestingMakeFor(post.platform);
@@ -2648,9 +2800,7 @@ export default function SocialStudioPage() {
         throw new Error(result.error || "Make rejected the campaign video.");
       }
 
-      setMakeTestMessage(
-        `${post.platform} video sent to Make for publishing.`,
-      );
+      setMakeTestMessage(`${post.platform} video sent to Make for publishing.`);
     } catch (publishError) {
       setMakeTestError(
         `${post.platform}: ${
@@ -2739,8 +2889,8 @@ export default function SocialStudioPage() {
           </p>
           <h2 className="mt-2 text-2xl font-bold">Choose a book to promote</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
-            This catalogue is read directly from marlowquinn.com. Book changes made
-            on the website will appear here automatically.
+            This catalogue is read directly from marlowquinn.com. Book changes
+            made on the website will appear here automatically.
           </p>
         </div>
 
@@ -2759,7 +2909,9 @@ export default function SocialStudioPage() {
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-400">
                       Campaign setup
                     </p>
-                    <h2 className="mt-2 text-2xl font-bold">{selectedBook.title}</h2>
+                    <h2 className="mt-2 text-2xl font-bold">
+                      {selectedBook.title}
+                    </h2>
                     <p className="mt-1 text-sm text-neutral-400">
                       {selectedBook.subgenre}
                     </p>
@@ -2814,7 +2966,8 @@ export default function SocialStudioPage() {
 
               <h3 className="mt-6 font-semibold">Poster design</h3>
               <p className="mt-2 text-sm leading-5 text-neutral-400">
-                Every design uses the real cover, book-matched colours and cinematic effects. No generated people.
+                Every design uses the real cover, book-matched colours and
+                cinematic effects. No generated people.
               </p>
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {POSTER_OPTIONS.map((option) => (
@@ -2893,7 +3046,8 @@ export default function SocialStudioPage() {
                   htmlFor="campaign-instructions"
                   className="block font-semibold"
                 >
-                  Anything specific? <span className="text-neutral-500">Optional</span>
+                  Anything specific?{" "}
+                  <span className="text-neutral-500">Optional</span>
                 </label>
                 <textarea
                   id="campaign-instructions"
@@ -2948,159 +3102,167 @@ export default function SocialStudioPage() {
                     );
 
                     return (
-                    <article
-                      key={post.platform}
-                      className="rounded-2xl border border-white/10 bg-neutral-950 p-5"
-                    >
-                      <div className="flex items-center justify-between gap-4">
-                        <h4 className="text-lg font-bold capitalize">
-                          {post.platform}
-                        </h4>
-                        <button
-                          type="button"
-                          onClick={() => void copyPost(post)}
-                          className="rounded-lg border border-pink-500/40 bg-pink-500/10 px-3 py-2 text-sm font-semibold text-pink-200 transition hover:bg-pink-500/20"
-                        >
-                          {copiedPlatform === post.platform ? "Copied" : "Copy post"}
-                        </button>
-                      </div>
+                      <article
+                        key={post.platform}
+                        className="rounded-2xl border border-white/10 bg-neutral-950 p-5"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <h4 className="text-lg font-bold capitalize">
+                            {post.platform}
+                          </h4>
+                          <button
+                            type="button"
+                            onClick={() => void copyPost(post)}
+                            className="rounded-lg border border-pink-500/40 bg-pink-500/10 px-3 py-2 text-sm font-semibold text-pink-200 transition hover:bg-pink-500/20"
+                          >
+                            {copiedPlatform === post.platform
+                              ? "Copied"
+                              : "Copy post"}
+                          </button>
+                        </div>
 
-                      {post.title && (
+                        {post.title && (
+                          <div className="mt-4">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                              Title or hook
+                            </p>
+                            <p className="mt-1 font-semibold text-white">
+                              {post.title}
+                            </p>
+                          </div>
+                        )}
+
                         <div className="mt-4">
                           <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                            Title or hook
+                            Caption
                           </p>
-                          <p className="mt-1 font-semibold text-white">
-                            {post.title}
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">
+                            {post.caption}
                           </p>
                         </div>
-                      )}
 
-                      <div className="mt-4">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                          Caption
+                        <p className="mt-4 text-sm leading-6 text-pink-300">
+                          {post.hashtags.join(" ")}
                         </p>
-                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-neutral-200">
-                          {post.caption}
-                        </p>
-                      </div>
 
-                      <p className="mt-4 text-sm leading-6 text-pink-300">
-                        {post.hashtags.join(" ")}
-                      </p>
+                        <button
+                          type="button"
+                          onClick={() => void createImage(post)}
+                          disabled={creatingImageFor !== null}
+                          className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-semibold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-neutral-500"
+                        >
+                          {creatingImageFor === post.platform
+                            ? "Designing professional campaign poster..."
+                            : media
+                              ? "Create Another Poster"
+                              : "Create Professional Poster"}
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => void createImage(post)}
-                        disabled={creatingImageFor !== null}
-                        className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-semibold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-neutral-500"
-                      >
-                        {creatingImageFor === post.platform
-                          ? "Designing professional campaign poster..."
-                          : media
-                            ? "Create Another Poster"
-                            : "Create Professional Poster"}
-                      </button>
+                        {media && (
+                          <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3">
+                            <img
+                              src={media.dataUrl}
+                              alt={`${post.platform} campaign for ${selectedBook?.title ?? "book"}`}
+                              className="mx-auto max-h-[720px] w-auto rounded-xl object-contain"
+                            />
+                            <a
+                              href={media.dataUrl}
+                              download={`${selectedBook?.slug ?? "book"}-${post.platform}-${media.style}.jpg`}
+                              className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
+                            >
+                              Download Finished Image
+                            </a>
 
-                      {media && (
-                        <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3">
-                          <img
-                            src={media.dataUrl}
-                            alt={`${post.platform} campaign for ${selectedBook?.title ?? "book"}`}
-                            className="mx-auto max-h-[720px] w-auto rounded-xl object-contain"
-                          />
-                          <a
-                            href={media.dataUrl}
-                            download={`${selectedBook?.slug ?? "book"}-${post.platform}-${media.style}.jpg`}
-                            className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
-                          >
-                            Download Finished Image
-                          </a>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void publishImageToMake(post, media)
+                              }
+                              disabled={
+                                testingMakeFor !== null ||
+                                post.platform === "tiktok"
+                              }
+                              className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                            >
+                              {testingMakeFor === post.platform
+                                ? "Uploading and sending to Make..."
+                                : post.platform === "tiktok"
+                                  ? "TikTok Publishing Comes Next"
+                                  : `Publish Image to ${
+                                      post.platform === "facebook"
+                                        ? "Facebook"
+                                        : "Instagram"
+                                    }`}
+                            </button>
 
-                          <button
-                            type="button"
-                            onClick={() => void publishImageToMake(post, media)}
-                            disabled={
-                              testingMakeFor !== null || post.platform === "tiktok"
-                            }
-                            className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
-                          >
-                            {testingMakeFor === post.platform
-                              ? "Uploading and sending to Make..."
-                              : post.platform === "tiktok"
-                                ? "TikTok Publishing Comes Next"
-                                : `Publish Image to ${
-                                    post.platform === "facebook"
-                                      ? "Facebook"
-                                      : "Instagram"
-                                  }`}
-                          </button>
-
-                          {makeTestMessage.startsWith(post.platform) && (
-                            <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                              {makeTestMessage}
-                            </p>
-                          )}
-
-                          {makeTestError.startsWith(post.platform) && (
-                            <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                              {makeTestError}
-                            </p>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => void createVideo(post, media)}
-                            disabled={creatingVideoFor !== null}
-                            className="mt-3 w-full rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
-                          >
-                            {creatingVideoFor === post.platform
-                              ? "Rendering 11-second video..."
-                              : video
-                                ? "Create Another Video"
-                                : "Create Vertical Video"}
-                          </button>
-
-                          {video && (
-                            <div className="mt-4 rounded-xl border border-white/10 bg-neutral-950 p-3">
-                              <video
-                                src={video.url}
-                                controls
-                                playsInline
-                                className="mx-auto max-h-[720px] w-auto rounded-lg"
-                              />
-                              <a
-                                href={video.url}
-                                download={`${selectedBook?.slug ?? "book"}-${post.platform}-video.${video.extension}`}
-                                className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
-                              >
-                                Download Finished Video
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => void publishVideoToMake(post, video)}
-                                disabled={
-                                  testingMakeFor !== null ||
-                                  post.platform === "tiktok"
-                                }
-                                className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
-                              >
-                                {testingMakeFor === post.platform
-                                  ? "Uploading and sending video to Make..."
-                                  : post.platform === "tiktok"
-                                    ? "TikTok Publishing Comes Next"
-                                    : post.platform === "facebook"
-                                      ? "Publish Video to Facebook"
-                                      : "Publish Reel to Instagram"}
-                              </button>
-                              <p className="mt-3 text-center text-xs leading-5 text-neutral-500">
-                                Add platform music or trending audio when you upload it.
+                            {makeTestMessage.startsWith(post.platform) && (
+                              <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                                {makeTestMessage}
                               </p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </article>
+                            )}
+
+                            {makeTestError.startsWith(post.platform) && (
+                              <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                                {makeTestError}
+                              </p>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => void createVideo(post, media)}
+                              disabled={creatingVideoFor !== null}
+                              className="mt-3 w-full rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                            >
+                              {creatingVideoFor === post.platform
+                                ? "Rendering 11-second video..."
+                                : video
+                                  ? "Create Another Video"
+                                  : "Create Vertical Video"}
+                            </button>
+
+                            {video && (
+                              <div className="mt-4 rounded-xl border border-white/10 bg-neutral-950 p-3">
+                                <video
+                                  src={video.url}
+                                  controls
+                                  playsInline
+                                  className="mx-auto max-h-[720px] w-auto rounded-lg"
+                                />
+                                <a
+                                  href={video.url}
+                                  download={`${selectedBook?.slug ?? "book"}-${post.platform}-video.${video.extension}`}
+                                  className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
+                                >
+                                  Download Finished Video
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void publishVideoToMake(post, video)
+                                  }
+                                  disabled={
+                                    testingMakeFor !== null ||
+                                    post.platform === "tiktok"
+                                  }
+                                  className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                                >
+                                  {testingMakeFor === post.platform
+                                    ? "Uploading and sending video to Make..."
+                                    : post.platform === "tiktok"
+                                      ? "TikTok Publishing Comes Next"
+                                      : post.platform === "facebook"
+                                        ? "Publish Video to Facebook"
+                                        : "Publish Reel to Instagram"}
+                                </button>
+                                <p className="mt-3 text-center text-xs leading-5 text-neutral-500">
+                                  Add platform music or trending audio when you
+                                  upload it.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </article>
                     );
                   })}
                 </div>
