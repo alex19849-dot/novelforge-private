@@ -14,14 +14,13 @@ type ImageRequest = {
   book?: unknown;
   platform?: unknown;
   campaignType?: unknown;
+  template?: unknown;
   visualDirection?: unknown;
   instructions?: unknown;
 };
 
 function cleanString(value: unknown, maximumLength = 4000): string {
-  return typeof value === "string"
-    ? value.trim().slice(0, maximumLength)
-    : "";
+  return typeof value === "string" ? value.trim().slice(0, maximumLength) : "";
 }
 
 function cleanStringArray(value: unknown, maximumItems = 12): string[] {
@@ -32,29 +31,6 @@ function cleanStringArray(value: unknown, maximumItems = 12): string[] {
         .filter(Boolean)
         .slice(0, maximumItems)
     : [];
-}
-
-const CASTING_PROFILES = [
-  "very tall with broad shoulders, a close-cropped hair outline and a heavy athletic silhouette",
-  "slightly shorter with a lean runner's build, loose wavy hair and a narrow silhouette",
-  "tall and powerfully stocky with a short curly hair outline and thick forearms",
-  "long-limbed with swimmer's shoulders, a neat undercut outline and an upright stance",
-  "medium height with a solid muscular build, swept-back hair and a relaxed stance",
-  "compact and athletic with straight cropped hair and a sharply defined silhouette",
-  "very tall and broad-chested with a buzz-cut outline and a guarded stance",
-  "lean and muscular with tied-back shoulder-length hair and an open stance",
-  "sturdy and athletic with short wavy hair and a strong squared silhouette",
-  "tall and wiry with collar-length hair and a slightly restless stance",
-] as const;
-
-function stableTitleNumber(value: string): number {
-  let result = 0;
-
-  for (let index = 0; index < value.length; index += 1) {
-    result = (result * 31 + value.charCodeAt(index)) >>> 0;
-  }
-
-  return result;
 }
 
 export async function POST(request: Request) {
@@ -92,31 +68,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const castingNumber = stableTitleNumber(book.title.toLowerCase());
-    const firstCastingIndex = castingNumber % CASTING_PROFILES.length;
-    let secondCastingIndex =
-      (castingNumber * 7 + 3) % CASTING_PROFILES.length;
-
-    if (secondCastingIndex === firstCastingIndex) {
-      secondCastingIndex = (secondCastingIndex + 1) % CASTING_PROFILES.length;
-    }
-
-    const firstCasting = CASTING_PROFILES[firstCastingIndex];
-    const secondCasting = CASTING_PROFILES[secondCastingIndex];
+    const template = cleanString(body.template, 100);
+    const layoutDirection =
+      template === "cinematic-quote"
+        ? "Keep the upper 45 percent calm, dark and uncluttered for a large quote. Concentrate the strongest environmental detail around the lower corners and outer edges."
+        : template === "trope-showcase"
+          ? "Leave a clean dark vertical area down the left 42 percent for four large trope lines. Place the strongest lighting, dimensional props and visual energy on the right half, with room for a large angled Kindle mockup."
+          : "Create a dramatic central stage with a reflective foreground and contextual props around the outer edges. Leave the central middle area open for a large Kindle mockup and the top area clean for a bold headline.";
 
     const prompt = [
-      "Create premium cinematic environmental artwork for an adult MM romance book promotion.",
-      "The characters are fictional adult men aged twenty-one or older.",
-      "Show exactly two fully clothed adult male silhouettes as secondary elements within the setting. They must be backlit, rim-lit or in deep shadow with no visible facial features, eyes, noses, mouths or realistic skin detail.",
-      "Do not generate portrait faces, close-up faces, handsome catalogue models or photorealistic facial detail. The atmosphere and story setting are the hero, not the men's faces.",
-      "The two silhouettes must be clearly different in height, build, hair outline, clothing outline, stance and body language. Never make them twins, clones or mirrored duplicates.",
-      `Silhouette one: ${firstCasting}.`,
-      `Silhouette two: ${secondCasting}.`,
-      "Keep both figures tasteful and graphic. Their attraction should come through distance, tension, posture and lighting rather than kissing or visible facial expressions.",
-      "Keep the image sensual, atmospheric and suitable for a mainstream social media feed. No nudity, explicit sexual action or fetish imagery.",
+      "Create a premium cinematic background plate for a modern commercial MM romance book advertisement.",
+      "This must look like high-end BookTok and romance advertising artwork, never a corporate flyer, website template, presentation slide or dashboard.",
+      "Create a photorealistic editorial still life using story-specific locations, sporting equipment and symbolic props inferred from the supplied tropes and blurb. Use only props that genuinely fit this book.",
+      "Use vivid jewel-tone lighting, strong contrast, practical stadium or environmental lights, atmospheric haze, subtle particles, reflections and real depth. Select two or three harmonious bright accent colours such as electric blue, hot magenta, teal, violet or warm gold.",
+      "Do not generate any people, men, women, faces, bodies, silhouettes, hands or human figures. The environment, lighting and objects are the entire image.",
       "Do not add any words, letters, typography, logos, watermarks, book covers, product mockups or UI elements. NovelForge will add the real book cover and accurate text afterwards.",
       "Do not imitate a living artist, celebrity or identifiable public figure.",
-      "Use strong composition, believable anatomy, natural masculine styling, dramatic lighting and enough uncluttered negative space for a cover and promotional hook.",
+      "Keep important visual detail away from the reserved text and cover zones. Make the frame feel deliberately art-directed even before typography is added.",
+      layoutDirection,
       `Book title for context only: ${book.title}`,
       `Subgenre: ${book.subgenre}`,
       `Tropes: ${book.tropes.join(", ")}`,
@@ -125,8 +94,8 @@ export async function POST(request: Request) {
       `Campaign visual concept: ${cleanString(body.visualDirection, 1200)}`,
       `Additional author direction: ${cleanString(body.instructions, 1000) || "None"}`,
       platform === "tiktok"
-        ? "Compose for a tall 9:16 vertical frame. Keep both men together in the upper-left and middle-left area. Leave the right side calm and uncluttered for the real book cover. Keep faces away from interface zones."
-        : "Compose for a portrait 4:5 post. Keep both men clearly visible within the left half of the frame. Leave the right half atmospheric and uncluttered for the real book cover. Do not place either face behind the right-side negative space.",
+        ? "Compose for a tall 9:16 vertical frame with strong detail extending naturally to every edge."
+        : "Compose for a portrait 4:5 social post with strong detail extending naturally to every edge.",
     ].join("\n\n");
 
     const image = await openai.images.generate({
