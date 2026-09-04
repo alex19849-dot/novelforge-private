@@ -1280,13 +1280,11 @@ function ensurePosterFonts(): Promise<void> {
   if (posterFontsReady) return posterFontsReady;
   posterFontsReady = Promise.all(
     POSTER_FONT_URLS.map(async ([family, url]) => {
-      if (!document.fonts.check(`32px "${family}"`)) {
-        const face = new FontFace(family, `url(${url})`, {
-          weight: family === "PosterDisplay" ? "400" : "700",
-          style: "normal",
-        });
-        document.fonts.add(await face.load());
-      }
+      const face = new FontFace(family, `url(${url})`, {
+        weight: family === "PosterDisplay" ? "400" : "700",
+        style: "normal",
+      });
+      document.fonts.add(await face.load());
       await document.fonts.load(`32px "${family}"`);
       if (!document.fonts.check(`32px "${family}"`)) {
         throw new Error(`The ${family} poster font did not finish loading.`);
@@ -1963,35 +1961,30 @@ function drawStaticPosterBackground(
   }
   context.restore();
 
-  context.save();
-  context.globalCompositeOperation = "screen";
-  context.translate(width * 0.5, height * 0.5);
-  context.rotate(-0.2);
-  const ribbon = context.createLinearGradient(-width, 0, width, 0);
-  ribbon.addColorStop(0, colourCss(palette.primary, 0));
-  ribbon.addColorStop(0.28, colourCss(palette.primary, 0.24));
-  ribbon.addColorStop(0.62, colourCss(palette.secondary, 0.18));
-  ribbon.addColorStop(1, colourCss(palette.secondary, 0));
-  context.fillStyle = ribbon;
-  context.fillRect(-width * 0.8, -height * 0.08, width * 1.6, height * 0.16);
-  context.restore();
-
   drawStaticPaint(
     context,
-    -width * 0.08,
-    height * 0.74,
-    width * 0.78,
-    Math.max(34, height * 0.034),
-    colourCss(palette.primary, 0.2),
+    -width * 0.16,
+    height * 0.31,
+    width * 0.84,
+    Math.max(120, height * 0.13),
+    colourCss(palette.primary, 0.24),
   );
   drawStaticPaint(
     context,
-    width * 0.56,
-    height * 0.14,
-    width * 0.55,
-    Math.max(24, height * 0.024),
-    colourCss(palette.secondary, 0.18),
+    width * 0.47,
+    height * 0.48,
+    width * 0.68,
+    Math.max(150, height * 0.15),
+    colourCss(palette.secondary, 0.24),
     -1,
+  );
+  drawStaticPaint(
+    context,
+    width * 0.03,
+    height * 0.79,
+    width * 0.7,
+    Math.max(38, height * 0.04),
+    colourCss(palette.primary, 0.16),
   );
 
   const upperShade = context.createLinearGradient(0, 0, 0, height * 0.42);
@@ -2023,23 +2016,24 @@ function drawStaticPosterBackground(
   }
 
   context.save();
-  context.globalAlpha = 0.18;
-  context.strokeStyle = colourCss(palette.primary);
-  context.lineWidth = 2;
-  for (let index = 0; index < 5; index += 1) {
-    const y = height * 0.83 + index * 19;
+  context.globalCompositeOperation = "screen";
+  for (let index = 0; index < 48; index += 1) {
+    const side = index % 2 === 0 ? 0.12 : 0.88;
+    const x = width * side + (((particleSeed + index * 79) % 220) - 110);
+    const y = height * (0.2 + ((particleSeed + index * 47) % 650) / 1000);
+    const radius = 2 + ((particleSeed + index * 23) % 13);
+    context.fillStyle = colourCss(index % 3 === 0 ? palette.secondary : palette.primary, 0.12);
+    context.save();
+    context.translate(x, y);
+    context.rotate(((particleSeed + index * 31) % 628) / 100);
     context.beginPath();
-    context.moveTo(width * 0.08, y);
-    context.bezierCurveTo(width * 0.32, y - 8, width * 0.7, y + 11, width * 0.94, y - 3);
-    context.stroke();
-  }
-  context.restore();
-
-  context.save();
-  context.globalAlpha = 0.055;
-  for (let y = 0; y < height; y += 4) {
-    context.fillStyle = y % 8 === 0 ? "#ffffff" : "#000000";
-    context.fillRect(0, y, width, 1);
+    context.moveTo(-radius * 0.35, -radius * 1.4);
+    context.lineTo(radius * 0.7, -radius * 0.2);
+    context.lineTo(radius * 0.25, radius * 1.2);
+    context.lineTo(-radius * 0.65, radius * 0.35);
+    context.closePath();
+    context.fill();
+    context.restore();
   }
   context.restore();
 }
@@ -2253,19 +2247,6 @@ function drawStaticTropeIcon(
   const cx = x + size / 2;
   const cy = y + size / 2;
   context.save();
-  const medallion = context.createRadialGradient(cx, cy, size * 0.08, cx, cy, size * 0.5);
-  medallion.addColorStop(0, "rgba(255,255,255,0.13)");
-  medallion.addColorStop(0.72, "rgba(5,6,12,0.72)");
-  medallion.addColorStop(1, "rgba(2,3,8,0.94)");
-  context.fillStyle = medallion;
-  context.beginPath();
-  context.arc(cx, cy, size * 0.48, 0, Math.PI * 2);
-  context.fill();
-  context.strokeStyle = colour;
-  context.lineWidth = Math.max(7, size * 0.075);
-  context.globalAlpha = 0.95;
-  context.stroke();
-
   context.strokeStyle = colour;
   context.fillStyle = colour;
   context.lineWidth = Math.max(7, size * 0.078);
@@ -2341,14 +2322,19 @@ function drawStaticTropeIcon(
     context.arc(x + size * 0.55, cy, size * 0.028, 0, Math.PI * 2);
     context.fill();
   } else if (/found family|family|stepbrother|teammate/.test(key)) {
-    [0.3, 0.5, 0.7].forEach((position, index) => {
-      context.beginPath();
-      context.arc(x + size * position, y + size * (index === 1 ? 0.28 : 0.36), size * (index === 1 ? 0.13 : 0.1), 0, Math.PI * 2);
-      context.stroke();
-    });
     context.beginPath();
-    context.moveTo(x + size * 0.12, y + size * 0.82);
-    context.quadraticCurveTo(cx, y + size * 0.52, x + size * 0.88, y + size * 0.82);
+    context.moveTo(x + size * 0.13, y + size * 0.47);
+    context.lineTo(cx, y + size * 0.14);
+    context.lineTo(x + size * 0.87, y + size * 0.47);
+    context.lineTo(x + size * 0.8, y + size * 0.47);
+    context.lineTo(x + size * 0.8, y + size * 0.87);
+    context.lineTo(x + size * 0.2, y + size * 0.87);
+    context.lineTo(x + size * 0.2, y + size * 0.47);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(cx, y + size * 0.78);
+    context.bezierCurveTo(x + size * 0.3, y + size * 0.66, x + size * 0.35, y + size * 0.49, cx, y + size * 0.58);
+    context.bezierCurveTo(x + size * 0.65, y + size * 0.49, x + size * 0.7, y + size * 0.66, cx, y + size * 0.78);
     context.stroke();
   } else if (/slow burn|heat|passion|high heat/.test(key)) {
     context.beginPath();
@@ -2755,36 +2741,53 @@ async function createProfessionalCampaignImage(input: {
       "left",
     );
   } else if (template === "trope-showcase") {
-    drawStaticText(
-      context,
-      subgenre,
-      {
-        x: 55,
-        y: isTikTok ? 68 : 42,
-        width: 970,
-        height: isTikTok ? 175 : 130,
-      },
-      {
-        family: "PosterDisplay",
-        weight: 400,
-        startingSize: isTikTok ? 116 : 96,
-        minimumSize: isTikTok ? 60 : 48,
-        maximumLines: 2,
-        colour: "#ffffff",
-        align: "center",
-        lineHeight: 0.9,
-        uppercase: true,
-      },
-      audit,
-      "trope heading",
-    );
+    const genreWords = subgenre.split(/\s+/).filter(Boolean);
+    const genreAccent = genreWords.pop() || "ROMANCE";
+    const genreLead = genreWords.join(" ");
+    if (genreLead) {
+      drawStaticText(
+        context,
+        genreLead,
+        { x: 55, y: isTikTok ? 46 : 38, width: 970, height: isTikTok ? 105 : 76 },
+        {
+          family: "PosterDisplay",
+          weight: 400,
+          startingSize: isTikTok ? 94 : 76,
+          minimumSize: isTikTok ? 48 : 38,
+          maximumLines: 2,
+          colour: "#ffffff",
+          align: "center",
+          lineHeight: 0.88,
+          uppercase: true,
+        },
+        audit,
+        "trope heading lead",
+      );
+    }
     drawStaticPaint(
       context,
-      170,
-      isTikTok ? 212 : 157,
-      740,
-      isTikTok ? 32 : 26,
-      colourCss(palette.primary, 0.85),
+      230,
+      isTikTok ? 137 : 91,
+      620,
+      isTikTok ? 72 : 58,
+      colourCss(palette.primary, 0.82),
+    );
+    drawStaticText(
+      context,
+      genreAccent,
+      { x: 55, y: isTikTok ? 105 : 66, width: 970, height: isTikTok ? 120 : 96 },
+      {
+        family: "PosterAccent",
+        weight: 700,
+        startingSize: isTikTok ? 122 : 102,
+        minimumSize: isTikTok ? 64 : 52,
+        maximumLines: 1,
+        colour: palette.cream,
+        align: "center",
+        lineHeight: 0.84,
+      },
+      audit,
+      "trope heading accent",
     );
 
     context.save();
