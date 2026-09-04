@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 const IMAGE_MODEL = "gpt-image-2";
-const BACKGROUND_CHECK_MODEL = "gpt-5-mini";
+const BACKGROUND_CHECK_MODEL = "gpt-4.1-mini";
 
 type PosterTemplate =
   | "cinematic-quote"
@@ -115,52 +115,63 @@ type BackgroundCheck = {
 };
 
 async function inspectBackground(openai: OpenAI, imageDataUrl: string): Promise<BackgroundCheck> {
-  const response = await openai.responses.create({
-    model: BACKGROUND_CHECK_MODEL,
-    text: {
-      verbosity: "low",
-      format: {
-        type: "json_schema",
-        name: "background_inspection",
-        strict: true,
-        schema: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            decision: { type: "string", enum: ["pass", "reject"] },
-            reason: { type: "string" },
+  let lastFailure = "empty response";
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await openai.responses.create({
+      model: BACKGROUND_CHECK_MODEL,
+      text: {
+        verbosity: "low",
+        format: {
+          type: "json_schema",
+          name: "background_inspection",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              decision: { type: "string", enum: ["pass", "reject"] },
+              reason: { type: "string" },
+            },
+            required: ["decision", "reason"],
           },
-          required: ["decision", "reason"],
         },
       },
-    },
-    input: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: "Inspect only the environmental background. Reject it only for clearly readable writing or numbers, a recognizable logo or watermark, or an obvious deliberate cluster of fake typographic glyphs. Pass natural seams, stitching, scratches, reflections, bokeh, foliage, surface texture and ambiguous incidental marks. Explain the specific visible reason briefly.",
-          },
-          { type: "input_image", image_url: imageDataUrl, detail: "high" },
-        ],
-      },
-    ],
-    max_output_tokens: 200,
-  });
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: "Inspect only the environmental background. Reject it only for clearly readable writing or numbers, a recognizable logo or watermark, or an obvious deliberate cluster of fake typographic glyphs. Pass natural seams, stitching, scratches, reflections, bokeh, foliage, surface texture and ambiguous incidental marks. Explain the specific visible reason briefly.",
+            },
+            { type: "input_image", image_url: imageDataUrl, detail: "high" },
+          ],
+        },
+      ],
+      max_output_tokens: 300,
+    });
 
-  if (!response.output_text?.trim()) {
-    throw new Error("The background inspection returned no result.");
+    if (!response.output_text?.trim()) {
+      lastFailure = response.incomplete_details?.reason || response.status || "empty response";
+      continue;
+    }
+
+    try {
+      const parsed = JSON.parse(response.output_text) as Partial<BackgroundCheck>;
+      if (
+        (parsed.decision === "pass" || parsed.decision === "reject") &&
+        typeof parsed.reason === "string"
+      ) {
+        return { decision: parsed.decision, reason: parsed.reason };
+      }
+      lastFailure = "invalid structured result";
+    } catch {
+      lastFailure = "invalid JSON result";
+    }
   }
 
-  const parsed = JSON.parse(response.output_text) as Partial<BackgroundCheck>;
-  if (
-    (parsed.decision !== "pass" && parsed.decision !== "reject") ||
-    typeof parsed.reason !== "string"
-  ) {
-    throw new Error("The background inspection returned an invalid result.");
-  }
-  return { decision: parsed.decision, reason: parsed.reason };
+  throw new Error(`The background inspection could not be completed (${lastFailure}).`);
 }
 
 async function generateBackground(openai: OpenAI, prompt: string): Promise<string> {
