@@ -1526,7 +1526,1675 @@ function drawCallToAction(
   );
 }
 
+type StaticPosterPalette = {
+  base: CampaignColour;
+  primary: CampaignColour;
+  secondary: CampaignColour;
+  warm: CampaignColour;
+  cream: string;
+};
+
+type StaticPosterAudit = {
+  width: number;
+  height: number;
+  rectangles: Array<{ name: string; rect: PosterRect }>;
+};
+
+type StaticTextOptions = {
+  family: "PosterDisplay" | "PosterSans" | "PosterAccent";
+  weight: number;
+  startingSize: number;
+  minimumSize: number;
+  maximumLines: number;
+  colour: string;
+  align?: "left" | "center" | "right";
+  lineHeight?: number;
+  shadow?: boolean;
+  uppercase?: boolean;
+};
+
+function clampPosterChannel(value: number): number {
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
+function hueDistance(left: number, right: number): number {
+  const difference = Math.abs(left - right) % 360;
+  return Math.min(difference, 360 - difference);
+}
+
+function rgbToHsv(colour: CampaignColour): {
+  hue: number;
+  saturation: number;
+  value: number;
+} {
+  const red = colour.red / 255;
+  const green = colour.green / 255;
+  const blue = colour.blue / 255;
+  const maximum = Math.max(red, green, blue);
+  const minimum = Math.min(red, green, blue);
+  const range = maximum - minimum;
+  let hue = 0;
+
+  if (range > 0) {
+    if (maximum === red) hue = 60 * (((green - blue) / range) % 6);
+    else if (maximum === green) hue = 60 * ((blue - red) / range + 2);
+    else hue = 60 * ((red - green) / range + 4);
+  }
+
+  if (hue < 0) hue += 360;
+  return {
+    hue,
+    saturation: maximum === 0 ? 0 : range / maximum,
+    value: maximum,
+  };
+}
+
+function hsvToRgb(hue: number, saturation: number, value: number): CampaignColour {
+  const chroma = value * saturation;
+  const section = ((hue % 360) + 360) % 360 / 60;
+  const secondary = chroma * (1 - Math.abs((section % 2) - 1));
+  const offset = value - chroma;
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+
+  if (section < 1) [red, green, blue] = [chroma, secondary, 0];
+  else if (section < 2) [red, green, blue] = [secondary, chroma, 0];
+  else if (section < 3) [red, green, blue] = [0, chroma, secondary];
+  else if (section < 4) [red, green, blue] = [0, secondary, chroma];
+  else if (section < 5) [red, green, blue] = [secondary, 0, chroma];
+  else [red, green, blue] = [chroma, 0, secondary];
+
+  return {
+    red: clampPosterChannel((red + offset) * 255),
+    green: clampPosterChannel((green + offset) * 255),
+    blue: clampPosterChannel((blue + offset) * 255),
+  };
+}
+
+function posterFallbackPalette(seed: string): StaticPosterPalette {
+  const options: StaticPosterPalette[] = [
+    {
+      base: { red: 4, green: 7, blue: 13 },
+      primary: { red: 0, green: 196, blue: 255 },
+      secondary: { red: 142, green: 74, blue: 255 },
+      warm: { red: 255, green: 113, blue: 31 },
+      cream: "#fffaf0",
+    },
+    {
+      base: { red: 8, green: 5, blue: 10 },
+      primary: { red: 255, green: 35, blue: 133 },
+      secondary: { red: 78, green: 142, blue: 255 },
+      warm: { red: 255, green: 170, blue: 29 },
+      cream: "#fff8ef",
+    },
+    {
+      base: { red: 3, green: 10, blue: 10 },
+      primary: { red: 0, green: 214, blue: 184 },
+      secondary: { red: 210, green: 64, blue: 255 },
+      warm: { red: 255, green: 127, blue: 32 },
+      cream: "#fff9ec",
+    },
+  ];
+  return options[seededNumber(seed) % options.length];
+}
+
+function extractStaticPosterPalette(
+  cover: HTMLImageElement,
+  seed: string,
+): StaticPosterPalette {
+  const sample = document.createElement("canvas");
+  sample.width = 96;
+  sample.height = 144;
+  const sampleContext = sample.getContext("2d", { willReadFrequently: true });
+  const fallback = posterFallbackPalette(seed);
+  if (!sampleContext) return fallback;
+
+  sampleContext.drawImage(cover, 0, 0, sample.width, sample.height);
+  const data = sampleContext.getImageData(0, 0, sample.width, sample.height).data;
+  const buckets = new Map<
+    number,
+    {
+      hue: number;
+      red: number;
+      green: number;
+      blue: number;
+      weight: number;
+      count: number;
+      peakSaturation: number;
+      peakValue: number;
+    }
+  >();
+
+  for (let index = 0; index < data.length; index += 8) {
+    if (data[index + 3] < 190) continue;
+    const colour = {
+      red: data[index],
+      green: data[index + 1],
+      blue: data[index + 2],
+    };
+    const hsv = rgbToHsv(colour);
+    if (hsv.saturation < 0.3 || hsv.value < 0.28 || hsv.value > 0.98) continue;
+
+    const bucketKey = Math.round(hsv.hue / 15) % 24;
+    const vividness = Math.pow(hsv.saturation, 2.35) * (0.4 + hsv.value * 0.6);
+    const existing = buckets.get(bucketKey) ?? {
+      hue: 0,
+      red: 0,
+      green: 0,
+      blue: 0,
+      weight: 0,
+      count: 0,
+      peakSaturation: 0,
+      peakValue: 0,
+    };
+    existing.hue += hsv.hue * vividness;
+    existing.red += colour.red * vividness;
+    existing.green += colour.green * vividness;
+    existing.blue += colour.blue * vividness;
+    existing.weight += vividness;
+    existing.count += 1;
+    existing.peakSaturation = Math.max(existing.peakSaturation, hsv.saturation);
+    existing.peakValue = Math.max(existing.peakValue, hsv.value);
+    buckets.set(bucketKey, existing);
+  }
+
+  const candidates = [...buckets.values()]
+    .filter((bucket) => bucket.weight > 0)
+    .map((bucket) => {
+      const average = {
+        red: bucket.red / bucket.weight,
+        green: bucket.green / bucket.weight,
+        blue: bucket.blue / bucket.weight,
+      };
+      const hsv = rgbToHsv(average);
+      const hue = bucket.hue / bucket.weight;
+      const score =
+        (0.55 + bucket.peakSaturation * 0.45) *
+        (0.62 + bucket.peakValue * 0.38) *
+        (1 + Math.log1p(bucket.count) * 0.16);
+      return {
+        hue,
+        score,
+        colour: hsvToRgb(
+          hue,
+          Math.max(0.76, Math.min(0.94, hsv.saturation * 1.12)),
+          Math.max(0.78, Math.min(0.98, hsv.value * 1.08)),
+        ),
+      };
+    })
+    .sort((left, right) => right.score - left.score);
+
+  if (!candidates.length) return fallback;
+
+  let primary = candidates[0];
+  const coolCandidate = candidates.find(
+    (candidate) => candidate.hue >= 168 && candidate.hue <= 235,
+  );
+  const primaryIsWarm = primary.hue <= 72 || primary.hue >= 332;
+  if (primaryIsWarm && coolCandidate && coolCandidate.score >= primary.score * 0.66) {
+    primary = coolCandidate;
+  }
+  const violetCompanion =
+    primary.hue >= 168 && primary.hue <= 235
+      ? candidates.find(
+          (candidate) =>
+            candidate.hue >= 250 &&
+            candidate.hue <= 325 &&
+            candidate.score >= primary.score * 0.42,
+        )
+      : undefined;
+  const secondary =
+    violetCompanion ??
+    candidates.find((candidate) => hueDistance(candidate.hue, primary.hue) >= 52) ??
+    { colour: fallback.secondary, hue: rgbToHsv(fallback.secondary).hue, score: 0 };
+  const warm =
+    candidates.find(
+      (candidate) =>
+        (candidate.hue <= 68 || candidate.hue >= 335) &&
+        hueDistance(candidate.hue, primary.hue) >= 34 &&
+        hueDistance(candidate.hue, secondary.hue) >= 28,
+    ) ?? { colour: fallback.warm, hue: rgbToHsv(fallback.warm).hue, score: 0 };
+
+  return {
+    base: fallback.base,
+    primary: primary.colour,
+    secondary: secondary.colour,
+    warm: warm.colour,
+    cream: fallback.cream,
+  };
+}
+
+function recordStaticRect(
+  audit: StaticPosterAudit,
+  name: string,
+  rect: PosterRect,
+  inset = 34,
+) {
+  const tolerance = 0.5;
+  if (
+    rect.x < inset - tolerance ||
+    rect.y < inset - tolerance ||
+    rect.x + rect.width > audit.width - inset + tolerance ||
+    rect.y + rect.height > audit.height - inset + tolerance
+  ) {
+    throw new Error(`${name} escaped the poster safe zone.`);
+  }
+  audit.rectangles.push({ name, rect });
+}
+
+function staticFont(options: StaticTextOptions, size: number): string {
+  return `${options.weight} ${size}px "${options.family}", ${
+    options.family === "PosterDisplay" ? '"Arial Narrow"' : "Arial"
+  }, sans-serif`;
+}
+
+function wrapStaticText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  maximumWidth: number,
+): string[] {
+  const paragraphs = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const result: string[] = [];
+
+  paragraphs.forEach((paragraph) => {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let line = "";
+    words.forEach((word) => {
+      const candidate = line ? `${line} ${word}` : word;
+      if (!line || context.measureText(candidate).width <= maximumWidth) {
+        line = candidate;
+      } else {
+        result.push(line);
+        line = word;
+      }
+    });
+    if (line) result.push(line);
+  });
+
+  return result;
+}
+
+function drawStaticText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  area: PosterRect,
+  options: StaticTextOptions,
+  audit: StaticPosterAudit,
+  name: string,
+): PosterRect {
+  const value = (options.uppercase ? text.toUpperCase() : text).trim();
+  if (!value) return { x: area.x, y: area.y, width: 0, height: 0 };
+
+  let size = options.startingSize;
+  let lines: string[] = [];
+  let lineHeight = size * (options.lineHeight ?? 1.02);
+
+  while (size >= options.minimumSize) {
+    context.font = staticFont(options, size);
+    lines = wrapStaticText(context, value, area.width);
+    lineHeight = size * (options.lineHeight ?? 1.02);
+    if (lines.length <= options.maximumLines && lines.length * lineHeight <= area.height) break;
+    size -= 2;
+  }
+
+  if (
+    size < options.minimumSize ||
+    lines.length > options.maximumLines ||
+    lines.length * lineHeight > area.height
+  ) {
+    throw new Error(`${name} is too long for a readable poster layout.`);
+  }
+
+  const measuredWidth = Math.min(
+    area.width,
+    Math.max(...lines.map((line) => context.measureText(line).width)),
+  );
+  const rect: PosterRect = {
+    x:
+      options.align === "center"
+        ? area.x + (area.width - measuredWidth) / 2
+        : options.align === "right"
+          ? area.x + area.width - measuredWidth
+          : area.x,
+    y: area.y,
+    width: measuredWidth,
+    height: lines.length * lineHeight,
+  };
+  recordStaticRect(audit, name, rect);
+
+  context.save();
+  context.font = staticFont(options, size);
+  context.textAlign = options.align ?? "left";
+  context.textBaseline = "top";
+  context.fillStyle = options.colour;
+  if (options.shadow !== false) {
+    context.shadowColor = "rgba(0,0,0,0.92)";
+    context.shadowBlur = Math.max(10, size * 0.18);
+    context.shadowOffsetY = Math.max(2, size * 0.04);
+  }
+  const x =
+    options.align === "center"
+      ? area.x + area.width / 2
+      : options.align === "right"
+        ? area.x + area.width
+        : area.x;
+  lines.forEach((line, index) => {
+    context.fillText(line, x, area.y + index * lineHeight);
+  });
+  context.restore();
+  return rect;
+}
+
+function drawStaticPaint(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  colour: string,
+  direction = 1,
+) {
+  context.save();
+  context.fillStyle = colour;
+  context.beginPath();
+  context.moveTo(x, y + height * 0.22);
+  context.bezierCurveTo(
+    x + width * 0.24,
+    y - height * 0.12 * direction,
+    x + width * 0.69,
+    y + height * 0.26 * direction,
+    x + width,
+    y + height * 0.06,
+  );
+  context.lineTo(x + width * 0.96, y + height * 0.78);
+  context.bezierCurveTo(
+    x + width * 0.64,
+    y + height * 1.08,
+    x + width * 0.25,
+    y + height * 0.72,
+    x + width * 0.03,
+    y + height,
+  );
+  context.closePath();
+  context.fill();
+  context.globalAlpha = 0.45;
+  context.fillRect(x + width * 0.08, y + height * 1.08, width * 0.72, Math.max(2, height * 0.08));
+  context.restore();
+}
+
+function drawStaticGlow(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  colour: CampaignColour,
+  alpha: number,
+) {
+  const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
+  gradient.addColorStop(0, colourCss(colour, alpha));
+  gradient.addColorStop(0.45, colourCss(colour, alpha * 0.42));
+  gradient.addColorStop(1, colourCss(colour, 0));
+  context.fillStyle = gradient;
+  context.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+}
+
+function drawStaticPosterBackground(
+  context: CanvasRenderingContext2D,
+  cover: HTMLImageElement,
+  scene: HTMLImageElement | null,
+  palette: StaticPosterPalette,
+  width: number,
+  height: number,
+  template: Exclude<PosterTemplate, "auto">,
+  seed: number,
+) {
+  context.fillStyle = colourCss(palette.base);
+  context.fillRect(0, 0, width, height);
+
+  context.save();
+  context.filter = scene
+    ? "saturate(0.88) contrast(1.16) brightness(0.9)"
+    : "blur(58px) saturate(1.45) contrast(1.2)";
+  context.globalAlpha = scene ? 0.92 : 0.58;
+  drawImageCover(
+    context,
+    scene ?? cover,
+    scene ? -18 : -170,
+    scene ? -18 : -160,
+    scene ? width + 36 : width + 340,
+    scene ? height + 36 : height + 320,
+  );
+  context.restore();
+
+  context.save();
+  context.globalCompositeOperation = "screen";
+  drawStaticGlow(context, width * 0.16, height * 0.42, width * 0.72, palette.primary, 0.34);
+  drawStaticGlow(context, width * 0.9, height * 0.28, width * 0.64, palette.secondary, 0.3);
+  if (template === "offer-promotion") {
+    drawStaticGlow(context, width * 0.18, height * 0.44, width * 0.44, palette.warm, 0.35);
+  }
+  context.restore();
+
+  const upperShade = context.createLinearGradient(0, 0, 0, height * 0.42);
+  upperShade.addColorStop(0, "rgba(1,2,5,0.66)");
+  upperShade.addColorStop(0.56, "rgba(1,2,5,0.18)");
+  upperShade.addColorStop(1, "rgba(1,2,5,0)");
+  context.fillStyle = upperShade;
+  context.fillRect(0, 0, width, height * 0.42);
+
+  const floor = context.createLinearGradient(0, height * 0.68, 0, height);
+  floor.addColorStop(0, "rgba(1,2,5,0)");
+  floor.addColorStop(0.66, "rgba(1,2,5,0.42)");
+  floor.addColorStop(1, "rgba(1,2,5,0.88)");
+  context.fillStyle = floor;
+  context.fillRect(0, height * 0.68, width, height * 0.32);
+
+  const particleSeed = seed || 1;
+  for (let index = 0; index < 46; index += 1) {
+    const x = (particleSeed * (index + 13) * 71) % width;
+    const y = (particleSeed * (index + 29) * 43) % height;
+    const radius = 1 + ((particleSeed + index * 17) % 5);
+    context.fillStyle = colourCss(
+      index % 5 === 0 ? palette.warm : index % 2 === 0 ? palette.secondary : palette.primary,
+      0.1 + ((index * 11) % 18) / 100,
+    );
+    context.beginPath();
+    context.arc(x, y, radius, 0, Math.PI * 2);
+    context.fill();
+  }
+
+  context.save();
+  context.globalAlpha = 0.18;
+  context.strokeStyle = colourCss(palette.primary);
+  context.lineWidth = 2;
+  for (let index = 0; index < 5; index += 1) {
+    const y = height * 0.83 + index * 19;
+    context.beginPath();
+    context.moveTo(width * 0.08, y);
+    context.bezierCurveTo(width * 0.32, y - 8, width * 0.7, y + 11, width * 0.94, y - 3);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function drawContainedStaticCover(
+  context: CanvasRenderingContext2D,
+  cover: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const scale = Math.min(width / cover.naturalWidth, height / cover.naturalHeight);
+  const drawWidth = cover.naturalWidth * scale;
+  const drawHeight = cover.naturalHeight * scale;
+  context.drawImage(
+    cover,
+    x + (width - drawWidth) / 2,
+    y + (height - drawHeight) / 2,
+    drawWidth,
+    drawHeight,
+  );
+}
+
+function staticKindleRect(
+  centreX: number,
+  top: number,
+  deviceWidth: number,
+  rotation: number,
+): PosterRect {
+  const frame = Math.max(24, deviceWidth * 0.055);
+  const innerWidth = deviceWidth - frame * 2;
+  const deviceHeight = frame + innerWidth * 1.5 + Math.max(66, deviceWidth * 0.13);
+  const rotatedWidth =
+    Math.abs(deviceWidth * Math.cos(rotation)) +
+    Math.abs(deviceHeight * Math.sin(rotation));
+  const rotatedHeight =
+    Math.abs(deviceWidth * Math.sin(rotation)) +
+    Math.abs(deviceHeight * Math.cos(rotation));
+  return {
+    x: centreX - rotatedWidth / 2 - 12,
+    y: top + deviceHeight / 2 - rotatedHeight / 2 - 12,
+    width: rotatedWidth + 24,
+    height: rotatedHeight + 38,
+  };
+}
+
+function drawStaticKindle(
+  context: CanvasRenderingContext2D,
+  cover: HTMLImageElement,
+  palette: StaticPosterPalette,
+  centreX: number,
+  top: number,
+  deviceWidth: number,
+  rotation: number,
+  audit: StaticPosterAudit,
+  name: string,
+): PosterRect {
+  const frame = Math.max(24, deviceWidth * 0.055);
+  const innerWidth = deviceWidth - frame * 2;
+  const screenHeight = innerWidth * 1.5;
+  const bottomFrame = Math.max(66, deviceWidth * 0.13);
+  const deviceHeight = frame + screenHeight + bottomFrame;
+  const rect = staticKindleRect(centreX, top, deviceWidth, rotation);
+  recordStaticRect(audit, name, rect, 20);
+
+  context.save();
+  context.translate(centreX, top + deviceHeight + 18);
+  context.rotate(rotation * 0.35);
+  context.scale(1, 0.18);
+  const reflection = context.createRadialGradient(0, 0, 12, 0, 0, deviceWidth * 0.65);
+  reflection.addColorStop(0, colourCss(palette.primary, 0.32));
+  reflection.addColorStop(0.55, "rgba(255,255,255,0.07)");
+  reflection.addColorStop(1, "rgba(0,0,0,0)");
+  context.fillStyle = reflection;
+  context.beginPath();
+  context.ellipse(0, 0, deviceWidth * 0.7, deviceWidth * 0.42, 0, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  context.save();
+  context.translate(centreX, top + deviceHeight / 2);
+  context.rotate(rotation);
+  context.translate(-deviceWidth / 2, -deviceHeight / 2);
+  context.shadowColor = "rgba(0,0,0,0.96)";
+  context.shadowBlur = Math.max(36, deviceWidth * 0.085);
+  context.shadowOffsetY = Math.max(18, deviceWidth * 0.045);
+
+  roundedRectanglePath(context, 0, 0, deviceWidth, deviceHeight, deviceWidth * 0.052);
+  const shell = context.createLinearGradient(0, 0, deviceWidth, deviceHeight);
+  shell.addColorStop(0, "#3b3d43");
+  shell.addColorStop(0.12, "#111217");
+  shell.addColorStop(0.68, "#050608");
+  shell.addColorStop(1, "#262831");
+  context.fillStyle = shell;
+  context.fill();
+  context.shadowColor = "transparent";
+
+  roundedRectanglePath(context, 6, 6, deviceWidth - 12, deviceHeight - 12, deviceWidth * 0.044);
+  context.strokeStyle = "rgba(255,255,255,0.34)";
+  context.lineWidth = 2;
+  context.stroke();
+
+  const screenX = frame;
+  const screenY = frame;
+  context.save();
+  roundedRectanglePath(context, screenX, screenY, innerWidth, screenHeight, Math.max(5, frame * 0.14));
+  context.clip();
+  context.fillStyle = colourCss(palette.base);
+  context.fillRect(screenX, screenY, innerWidth, screenHeight);
+  context.save();
+  context.filter = "blur(20px) saturate(1.25)";
+  context.globalAlpha = 0.48;
+  drawImageCover(context, cover, screenX - 20, screenY - 20, innerWidth + 40, screenHeight + 40);
+  context.restore();
+  drawContainedStaticCover(context, cover, screenX, screenY, innerWidth, screenHeight);
+
+  const glass = context.createLinearGradient(screenX, screenY, screenX + innerWidth, screenY + screenHeight);
+  glass.addColorStop(0, "rgba(255,255,255,0.2)");
+  glass.addColorStop(0.16, "rgba(255,255,255,0.035)");
+  glass.addColorStop(0.55, "rgba(255,255,255,0)");
+  glass.addColorStop(1, "rgba(255,255,255,0.07)");
+  context.fillStyle = glass;
+  context.fillRect(screenX, screenY, innerWidth, screenHeight);
+  context.restore();
+
+  context.strokeStyle = "rgba(0,0,0,0.9)";
+  context.lineWidth = 5;
+  context.strokeRect(screenX - 1, screenY - 1, innerWidth + 2, screenHeight + 2);
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillStyle = "rgba(255,255,255,0.4)";
+  context.font = `700 ${Math.max(21, deviceWidth * 0.046)}px "PosterSans", Arial, sans-serif`;
+  context.fillText("kindle", deviceWidth / 2, deviceHeight - bottomFrame * 0.39);
+
+  context.save();
+  context.globalCompositeOperation = "screen";
+  const edgeGlow = context.createLinearGradient(0, 0, deviceWidth, 0);
+  edgeGlow.addColorStop(0, colourCss(palette.primary, 0.5));
+  edgeGlow.addColorStop(0.5, "rgba(255,255,255,0.08)");
+  edgeGlow.addColorStop(1, colourCss(palette.secondary, 0.5));
+  context.strokeStyle = edgeGlow;
+  context.lineWidth = 3;
+  roundedRectanglePath(context, 2, 2, deviceWidth - 4, deviceHeight - 4, deviceWidth * 0.05);
+  context.stroke();
+  context.restore();
+  context.restore();
+  return rect;
+}
+
+function drawStaticCoverHero(
+  context: CanvasRenderingContext2D,
+  cover: HTMLImageElement,
+  palette: StaticPosterPalette,
+  bounds: PosterRect,
+  rotation: number,
+  audit: StaticPosterAudit,
+): PosterRect {
+  const scale = Math.min(bounds.width / cover.naturalWidth, bounds.height / cover.naturalHeight);
+  const width = cover.naturalWidth * scale;
+  const height = cover.naturalHeight * scale;
+  const x = bounds.x + (bounds.width - width) / 2;
+  const y = bounds.y + (bounds.height - height) / 2;
+  const rotatedWidth =
+    Math.abs(width * Math.cos(rotation)) + Math.abs(height * Math.sin(rotation));
+  const rotatedHeight =
+    Math.abs(width * Math.sin(rotation)) + Math.abs(height * Math.cos(rotation));
+  const rect = {
+    x: x + width / 2 - rotatedWidth / 2 - 12,
+    y: y + height / 2 - rotatedHeight / 2 - 12,
+    width: rotatedWidth + 24,
+    height: rotatedHeight + 34,
+  };
+  recordStaticRect(audit, "editorial cover", rect, 20);
+
+  context.save();
+  context.translate(x + width / 2, y + height / 2);
+  context.rotate(rotation);
+  context.shadowColor = "rgba(0,0,0,0.95)";
+  context.shadowBlur = 46;
+  context.shadowOffsetY = 26;
+  context.fillStyle = colourCss(palette.secondary, 0.62);
+  context.beginPath();
+  context.moveTo(-width / 2 + 8, -height / 2 + 12);
+  context.lineTo(width / 2 + 15, -height / 2 + 24);
+  context.lineTo(width / 2 + 15, height / 2 + 18);
+  context.lineTo(-width / 2 + 8, height / 2 + 2);
+  context.closePath();
+  context.fill();
+  context.shadowColor = "transparent";
+  context.drawImage(cover, -width / 2, -height / 2, width, height);
+  const shine = context.createLinearGradient(-width / 2, -height / 2, width / 2, height / 2);
+  shine.addColorStop(0, "rgba(255,255,255,0.2)");
+  shine.addColorStop(0.22, "rgba(255,255,255,0)");
+  shine.addColorStop(1, "rgba(255,255,255,0.04)");
+  context.fillStyle = shine;
+  context.fillRect(-width / 2, -height / 2, width, height);
+  context.restore();
+  return rect;
+}
+
+function drawStaticTropeIcon(
+  context: CanvasRenderingContext2D,
+  trope: string,
+  x: number,
+  y: number,
+  size: number,
+  colour: string,
+) {
+  const key = trope.toLowerCase();
+  const cx = x + size / 2;
+  const cy = y + size / 2;
+  context.save();
+  context.strokeStyle = colour;
+  context.fillStyle = colour;
+  context.lineWidth = Math.max(5, size * 0.065);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.shadowColor = colour;
+  context.shadowBlur = size * 0.16;
+
+  const heart = () => {
+    context.beginPath();
+    context.moveTo(cx, y + size * 0.86);
+    context.bezierCurveTo(x + size * 0.08, y + size * 0.58, x + size * 0.13, y + size * 0.18, cx, y + size * 0.35);
+    context.bezierCurveTo(x + size * 0.87, y + size * 0.18, x + size * 0.92, y + size * 0.58, cx, y + size * 0.86);
+    context.stroke();
+  };
+
+  if (/adhd|neurodiv|neuro/.test(key)) {
+    context.beginPath();
+    context.moveTo(cx, y + size * 0.17);
+    context.bezierCurveTo(x + size * 0.27, y + size * 0.05, x + size * 0.12, y + size * 0.24, x + size * 0.2, y + size * 0.4);
+    context.bezierCurveTo(x + size * 0.04, y + size * 0.54, x + size * 0.2, y + size * 0.78, x + size * 0.39, y + size * 0.72);
+    context.bezierCurveTo(x + size * 0.43, y + size * 0.94, x + size * 0.68, y + size * 0.88, x + size * 0.65, y + size * 0.71);
+    context.bezierCurveTo(x + size * 0.9, y + size * 0.78, x + size * 0.96, y + size * 0.47, x + size * 0.79, y + size * 0.4);
+    context.bezierCurveTo(x + size * 0.9, y + size * 0.2, x + size * 0.68, y + size * 0.06, cx, y + size * 0.17);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(cx, y + size * 0.18);
+    context.lineTo(cx, y + size * 0.72);
+    context.moveTo(x + size * 0.28, y + size * 0.35);
+    context.quadraticCurveTo(x + size * 0.48, y + size * 0.43, x + size * 0.34, y + size * 0.62);
+    context.moveTo(x + size * 0.72, y + size * 0.32);
+    context.quadraticCurveTo(x + size * 0.52, y + size * 0.45, x + size * 0.69, y + size * 0.61);
+    context.stroke();
+  } else if (/hockey|puck|ice/.test(key)) {
+    context.beginPath();
+    context.moveTo(x + size * 0.2, y + size * 0.08);
+    context.lineTo(x + size * 0.39, y + size * 0.74);
+    context.quadraticCurveTo(x + size * 0.43, y + size * 0.91, x + size * 0.65, y + size * 0.82);
+    context.stroke();
+    context.beginPath();
+    context.ellipse(x + size * 0.77, y + size * 0.8, size * 0.14, size * 0.075, 0, 0, Math.PI * 2);
+    context.fill();
+  } else if (/football|quarterback|touchdown/.test(key)) {
+    context.beginPath();
+    context.ellipse(cx, cy, size * 0.4, size * 0.25, -0.46, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(cx - size * 0.12, cy - size * 0.09);
+    context.lineTo(cx + size * 0.12, cy + size * 0.09);
+    context.stroke();
+    [-0.07, 0, 0.07].forEach((offset) => {
+      context.beginPath();
+      context.moveTo(cx + size * (offset - 0.045), cy + size * (offset + 0.04));
+      context.lineTo(cx + size * (offset + 0.045), cy + size * (offset - 0.04));
+      context.stroke();
+    });
+  } else if (/forbidden|secret|off.?limits|locked/.test(key)) {
+    roundedRectanglePath(context, x + size * 0.19, y + size * 0.42, size * 0.62, size * 0.46, size * 0.08);
+    context.stroke();
+    context.beginPath();
+    context.arc(cx, y + size * 0.42, size * 0.24, Math.PI, 0);
+    context.stroke();
+    context.beginPath();
+    context.arc(cx, y + size * 0.64, size * 0.045, 0, Math.PI * 2);
+    context.fill();
+  } else if (/forced proximity|roommate|neighbou?r|close quarters/.test(key)) {
+    context.strokeRect(x + size * 0.17, y + size * 0.1, size * 0.66, size * 0.8);
+    context.beginPath();
+    context.moveTo(x + size * 0.64, y + size * 0.18);
+    context.lineTo(x + size * 0.64, y + size * 0.82);
+    context.stroke();
+    context.beginPath();
+    context.arc(x + size * 0.55, cy, size * 0.028, 0, Math.PI * 2);
+    context.fill();
+  } else if (/found family|family|stepbrother|teammate/.test(key)) {
+    [0.3, 0.5, 0.7].forEach((position, index) => {
+      context.beginPath();
+      context.arc(x + size * position, y + size * (index === 1 ? 0.28 : 0.36), size * (index === 1 ? 0.13 : 0.1), 0, Math.PI * 2);
+      context.stroke();
+    });
+    context.beginPath();
+    context.moveTo(x + size * 0.12, y + size * 0.82);
+    context.quadraticCurveTo(cx, y + size * 0.52, x + size * 0.88, y + size * 0.82);
+    context.stroke();
+  } else if (/slow burn|heat|passion|high heat/.test(key)) {
+    context.beginPath();
+    context.moveTo(cx, y + size * 0.92);
+    context.bezierCurveTo(x + size * 0.15, y + size * 0.67, x + size * 0.43, y + size * 0.4, cx, y + size * 0.08);
+    context.bezierCurveTo(x + size * 0.84, y + size * 0.42, x + size * 0.92, y + size * 0.7, cx, y + size * 0.92);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(cx, y + size * 0.78);
+    context.quadraticCurveTo(x + size * 0.39, y + size * 0.62, cx, y + size * 0.44);
+    context.quadraticCurveTo(x + size * 0.66, y + size * 0.63, cx, y + size * 0.78);
+    context.stroke();
+  } else if (/workplace|office|boss|executive/.test(key)) {
+    roundedRectanglePath(context, x + size * 0.12, y + size * 0.31, size * 0.76, size * 0.55, size * 0.06);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(x + size * 0.34, y + size * 0.31);
+    context.lineTo(x + size * 0.39, y + size * 0.16);
+    context.lineTo(x + size * 0.61, y + size * 0.16);
+    context.lineTo(x + size * 0.66, y + size * 0.31);
+    context.moveTo(x + size * 0.12, y + size * 0.5);
+    context.quadraticCurveTo(cx, y + size * 0.7, x + size * 0.88, y + size * 0.5);
+    context.stroke();
+  } else if (/coach|player/.test(key)) {
+    context.beginPath();
+    context.moveTo(x + size * 0.18, y + size * 0.28);
+    context.quadraticCurveTo(cx, y + size * 0.02, x + size * 0.82, y + size * 0.28);
+    context.lineTo(x + size * 0.68, y + size * 0.62);
+    context.quadraticCurveTo(cx, y + size * 0.78, x + size * 0.32, y + size * 0.62);
+    context.closePath();
+    context.stroke();
+    context.beginPath();
+    context.moveTo(x + size * 0.66, y + size * 0.62);
+    context.lineTo(x + size * 0.84, y + size * 0.88);
+    context.stroke();
+  } else {
+    heart();
+  }
+  context.restore();
+}
+
+function drawStaticTropeLabel(
+  context: CanvasRenderingContext2D,
+  trope: string,
+  area: PosterRect,
+  colour: string,
+  audit: StaticPosterAudit,
+  index: number,
+) {
+  const iconSize = Math.min(area.height * 0.48, area.width * 0.32, 94);
+  const iconX = area.x + (area.width - iconSize) / 2;
+  drawStaticTropeIcon(context, trope, iconX, area.y, iconSize, colour);
+  drawStaticText(
+    context,
+    trope,
+    {
+      x: area.x,
+      y: area.y + iconSize + 9,
+      width: area.width,
+      height: area.height - iconSize - 9,
+    },
+    {
+      family: "PosterDisplay",
+      weight: 400,
+      startingSize: 40,
+      minimumSize: 25,
+      maximumLines: 3,
+      colour: "#ffffff",
+      align: "center",
+      lineHeight: 1.02,
+      uppercase: true,
+    },
+    audit,
+    `trope ${index + 1}`,
+  );
+}
+
+function selectQuoteParts(value: string): { lead: string; accent: string; tail: string } {
+  const clean = value.trim().replace(/^[“\"]+|[”\"]+$/g, "");
+  const preferred = clean.match(/keep touching you|risk everything|my coach|worth everything|totally off limits/i);
+  if (preferred && preferred.index !== undefined) {
+    return {
+      lead: clean.slice(0, preferred.index).trim(),
+      accent: preferred[0].trim(),
+      tail: clean.slice(preferred.index + preferred[0].length).trim(),
+    };
+  }
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length <= 5) return { lead: "", accent: clean, tail: "" };
+  const accentLength = Math.min(4, Math.max(2, Math.round(words.length * 0.28)));
+  const accentStart = Math.max(1, Math.floor((words.length - accentLength) * 0.48));
+  return {
+    lead: words.slice(0, accentStart).join(" "),
+    accent: words.slice(accentStart, accentStart + accentLength).join(" "),
+    tail: words.slice(accentStart + accentLength).join(" "),
+  };
+}
+
+function drawStaticCta(
+  context: CanvasRenderingContext2D,
+  book: CatalogueBook,
+  palette: StaticPosterPalette,
+  area: PosterRect,
+  audit: StaticPosterAudit,
+  align: "left" | "center" = "center",
+) {
+  const eyebrow = book.kindleUnlimited ? "AVAILABLE ON" : "AVAILABLE ON";
+  const main = book.kindleUnlimited ? "KINDLE UNLIMITED" : "AMAZON";
+  const eyebrowRect = drawStaticText(
+    context,
+    eyebrow,
+    { x: area.x, y: area.y, width: area.width, height: 38 },
+    {
+      family: "PosterSans",
+      weight: 700,
+      startingSize: area.width < 430 ? 20 : 25,
+      minimumSize: 17,
+      maximumLines: 1,
+      colour: "rgba(255,255,255,0.9)",
+      align,
+      uppercase: true,
+      shadow: true,
+    },
+    audit,
+    "CTA eyebrow",
+  );
+  const mainTop = area.y + eyebrowRect.height + 12;
+  const mainRect = drawStaticText(
+    context,
+    main,
+    { x: area.x, y: mainTop, width: area.width, height: area.height - eyebrowRect.height - 12 },
+    {
+      family: "PosterDisplay",
+      weight: 400,
+      startingSize: area.width < 430 ? 46 : 66,
+      minimumSize: area.width < 430 ? 34 : 44,
+      maximumLines: 1,
+      colour: colourCss(palette.primary),
+      align,
+      uppercase: true,
+      shadow: true,
+    },
+    audit,
+    "CTA",
+  );
+  const underlineWidth = Math.min(area.width * 0.76, mainRect.width);
+  drawStaticPaint(
+    context,
+    align === "center" ? area.x + (area.width - underlineWidth) / 2 : area.x,
+    mainTop + mainRect.height + 6,
+    underlineWidth,
+    11,
+    colourCss(palette.secondary, 0.9),
+  );
+}
+
+function drawStaticSignature(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  palette: StaticPosterPalette,
+  audit: StaticPosterAudit,
+) {
+  drawStaticText(
+    context,
+    "MARLOW QUINN",
+    { x: 50, y: height - 52, width: width - 100, height: 28 },
+    {
+      family: "PosterSans",
+      weight: 700,
+      startingSize: 18,
+      minimumSize: 16,
+      maximumLines: 1,
+      colour: colourCss(palette.primary, 0.8),
+      align: "right",
+      uppercase: true,
+      shadow: true,
+    },
+    audit,
+    "author signature",
+  );
+}
+
+type StaticOffer = { eyebrow: string; value: string };
+
+function extractStaticOffer(text: string): StaticOffer | null {
+  const price = text.match(/(?:£|\$)\s?\d+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?\s?(?:p|¢)/iu)?.[0];
+  if (price) return { eyebrow: "LIMITED TIME", value: price.replace(/\s+/g, "") };
+  if (/\bfree\b/i.test(text)) return { eyebrow: "LIMITED TIME", value: "FREE" };
+  if (/\bnew release\b/i.test(text)) return { eyebrow: "", value: "NEW RELEASE" };
+  if (/\bon sale\b|\bsale price\b/i.test(text)) return { eyebrow: "SPECIAL OFFER", value: "SALE" };
+  return null;
+}
+
+function resolveStaticPosterTemplate(
+  selected: PosterTemplate,
+  campaignType: CampaignType,
+  seed: number,
+  suppliedText: string,
+): Exclude<PosterTemplate, "auto"> {
+  if (selected !== "auto") return selected;
+  if (extractStaticOffer(suppliedText)) return "offer-promotion";
+  if (campaignType === "quote-post") return "cinematic-quote";
+  if (campaignType === "trope-hook") return "trope-showcase";
+  if (campaignType === "kindle-unlimited") return seed % 2 === 0 ? "kindle-hero" : "modern-editorial";
+  if (campaignType === "backlist-revival") return "modern-editorial";
+  return ["kindle-hero", "modern-editorial", "trope-showcase"][seed % 3] as
+    | "kindle-hero"
+    | "modern-editorial"
+    | "trope-showcase";
+}
+
 async function createProfessionalCampaignImage(input: {
+  book: CatalogueBook;
+  post: GeneratedPost;
+  mediaStyle: MediaStyle;
+  campaignType: CampaignType;
+  quote: string;
+  template: PosterTemplate;
+  aiBackground?: string;
+}): Promise<{ dataUrl: string; template: Exclude<PosterTemplate, "auto"> }> {
+  await ensurePosterFonts();
+  const isTikTok = input.post.platform === "tiktok";
+  const width = 1080;
+  const height = isTikTok ? 1920 : 1350;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+
+  if (!context) throw new Error("This browser could not create the image.");
+
+  const [cover, scene] = await Promise.all([
+    loadImage(input.book.coverUrl),
+    input.aiBackground ? loadImage(input.aiBackground) : Promise.resolve(null),
+  ]);
+  const suppliedText = `${input.post.title} ${input.post.caption} ${input.quote}`;
+  const seed = seededNumber(
+    `${input.book.slug}-${input.post.platform}-${input.template}-${suppliedText}`,
+  );
+  let template = resolveStaticPosterTemplate(
+    input.template,
+    input.campaignType,
+    seed,
+    suppliedText,
+  );
+
+  if (template === "cinematic-quote" && !input.quote.trim()) {
+    template = "modern-editorial";
+  }
+  const offer = extractStaticOffer(suppliedText);
+  if (template === "offer-promotion" && !offer) {
+    template = "modern-editorial";
+  }
+
+  const palette = extractStaticPosterPalette(cover, input.book.slug);
+  const audit: StaticPosterAudit = { width, height, rectangles: [] };
+  const primary = colourCss(palette.primary);
+  const secondary = colourCss(palette.secondary);
+  const warm = colourCss(palette.warm);
+  const subgenre = (input.book.subgenre || "ROMANCE").trim();
+  const normalise = (value: string) =>
+    value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const uniqueTropes = input.book.tropes
+    .filter(
+      (trope, index, all) =>
+        all.findIndex((item) => normalise(item) === normalise(trope)) === index,
+    )
+    .filter((trope) => normalise(trope) !== normalise(subgenre))
+    .slice(0, 5);
+
+  drawStaticPosterBackground(
+    context,
+    cover,
+    scene,
+    palette,
+    width,
+    height,
+    template,
+    seed,
+  );
+
+  if (template === "cinematic-quote") {
+    const quote = input.quote.trim().replace(/^[“\"]+|[”\"]+$/g, "");
+    const parts = selectQuoteParts(quote);
+    const textX = 55;
+    const textWidth = width - 110;
+    let textY = isTikTok ? 82 : 55;
+
+    if (parts.lead) {
+      const lead = drawStaticText(
+        context,
+        `“${parts.lead}`,
+        {
+          x: textX,
+          y: textY,
+          width: textWidth,
+          height: isTikTok ? 170 : 105,
+        },
+        {
+          family: "PosterDisplay",
+          weight: 400,
+          startingSize: isTikTok ? 86 : 68,
+          minimumSize: isTikTok ? 46 : 36,
+          maximumLines: 2,
+          colour: "#ffffff",
+          uppercase: true,
+          lineHeight: 0.94,
+        },
+        audit,
+        "quote lead",
+      );
+      textY += lead.height + 5;
+    }
+
+    drawStaticPaint(
+      context,
+      textX - 8,
+      textY + (isTikTok ? 18 : 10),
+      Math.min(textWidth * 0.82, isTikTok ? 760 : 650),
+      isTikTok ? 92 : 68,
+      colourCss(palette.primary, 0.82),
+      -1,
+    );
+    const accentQuote = drawStaticText(
+      context,
+      `${parts.lead ? "" : "“"}${parts.accent}${parts.tail ? "" : "”"}`,
+      {
+        x: textX + (isTikTok ? 20 : 12),
+        y: textY,
+        width: textWidth - 24,
+        height: isTikTok ? 210 : 145,
+      },
+      {
+        family: "PosterAccent",
+        weight: 700,
+        startingSize: isTikTok ? 112 : 86,
+        minimumSize: isTikTok ? 56 : 44,
+        maximumLines: 2,
+        colour: palette.cream,
+        lineHeight: 0.88,
+      },
+      audit,
+      "quote accent",
+    );
+    textY += accentQuote.height + (isTikTok ? 34 : 28);
+
+    if (parts.tail) {
+      drawStaticText(
+        context,
+        `${parts.tail}”`,
+        {
+          x: textX,
+          y: textY,
+          width: textWidth,
+          height: isTikTok ? 180 : 110,
+        },
+        {
+          family: "PosterDisplay",
+          weight: 400,
+          startingSize: isTikTok ? 78 : 58,
+          minimumSize: isTikTok ? 42 : 32,
+          maximumLines: 3,
+          colour: "#ffffff",
+          uppercase: true,
+          lineHeight: 0.94,
+        },
+        audit,
+        "quote tail",
+      );
+    }
+
+    context.save();
+    context.globalCompositeOperation = "screen";
+    drawStaticGlow(
+      context,
+      isTikTok ? 735 : 770,
+      isTikTok ? 1170 : 800,
+      isTikTok ? 470 : 390,
+      palette.secondary,
+      0.34,
+    );
+    context.restore();
+    drawStaticKindle(
+      context,
+      cover,
+      palette,
+      isTikTok ? 700 : 760,
+      isTikTok ? 720 : 390,
+      isTikTok ? 620 : 535,
+      isTikTok ? -0.035 : 0.035,
+      audit,
+      "quote Kindle",
+    );
+    drawStaticCta(
+      context,
+      input.book,
+      palette,
+      isTikTok
+        ? { x: 55, y: 548, width: 485, height: 135 }
+        : { x: 55, y: 1122, width: 405, height: 135 },
+      audit,
+      "left",
+    );
+  } else if (template === "trope-showcase") {
+    drawStaticText(
+      context,
+      subgenre,
+      {
+        x: 55,
+        y: isTikTok ? 78 : 52,
+        width: 970,
+        height: isTikTok ? 190 : 145,
+      },
+      {
+        family: "PosterDisplay",
+        weight: 400,
+        startingSize: isTikTok ? 120 : 92,
+        minimumSize: isTikTok ? 60 : 48,
+        maximumLines: 2,
+        colour: "#ffffff",
+        align: "center",
+        lineHeight: 0.9,
+        uppercase: true,
+      },
+      audit,
+      "trope heading",
+    );
+    drawStaticPaint(
+      context,
+      235,
+      isTikTok ? 235 : 188,
+      610,
+      24,
+      colourCss(palette.primary, 0.85),
+    );
+
+    context.save();
+    context.globalCompositeOperation = "screen";
+    drawStaticGlow(
+      context,
+      isTikTok ? 745 : 740,
+      isTikTok ? 1110 : 720,
+      isTikTok ? 500 : 420,
+      palette.primary,
+      0.3,
+    );
+    context.restore();
+    drawStaticKindle(
+      context,
+      cover,
+      palette,
+      540,
+      isTikTok ? 600 : 365,
+      isTikTok ? 620 : 520,
+      0.042,
+      audit,
+      "trope Kindle",
+    );
+
+    const mosaic = isTikTok
+      ? [
+          { x: 35, y: 250, width: 315, height: 180 },
+          { x: 382, y: 225, width: 315, height: 180 },
+          { x: 730, y: 250, width: 315, height: 180 },
+          { x: 35, y: 1040, width: 250, height: 180 },
+          { x: 795, y: 1040, width: 250, height: 180 },
+        ]
+      : [
+          { x: 35, y: 225, width: 315, height: 180 },
+          { x: 382, y: 210, width: 315, height: 180 },
+          { x: 730, y: 225, width: 315, height: 180 },
+          { x: 35, y: 760, width: 250, height: 175 },
+          { x: 795, y: 760, width: 250, height: 175 },
+        ];
+    uniqueTropes.forEach((trope, index) => {
+      const area = mosaic[index];
+      if (!area) return;
+      recordStaticRect(audit, `trope composition ${index + 1}`, area, 32);
+      drawStaticTropeLabel(
+        context,
+        trope,
+        area,
+        index % 3 === 0 ? primary : index % 3 === 1 ? secondary : warm,
+        audit,
+        index,
+      );
+    });
+    drawStaticCta(
+      context,
+      input.book,
+      palette,
+      isTikTok
+        ? { x: 105, y: 1692, width: 870, height: 140 }
+        : { x: 105, y: 1185, width: 870, height: 120 },
+      audit,
+      "center",
+    );
+  } else if (template === "kindle-hero") {
+    drawStaticText(
+      context,
+      subgenre,
+      {
+        x: 55,
+        y: isTikTok ? 76 : 48,
+        width: 970,
+        height: isTikTok ? 150 : 105,
+      },
+      {
+        family: "PosterDisplay",
+        weight: 400,
+        startingSize: isTikTok ? 94 : 72,
+        minimumSize: isTikTok ? 48 : 38,
+        maximumLines: 2,
+        colour: "#ffffff",
+        align: "center",
+        lineHeight: 0.92,
+        uppercase: true,
+      },
+      audit,
+      "hero heading",
+    );
+    drawStaticPaint(
+      context,
+      270,
+      isTikTok ? 210 : 150,
+      540,
+      22,
+      colourCss(palette.secondary, 0.85),
+    );
+    context.save();
+    context.globalCompositeOperation = "screen";
+    drawStaticGlow(
+      context,
+      540,
+      isTikTok ? 930 : 675,
+      isTikTok ? 570 : 475,
+      palette.primary,
+      0.36,
+    );
+    drawStaticGlow(
+      context,
+      isTikTok ? 805 : 815,
+      isTikTok ? 780 : 590,
+      isTikTok ? 370 : 310,
+      palette.secondary,
+      0.24,
+    );
+    context.restore();
+    drawStaticKindle(
+      context,
+      cover,
+      palette,
+      540,
+      isTikTok ? 270 : 190,
+      isTikTok ? 740 : 620,
+      -0.018,
+      audit,
+      "hero Kindle",
+    );
+
+    if (isTikTok && uniqueTropes.length) {
+      drawStaticText(
+        context,
+        uniqueTropes.slice(0, 3).join("  •  "),
+        { x: 90, y: 1485, width: 900, height: 80 },
+        {
+          family: "PosterSans",
+          weight: 700,
+          startingSize: 30,
+          minimumSize: 23,
+          maximumLines: 2,
+          colour: palette.cream,
+          align: "center",
+          lineHeight: 1.05,
+          uppercase: true,
+        },
+        audit,
+        "hero support",
+      );
+    }
+    drawStaticCta(
+      context,
+      input.book,
+      palette,
+      isTikTok
+        ? { x: 105, y: 1650, width: 870, height: 150 }
+        : { x: 105, y: 1182, width: 870, height: 125 },
+      audit,
+      "center",
+    );
+  } else if (template === "offer-promotion" && offer) {
+    if (isTikTok) {
+      drawStaticPaint(context, 48, 145, 930, 360, colourCss(palette.warm, 0.72), -1);
+      if (offer.eyebrow) {
+        drawStaticText(
+          context,
+          offer.eyebrow,
+          { x: 55, y: 118, width: 970, height: 60 },
+          {
+            family: "PosterSans",
+            weight: 700,
+            startingSize: 34,
+            minimumSize: 26,
+            maximumLines: 1,
+            colour: "#ffffff",
+            align: "center",
+            uppercase: true,
+          },
+          audit,
+          "offer eyebrow",
+        );
+      }
+      drawStaticText(
+        context,
+        offer.value,
+        { x: 55, y: 190, width: 970, height: 330 },
+        {
+          family: "PosterDisplay",
+          weight: 400,
+          startingSize: offer.value.length > 8 ? 205 : 315,
+          minimumSize: 112,
+          maximumLines: 2,
+          colour: palette.cream,
+          align: "center",
+          lineHeight: 0.82,
+          uppercase: true,
+        },
+        audit,
+        "offer value",
+      );
+      drawStaticText(
+        context,
+        input.book.title,
+        { x: 55, y: 520, width: 970, height: 150 },
+        {
+          family: "PosterDisplay",
+          weight: 400,
+          startingSize: 75,
+          minimumSize: 40,
+          maximumLines: 2,
+          colour: "#ffffff",
+          align: "center",
+          lineHeight: 0.9,
+          uppercase: true,
+        },
+        audit,
+        "offer title",
+      );
+    } else {
+      drawStaticPaint(context, 38, 175, 480, 330, colourCss(palette.warm, 0.74), -1);
+      if (offer.eyebrow) {
+        drawStaticText(
+          context,
+          offer.eyebrow,
+          { x: 55, y: 118, width: 445, height: 55 },
+          {
+            family: "PosterSans",
+            weight: 700,
+            startingSize: 28,
+            minimumSize: 22,
+            maximumLines: 1,
+            colour: "#ffffff",
+            align: "center",
+            uppercase: true,
+          },
+          audit,
+          "offer eyebrow",
+        );
+      }
+      drawStaticText(
+        context,
+        offer.value,
+        { x: 55, y: 185, width: 445, height: 295 },
+        {
+          family: "PosterDisplay",
+          weight: 400,
+          startingSize: offer.value.length > 8 ? 126 : 210,
+          minimumSize: 82,
+          maximumLines: 2,
+          colour: palette.cream,
+          align: "center",
+          lineHeight: 0.84,
+          uppercase: true,
+        },
+        audit,
+        "offer value",
+      );
+      drawStaticText(
+        context,
+        input.book.title,
+        { x: 55, y: 535, width: 430, height: 230 },
+        {
+          family: "PosterDisplay",
+          weight: 400,
+          startingSize: 66,
+          minimumSize: 38,
+          maximumLines: 3,
+          colour: "#ffffff",
+          lineHeight: 0.92,
+          uppercase: true,
+        },
+        audit,
+        "offer title",
+      );
+    }
+
+    context.save();
+    context.globalCompositeOperation = "screen";
+    drawStaticGlow(
+      context,
+      isTikTok ? 745 : 795,
+      isTikTok ? 1130 : 760,
+      isTikTok ? 500 : 390,
+      palette.primary,
+      0.34,
+    );
+    context.restore();
+    drawStaticKindle(
+      context,
+      cover,
+      palette,
+      isTikTok ? 700 : 745,
+      isTikTok ? 700 : 315,
+      isTikTok ? 600 : 505,
+      isTikTok ? 0.035 : 0.045,
+      audit,
+      "offer Kindle",
+    );
+    drawStaticCta(
+      context,
+      input.book,
+      palette,
+      isTikTok
+        ? { x: 100, y: 1685, width: 880, height: 140 }
+        : { x: 55, y: 1100, width: 430, height: 135 },
+      audit,
+      isTikTok ? "center" : "left",
+    );
+  } else {
+    template = "modern-editorial";
+    const editorialWide = cover.naturalWidth / cover.naturalHeight > 1.25;
+    context.save();
+    context.globalCompositeOperation = "screen";
+    context.fillStyle = colourCss(palette.primary, 0.27);
+    context.beginPath();
+    if (isTikTok) {
+      context.moveTo(0, 520);
+      context.lineTo(width, 265);
+      context.lineTo(width, 720);
+      context.lineTo(0, 920);
+    } else {
+      context.moveTo(0, 270);
+      context.lineTo(width, 70);
+      context.lineTo(width, 435);
+      context.lineTo(0, 620);
+    }
+    context.closePath();
+    context.fill();
+    context.restore();
+
+    drawStaticText(
+      context,
+      subgenre,
+      {
+        x: 55,
+        y: isTikTok ? 88 : 65,
+        width: 970,
+        height: isTikTok ? 330 : 235,
+      },
+      {
+        family: "PosterDisplay",
+        weight: 400,
+        startingSize: isTikTok ? 150 : 112,
+        minimumSize: isTikTok ? 70 : 54,
+        maximumLines: 3,
+        colour: "#ffffff",
+        align: isTikTok ? "left" : "right",
+        lineHeight: 0.84,
+        uppercase: true,
+      },
+      audit,
+      "editorial heading",
+    );
+    drawStaticPaint(
+      context,
+      isTikTok ? 55 : 590,
+      isTikTok ? 420 : 302,
+      isTikTok ? 640 : 420,
+      26,
+      colourCss(palette.secondary, 0.9),
+      -1,
+    );
+
+    const editorialBounds: PosterRect = isTikTok
+      ? editorialWide
+        ? { x: 55, y: 760, width: 970, height: 540 }
+        : { x: 70, y: 650, width: 580, height: 1010 }
+      : editorialWide
+        ? { x: 55, y: 510, width: 970, height: 500 }
+        : { x: 65, y: 345, width: 515, height: 865 };
+    drawStaticCoverHero(
+      context,
+      cover,
+      palette,
+      editorialBounds,
+      isTikTok ? -0.032 : -0.045,
+      audit,
+    );
+
+    drawStaticText(
+      context,
+      input.book.title,
+      isTikTok
+        ? editorialWide
+          ? { x: 55, y: 500, width: 970, height: 190 }
+          : { x: 650, y: 610, width: 375, height: 360 }
+        : editorialWide
+          ? { x: 55, y: 355, width: 970, height: 145 }
+          : { x: 610, y: 395, width: 415, height: 325 },
+      {
+        family: "PosterDisplay",
+        weight: 400,
+        startingSize: isTikTok ? 72 : 68,
+        minimumSize: isTikTok ? 38 : 35,
+        maximumLines: editorialWide ? 3 : 5,
+        colour: palette.cream,
+        align: editorialWide ? "center" : "left",
+        lineHeight: 0.9,
+        uppercase: true,
+      },
+      audit,
+      "editorial title",
+    );
+
+    uniqueTropes.slice(0, 2).forEach((trope, index) => {
+      drawStaticText(
+        context,
+        trope,
+        isTikTok
+          ? editorialWide
+            ? { x: 55 + index * 500, y: 1350, width: 470, height: 120 }
+            : { x: 665, y: 1035 + index * 135, width: 345, height: 120 }
+          : editorialWide
+            ? { x: 55 + index * 500, y: 1020, width: 470, height: 100 }
+            : { x: 625, y: 785 + index * 105, width: 380, height: 95 },
+        {
+          family: "PosterSans",
+          weight: 700,
+          startingSize: isTikTok ? 29 : 26,
+          minimumSize: 19,
+          maximumLines: 3,
+          colour: index === 0 ? primary : secondary,
+          lineHeight: 1.05,
+          uppercase: true,
+        },
+        audit,
+        `editorial detail ${index + 1}`,
+      );
+    });
+    drawStaticCta(
+      context,
+      input.book,
+      palette,
+      isTikTok
+        ? editorialWide
+          ? { x: 105, y: 1690, width: 870, height: 145 }
+          : { x: 650, y: 1530, width: 375, height: 150 }
+        : editorialWide
+          ? { x: 105, y: 1180, width: 870, height: 125 }
+          : { x: 610, y: 1052, width: 415, height: 135 },
+      audit,
+      editorialWide ? "center" : "left",
+    );
+  }
+
+  drawStaticSignature(context, width, height, palette, audit);
+
+  return {
+    dataUrl: canvas.toDataURL("image/jpeg", 0.95),
+    template,
+  };
+}
+
+async function createLegacyProfessionalCampaignImage(input: {
   book: CatalogueBook;
   post: GeneratedPost;
   mediaStyle: MediaStyle;
@@ -2703,6 +4371,15 @@ export default function SocialStudioPage() {
 
     try {
       let aiBackground = "";
+      const generationSeed = seededNumber(
+        `${selectedBook.slug}-${post.platform}-${Date.now()}`,
+      );
+      const selectedTemplate = resolveStaticPosterTemplate(
+        posterTemplate,
+        campaignType,
+        generationSeed,
+        `${post.title} ${post.caption} ${quote}`,
+      );
 
       if (mediaStyle === "ai-scene") {
         const backgroundResponse = await fetch("/api/social-studio/image", {
@@ -2712,11 +4389,7 @@ export default function SocialStudioPage() {
             book: selectedBook,
             platform: post.platform,
             campaignType,
-            template: resolvePosterTemplate(
-              posterTemplate,
-              campaignType,
-              seededNumber(`${selectedBook.slug}-${post.platform}-${Date.now()}`),
-            ),
+            template: selectedTemplate,
             visualDirection: post.visualDirection,
             instructions: instructions.trim(),
           }),
@@ -2741,7 +4414,7 @@ export default function SocialStudioPage() {
         mediaStyle,
         campaignType,
         quote,
-        template: posterTemplate,
+        template: selectedTemplate,
         aiBackground,
       });
 
