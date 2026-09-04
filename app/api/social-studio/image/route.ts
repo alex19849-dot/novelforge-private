@@ -110,7 +110,7 @@ async function backgroundHasWriting(openai: OpenAI, imageDataUrl: string): Promi
         ],
       },
     ],
-    max_output_tokens: 16,
+    max_output_tokens: 10,
   });
   return response.output_text.trim().toUpperCase() !== "PASS";
 }
