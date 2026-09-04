@@ -282,7 +282,7 @@ async function generateBackground(
     model: IMAGE_MODEL,
     prompt,
     n: 1,
-    size: generationSize(platform),
+    size: "1024x1536",
     quality: "medium",
     output_format: "jpeg",
     output_compression: 88,
