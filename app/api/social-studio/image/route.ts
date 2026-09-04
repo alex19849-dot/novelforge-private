@@ -109,24 +109,73 @@ function campaignDirection(campaignType: string): string {
   return "Create a polished hero environment with cinematic depth and generous calm areas for typography that will be added later.";
 }
 
-async function backgroundHasWriting(openai: OpenAI, imageDataUrl: string): Promise<boolean> {
+type BackgroundCheck = {
+  decision: "pass" | "reject";
+  reason: string;
+};
+
+async function inspectBackground(openai: OpenAI, imageDataUrl: string): Promise<BackgroundCheck> {
   const response = await openai.responses.create({
     model: BACKGROUND_CHECK_MODEL,
+    text: {
+      verbosity: "low",
+      format: {
+        type: "json_schema",
+        name: "background_inspection",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            decision: { type: "string", enum: ["pass", "reject"] },
+            reason: { type: "string" },
+          },
+          required: ["decision", "reason"],
+        },
+      },
+    },
     input: [
       {
         role: "user",
         content: [
           {
             type: "input_text",
-            text: "Inspect this environmental background plate. Reply with exactly REJECT only when you can clearly see (1) a readable word, letter or number, (2) a recognizable logo, watermark, sign or label, or (3) an obvious deliberate cluster of fake typographic glyphs. Reply with exactly PASS when none are clearly present. Natural seams, stitching, scratches, reflections, bokeh, foliage, surface texture and equipment shapes are not writing; ambiguous incidental marks must PASS. Blank unbranded environmental and sports objects are allowed.",
+            text: "Inspect only the environmental background. Reject it only for clearly readable writing or numbers, a recognizable logo or watermark, or an obvious deliberate cluster of fake typographic glyphs. Pass natural seams, stitching, scratches, reflections, bokeh, foliage, surface texture and ambiguous incidental marks. Explain the specific visible reason briefly.",
           },
           { type: "input_image", image_url: imageDataUrl, detail: "high" },
         ],
       },
     ],
-    max_output_tokens: 32,
+    max_output_tokens: 200,
   });
-  return response.output_text.trim().toUpperCase() !== "PASS";
+
+  if (!response.output_text?.trim()) {
+    throw new Error("The background inspection returned no result.");
+  }
+
+  const parsed = JSON.parse(response.output_text) as Partial<BackgroundCheck>;
+  if (
+    (parsed.decision !== "pass" && parsed.decision !== "reject") ||
+    typeof parsed.reason !== "string"
+  ) {
+    throw new Error("The background inspection returned an invalid result.");
+  }
+  return { decision: parsed.decision, reason: parsed.reason };
+}
+
+async function generateBackground(openai: OpenAI, prompt: string): Promise<string> {
+  const image = await openai.images.generate({
+    model: IMAGE_MODEL,
+    prompt,
+    n: 1,
+    size: "1024x1536",
+    quality: "medium",
+    output_format: "jpeg",
+    output_compression: 88,
+  });
+  const base64 = image.data?.[0]?.b64_json;
+  if (!base64) throw new Error("The image model returned no background artwork.");
+  return `data:image/jpeg;base64,${base64}`;
 }
 
 export async function POST(request: Request) {
@@ -154,11 +203,11 @@ export async function POST(request: Request) {
 
     const template = cleanTemplate(body.template);
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const prompt = [
+    const visualPrompt = [
       "Create a premium photorealistic environmental background plate for a commercial romance book advertisement.",
-      "The result must be environmental artwork only. Do not create an advertisement, poster, book cover, e-reader, tablet, phone, layout, frame, card, badge or user interface.",
-      "ABSOLUTELY NO PEOPLE: no faces, bodies, silhouettes, hands, skin, reflections of people or human-shaped shadows.",
-      "ABSOLUTELY NO WRITING: no words, letters, numbers, glyphs, logos, watermarks, signs, labels, scoreboards, jersey numbers, book spines, screens, fake typography or text-like marks. All props must be completely unbranded and unmarked.",
+      "Show only an empty cinematic environment with tasteful story-relevant props around the edges. Every visible surface and prop is plain, blank and unbranded.",
+      "Keep the scene completely unpopulated, including reflections and shadows. Reserve clean negative space for a real cover and accurate typography that will be added later in code.",
+      "The finished plate contains no readable marks, symbols, signage, displays, packaging, printed material or decorative glyph patterns.",
       "Use cinematic practical lighting, strong contrast, controlled bright jewel-tone accents, haze, subtle particles, reflections, tactile surfaces and believable depth. Avoid muddy brown colour grading.",
       "Keep the darkest value near black. Use no more than two vivid accent-light colours and one restrained supporting light colour. The final accurate palette and typography will be added separately in code.",
       genreDirection(book.subgenre, book.tropes, book.blurb),
@@ -172,22 +221,29 @@ export async function POST(request: Request) {
           : "Compose natively for a 4:5 Instagram feed portrait. Use a strong mobile-first focal hierarchy and keep important detail clear of the outer 6 percent safe zone.",
     ].join("\n\n");
 
-    const image = await openai.images.generate({
-      model: IMAGE_MODEL,
-      prompt,
-      n: 1,
-      size: "1024x1536",
-      quality: "medium",
-      output_format: "jpeg",
-      output_compression: 88,
-    });
-    const base64 = image.data?.[0]?.b64_json;
-    if (!base64) throw new Error("The image model returned no background artwork.");
+    let imageDataUrl = await generateBackground(openai, visualPrompt);
+    let inspection = await inspectBackground(openai, imageDataUrl);
 
-    const imageDataUrl = `data:image/jpeg;base64,${base64}`;
-    if (await backgroundHasWriting(openai, imageDataUrl)) {
+    if (inspection.decision === "reject") {
+      const recoveryPrompt = [
+        "Create a premium abstract cinematic environmental background plate for a romance advertisement.",
+        "Use only atmospheric coloured light, soft haze, bokeh, glass reflections, fabric-like gradients and subtle particles against a near-black base.",
+        "Keep every surface blank and keep the frame completely unpopulated. Include no equipment, architecture, products, signs, displays, printed objects, symbols or glyph-like patterns.",
+        compositionDirection(template, platform),
+        platform === "tiktok"
+          ? "Compose natively for a tall 9:16 frame."
+          : "Compose natively for a 4:5 portrait frame.",
+      ].join("\n\n");
+      imageDataUrl = await generateBackground(openai, recoveryPrompt);
+      inspection = await inspectBackground(openai, imageDataUrl);
+    }
+
+    if (inspection.decision === "reject") {
       return NextResponse.json(
-        { error: "The generated background was rejected because it contained writing, a logo or text-like gibberish. No unsafe background was added to the poster." },
+        {
+          error: "Two generated backgrounds failed the visible-writing safety check. No unsafe background was added.",
+          reason: inspection.reason,
+        },
         { status: 422 },
       );
     }
