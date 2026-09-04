@@ -77,14 +77,14 @@ function compositionDirection(template: PosterTemplate, platform: string): strin
 
 function genreDirection(subgenre: string, tropes: string[], blurb: string): string {
   const source = `${subgenre} ${tropes.join(" ")} ${blurb}`.toLowerCase();
-  if (/hockey|ice|rink|coach|player/.test(source)) {
-    return "Use an empty ice rink or atmospheric locker-room setting, ice reflections, cool arena lights, subtle skate marks and unbranded hockey equipment.";
-  }
   if (/football|quarterback|touchdown|college sport/.test(source)) {
-    return "Use an empty floodlit football field or atmospheric locker-room setting, turf texture, stadium haze and unbranded football equipment.";
+    return "Use an empty floodlit football field, close turf texture, stadium haze and plain unmarked football equipment. Exclude locker signage, jerseys, scoreboards, boundary lettering and screens.";
   }
   if (/baseball|pitcher|catcher/.test(source)) {
-    return "Use an empty floodlit baseball diamond or dugout setting with dust, stadium haze and unbranded baseball equipment.";
+    return "Use an empty floodlit baseball diamond with infield dust, stadium haze and plain unmarked baseball equipment. Exclude dugout signage, uniforms, scoreboards and screens.";
+  }
+  if (/hockey|ice rink|ice hockey|goalie|puck/.test(source)) {
+    return "Use an empty ice rink, clean ice reflections, cool arena haze and plain unmarked hockey equipment. Exclude locker signage, jerseys, scoreboards, rink lettering and screens.";
   }
   if (/motorcycle|biker|mc romance/.test(source)) {
     return "Use a rain-darkened workshop or night road setting with chrome reflections, smoke, worn leather texture and an unbranded motorcycle detail.";
@@ -92,7 +92,21 @@ function genreDirection(subgenre: string, tropes: string[], blurb: string): stri
   if (/vampire|paranormal|gothic/.test(source)) {
     return "Use an elegant nocturnal gothic interior or rain-darkened street with moonlight, candle glow, mist, glass and deep jewel-toned shadows.";
   }
-  return "Build a sophisticated romance still life from locations and symbolic objects clearly supported by the supplied blurb and tropes. Use tactile surfaces, practical lights and editorial prop styling.";
+  return "Build a sophisticated cinematic romance still life using abstract light, glass, fabric, flowers and atmospheric architectural depth. Every object must be blank, unmarked and free of writing.";
+}
+
+function campaignDirection(campaignType: string): string {
+  const source = campaignType.toLowerCase();
+  if (/sale|offer|99|free|price|promotion/.test(source)) {
+    return "Create energetic promotional lighting with one clean circular glow area, but do not render a price, currency symbol, badge or label.";
+  }
+  if (/quote/.test(source)) {
+    return "Create an emotionally dramatic, restrained setting with a generous calm shadow area for typography that will be added later.";
+  }
+  if (/trope/.test(source)) {
+    return "Create editorial rhythm using light, depth and a few separated unmarked props, leaving a calm column for typography that will be added later.";
+  }
+  return "Create a polished hero environment with cinematic depth and generous calm areas for typography that will be added later.";
 }
 
 async function backgroundHasWriting(openai: OpenAI, imageDataUrl: string): Promise<boolean> {
@@ -104,13 +118,13 @@ async function backgroundHasWriting(openai: OpenAI, imageDataUrl: string): Promi
         content: [
           {
             type: "input_text",
-            text: "Inspect this advertising background plate. Reply with exactly REJECT if you can see any word, letter, number, logo, watermark, sign, label, scoreboard, jersey number, book cover, screen writing, fake typography or glyph-like gibberish anywhere. Reply with exactly PASS only if none of those appear. Ordinary unmarked sports equipment and environmental objects are allowed.",
+            text: "Inspect this environmental background plate. Reply with exactly REJECT only when you can clearly see (1) a readable word, letter or number, (2) a recognizable logo, watermark, sign or label, or (3) an obvious deliberate cluster of fake typographic glyphs. Reply with exactly PASS when none are clearly present. Natural seams, stitching, scratches, reflections, bokeh, foliage, surface texture and equipment shapes are not writing; ambiguous incidental marks must PASS. Blank unbranded environmental and sports objects are allowed.",
           },
-          { type: "input_image", image_url: imageDataUrl, detail: "low" },
+          { type: "input_image", image_url: imageDataUrl, detail: "high" },
         ],
       },
     ],
-    max_output_tokens: 16,
+    max_output_tokens: 32,
   });
   return response.output_text.trim().toUpperCase() !== "PASS";
 }
@@ -148,13 +162,9 @@ export async function POST(request: Request) {
       "Use cinematic practical lighting, strong contrast, controlled bright jewel-tone accents, haze, subtle particles, reflections, tactile surfaces and believable depth. Avoid muddy brown colour grading.",
       "Keep the darkest value near black. Use no more than two vivid accent-light colours and one restrained supporting light colour. The final accurate palette and typography will be added separately in code.",
       genreDirection(book.subgenre, book.tropes, book.blurb),
+      campaignDirection(cleanString(body.campaignType, 100)),
       compositionDirection(template, platform),
-      `Subgenre: ${book.subgenre || "romance"}`,
-      `Tropes for environmental context only: ${book.tropes.join(", ") || "romance"}`,
-      `Story context: ${book.blurb}`,
-      `Campaign type: ${cleanString(body.campaignType, 100)}`,
-      `Requested visual direction: ${cleanString(body.visualDirection, 1200) || "Use the story context."}`,
-      `Additional author direction: ${cleanString(body.instructions, 1000) || "None"}`,
+      "Do not visualize, quote, spell or imitate any source wording. Do not place decorative marks that resemble characters. The source material has already been converted into the visual directions above and must not appear in the image.",
       platform === "tiktok"
         ? "Compose natively for a tall 9:16 frame. Keep all important props inside the central 82 percent and extend atmosphere naturally to every edge."
         : platform === "facebook"
