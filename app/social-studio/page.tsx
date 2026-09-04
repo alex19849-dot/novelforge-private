@@ -926,6 +926,8 @@ function extractCampaignPalette(
     string,
     { colour: CampaignColour; count: number; score: number }
   >();
+  let sampledPixels = 0;
+  let chromaticPixels = 0;
 
   for (let index = 0; index < pixels.length; index += 16) {
     const red = pixels[index];
@@ -933,6 +935,7 @@ function extractCampaignPalette(
     const blue = pixels[index + 2];
     const alpha = pixels[index + 3];
     if (alpha < 180) continue;
+    sampledPixels += 1;
 
     const maximum = Math.max(red, green, blue);
     const minimum = Math.min(red, green, blue);
@@ -940,6 +943,7 @@ function extractCampaignPalette(
     const saturation = maximum === minimum ? 0 : (maximum - minimum) / 255;
 
     if (brightness < 34 || brightness > 232 || saturation < 0.16) continue;
+    chromaticPixels += 1;
 
     const colour = {
       red: Math.round(red / 32) * 32,
@@ -968,8 +972,16 @@ function extractCampaignPalette(
       (candidate) => colourDistance(candidate.colour, sampledPrimary) > 125,
     )?.colour ?? fallback.secondary;
 
-  const primary = vividCampaignColour(sampledPrimary, fallback.primary);
-  const secondary = vividCampaignColour(sampledSecondary, fallback.secondary);
+  let primary = vividCampaignColour(sampledPrimary, fallback.primary);
+  let secondary = vividCampaignColour(sampledSecondary, fallback.secondary);
+
+  const sparseColourOnNeutralCover =
+    sampledPixels > 0 && chromaticPixels / sampledPixels < 0.14;
+  const primaryIsWarm = primary.red > primary.blue * 1.25;
+  const secondaryIsCool = secondary.blue > secondary.red * 1.2;
+  if (sparseColourOnNeutralCover && primaryIsWarm && secondaryIsCool) {
+    [primary, secondary] = [secondary, primary];
+  }
 
   return { primary, secondary };
 }
@@ -1633,20 +1645,36 @@ async function createProfessionalCampaignImage(input: {
     drawKindleMockup(context, cover, palette, isTikTok ? 650 : 820, isTikTok ? 720 : 360, isTikTok ? 540 : 430, isTikTok ? -0.035 : 0.045);
     drawCta();
   } else if (template === "trope-showcase") {
-    const kindle = isTikTok ? deviceRect(780, 355, 560) : deviceRect(820, 220, 450);
-    const heading: PosterRect = { x: platformInset, y: isTikTok ? 95 : 70, width: isTikTok ? 930 : 470, height: isTikTok ? 220 : 145 };
+    const kindle = isTikTok ? deviceRect(780, 355, 560) : deviceRect(820, 220, 480);
+    const heading: PosterRect = { x: platformInset, y: isTikTok ? 95 : 70, width: isTikTok ? 930 : 470, height: isTikTok ? 220 : 190 };
     const tropeArea: PosterRect = isTikTok
       ? { x: platformInset, y: 390, width: 390, height: 1080 }
-      : { x: platformInset, y: 300, width: 420, height: 710 };
+      : { x: platformInset, y: 330, width: 430, height: 680 };
     verifyPosterGeometry(width, height, kindle, [heading, tropeArea], ctaRect);
     shade(0, 0, 535, height, "right");
-    drawDisplayLines(context, (input.book.subgenre || hook).toUpperCase(), heading, { colour: "#ffffff", accent, maximumLines: 2, startingSize: isTikTok ? 88 : 62, minimumSize: 42, highlightLast: true });
-    drawBrushStroke(context, heading.x, heading.y + heading.height - 15, Math.min(heading.width * 0.72, 460), accent);
+    const headingWords = (input.book.subgenre || hook).toUpperCase().split(/\s+/).filter(Boolean);
+    const headingAccent = headingWords.pop() || "ROMANCE";
+    const headingLead = headingWords.join(" ");
     context.textAlign = "left";
-    const tropeGap = isTikTok ? 205 : 148;
+    context.shadowColor = "rgba(0,0,0,0.9)";
+    context.shadowBlur = 16;
+    if (headingLead) {
+      context.fillStyle = "#ffffff";
+      context.font = `400 ${isTikTok ? 56 : 46}px "PosterDisplay", sans-serif`;
+      context.fillText(headingLead, heading.x, heading.y + (isTikTok ? 56 : 46), heading.width);
+    }
+    context.fillStyle = accent;
+    context.font = `400 ${isTikTok ? 112 : 90}px "PosterDisplay", sans-serif`;
+    context.fillText(headingAccent, heading.x, heading.y + (isTikTok ? 160 : 132), heading.width);
+    context.shadowColor = "transparent";
+    drawBrushStroke(context, heading.x, heading.y + heading.height - 12, Math.min(heading.width * 0.76, 460), secondary);
+    context.textAlign = "left";
+    const tropeGap = isTikTok
+      ? Math.min(205, 1030 / Math.max(1, uniqueTropes.length))
+      : Math.min(170, 650 / Math.max(1, uniqueTropes.length));
     uniqueTropes.forEach((trope, index) => {
       const y = tropeArea.y + index * tropeGap;
-      const iconSize = isTikTok ? 66 : 54;
+      const iconSize = isTikTok ? 72 : 66;
       drawTropeIcon(
         context,
         trope,
@@ -1657,14 +1685,14 @@ async function createProfessionalCampaignImage(input: {
       );
       context.fillStyle = "#ffffff";
       const textX = tropeArea.x + iconSize + 24;
-      const block = fittedMultiline(context, trope.toUpperCase(), tropeArea.width - iconSize - 24, 2, isTikTok ? 49 : 40, isTikTok ? 31 : 27);
+      const block = fittedMultiline(context, trope.toUpperCase(), tropeArea.width - iconSize - 24, 2, isTikTok ? 49 : 38, isTikTok ? 31 : 27);
       block.lines.forEach((line, lineIndex) => {
         context.font = `400 ${block.fontSize}px "PosterDisplay", sans-serif`;
         context.fillText(line, textX, y + block.fontSize + lineIndex * block.lineHeight, tropeArea.width - iconSize - 24);
       });
     });
     glow(isTikTok ? 790 : 850, isTikTok ? 1000 : 650, 440, colourCss(palette.secondary, 0.25));
-    drawKindleMockup(context, cover, palette, isTikTok ? 780 : 820, isTikTok ? 355 : 220, isTikTok ? 560 : 450, 0.045);
+    drawKindleMockup(context, cover, palette, isTikTok ? 780 : 820, isTikTok ? 355 : 220, isTikTok ? 560 : 480, 0.045);
     drawCta();
   } else if (template === "offer-promotion") {
     const kindle = isTikTok ? deviceRect(750, 420, 580) : deviceRect(820, 300, 450);
