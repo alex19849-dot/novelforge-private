@@ -1954,8 +1954,8 @@ function drawStaticPosterBackground(
 
   context.save();
   context.globalCompositeOperation = "screen";
-  drawStaticGlow(context, width * 0.03, height * 0.2, width * 0.72, palette.primary, 0.34);
-  drawStaticGlow(context, width * 0.98, height * 0.56, width * 0.76, palette.secondary, 0.3);
+  drawStaticGlow(context, width * 0.03, height * 0.2, width * 0.72, palette.primary, 0.4);
+  drawStaticGlow(context, width * 0.98, height * 0.56, width * 0.76, palette.secondary, 0.36);
   if (template === "offer-promotion") {
     drawStaticGlow(context, width * 0.14, height * 0.42, width * 0.52, palette.warm, 0.38);
   }
@@ -1967,7 +1967,7 @@ function drawStaticPosterBackground(
     height * 0.31,
     width * 0.84,
     Math.max(120, height * 0.13),
-    colourCss(palette.primary, 0.24),
+    colourCss(palette.primary, 0.31),
   );
   drawStaticPaint(
     context,
@@ -1975,7 +1975,7 @@ function drawStaticPosterBackground(
     height * 0.48,
     width * 0.68,
     Math.max(150, height * 0.15),
-    colourCss(palette.secondary, 0.24),
+    colourCss(palette.secondary, 0.3),
     -1,
   );
   drawStaticPaint(
@@ -1984,7 +1984,7 @@ function drawStaticPosterBackground(
     height * 0.79,
     width * 0.7,
     Math.max(38, height * 0.04),
-    colourCss(palette.primary, 0.16),
+    colourCss(palette.primary, 0.21),
   );
 
   const upperShade = context.createLinearGradient(0, 0, 0, height * 0.42);
@@ -2249,11 +2249,11 @@ function drawStaticTropeIcon(
   context.save();
   context.strokeStyle = colour;
   context.fillStyle = colour;
-  context.lineWidth = Math.max(7, size * 0.078);
+  context.lineWidth = Math.max(8, size * 0.088);
   context.lineCap = "round";
   context.lineJoin = "round";
   context.shadowColor = colour;
-  context.shadowBlur = size * 0.1;
+  context.shadowBlur = size * 0.085;
 
   const heart = () => {
     context.beginPath();
@@ -2748,7 +2748,7 @@ async function createProfessionalCampaignImage(input: {
       drawStaticText(
         context,
         genreLead,
-        { x: 55, y: isTikTok ? 46 : 38, width: 970, height: isTikTok ? 105 : 76 },
+        { x: 55, y: isTikTok ? 60 : 50, width: 970, height: isTikTok ? 105 : 76 },
         {
           family: "PosterDisplay",
           weight: 400,
@@ -2767,7 +2767,7 @@ async function createProfessionalCampaignImage(input: {
     drawStaticPaint(
       context,
       230,
-      isTikTok ? 137 : 91,
+      isTikTok ? 151 : 103,
       620,
       isTikTok ? 72 : 58,
       colourCss(palette.primary, 0.82),
@@ -2775,7 +2775,7 @@ async function createProfessionalCampaignImage(input: {
     drawStaticText(
       context,
       genreAccent,
-      { x: 55, y: isTikTok ? 105 : 66, width: 970, height: isTikTok ? 120 : 96 },
+      { x: 55, y: isTikTok ? 119 : 78, width: 970, height: isTikTok ? 120 : 96 },
       {
         family: "PosterAccent",
         weight: 700,
@@ -2806,7 +2806,7 @@ async function createProfessionalCampaignImage(input: {
       cover,
       palette,
       isTikTok ? 380 : 350,
-      isTikTok ? 300 : 205,
+      isTikTok ? 315 : 220,
       isTikTok ? 620 : 510,
       isTikTok ? -0.025 : -0.03,
       audit,
@@ -2866,13 +2866,21 @@ async function createProfessionalCampaignImage(input: {
         index,
       );
     });
+    drawStaticPaint(
+      context,
+      isTikTok ? 155 : 180,
+      isTikTok ? 1482 : 1080,
+      isTikTok ? 770 : 720,
+      isTikTok ? 105 : 84,
+      colourCss(palette.secondary, 0.24),
+    );
     drawStaticCta(
       context,
       input.book,
       palette,
       isTikTok
-        ? { x: 105, y: 1505, width: 870, height: 150 }
-        : { x: 105, y: 1185, width: 870, height: 120 },
+        ? { x: 105, y: 1465, width: 870, height: 150 }
+        : { x: 105, y: 1095, width: 870, height: 130 },
       audit,
       "center",
     );
