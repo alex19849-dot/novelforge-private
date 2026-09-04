@@ -2407,7 +2407,7 @@ function drawStaticTropeLabel(
       weight: 400,
       startingSize: Math.min(42, Math.max(28, area.width * 0.13)),
       minimumSize: Math.min(24, Math.max(19, area.width * 0.09)),
-      maximumLines: area.width < 230 ? 4 : 2,
+      maximumLines: area.width < 230 ? 4 : area.height < 180 ? 3 : 2,
       colour: "#ffffff",
       align: "center",
       lineHeight: 0.94,
@@ -2794,34 +2794,64 @@ async function createProfessionalCampaignImage(input: {
     context.globalCompositeOperation = "screen";
     drawStaticGlow(
       context,
-      540,
-      isTikTok ? 800 : 605,
-      isTikTok ? 570 : 470,
+      isTikTok ? 370 : 345,
+      isTikTok ? 850 : 610,
+      isTikTok ? 540 : 440,
       palette.primary,
-      0.3,
+      0.38,
     );
     context.restore();
     drawStaticKindle(
       context,
       cover,
       palette,
-      540,
-      isTikTok ? 245 : 185,
-      isTikTok ? 680 : 560,
-      -0.018,
+      isTikTok ? 380 : 350,
+      isTikTok ? 300 : 205,
+      isTikTok ? 620 : 510,
+      isTikTok ? -0.025 : -0.03,
       audit,
       "trope Kindle",
     );
 
     const tropeCount = Math.max(1, uniqueTropes.length);
-    const tropeGap = tropeCount >= 5 ? 10 : tropeCount === 4 ? 14 : 24;
-    const tropeWidth = (970 - tropeGap * (tropeCount - 1)) / tropeCount;
-    const tropeY = isTikTok ? 1350 : 965;
+    const tropeCellHeight = isTikTok
+      ? tropeCount <= 3
+        ? 240
+        : tropeCount === 4
+          ? 220
+          : 190
+      : tropeCount <= 3
+        ? 210
+        : tropeCount === 4
+          ? 180
+          : 155;
+    const tropeGap = isTikTok
+      ? tropeCount <= 3
+        ? 80
+        : tropeCount === 4
+          ? 20
+          : 10
+      : tropeCount <= 3
+        ? 40
+        : tropeCount === 4
+          ? 15
+          : 10;
+    const tropeY = isTikTok
+      ? tropeCount <= 3
+        ? 430
+        : tropeCount === 4
+          ? 350
+          : 310
+      : tropeCount <= 3
+        ? 320
+        : tropeCount === 4
+          ? 270
+          : 240;
     const mosaic = uniqueTropes.map((_, index) => ({
-      x: 55 + index * (tropeWidth + tropeGap),
-      y: tropeY,
-      width: tropeWidth,
-      height: isTikTok ? 235 : 195,
+      x: isTikTok ? 730 : 675,
+      y: tropeY + index * (tropeCellHeight + tropeGap),
+      width: isTikTok ? 295 : 350,
+      height: tropeCellHeight,
     }));
     uniqueTropes.forEach((trope, index) => {
       const area = mosaic[index];
@@ -2831,7 +2861,7 @@ async function createProfessionalCampaignImage(input: {
         context,
         trope,
         area,
-        index % 2 === 0 ? primary : secondary,
+        index % 3 === 0 ? primary : index % 3 === 1 ? secondary : warm,
         audit,
         index,
       );
@@ -2841,8 +2871,8 @@ async function createProfessionalCampaignImage(input: {
       input.book,
       palette,
       isTikTok
-        ? { x: 105, y: 1700, width: 870, height: 140 }
-        : { x: 105, y: 1195, width: 870, height: 120 },
+        ? { x: 105, y: 1505, width: 870, height: 150 }
+        : { x: 105, y: 1185, width: 870, height: 120 },
       audit,
       "center",
     );
