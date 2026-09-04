@@ -115,63 +115,52 @@ type BackgroundCheck = {
 };
 
 async function inspectBackground(openai: OpenAI, imageDataUrl: string): Promise<BackgroundCheck> {
-  let lastFailure = "empty response";
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const response = await openai.responses.create({
-      model: BACKGROUND_CHECK_MODEL,
-      text: {
-        verbosity: "low",
-        format: {
-          type: "json_schema",
-          name: "background_inspection",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              decision: { type: "string", enum: ["pass", "reject"] },
-              reason: { type: "string" },
-            },
-            required: ["decision", "reason"],
+  const response = await openai.responses.create({
+    model: BACKGROUND_CHECK_MODEL,
+    text: {
+      format: {
+        type: "json_schema",
+        name: "background_inspection",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            decision: { type: "string", enum: ["pass", "reject"] },
+            reason: { type: "string" },
           },
+          required: ["decision", "reason"],
         },
       },
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: "Inspect only the environmental background. Reject it only for clearly readable writing or numbers, a recognizable logo or watermark, or an obvious deliberate cluster of fake typographic glyphs. Pass natural seams, stitching, scratches, reflections, bokeh, foliage, surface texture and ambiguous incidental marks. Explain the specific visible reason briefly.",
-            },
-            { type: "input_image", image_url: imageDataUrl, detail: "high" },
-          ],
-        },
-      ],
-      max_output_tokens: 300,
-    });
+    },
+    input: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: "Inspect only the environmental background. Reject it only for clearly readable writing or numbers, a recognizable logo or watermark, or an obvious deliberate cluster of fake typographic glyphs. Pass natural seams, stitching, scratches, reflections, bokeh, foliage, surface texture and ambiguous incidental marks. Explain the specific visible reason briefly.",
+          },
+          { type: "input_image", image_url: imageDataUrl, detail: "high" },
+        ],
+      },
+    ],
+    max_output_tokens: 300,
+  });
 
-    if (!response.output_text?.trim()) {
-      lastFailure = response.incomplete_details?.reason || response.status || "empty response";
-      continue;
-    }
-
-    try {
-      const parsed = JSON.parse(response.output_text) as Partial<BackgroundCheck>;
-      if (
-        (parsed.decision === "pass" || parsed.decision === "reject") &&
-        typeof parsed.reason === "string"
-      ) {
-        return { decision: parsed.decision, reason: parsed.reason };
-      }
-      lastFailure = "invalid structured result";
-    } catch {
-      lastFailure = "invalid JSON result";
-    }
+  if (!response.output_text?.trim()) {
+    throw new Error("The background inspection returned no result.");
   }
 
-  throw new Error(`The background inspection could not be completed (${lastFailure}).`);
+  const parsed = JSON.parse(response.output_text) as Partial<BackgroundCheck>;
+  if (
+    (parsed.decision !== "pass" && parsed.decision !== "reject") ||
+    typeof parsed.reason !== "string"
+  ) {
+    throw new Error("The background inspection returned an invalid result.");
+  }
+
+  return { decision: parsed.decision, reason: parsed.reason };
 }
 
 async function generateBackground(openai: OpenAI, prompt: string): Promise<string> {
@@ -232,27 +221,13 @@ export async function POST(request: Request) {
           : "Compose natively for a 4:5 Instagram feed portrait. Use a strong mobile-first focal hierarchy and keep important detail clear of the outer 6 percent safe zone.",
     ].join("\n\n");
 
-    let imageDataUrl = await generateBackground(openai, visualPrompt);
-    let inspection = await inspectBackground(openai, imageDataUrl);
-
-    if (inspection.decision === "reject") {
-      const recoveryPrompt = [
-        "Create a premium abstract cinematic environmental background plate for a romance advertisement.",
-        "Use only atmospheric coloured light, soft haze, bokeh, glass reflections, fabric-like gradients and subtle particles against a near-black base.",
-        "Keep every surface blank and keep the frame completely unpopulated. Include no equipment, architecture, products, signs, displays, printed objects, symbols or glyph-like patterns.",
-        compositionDirection(template, platform),
-        platform === "tiktok"
-          ? "Compose natively for a tall 9:16 frame."
-          : "Compose natively for a 4:5 portrait frame.",
-      ].join("\n\n");
-      imageDataUrl = await generateBackground(openai, recoveryPrompt);
-      inspection = await inspectBackground(openai, imageDataUrl);
-    }
+    const imageDataUrl = await generateBackground(openai, visualPrompt);
+    const inspection = await inspectBackground(openai, imageDataUrl);
 
     if (inspection.decision === "reject") {
       return NextResponse.json(
         {
-          error: "Two generated backgrounds failed the visible-writing safety check. No unsafe background was added.",
+          error: "The generated background failed the visible-writing safety check. No unsafe background was added.",
           reason: inspection.reason,
         },
         { status: 422 },
