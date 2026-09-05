@@ -1280,13 +1280,11 @@ function ensurePosterFonts(): Promise<void> {
   if (posterFontsReady) return posterFontsReady;
   posterFontsReady = Promise.all(
     POSTER_FONT_URLS.map(async ([family, url]) => {
-      if (!document.fonts.check(`32px "${family}"`)) {
-        const face = new FontFace(family, `url(${url})`, {
-          weight: family === "PosterDisplay" ? "400" : "700",
-          style: "normal",
-        });
-        document.fonts.add(await face.load());
-      }
+      const face = new FontFace(family, `url(${url})`, {
+        weight: family === "PosterDisplay" ? "400" : "700",
+        style: "normal",
+      });
+      document.fonts.add(await face.load());
       await document.fonts.load(`32px "${family}"`);
       if (!document.fonts.check(`32px "${family}"`)) {
         throw new Error(`The ${family} poster font did not finish loading.`);
@@ -1941,44 +1939,57 @@ function drawStaticGlow(
 
 function drawStaticPosterBackground(
   context: CanvasRenderingContext2D,
-  cover: HTMLImageElement,
-  scene: HTMLImageElement | null,
   palette: StaticPosterPalette,
   width: number,
   height: number,
   template: Exclude<PosterTemplate, "auto">,
   seed: number,
 ) {
-  context.fillStyle = colourCss(palette.base);
+  const base = context.createLinearGradient(0, 0, width, height);
+  base.addColorStop(0, colourCss(palette.base));
+  base.addColorStop(0.46, "rgb(5, 6, 12)");
+  base.addColorStop(1, "rgb(1, 2, 5)");
+  context.fillStyle = base;
   context.fillRect(0, 0, width, height);
 
   context.save();
-  context.filter = scene
-    ? "saturate(0.88) contrast(1.16) brightness(0.9)"
-    : "blur(58px) saturate(1.45) contrast(1.2)";
-  context.globalAlpha = scene ? 0.92 : 0.58;
-  drawImageCover(
-    context,
-    scene ?? cover,
-    scene ? -18 : -170,
-    scene ? -18 : -160,
-    scene ? width + 36 : width + 340,
-    scene ? height + 36 : height + 320,
-  );
-  context.restore();
-
-  context.save();
   context.globalCompositeOperation = "screen";
-  drawStaticGlow(context, width * 0.16, height * 0.42, width * 0.72, palette.primary, 0.34);
-  drawStaticGlow(context, width * 0.9, height * 0.28, width * 0.64, palette.secondary, 0.3);
+  drawStaticGlow(context, width * 0.03, height * 0.2, width * 0.72, palette.primary, 0.4);
+  drawStaticGlow(context, width * 0.98, height * 0.56, width * 0.76, palette.secondary, 0.36);
   if (template === "offer-promotion") {
-    drawStaticGlow(context, width * 0.18, height * 0.44, width * 0.44, palette.warm, 0.35);
+    drawStaticGlow(context, width * 0.14, height * 0.42, width * 0.52, palette.warm, 0.38);
   }
   context.restore();
 
+  drawStaticPaint(
+    context,
+    -width * 0.16,
+    height * 0.31,
+    width * 0.84,
+    Math.max(120, height * 0.13),
+    colourCss(palette.primary, 0.31),
+  );
+  drawStaticPaint(
+    context,
+    width * 0.47,
+    height * 0.48,
+    width * 0.68,
+    Math.max(150, height * 0.15),
+    colourCss(palette.secondary, 0.3),
+    -1,
+  );
+  drawStaticPaint(
+    context,
+    width * 0.03,
+    height * 0.79,
+    width * 0.7,
+    Math.max(38, height * 0.04),
+    colourCss(palette.primary, 0.21),
+  );
+
   const upperShade = context.createLinearGradient(0, 0, 0, height * 0.42);
-  upperShade.addColorStop(0, "rgba(1,2,5,0.66)");
-  upperShade.addColorStop(0.56, "rgba(1,2,5,0.18)");
+  upperShade.addColorStop(0, "rgba(1,2,5,0.3)");
+  upperShade.addColorStop(0.56, "rgba(1,2,5,0.08)");
   upperShade.addColorStop(1, "rgba(1,2,5,0)");
   context.fillStyle = upperShade;
   context.fillRect(0, 0, width, height * 0.42);
@@ -1991,13 +2002,13 @@ function drawStaticPosterBackground(
   context.fillRect(0, height * 0.68, width, height * 0.32);
 
   const particleSeed = seed || 1;
-  for (let index = 0; index < 46; index += 1) {
+  for (let index = 0; index < 62; index += 1) {
     const x = (particleSeed * (index + 13) * 71) % width;
     const y = (particleSeed * (index + 29) * 43) % height;
     const radius = 1 + ((particleSeed + index * 17) % 5);
     context.fillStyle = colourCss(
       index % 5 === 0 ? palette.warm : index % 2 === 0 ? palette.secondary : palette.primary,
-      0.1 + ((index * 11) % 18) / 100,
+      0.08 + ((index * 11) % 16) / 100,
     );
     context.beginPath();
     context.arc(x, y, radius, 0, Math.PI * 2);
@@ -2005,15 +2016,24 @@ function drawStaticPosterBackground(
   }
 
   context.save();
-  context.globalAlpha = 0.18;
-  context.strokeStyle = colourCss(palette.primary);
-  context.lineWidth = 2;
-  for (let index = 0; index < 5; index += 1) {
-    const y = height * 0.83 + index * 19;
+  context.globalCompositeOperation = "screen";
+  for (let index = 0; index < 48; index += 1) {
+    const side = index % 2 === 0 ? 0.12 : 0.88;
+    const x = width * side + (((particleSeed + index * 79) % 220) - 110);
+    const y = height * (0.2 + ((particleSeed + index * 47) % 650) / 1000);
+    const radius = 2 + ((particleSeed + index * 23) % 13);
+    context.fillStyle = colourCss(index % 3 === 0 ? palette.secondary : palette.primary, 0.12);
+    context.save();
+    context.translate(x, y);
+    context.rotate(((particleSeed + index * 31) % 628) / 100);
     context.beginPath();
-    context.moveTo(width * 0.08, y);
-    context.bezierCurveTo(width * 0.32, y - 8, width * 0.7, y + 11, width * 0.94, y - 3);
-    context.stroke();
+    context.moveTo(-radius * 0.35, -radius * 1.4);
+    context.lineTo(radius * 0.7, -radius * 0.2);
+    context.lineTo(radius * 0.25, radius * 1.2);
+    context.lineTo(-radius * 0.65, radius * 0.35);
+    context.closePath();
+    context.fill();
+    context.restore();
   }
   context.restore();
 }
@@ -2229,11 +2249,11 @@ function drawStaticTropeIcon(
   context.save();
   context.strokeStyle = colour;
   context.fillStyle = colour;
-  context.lineWidth = Math.max(5, size * 0.065);
+  context.lineWidth = Math.max(8, size * 0.088);
   context.lineCap = "round";
   context.lineJoin = "round";
   context.shadowColor = colour;
-  context.shadowBlur = size * 0.16;
+  context.shadowBlur = size * 0.085;
 
   const heart = () => {
     context.beginPath();
@@ -2302,14 +2322,19 @@ function drawStaticTropeIcon(
     context.arc(x + size * 0.55, cy, size * 0.028, 0, Math.PI * 2);
     context.fill();
   } else if (/found family|family|stepbrother|teammate/.test(key)) {
-    [0.3, 0.5, 0.7].forEach((position, index) => {
-      context.beginPath();
-      context.arc(x + size * position, y + size * (index === 1 ? 0.28 : 0.36), size * (index === 1 ? 0.13 : 0.1), 0, Math.PI * 2);
-      context.stroke();
-    });
     context.beginPath();
-    context.moveTo(x + size * 0.12, y + size * 0.82);
-    context.quadraticCurveTo(cx, y + size * 0.52, x + size * 0.88, y + size * 0.82);
+    context.moveTo(x + size * 0.13, y + size * 0.47);
+    context.lineTo(cx, y + size * 0.14);
+    context.lineTo(x + size * 0.87, y + size * 0.47);
+    context.lineTo(x + size * 0.8, y + size * 0.47);
+    context.lineTo(x + size * 0.8, y + size * 0.87);
+    context.lineTo(x + size * 0.2, y + size * 0.87);
+    context.lineTo(x + size * 0.2, y + size * 0.47);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(cx, y + size * 0.78);
+    context.bezierCurveTo(x + size * 0.3, y + size * 0.66, x + size * 0.35, y + size * 0.49, cx, y + size * 0.58);
+    context.bezierCurveTo(x + size * 0.65, y + size * 0.49, x + size * 0.7, y + size * 0.66, cx, y + size * 0.78);
     context.stroke();
   } else if (/slow burn|heat|passion|high heat/.test(key)) {
     context.beginPath();
@@ -2359,12 +2384,18 @@ function drawStaticTropeLabel(
   audit: StaticPosterAudit,
   index: number,
 ) {
-  const iconSize = Math.min(area.height * 0.48, area.width * 0.32, 94);
+  const words = trope.trim().split(/\s+/).filter(Boolean);
+  const splitAt = words.length > 1 ? Math.ceil(words.length / 2) : words.length;
+  const balancedLabel =
+    words.length > 1
+      ? `${words.slice(0, splitAt).join(" ")}\n${words.slice(splitAt).join(" ")}`
+      : trope;
+  const iconSize = Math.min(area.height * 0.54, area.width * 0.42, 118);
   const iconX = area.x + (area.width - iconSize) / 2;
   drawStaticTropeIcon(context, trope, iconX, area.y, iconSize, colour);
   drawStaticText(
     context,
-    trope,
+    balancedLabel,
     {
       x: area.x,
       y: area.y + iconSize + 9,
@@ -2374,12 +2405,12 @@ function drawStaticTropeLabel(
     {
       family: "PosterDisplay",
       weight: 400,
-      startingSize: 40,
-      minimumSize: 25,
-      maximumLines: 3,
+      startingSize: Math.min(42, Math.max(28, area.width * 0.13)),
+      minimumSize: Math.min(24, Math.max(19, area.width * 0.09)),
+      maximumLines: area.width < 230 ? 4 : area.height < 180 ? 3 : 2,
       colour: "#ffffff",
       align: "center",
-      lineHeight: 1.02,
+      lineHeight: 0.94,
       uppercase: true,
     },
     audit,
@@ -2391,10 +2422,11 @@ function selectQuoteParts(value: string): { lead: string; accent: string; tail: 
   const clean = value.trim().replace(/^[“\"]+|[”\"]+$/g, "");
   const preferred = clean.match(/keep touching you|risk everything|my coach|worth everything|totally off limits/i);
   if (preferred && preferred.index !== undefined) {
+    const trailing = clean.slice(preferred.index + preferred[0].length).trim();
     return {
       lead: clean.slice(0, preferred.index).trim(),
-      accent: preferred[0].trim(),
-      tail: clean.slice(preferred.index + preferred[0].length).trim(),
+      accent: `${preferred[0].trim()}${/^[.!?]+$/.test(trailing) ? trailing : ""}`,
+      tail: /^[.!?]+$/.test(trailing) ? "" : trailing,
     };
   }
   const words = clean.split(/\s+/).filter(Boolean);
@@ -2475,13 +2507,13 @@ function drawStaticSignature(
 ) {
   drawStaticText(
     context,
-    "MARLOW QUINN",
-    { x: 50, y: height - 52, width: width - 100, height: 28 },
+    "M/M ROMANCE BY MARLOW QUINN",
+    { x: 50, y: height - 60, width: width - 100, height: 34 },
     {
       family: "PosterSans",
       weight: 700,
-      startingSize: 18,
-      minimumSize: 16,
+      startingSize: 22,
+      minimumSize: 18,
       maximumLines: 1,
       colour: colourCss(palette.primary, 0.8),
       align: "right",
@@ -2542,10 +2574,7 @@ async function createProfessionalCampaignImage(input: {
 
   if (!context) throw new Error("This browser could not create the image.");
 
-  const [cover, scene] = await Promise.all([
-    loadImage(input.book.coverUrl),
-    input.aiBackground ? loadImage(input.aiBackground) : Promise.resolve(null),
-  ]);
+  const cover = await loadImage(input.book.coverUrl);
   const suppliedText = `${input.post.title} ${input.post.caption} ${input.quote}`;
   const seed = seededNumber(
     `${input.book.slug}-${input.post.platform}-${input.template}-${suppliedText}`,
@@ -2583,8 +2612,6 @@ async function createProfessionalCampaignImage(input: {
 
   drawStaticPosterBackground(
     context,
-    cover,
-    scene,
     palette,
     width,
     height,
@@ -2697,10 +2724,10 @@ async function createProfessionalCampaignImage(input: {
       context,
       cover,
       palette,
-      isTikTok ? 700 : 760,
-      isTikTok ? 720 : 390,
-      isTikTok ? 620 : 535,
-      isTikTok ? -0.035 : 0.035,
+      isTikTok ? 690 : 735,
+      isTikTok ? 650 : 350,
+      isTikTok ? 680 : 575,
+      isTikTok ? -0.028 : 0.028,
       audit,
       "quote Kindle",
     );
@@ -2709,82 +2736,124 @@ async function createProfessionalCampaignImage(input: {
       input.book,
       palette,
       isTikTok
-        ? { x: 55, y: 548, width: 485, height: 135 }
-        : { x: 55, y: 1122, width: 405, height: 135 },
+        ? { x: 55, y: 530, width: 490, height: 145 }
+        : { x: 55, y: 1120, width: 405, height: 140 },
       audit,
       "left",
     );
   } else if (template === "trope-showcase") {
-    drawStaticText(
-      context,
-      subgenre,
-      {
-        x: 55,
-        y: isTikTok ? 78 : 52,
-        width: 970,
-        height: isTikTok ? 190 : 145,
-      },
-      {
-        family: "PosterDisplay",
-        weight: 400,
-        startingSize: isTikTok ? 120 : 92,
-        minimumSize: isTikTok ? 60 : 48,
-        maximumLines: 2,
-        colour: "#ffffff",
-        align: "center",
-        lineHeight: 0.9,
-        uppercase: true,
-      },
-      audit,
-      "trope heading",
-    );
+    const genreWords = subgenre.split(/\s+/).filter(Boolean);
+    const genreAccent = genreWords.pop() || "ROMANCE";
+    const genreLead = genreWords.join(" ");
+    if (genreLead) {
+      drawStaticText(
+        context,
+        genreLead,
+        { x: 55, y: isTikTok ? 60 : 50, width: 970, height: isTikTok ? 105 : 76 },
+        {
+          family: "PosterDisplay",
+          weight: 400,
+          startingSize: isTikTok ? 94 : 76,
+          minimumSize: isTikTok ? 48 : 38,
+          maximumLines: 2,
+          colour: "#ffffff",
+          align: "center",
+          lineHeight: 0.88,
+          uppercase: true,
+        },
+        audit,
+        "trope heading lead",
+      );
+    }
     drawStaticPaint(
       context,
-      235,
-      isTikTok ? 235 : 188,
-      610,
-      24,
-      colourCss(palette.primary, 0.85),
+      230,
+      isTikTok ? 151 : 103,
+      620,
+      isTikTok ? 72 : 58,
+      colourCss(palette.primary, 0.82),
+    );
+    drawStaticText(
+      context,
+      genreAccent,
+      { x: 55, y: isTikTok ? 119 : 78, width: 970, height: isTikTok ? 120 : 96 },
+      {
+        family: "PosterAccent",
+        weight: 700,
+        startingSize: isTikTok ? 122 : 102,
+        minimumSize: isTikTok ? 64 : 52,
+        maximumLines: 1,
+        colour: palette.cream,
+        align: "center",
+        lineHeight: 0.84,
+      },
+      audit,
+      "trope heading accent",
     );
 
     context.save();
     context.globalCompositeOperation = "screen";
     drawStaticGlow(
       context,
-      isTikTok ? 745 : 740,
-      isTikTok ? 1110 : 720,
-      isTikTok ? 500 : 420,
+      isTikTok ? 370 : 345,
+      isTikTok ? 850 : 610,
+      isTikTok ? 540 : 440,
       palette.primary,
-      0.3,
+      0.38,
     );
     context.restore();
     drawStaticKindle(
       context,
       cover,
       palette,
-      540,
-      isTikTok ? 600 : 365,
-      isTikTok ? 620 : 520,
-      0.042,
+      isTikTok ? 380 : 345,
+      isTikTok ? 300 : 205,
+      isTikTok ? 650 : 540,
+      isTikTok ? -0.025 : -0.03,
       audit,
       "trope Kindle",
     );
 
-    const mosaic = isTikTok
-      ? [
-          { x: 35, y: 250, width: 315, height: 180 },
-          { x: 382, y: 225, width: 315, height: 180 },
-          { x: 730, y: 250, width: 315, height: 180 },
-          { x: 35, y: 1040, width: 250, height: 180 },
-          { x: 795, y: 1040, width: 250, height: 180 },
-        ]
-      : [
-          { x: 35, y: 225, width: 315, height: 180 },
-          { x: 382, y: 210, width: 315, height: 180 },
-          { x: 730, y: 225, width: 315, height: 180 },
-          { x: 35, y: 760, width: 250, height: 175 },
-          { x: 795, y: 760, width: 250, height: 175 },
-        ];
+    const tropeCount = Math.max(1, uniqueTropes.length);
+    const tropeCellHeight = isTikTok
+      ? tropeCount <= 3
+        ? 240
+        : tropeCount === 4
+          ? 220
+          : 190
+      : tropeCount <= 3
+        ? 210
+        : tropeCount === 4
+          ? 180
+          : 155;
+    const tropeGap = isTikTok
+      ? tropeCount <= 3
+        ? 80
+        : tropeCount === 4
+          ? 20
+          : 10
+      : tropeCount <= 3
+        ? 40
+        : tropeCount === 4
+          ? 15
+          : 10;
+    const tropeY = isTikTok
+      ? tropeCount <= 3
+        ? 430
+        : tropeCount === 4
+          ? 350
+          : 310
+      : tropeCount <= 3
+        ? 320
+        : tropeCount === 4
+          ? 270
+          : 240;
+    const mosaic = uniqueTropes.map((_, index) => ({
+      x: isTikTok ? 730 : 675,
+      y: tropeY + index * (tropeCellHeight + tropeGap),
+      width: isTikTok ? 295 : 350,
+      height: tropeCellHeight,
+    }));
     uniqueTropes.forEach((trope, index) => {
       const area = mosaic[index];
       if (!area) return;
@@ -2798,13 +2867,21 @@ async function createProfessionalCampaignImage(input: {
         index,
       );
     });
+    drawStaticPaint(
+      context,
+      isTikTok ? 155 : 180,
+      isTikTok ? 1482 : 1080,
+      isTikTok ? 770 : 720,
+      isTikTok ? 105 : 84,
+      colourCss(palette.secondary, 0.24),
+    );
     drawStaticCta(
       context,
       input.book,
       palette,
       isTikTok
-        ? { x: 105, y: 1692, width: 870, height: 140 }
-        : { x: 105, y: 1185, width: 870, height: 120 },
+        ? { x: 105, y: 1465, width: 870, height: 150 }
+        : { x: 105, y: 1095, width: 870, height: 130 },
       audit,
       "center",
     );
@@ -2865,7 +2942,7 @@ async function createProfessionalCampaignImage(input: {
       palette,
       540,
       isTikTok ? 270 : 190,
-      isTikTok ? 740 : 620,
+      isTikTok ? 770 : 650,
       -0.018,
       audit,
       "hero Kindle",
@@ -2903,7 +2980,7 @@ async function createProfessionalCampaignImage(input: {
     );
   } else if (template === "offer-promotion" && offer) {
     if (isTikTok) {
-      drawStaticPaint(context, 48, 145, 930, 360, colourCss(palette.warm, 0.72), -1);
+      drawStaticPaint(context, 48, 145, 930, 360, colourCss(palette.primary, 0.82), -1);
       if (offer.eyebrow) {
         drawStaticText(
           context,
@@ -2960,7 +3037,7 @@ async function createProfessionalCampaignImage(input: {
         "offer title",
       );
     } else {
-      drawStaticPaint(context, 38, 175, 480, 330, colourCss(palette.warm, 0.74), -1);
+      drawStaticPaint(context, 38, 175, 480, 330, colourCss(palette.primary, 0.82), -1);
       if (offer.eyebrow) {
         drawStaticText(
           context,
@@ -3145,24 +3222,33 @@ async function createProfessionalCampaignImage(input: {
       "editorial title",
     );
 
-    uniqueTropes.slice(0, 2).forEach((trope, index) => {
+    uniqueTropes.slice(0, 3).forEach((trope, index) => {
+      const detailColour =
+        index === 0 ? primary : index === 1 ? secondary : colourCss(palette.warm);
+      const detailBounds: PosterRect = isTikTok
+        ? editorialWide
+          ? { x: 55 + index * 330, y: 1350, width: 310, height: 150 }
+          : { x: 665, y: 990 + index * 150, width: 345, height: 130 }
+        : editorialWide
+          ? { x: 55 + index * 330, y: 1010, width: 310, height: 115 }
+          : { x: 625, y: 735 + index * 120, width: 380, height: 110 };
+
+      context.save();
+      context.fillStyle = detailColour;
+      context.globalAlpha = 0.9;
+      context.fillRect(detailBounds.x, detailBounds.y - 13, 78, 7);
+      context.restore();
       drawStaticText(
         context,
         trope,
-        isTikTok
-          ? editorialWide
-            ? { x: 55 + index * 500, y: 1350, width: 470, height: 120 }
-            : { x: 665, y: 1035 + index * 135, width: 345, height: 120 }
-          : editorialWide
-            ? { x: 55 + index * 500, y: 1020, width: 470, height: 100 }
-            : { x: 625, y: 785 + index * 105, width: 380, height: 95 },
+        detailBounds,
         {
           family: "PosterSans",
           weight: 700,
           startingSize: isTikTok ? 29 : 26,
           minimumSize: 19,
           maximumLines: 3,
-          colour: index === 0 ? primary : secondary,
+          colour: detailColour,
           lineHeight: 1.05,
           uppercase: true,
         },
@@ -3185,8 +3271,6 @@ async function createProfessionalCampaignImage(input: {
       editorialWide ? "center" : "left",
     );
   }
-
-  drawStaticSignature(context, width, height, palette, audit);
 
   return {
     dataUrl: canvas.toDataURL("image/jpeg", 0.95),
@@ -3926,6 +4010,7 @@ async function createCoverFirstCampaignVideo(input: {
   quote: string;
   template: Exclude<PosterTemplate, "auto">;
 }): Promise<{ blob: Blob; mimeType: string }> {
+  await ensurePosterFonts();
   if (typeof MediaRecorder === "undefined") {
     throw new Error("This browser cannot create downloadable video files.");
   }
@@ -3944,7 +4029,8 @@ async function createCoverFirstCampaignVideo(input: {
   if (!context) throw new Error("This browser could not create the video.");
 
   const cover = await loadImage(input.book.coverUrl);
-  const palette = extractCampaignPalette(cover, input.book.slug);
+  const palette = extractStaticPosterPalette(cover, input.book.slug);
+  const videoSeed = seededNumber(`${input.book.slug}-${input.template}-video`);
   const stream = canvas.captureStream(30);
   const chunks: BlobPart[] = [];
   const recorder = new MediaRecorder(stream, {
@@ -4026,51 +4112,129 @@ async function createCoverFirstCampaignVideo(input: {
       const progress = elapsed / durationMs;
 
       context.clearRect(0, 0, canvas.width, canvas.height);
-      drawAtmosphericBackground(
+      drawStaticPosterBackground(
         context,
-        cover,
         palette,
         canvas.width,
         canvas.height,
-        `${input.book.slug}-video`,
-        progress,
+        input.template,
+        videoSeed,
       );
-      drawCampaignBrand(context, palette, canvas.width);
+      context.save();
+      context.globalCompositeOperation = "screen";
+      drawStaticGlow(
+        context,
+        160 + Math.sin(progress * Math.PI * 2) * 90,
+        760,
+        470,
+        palette.primary,
+        0.2,
+      );
+      drawStaticGlow(
+        context,
+        930 - Math.cos(progress * Math.PI * 2) * 80,
+        1180,
+        520,
+        palette.secondary,
+        0.18,
+      );
+      context.restore();
 
       const hookOpacity = windowOpacity(progress, 0, 0.055, 0.22, 0.3);
       if (hookOpacity > 0) {
+        const reveal = eased(progress / 0.19);
+        context.save();
         context.globalAlpha = hookOpacity;
-        context.textAlign = "center";
-        context.fillStyle = colourCss(palette.primary);
-        context.font = "800 25px Arial, sans-serif";
-        const eyebrow =
-          input.template === "cinematic-quote"
-            ? "FROM THE PAGES OF"
-            : input.campaignType === "kindle-unlimited"
-              ? "AVAILABLE ON KINDLE UNLIMITED"
-              : "YOUR NEXT M/M ROMANCE";
-        context.fillText(eyebrow, canvas.width / 2, 300);
-        context.fillStyle = colourCss(palette.primary);
-        context.fillRect(370, 330, 340, 8);
-        context.globalAlpha = 1;
+        context.textBaseline = "top";
+        context.shadowColor = "rgba(0,0,0,0.9)";
+        context.shadowBlur = 22;
 
-        const hook =
-          input.template === "cinematic-quote" && input.quote.trim()
-            ? `“${input.quote.trim().replace(/^[“"]|[”"]$/g, "")}”`
-            : input.template === "trope-showcase"
-              ? input.book.tropes.slice(0, 2).join(" × ")
-              : cleanCampaignHook(input.book, input.post);
-        drawVideoHeading(
-          hook.toUpperCase(),
-          455,
-          900,
-          input.template === "cinematic-quote" ? 8 : 5,
-          input.template === "cinematic-quote" ? 76 : 92,
-          input.template === "cinematic-quote" ? 43 : 54,
-          input.template === "cinematic-quote" ? 2 : 1,
-          hookOpacity,
-          eased(progress / 0.2),
-        );
+        if (input.template === "cinematic-quote" && input.quote.trim()) {
+          const parts = selectQuoteParts(input.quote);
+          const lead = fittedMultiline(
+            context,
+            `“${parts.lead || parts.accent}`.toUpperCase(),
+            920,
+            5,
+            108,
+            58,
+          );
+          context.textAlign = "left";
+          context.fillStyle = "#ffffff";
+          lead.lines.forEach((line, index) => {
+            context.globalAlpha = hookOpacity * eased((reveal - index * 0.08) / 0.3);
+            context.font = `400 ${lead.fontSize}px "PosterDisplay", "Arial Narrow", sans-serif`;
+            context.fillText(line, 70, 270 + index * lead.lineHeight);
+          });
+          if (parts.lead) {
+            const accentY = 270 + lead.lines.length * lead.lineHeight + 34;
+            context.globalAlpha = hookOpacity * reveal;
+            drawStaticPaint(
+              context,
+              48,
+              accentY + 16,
+              850,
+              120,
+              colourCss(palette.primary, 0.86),
+              -1,
+            );
+            context.font = `700 126px "PosterAccent", cursive`;
+            context.fillStyle = palette.cream;
+            context.fillText(
+              `${parts.accent}${parts.tail ? ` ${parts.tail}` : ""}”`,
+              86,
+              accentY,
+              880,
+            );
+          }
+        } else if (input.template === "offer-promotion") {
+          const offer = extractStaticOffer(
+            `${input.post.title} ${input.post.caption}`,
+          );
+          context.textAlign = "center";
+          context.fillStyle = "#ffffff";
+          context.font = `700 38px "PosterSans", Arial, sans-serif`;
+          context.fillText(offer?.eyebrow || "SPECIAL OFFER", 540, 330);
+          context.globalAlpha = hookOpacity * reveal;
+          drawStaticPaint(
+            context,
+            50,
+            430,
+            980,
+            390,
+            colourCss(palette.primary, 0.84),
+            -1,
+          );
+          context.fillStyle = palette.cream;
+          context.font = `400 ${offer?.value.length && offer.value.length > 8 ? 220 : 360}px "PosterDisplay", "Arial Narrow", sans-serif`;
+          context.fillText(offer?.value || "SALE", 540, 455, 900);
+        } else {
+          const words = (input.book.subgenre || "M/M ROMANCE")
+            .trim()
+            .split(/\s+/);
+          const accent = words.pop() || "ROMANCE";
+          const lead = words.join(" ") || "M/M";
+          context.textAlign = "center";
+          context.fillStyle = "#ffffff";
+          context.font = `400 150px "PosterDisplay", "Arial Narrow", sans-serif`;
+          context.fillText(lead.toUpperCase(), 540, 360, 940);
+          context.globalAlpha = hookOpacity * reveal;
+          drawStaticPaint(
+            context,
+            95,
+            570,
+            890,
+            150,
+            colourCss(palette.primary, 0.82),
+          );
+          context.fillStyle = palette.cream;
+          context.font = `700 180px "PosterAccent", cursive`;
+          context.fillText(accent, 540, 525, 930);
+          context.fillStyle = colourCss(palette.secondary);
+          context.font = `700 34px "PosterSans", Arial, sans-serif`;
+          context.fillText("BITE  •  HEAT  •  HEART", 540, 850);
+        }
+        context.restore();
       }
 
       const coverOpacity = windowOpacity(progress, 0.23, 0.31, 0.48, 0.58);
@@ -4105,22 +4269,13 @@ async function createCoverFirstCampaignVideo(input: {
       const tropeOpacity = windowOpacity(progress, 0.51, 0.59, 0.73, 0.82);
       if (tropeOpacity > 0) {
         const scene = eased((progress - 0.51) / 0.2);
-        context.globalAlpha = tropeOpacity;
-        context.textAlign = "left";
-        context.fillStyle = "#ffffff";
-        context.font = "800 54px Impact, Arial, sans-serif";
-        context.fillText("WHAT TO EXPECT", 64, 310);
-        context.fillStyle = colourCss(palette.primary);
-        context.fillRect(64, 342, 310, 8);
-        context.globalAlpha = 1;
-
         drawKindleMockup(
           context,
           cover,
           palette,
-          300 - (1 - scene) * 160,
-          430,
-          455,
+          305 - (1 - scene) * 190,
+          350,
+          520,
           -0.045,
           tropeOpacity,
         );
@@ -4128,33 +4283,33 @@ async function createCoverFirstCampaignVideo(input: {
         input.book.tropes.slice(0, 4).forEach((trope, index) => {
           const itemProgress = eased((scene - index * 0.12) / 0.42);
           if (itemProgress <= 0) return;
-          const x = 585 + (1 - itemProgress) * 150;
-          const y = 500 + index * 245;
+          const x = 690 + (1 - itemProgress) * 190;
+          const y = 330 + index * 365;
+          const colour =
+            index % 3 === 0
+              ? colourCss(palette.primary)
+              : index % 3 === 1
+                ? colourCss(palette.secondary)
+                : colourCss(palette.warm);
           context.globalAlpha = tropeOpacity * itemProgress;
-          context.fillStyle = "rgba(0,0,0,0.58)";
-          roundedRectanglePath(context, x, y, 430, 178, 18);
-          context.fill();
-          context.strokeStyle = colourCss(palette.primary, 0.8);
-          context.lineWidth = 4;
-          context.stroke();
-          context.fillStyle = colourCss(palette.primary);
-          context.font = "800 24px Arial, sans-serif";
-          context.fillText(String(index + 1).padStart(2, "0"), x + 28, y + 48);
-          context.fillStyle = "#ffffff";
+          drawStaticTropeIcon(context, trope, x, y, 150, colour);
           const block = fittedMultiline(
             context,
             trope.toUpperCase(),
-            368,
-            2,
-            37,
-            25,
+            320,
+            3,
+            48,
+            30,
           );
+          context.textAlign = "center";
+          context.fillStyle = "#ffffff";
           block.lines.forEach((line, lineIndex) => {
-            context.font = `800 ${block.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
+            context.font = `400 ${block.fontSize}px "PosterDisplay", "Arial Narrow", sans-serif`;
             context.fillText(
               line,
-              x + 28,
-              y + 98 + lineIndex * block.lineHeight,
+              x + 75,
+              y + 176 + lineIndex * block.lineHeight,
+              320,
             );
           });
           context.globalAlpha = 1;
@@ -4169,8 +4324,8 @@ async function createCoverFirstCampaignVideo(input: {
           cover,
           palette,
           canvas.width / 2,
-          260 + rise,
-          570,
+          225 + rise,
+          650,
           -0.018 + (1 - finalOpacity) * 0.04,
           finalOpacity,
         );
@@ -4178,30 +4333,35 @@ async function createCoverFirstCampaignVideo(input: {
         context.globalAlpha = finalOpacity;
         context.textAlign = "center";
         context.fillStyle = "#ffffff";
-        const title = fittedMultiline(
+        const subgenre = fittedMultiline(
           context,
-          input.book.title.toUpperCase(),
+          (input.book.subgenre || "M/M ROMANCE").toUpperCase(),
           900,
           2,
-          68,
-          42,
+          72,
+          46,
         );
-        title.lines.forEach((line, index) => {
-          context.font = `800 ${title.fontSize}px Impact, "Arial Narrow", Arial, sans-serif`;
+        subgenre.lines.forEach((line, index) => {
+          context.font = `400 ${subgenre.fontSize}px "PosterDisplay", "Arial Narrow", sans-serif`;
           context.fillText(
             line,
             canvas.width / 2,
-            1350 + index * title.lineHeight,
+            1330 + index * subgenre.lineHeight,
           );
         });
-        context.fillStyle = colourCss(palette.primary);
-        context.font = "800 28px Arial, sans-serif";
-        context.fillText("M/M ROMANCE BY MARLOW QUINN", canvas.width / 2, 1490);
+        context.fillStyle = palette.cream;
+        context.font = `700 28px "PosterSans", Arial, sans-serif`;
+        context.fillText(
+          input.book.tropes.slice(0, 3).join("  •  ").toUpperCase(),
+          canvas.width / 2,
+          1435,
+          930,
+        );
         context.globalAlpha = finalOpacity;
-        drawCallToAction(context, input.book, palette, canvas.width, 1560);
-        context.fillStyle = "rgba(255,255,255,0.78)";
-        context.font = "700 24px Arial, sans-serif";
-        context.fillText("MARLOWQUINN.COM", canvas.width / 2, 1735);
+        drawCallToAction(context, input.book, palette, canvas.width, 1510);
+        context.fillStyle = colourCss(palette.primary);
+        context.font = `700 27px "PosterSans", Arial, sans-serif`;
+        context.fillText("MARLOWQUINN.COM", canvas.width / 2, 1715);
         context.globalAlpha = 1;
       }
 
@@ -4246,7 +4406,7 @@ export default function SocialStudioPage() {
   const [copiedPlatform, setCopiedPlatform] = useState<SocialPlatform | null>(
     null,
   );
-  const [mediaStyle] = useState<MediaStyle>("ai-scene");
+  const [mediaStyle] = useState<MediaStyle>("branded");
   const [posterTemplate, setPosterTemplate] = useState<PosterTemplate>("auto");
   const [generatedMedia, setGeneratedMedia] = useState<GeneratedMedia[]>([]);
   const [creatingImageFor, setCreatingImageFor] =
@@ -4370,7 +4530,6 @@ export default function SocialStudioPage() {
     setImageError("");
 
     try {
-      let aiBackground = "";
       const generationSeed = seededNumber(
         `${selectedBook.slug}-${post.platform}-${Date.now()}`,
       );
@@ -4381,33 +4540,6 @@ export default function SocialStudioPage() {
         `${post.title} ${post.caption} ${quote}`,
       );
 
-      if (mediaStyle === "ai-scene") {
-        const backgroundResponse = await fetch("/api/social-studio/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            book: selectedBook,
-            platform: post.platform,
-            campaignType,
-            template: selectedTemplate,
-            visualDirection: post.visualDirection,
-            instructions: instructions.trim(),
-          }),
-        });
-        const backgroundResult = (await backgroundResponse.json()) as {
-          imageDataUrl?: string;
-          error?: string;
-        };
-
-        if (!backgroundResponse.ok || !backgroundResult.imageDataUrl) {
-          throw new Error(
-            backgroundResult.error || "The cinematic background could not be created.",
-          );
-        } else {
-          aiBackground = backgroundResult.imageDataUrl;
-        }
-      }
-
       const image = await createProfessionalCampaignImage({
         book: selectedBook,
         post,
@@ -4415,7 +4547,6 @@ export default function SocialStudioPage() {
         campaignType,
         quote,
         template: selectedTemplate,
-        aiBackground,
       });
 
       setGeneratedMedia((current) => [
