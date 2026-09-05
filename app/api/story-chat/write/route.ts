@@ -11,7 +11,10 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const WRITING_MODEL = "gpt-5.6-terra";
+const WRITING_MODEL = "gpt-6-astra";
+const INPUT_COST_PER_MILLION_TOKENS = 10;
+const CACHED_INPUT_COST_PER_MILLION_TOKENS = 1;
+const OUTPUT_COST_PER_MILLION_TOKENS = 50;
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -697,7 +700,9 @@ function diagnostic(input: {
   const cachedTokens = input.usage?.input_tokens_details?.cached_tokens ?? 0;
   const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
   const costUsd =
-    (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+    (uncachedTokens * INPUT_COST_PER_MILLION_TOKENS +
+      cachedTokens * CACHED_INPUT_COST_PER_MILLION_TOKENS +
+      outputTokens * OUTPUT_COST_PER_MILLION_TOKENS) /
     1_000_000;
 
   return {
