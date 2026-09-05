@@ -1280,11 +1280,13 @@ function ensurePosterFonts(): Promise<void> {
   if (posterFontsReady) return posterFontsReady;
   posterFontsReady = Promise.all(
     POSTER_FONT_URLS.map(async ([family, url]) => {
-      const face = new FontFace(family, `url(${url})`, {
-        weight: family === "PosterDisplay" ? "400" : "700",
-        style: "normal",
-      });
-      document.fonts.add(await face.load());
+      if (!document.fonts.check(`32px "${family}"`)) {
+        const face = new FontFace(family, `url(${url})`, {
+          weight: family === "PosterDisplay" ? "400" : "700",
+          style: "normal",
+        });
+        document.fonts.add(await face.load());
+      }
       await document.fonts.load(`32px "${family}"`);
       if (!document.fonts.check(`32px "${family}"`)) {
         throw new Error(`The ${family} poster font did not finish loading.`);
@@ -1939,57 +1941,44 @@ function drawStaticGlow(
 
 function drawStaticPosterBackground(
   context: CanvasRenderingContext2D,
+  cover: HTMLImageElement,
+  scene: HTMLImageElement | null,
   palette: StaticPosterPalette,
   width: number,
   height: number,
   template: Exclude<PosterTemplate, "auto">,
   seed: number,
 ) {
-  const base = context.createLinearGradient(0, 0, width, height);
-  base.addColorStop(0, colourCss(palette.base));
-  base.addColorStop(0.46, "rgb(5, 6, 12)");
-  base.addColorStop(1, "rgb(1, 2, 5)");
-  context.fillStyle = base;
+  context.fillStyle = colourCss(palette.base);
   context.fillRect(0, 0, width, height);
 
   context.save();
+  context.filter = scene
+    ? "saturate(0.88) contrast(1.16) brightness(0.9)"
+    : "blur(58px) saturate(1.45) contrast(1.2)";
+  context.globalAlpha = scene ? 0.92 : 0.58;
+  drawImageCover(
+    context,
+    scene ?? cover,
+    scene ? -18 : -170,
+    scene ? -18 : -160,
+    scene ? width + 36 : width + 340,
+    scene ? height + 36 : height + 320,
+  );
+  context.restore();
+
+  context.save();
   context.globalCompositeOperation = "screen";
-  drawStaticGlow(context, width * 0.03, height * 0.2, width * 0.72, palette.primary, 0.4);
-  drawStaticGlow(context, width * 0.98, height * 0.56, width * 0.76, palette.secondary, 0.36);
+  drawStaticGlow(context, width * 0.16, height * 0.42, width * 0.72, palette.primary, 0.34);
+  drawStaticGlow(context, width * 0.9, height * 0.28, width * 0.64, palette.secondary, 0.3);
   if (template === "offer-promotion") {
-    drawStaticGlow(context, width * 0.14, height * 0.42, width * 0.52, palette.warm, 0.38);
+    drawStaticGlow(context, width * 0.18, height * 0.44, width * 0.44, palette.warm, 0.35);
   }
   context.restore();
 
-  drawStaticPaint(
-    context,
-    -width * 0.16,
-    height * 0.31,
-    width * 0.84,
-    Math.max(120, height * 0.13),
-    colourCss(palette.primary, 0.31),
-  );
-  drawStaticPaint(
-    context,
-    width * 0.47,
-    height * 0.48,
-    width * 0.68,
-    Math.max(150, height * 0.15),
-    colourCss(palette.secondary, 0.3),
-    -1,
-  );
-  drawStaticPaint(
-    context,
-    width * 0.03,
-    height * 0.79,
-    width * 0.7,
-    Math.max(38, height * 0.04),
-    colourCss(palette.primary, 0.21),
-  );
-
   const upperShade = context.createLinearGradient(0, 0, 0, height * 0.42);
-  upperShade.addColorStop(0, "rgba(1,2,5,0.3)");
-  upperShade.addColorStop(0.56, "rgba(1,2,5,0.08)");
+  upperShade.addColorStop(0, "rgba(1,2,5,0.66)");
+  upperShade.addColorStop(0.56, "rgba(1,2,5,0.18)");
   upperShade.addColorStop(1, "rgba(1,2,5,0)");
   context.fillStyle = upperShade;
   context.fillRect(0, 0, width, height * 0.42);
@@ -2002,13 +1991,13 @@ function drawStaticPosterBackground(
   context.fillRect(0, height * 0.68, width, height * 0.32);
 
   const particleSeed = seed || 1;
-  for (let index = 0; index < 62; index += 1) {
+  for (let index = 0; index < 46; index += 1) {
     const x = (particleSeed * (index + 13) * 71) % width;
     const y = (particleSeed * (index + 29) * 43) % height;
     const radius = 1 + ((particleSeed + index * 17) % 5);
     context.fillStyle = colourCss(
       index % 5 === 0 ? palette.warm : index % 2 === 0 ? palette.secondary : palette.primary,
-      0.08 + ((index * 11) % 16) / 100,
+      0.1 + ((index * 11) % 18) / 100,
     );
     context.beginPath();
     context.arc(x, y, radius, 0, Math.PI * 2);
@@ -2016,24 +2005,15 @@ function drawStaticPosterBackground(
   }
 
   context.save();
-  context.globalCompositeOperation = "screen";
-  for (let index = 0; index < 48; index += 1) {
-    const side = index % 2 === 0 ? 0.12 : 0.88;
-    const x = width * side + (((particleSeed + index * 79) % 220) - 110);
-    const y = height * (0.2 + ((particleSeed + index * 47) % 650) / 1000);
-    const radius = 2 + ((particleSeed + index * 23) % 13);
-    context.fillStyle = colourCss(index % 3 === 0 ? palette.secondary : palette.primary, 0.12);
-    context.save();
-    context.translate(x, y);
-    context.rotate(((particleSeed + index * 31) % 628) / 100);
+  context.globalAlpha = 0.18;
+  context.strokeStyle = colourCss(palette.primary);
+  context.lineWidth = 2;
+  for (let index = 0; index < 5; index += 1) {
+    const y = height * 0.83 + index * 19;
     context.beginPath();
-    context.moveTo(-radius * 0.35, -radius * 1.4);
-    context.lineTo(radius * 0.7, -radius * 0.2);
-    context.lineTo(radius * 0.25, radius * 1.2);
-    context.lineTo(-radius * 0.65, radius * 0.35);
-    context.closePath();
-    context.fill();
-    context.restore();
+    context.moveTo(width * 0.08, y);
+    context.bezierCurveTo(width * 0.32, y - 8, width * 0.7, y + 11, width * 0.94, y - 3);
+    context.stroke();
   }
   context.restore();
 }
@@ -2249,11 +2229,11 @@ function drawStaticTropeIcon(
   context.save();
   context.strokeStyle = colour;
   context.fillStyle = colour;
-  context.lineWidth = Math.max(8, size * 0.088);
+  context.lineWidth = Math.max(5, size * 0.065);
   context.lineCap = "round";
   context.lineJoin = "round";
   context.shadowColor = colour;
-  context.shadowBlur = size * 0.085;
+  context.shadowBlur = size * 0.16;
 
   const heart = () => {
     context.beginPath();
@@ -2322,19 +2302,14 @@ function drawStaticTropeIcon(
     context.arc(x + size * 0.55, cy, size * 0.028, 0, Math.PI * 2);
     context.fill();
   } else if (/found family|family|stepbrother|teammate/.test(key)) {
+    [0.3, 0.5, 0.7].forEach((position, index) => {
+      context.beginPath();
+      context.arc(x + size * position, y + size * (index === 1 ? 0.28 : 0.36), size * (index === 1 ? 0.13 : 0.1), 0, Math.PI * 2);
+      context.stroke();
+    });
     context.beginPath();
-    context.moveTo(x + size * 0.13, y + size * 0.47);
-    context.lineTo(cx, y + size * 0.14);
-    context.lineTo(x + size * 0.87, y + size * 0.47);
-    context.lineTo(x + size * 0.8, y + size * 0.47);
-    context.lineTo(x + size * 0.8, y + size * 0.87);
-    context.lineTo(x + size * 0.2, y + size * 0.87);
-    context.lineTo(x + size * 0.2, y + size * 0.47);
-    context.stroke();
-    context.beginPath();
-    context.moveTo(cx, y + size * 0.78);
-    context.bezierCurveTo(x + size * 0.3, y + size * 0.66, x + size * 0.35, y + size * 0.49, cx, y + size * 0.58);
-    context.bezierCurveTo(x + size * 0.65, y + size * 0.49, x + size * 0.7, y + size * 0.66, cx, y + size * 0.78);
+    context.moveTo(x + size * 0.12, y + size * 0.82);
+    context.quadraticCurveTo(cx, y + size * 0.52, x + size * 0.88, y + size * 0.82);
     context.stroke();
   } else if (/slow burn|heat|passion|high heat/.test(key)) {
     context.beginPath();
@@ -2384,18 +2359,12 @@ function drawStaticTropeLabel(
   audit: StaticPosterAudit,
   index: number,
 ) {
-  const words = trope.trim().split(/\s+/).filter(Boolean);
-  const splitAt = words.length > 1 ? Math.ceil(words.length / 2) : words.length;
-  const balancedLabel =
-    words.length > 1
-      ? `${words.slice(0, splitAt).join(" ")}\n${words.slice(splitAt).join(" ")}`
-      : trope;
-  const iconSize = Math.min(area.height * 0.54, area.width * 0.42, 118);
+  const iconSize = Math.min(area.height * 0.48, area.width * 0.32, 94);
   const iconX = area.x + (area.width - iconSize) / 2;
   drawStaticTropeIcon(context, trope, iconX, area.y, iconSize, colour);
   drawStaticText(
     context,
-    balancedLabel,
+    trope,
     {
       x: area.x,
       y: area.y + iconSize + 9,
@@ -2405,12 +2374,12 @@ function drawStaticTropeLabel(
     {
       family: "PosterDisplay",
       weight: 400,
-      startingSize: Math.min(42, Math.max(28, area.width * 0.13)),
-      minimumSize: Math.min(24, Math.max(19, area.width * 0.09)),
-      maximumLines: area.width < 230 ? 4 : area.height < 180 ? 3 : 2,
+      startingSize: 40,
+      minimumSize: 25,
+      maximumLines: 3,
       colour: "#ffffff",
       align: "center",
-      lineHeight: 0.94,
+      lineHeight: 1.02,
       uppercase: true,
     },
     audit,
@@ -2573,7 +2542,10 @@ async function createProfessionalCampaignImage(input: {
 
   if (!context) throw new Error("This browser could not create the image.");
 
-  const cover = await loadImage(input.book.coverUrl);
+  const [cover, scene] = await Promise.all([
+    loadImage(input.book.coverUrl),
+    input.aiBackground ? loadImage(input.aiBackground) : Promise.resolve(null),
+  ]);
   const suppliedText = `${input.post.title} ${input.post.caption} ${input.quote}`;
   const seed = seededNumber(
     `${input.book.slug}-${input.post.platform}-${input.template}-${suppliedText}`,
@@ -2611,6 +2583,8 @@ async function createProfessionalCampaignImage(input: {
 
   drawStaticPosterBackground(
     context,
+    cover,
+    scene,
     palette,
     width,
     height,
@@ -2741,118 +2715,76 @@ async function createProfessionalCampaignImage(input: {
       "left",
     );
   } else if (template === "trope-showcase") {
-    const genreWords = subgenre.split(/\s+/).filter(Boolean);
-    const genreAccent = genreWords.pop() || "ROMANCE";
-    const genreLead = genreWords.join(" ");
-    if (genreLead) {
-      drawStaticText(
-        context,
-        genreLead,
-        { x: 55, y: isTikTok ? 60 : 50, width: 970, height: isTikTok ? 105 : 76 },
-        {
-          family: "PosterDisplay",
-          weight: 400,
-          startingSize: isTikTok ? 94 : 76,
-          minimumSize: isTikTok ? 48 : 38,
-          maximumLines: 2,
-          colour: "#ffffff",
-          align: "center",
-          lineHeight: 0.88,
-          uppercase: true,
-        },
-        audit,
-        "trope heading lead",
-      );
-    }
-    drawStaticPaint(
-      context,
-      230,
-      isTikTok ? 151 : 103,
-      620,
-      isTikTok ? 72 : 58,
-      colourCss(palette.primary, 0.82),
-    );
     drawStaticText(
       context,
-      genreAccent,
-      { x: 55, y: isTikTok ? 119 : 78, width: 970, height: isTikTok ? 120 : 96 },
+      subgenre,
       {
-        family: "PosterAccent",
-        weight: 700,
-        startingSize: isTikTok ? 122 : 102,
-        minimumSize: isTikTok ? 64 : 52,
-        maximumLines: 1,
-        colour: palette.cream,
+        x: 55,
+        y: isTikTok ? 78 : 52,
+        width: 970,
+        height: isTikTok ? 190 : 145,
+      },
+      {
+        family: "PosterDisplay",
+        weight: 400,
+        startingSize: isTikTok ? 120 : 92,
+        minimumSize: isTikTok ? 60 : 48,
+        maximumLines: 2,
+        colour: "#ffffff",
         align: "center",
-        lineHeight: 0.84,
+        lineHeight: 0.9,
+        uppercase: true,
       },
       audit,
-      "trope heading accent",
+      "trope heading",
+    );
+    drawStaticPaint(
+      context,
+      235,
+      isTikTok ? 235 : 188,
+      610,
+      24,
+      colourCss(palette.primary, 0.85),
     );
 
     context.save();
     context.globalCompositeOperation = "screen";
     drawStaticGlow(
       context,
-      isTikTok ? 370 : 345,
-      isTikTok ? 850 : 610,
-      isTikTok ? 540 : 440,
+      isTikTok ? 745 : 740,
+      isTikTok ? 1110 : 720,
+      isTikTok ? 500 : 420,
       palette.primary,
-      0.38,
+      0.3,
     );
     context.restore();
     drawStaticKindle(
       context,
       cover,
       palette,
-      isTikTok ? 380 : 350,
-      isTikTok ? 315 : 220,
-      isTikTok ? 620 : 510,
-      isTikTok ? -0.025 : -0.03,
+      540,
+      isTikTok ? 600 : 365,
+      isTikTok ? 620 : 520,
+      0.042,
       audit,
       "trope Kindle",
     );
 
-    const tropeCount = Math.max(1, uniqueTropes.length);
-    const tropeCellHeight = isTikTok
-      ? tropeCount <= 3
-        ? 240
-        : tropeCount === 4
-          ? 220
-          : 190
-      : tropeCount <= 3
-        ? 210
-        : tropeCount === 4
-          ? 180
-          : 155;
-    const tropeGap = isTikTok
-      ? tropeCount <= 3
-        ? 80
-        : tropeCount === 4
-          ? 20
-          : 10
-      : tropeCount <= 3
-        ? 40
-        : tropeCount === 4
-          ? 15
-          : 10;
-    const tropeY = isTikTok
-      ? tropeCount <= 3
-        ? 430
-        : tropeCount === 4
-          ? 350
-          : 310
-      : tropeCount <= 3
-        ? 320
-        : tropeCount === 4
-          ? 270
-          : 240;
-    const mosaic = uniqueTropes.map((_, index) => ({
-      x: isTikTok ? 730 : 675,
-      y: tropeY + index * (tropeCellHeight + tropeGap),
-      width: isTikTok ? 295 : 350,
-      height: tropeCellHeight,
-    }));
+    const mosaic = isTikTok
+      ? [
+          { x: 35, y: 250, width: 315, height: 180 },
+          { x: 382, y: 225, width: 315, height: 180 },
+          { x: 730, y: 250, width: 315, height: 180 },
+          { x: 35, y: 1040, width: 250, height: 180 },
+          { x: 795, y: 1040, width: 250, height: 180 },
+        ]
+      : [
+          { x: 35, y: 225, width: 315, height: 180 },
+          { x: 382, y: 210, width: 315, height: 180 },
+          { x: 730, y: 225, width: 315, height: 180 },
+          { x: 35, y: 760, width: 250, height: 175 },
+          { x: 795, y: 760, width: 250, height: 175 },
+        ];
     uniqueTropes.forEach((trope, index) => {
       const area = mosaic[index];
       if (!area) return;
@@ -2866,21 +2798,13 @@ async function createProfessionalCampaignImage(input: {
         index,
       );
     });
-    drawStaticPaint(
-      context,
-      isTikTok ? 155 : 180,
-      isTikTok ? 1482 : 1080,
-      isTikTok ? 770 : 720,
-      isTikTok ? 105 : 84,
-      colourCss(palette.secondary, 0.24),
-    );
     drawStaticCta(
       context,
       input.book,
       palette,
       isTikTok
-        ? { x: 105, y: 1465, width: 870, height: 150 }
-        : { x: 105, y: 1095, width: 870, height: 130 },
+        ? { x: 105, y: 1692, width: 870, height: 140 }
+        : { x: 105, y: 1185, width: 870, height: 120 },
       audit,
       "center",
     );
@@ -4322,7 +4246,7 @@ export default function SocialStudioPage() {
   const [copiedPlatform, setCopiedPlatform] = useState<SocialPlatform | null>(
     null,
   );
-  const [mediaStyle] = useState<MediaStyle>("branded");
+  const [mediaStyle] = useState<MediaStyle>("ai-scene");
   const [posterTemplate, setPosterTemplate] = useState<PosterTemplate>("auto");
   const [generatedMedia, setGeneratedMedia] = useState<GeneratedMedia[]>([]);
   const [creatingImageFor, setCreatingImageFor] =
@@ -4446,6 +4370,7 @@ export default function SocialStudioPage() {
     setImageError("");
 
     try {
+      let aiBackground = "";
       const generationSeed = seededNumber(
         `${selectedBook.slug}-${post.platform}-${Date.now()}`,
       );
@@ -4456,6 +4381,33 @@ export default function SocialStudioPage() {
         `${post.title} ${post.caption} ${quote}`,
       );
 
+      if (mediaStyle === "ai-scene") {
+        const backgroundResponse = await fetch("/api/social-studio/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            book: selectedBook,
+            platform: post.platform,
+            campaignType,
+            template: selectedTemplate,
+            visualDirection: post.visualDirection,
+            instructions: instructions.trim(),
+          }),
+        });
+        const backgroundResult = (await backgroundResponse.json()) as {
+          imageDataUrl?: string;
+          error?: string;
+        };
+
+        if (!backgroundResponse.ok || !backgroundResult.imageDataUrl) {
+          throw new Error(
+            backgroundResult.error || "The cinematic background could not be created.",
+          );
+        } else {
+          aiBackground = backgroundResult.imageDataUrl;
+        }
+      }
+
       const image = await createProfessionalCampaignImage({
         book: selectedBook,
         post,
@@ -4463,6 +4415,7 @@ export default function SocialStudioPage() {
         campaignType,
         quote,
         template: selectedTemplate,
+        aiBackground,
       });
 
       setGeneratedMedia((current) => [
