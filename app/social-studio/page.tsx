@@ -175,16 +175,74 @@ function seededParticles(width: number, height: number) {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-  return Array.from({ length: 28 }, () => ({
+  return Array.from({ length: 44 }, () => ({
     x: random() * width,
     y: random() * height,
-    size: 1 + random() * 3.5,
-    speed: 10 + random() * 24,
-    alpha: 0.08 + random() * 0.18,
+    size: 1 + random() * 5,
+    speed: 18 + random() * 42,
+    alpha: 0.12 + random() * 0.28,
   }));
 }
 
-async function createMotionVideo(source: string, platform: SocialPlatform) {
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function easeOutCubic(value: number) {
+  return 1 - Math.pow(1 - clamp01(value), 3);
+}
+
+function drawFittedVideoText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maximumWidth: number,
+  startingSize: number,
+  minimumSize: number,
+) {
+  let size = startingSize;
+  context.font = `900 ${size}px Arial, sans-serif`;
+  while (size > minimumSize && context.measureText(text).width > maximumWidth) {
+    size -= 2;
+    context.font = `900 ${size}px Arial, sans-serif`;
+  }
+  context.fillText(text, x, y, maximumWidth);
+}
+
+function posterAccent(image: HTMLImageElement): [number, number, number] {
+  const sample = document.createElement("canvas");
+  sample.width = 32;
+  sample.height = 32;
+  const context = sample.getContext("2d", { willReadFrequently: true });
+  if (!context) return [236, 72, 153];
+  context.drawImage(image, 0, 0, 32, 32);
+  const pixels = context.getImageData(0, 0, 32, 32).data;
+  let best: [number, number, number] = [236, 72, 153];
+  let bestScore = 0;
+  for (let index = 0; index < pixels.length; index += 16) {
+    const red = pixels[index];
+    const green = pixels[index + 1];
+    const blue = pixels[index + 2];
+    const maximum = Math.max(red, green, blue);
+    const minimum = Math.min(red, green, blue);
+    const colour = maximum - minimum;
+    const brightness = (red + green + blue) / 3;
+    const score = colour * (1 - Math.abs(brightness - 155) / 190);
+    if (brightness > 45 && brightness < 235 && score > bestScore) {
+      bestScore = score;
+      best = [red, green, blue];
+    }
+  }
+  return best;
+}
+
+async function createMotionVideo(
+  source: string,
+  platform: SocialPlatform,
+  book: CatalogueBook,
+  post: GeneratedPost,
+) {
   if (typeof MediaRecorder === "undefined") {
     throw new Error("This browser cannot render campaign videos.");
   }
@@ -214,47 +272,209 @@ async function createMotionVideo(source: string, platform: SocialPlatform) {
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
-  const duration = 8;
+  const duration = 10.5;
   const start = performance.now();
   const particles = seededParticles(width, height);
+  const [accentRed, accentGreen, accentBlue] = posterAccent(image);
+  const accent = `rgb(${accentRed}, ${accentGreen}, ${accentBlue})`;
+  const accentSoft = `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0.28)`;
+  const tropes = book.tropes.filter(Boolean).slice(0, 4);
   recorder.start(250);
 
   await new Promise<void>((resolve) => {
     const frame = (now: number) => {
       const elapsed = Math.min(duration, (now - start) / 1000);
       const progress = elapsed / duration;
-      const fade = Math.min(1, elapsed / 0.55, (duration - elapsed) / 0.45);
+      const fade = Math.min(1, elapsed / 0.45, (duration - elapsed) / 0.55);
+
+      let scale = 1.035;
+      let offsetX = 0;
+      let offsetY = 0;
+      if (elapsed < 2.25) {
+        const local = easeOutCubic(elapsed / 2.25);
+        scale = 1.16 - local * 0.1;
+        offsetY = (1 - local) * height * 0.035;
+      } else if (elapsed < 7.35) {
+        const local = (elapsed - 2.25) / 5.1;
+        scale = 1.13 + Math.sin(local * Math.PI) * 0.045;
+        offsetX = Math.sin(local * Math.PI * 2) * width * 0.035;
+        offsetY = (0.5 - local) * height * 0.055;
+      } else {
+        const local = easeOutCubic((elapsed - 7.35) / 3.15);
+        scale = 1.1 - local * 0.065;
+        offsetY = (1 - local) * -height * 0.025;
+      }
 
       context.save();
       context.clearRect(0, 0, width, height);
       context.globalAlpha = Math.max(0, fade);
-      drawImageCover(context, image, width, height);
+      context.translate(width / 2 + offsetX, height / 2 + offsetY);
+      context.scale(scale, scale);
+      context.drawImage(image, -width / 2, -height / 2, width, height);
+      context.restore();
 
+      const transitionDistance = Math.min(
+        Math.abs(elapsed - 2.25),
+        Math.abs(elapsed - 7.35),
+      );
+      if (transitionDistance < 0.16) {
+        const strength = 1 - transitionDistance / 0.16;
+        context.save();
+        context.globalCompositeOperation = "screen";
+        for (let band = 0; band < 9; band += 1) {
+          const bandHeight = height / 9;
+          const shift = (band % 2 === 0 ? 1 : -1) * width * 0.035 * strength;
+          context.globalAlpha = 0.2 * strength;
+          context.drawImage(
+            image,
+            0,
+            band * bandHeight,
+            width,
+            bandHeight,
+            shift,
+            band * bandHeight,
+            width,
+            bandHeight,
+          );
+        }
+        context.fillStyle = `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, ${0.22 * strength})`;
+        context.fillRect(0, 0, width, height);
+        context.restore();
+      }
+
+      context.save();
+      context.globalAlpha = fade;
+      const cinematicShade = context.createLinearGradient(0, 0, 0, height);
+      cinematicShade.addColorStop(0, "rgba(0,0,0,0.38)");
+      cinematicShade.addColorStop(0.24, "rgba(0,0,0,0)");
+      cinematicShade.addColorStop(0.72, "rgba(0,0,0,0)");
+      cinematicShade.addColorStop(1, "rgba(0,0,0,0.52)");
+      context.fillStyle = cinematicShade;
+      context.fillRect(0, 0, width, height);
+      context.restore();
+
+      context.save();
       context.globalCompositeOperation = "screen";
-      const glowX = width * (-0.1 + progress * 1.2);
+      const glowX = width * (-0.25 + progress * 1.5);
       const glow = context.createRadialGradient(
         glowX,
-        height * 0.42,
+        height * (0.28 + 0.18 * Math.sin(progress * Math.PI)),
         0,
         glowX,
         height * 0.42,
-        width * 0.42,
+        width * 0.62,
       );
-      glow.addColorStop(0, "rgba(255,255,255,0.12)");
-      glow.addColorStop(0.35, "rgba(255,255,255,0.035)");
-      glow.addColorStop(1, "rgba(255,255,255,0)");
+      glow.addColorStop(0, `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0.34)`);
+      glow.addColorStop(0.32, `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0.1)`);
+      glow.addColorStop(1, `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0)`);
       context.fillStyle = glow;
       context.fillRect(0, 0, width, height);
 
       for (const particle of particles) {
         const y = (particle.y - elapsed * particle.speed + height) % height;
         context.globalAlpha = particle.alpha * fade * (0.55 + 0.45 * Math.sin(elapsed + particle.x));
-        context.fillStyle = "#ffffff";
+        context.fillStyle = bandedParticleColor(particle.x, width, accent);
         context.beginPath();
         context.arc(particle.x, y, particle.size, 0, Math.PI * 2);
         context.fill();
       }
       context.restore();
+
+      if (elapsed < 2.25) {
+        const local = clamp01((elapsed - 0.3) / 0.75) * clamp01((2.25 - elapsed) / 0.45);
+        context.save();
+        context.globalAlpha = local;
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillStyle = "rgba(0,0,0,0.48)";
+        context.fillRect(0, height * 0.39, width, height * 0.22);
+        context.shadowColor = "rgba(0,0,0,0.9)";
+        context.shadowBlur = 28;
+        context.fillStyle = "#ffffff";
+        drawFittedVideoText(
+          context,
+          post.title.toUpperCase(),
+          width / 2,
+          height * 0.49,
+          width * 0.84,
+          platform === "tiktok" ? 88 : 72,
+          42,
+        );
+        context.fillStyle = accent;
+        context.fillRect(width * 0.31, height * 0.555, width * 0.38, 8);
+        context.restore();
+      }
+
+      if (elapsed >= 2.25 && elapsed < 7.35 && tropes.length) {
+        const local = elapsed - 2.25;
+        const activeIndex = Math.min(tropes.length - 1, Math.floor(local / (5.1 / tropes.length)));
+        const beatLength = 5.1 / tropes.length;
+        const beat = (local - activeIndex * beatLength) / beatLength;
+        const entrance = easeOutCubic(beat / 0.34);
+        const exit = clamp01((1 - beat) / 0.18);
+        context.save();
+        context.globalAlpha = entrance * exit;
+        const scrim = context.createLinearGradient(0, height * 0.56, width, height * 0.56);
+        scrim.addColorStop(0, "rgba(0,0,0,0.12)");
+        scrim.addColorStop(0.18, "rgba(0,0,0,0.78)");
+        scrim.addColorStop(0.82, "rgba(0,0,0,0.78)");
+        scrim.addColorStop(1, "rgba(0,0,0,0.12)");
+        context.fillStyle = scrim;
+        context.fillRect(0, height * 0.43, width, height * 0.24);
+        context.translate((1 - entrance) * width * 0.16, 0);
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.shadowColor = accentSoft;
+        context.shadowBlur = 36;
+        context.fillStyle = accent;
+        context.font = `900 ${platform === "tiktok" ? 31 : 25}px Arial, sans-serif`;
+        context.fillText(`TROPE ${activeIndex + 1}`, width / 2, height * 0.49);
+        context.fillStyle = "#ffffff";
+        drawFittedVideoText(
+          context,
+          tropes[activeIndex].toUpperCase(),
+          width / 2,
+          height * 0.555,
+          width * 0.84,
+          platform === "tiktok" ? 90 : 74,
+          42,
+        );
+        context.fillStyle = accent;
+        context.fillRect(width * 0.39, height * 0.62, width * 0.22, 7);
+        context.restore();
+      }
+
+      if (elapsed >= 7.35) {
+        const local = clamp01((elapsed - 7.55) / 0.75) * clamp01((duration - elapsed) / 0.5);
+        context.save();
+        context.globalAlpha = local;
+        const footer = context.createLinearGradient(0, height * 0.69, 0, height);
+        footer.addColorStop(0, "rgba(0,0,0,0)");
+        footer.addColorStop(0.38, "rgba(0,0,0,0.82)");
+        footer.addColorStop(1, "rgba(0,0,0,0.94)");
+        context.fillStyle = footer;
+        context.fillRect(0, height * 0.67, width, height * 0.33);
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.shadowColor = "rgba(0,0,0,0.9)";
+        context.shadowBlur = 24;
+        context.fillStyle = "#ffffff";
+        drawFittedVideoText(
+          context,
+          book.kindleUnlimited ? "AVAILABLE ON KINDLE UNLIMITED" : "DISCOVER IT ON AMAZON",
+          width / 2,
+          height * 0.855,
+          width * 0.82,
+          platform === "tiktok" ? 54 : 44,
+          29,
+        );
+        context.fillStyle = accent;
+        context.fillRect(width * 0.28, height * 0.895, width * 0.44, 8);
+        context.fillStyle = "#ffffff";
+        context.font = `700 ${platform === "tiktok" ? 31 : 26}px Arial, sans-serif`;
+        context.fillText("www.marlowquinn.com", width / 2, height * 0.935);
+        context.restore();
+      }
 
       if (elapsed < duration) {
         requestAnimationFrame(frame);
@@ -269,6 +489,10 @@ async function createMotionVideo(source: string, platform: SocialPlatform) {
   stream.getTracks().forEach((track) => track.stop());
   const blob = await finished;
   return { blob, mimeType };
+}
+
+function bandedParticleColor(x: number, width: number, accent: string) {
+  return x % Math.max(1, width * 0.17) < width * 0.085 ? accent : "#ffffff";
 }
 
 function parseResponseText(text: string, status: number) {
@@ -412,7 +636,14 @@ export default function SocialStudioPage() {
       if (outputType === "video") {
         const rendered = await Promise.all(
           normalized.map(async (media) => {
-            const result = await createMotionVideo(media.dataUrl, media.platform);
+            const post = generated.find((item) => item.platform === media.platform);
+            if (!post) throw new Error(`The ${media.platform} video copy was missing.`);
+            const result = await createMotionVideo(
+              media.dataUrl,
+              media.platform,
+              selectedBook,
+              post,
+            );
             return {
               platform: media.platform,
               url: URL.createObjectURL(result.blob),
@@ -452,7 +683,12 @@ export default function SocialStudioPage() {
         { platform: post.platform, dataUrl },
       ]);
       if (outputType === "video") {
-        const result = await createMotionVideo(dataUrl, post.platform);
+        const result = await createMotionVideo(
+          dataUrl,
+          post.platform,
+          selectedBook,
+          updated,
+        );
         const replacement: GeneratedVideo = {
           platform: post.platform,
           url: URL.createObjectURL(result.blob),
@@ -654,7 +890,7 @@ export default function SocialStudioPage() {
                         </div>
 
                         {isVideo ? (
-                          <video src={video.url} controls playsInline loop className="mx-auto mt-5 max-h-[760px] w-auto max-w-full rounded-xl" />
+                          <video src={video.url} controls autoPlay muted playsInline loop className="mx-auto mt-5 max-h-[760px] w-auto max-w-full rounded-xl" />
                         ) : image ? (
                           <img src={image.dataUrl} alt={`${post.platform} poster for ${selectedBook.title}`} className="mx-auto mt-5 max-h-[760px] w-auto max-w-full rounded-xl object-contain" />
                         ) : null}
