@@ -47,6 +47,11 @@ type QualityCheck = {
   coverFidelity: number;
 };
 
+type InspectionResult = {
+  qualityCheck: QualityCheck;
+  socialCopy: SocialCopy;
+};
+
 type GeneratedPost = SocialCopy & {
   platform: SocialPlatform;
   visualDirection: string;
@@ -96,32 +101,50 @@ function outputLabel(outputType: CreativeOutput): string {
     : "Create one complete premium social-media poster.";
 }
 
-function fallbackCopy(book: BookFacts): SocialCopy {
+function fallbackCopy(book: BookFacts, platform: SocialPlatform): SocialCopy {
   const tags = [book.subgenre, ...book.tropes]
     .map((value) => `#${value.replace(/[^a-z0-9]+/gi, "")}`)
     .filter((value) => value.length > 1)
-    .slice(0, 5);
+    .slice(0, platform === "facebook" ? 8 : 5);
+  const tropeText = book.tropes.slice(0, 4).join(", ");
+  const availability = book.kindleUnlimited
+    ? "Available to read on Kindle Unlimited."
+    : "Discover it on Amazon.";
   return {
-    title: book.title,
-    caption: `${book.title} by ${book.author}`,
+    title: `Meet your next ${book.subgenre || "romance"} obsession`,
+    caption: [
+      `Looking for your next ${book.subgenre || "romance"}?`,
+      `${book.title} by ${book.author}${tropeText ? ` features ${tropeText}` : ""}.`,
+      availability,
+      book.amazonUrl,
+    ].filter(Boolean).join("\n\n"),
     hashtags: tags,
   };
 }
 
-function parseCopy(value: string, book: BookFacts): SocialCopy {
-  const fallback = fallbackCopy(book);
-  if (!value.trim()) return fallback;
+function parseCopy(
+  value: string,
+  book: BookFacts,
+  platform: SocialPlatform,
+): SocialCopy | null {
+  const fallback = fallbackCopy(book, platform);
+  if (!value.trim()) return null;
   try {
     const parsed = record(JSON.parse(value));
+    const caption = cleanString(parsed.caption, 5000);
+    const hashtags = cleanStringArray(parsed.hashtags, 8)
+      .map((tag) => tag.startsWith("#") ? tag : `#${tag.replace(/[^a-z0-9]+/gi, "")}`)
+      .filter((tag) => tag.length > 1);
+    if (caption.split(/\s+/).filter(Boolean).length < 45 || hashtags.length < 5) {
+      return null;
+    }
     return {
       title: cleanString(parsed.title, 240) || fallback.title,
-      caption: cleanString(parsed.caption, 5000) || fallback.caption,
-      hashtags: cleanStringArray(parsed.hashtags, 8)
-        .map((tag) => tag.startsWith("#") ? tag : `#${tag.replace(/[^a-z0-9]+/gi, "")}`)
-        .filter((tag) => tag.length > 1),
+      caption,
+      hashtags: hashtags.slice(0, platform === "facebook" ? 8 : 5),
     };
   } catch {
-    return fallback;
+    return null;
   }
 }
 
@@ -176,9 +199,11 @@ function posterPrompt(
 
 async function inspectPoster(
   imageDataUrl: string,
-  coverUrl: string,
+  book: BookFacts,
+  platform: SocialPlatform,
   guidance: string,
-): Promise<QualityCheck> {
+): Promise<InspectionResult> {
+  const fallback = fallbackCopy(book, platform);
   try {
     const response = await openai.responses.create({
       model: CHECK_MODEL,
@@ -197,8 +222,24 @@ async function inspectPoster(
               promptAdherence: { type: "number" },
               legibility: { type: "number" },
               coverFidelity: { type: "number" },
+              socialTitle: { type: "string" },
+              caption: { type: "string" },
+              hashtags: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 8,
+              },
             },
-            required: ["decision", "summary", "promptAdherence", "legibility", "coverFidelity"],
+            required: [
+              "decision",
+              "summary",
+              "promptAdherence",
+              "legibility",
+              "coverFidelity",
+              "socialTitle",
+              "caption",
+              "hashtags",
+            ],
           },
         },
       },
@@ -209,37 +250,68 @@ async function inspectPoster(
             type: "input_text",
             text: [
               "Inspect this generated social poster once.",
+              `Platform: ${platform}.`,
               `Author guidance: ${guidance}`,
+              `Verified book facts: ${JSON.stringify({
+                title: book.title,
+                author: book.author,
+                subgenre: book.subgenre,
+                blurb: book.blurb,
+                tropes: book.tropes,
+                kindleUnlimited: book.kindleUnlimited,
+                amazonUrl: book.amazonUrl,
+              })}`,
               "The first image is the finished poster. The second image is the genuine cover reference.",
               "Check prompt adherence, wording legibility and cover fidelity. Use scores from 0 to 100.",
               "Mark review when any score is below 70. Keep the summary under 240 characters.",
+              "Also write the finished social post that accompanies this artwork. Create an engaging hook title, a substantial natural caption, a clear reading call to action and strong relevant hashtags.",
+              platform === "facebook"
+                ? "For Facebook, write 90 to 170 words and provide 6 to 8 relevant hashtags."
+                : platform === "instagram"
+                  ? "For Instagram, write 70 to 140 words and provide exactly 5 strong relevant hashtags."
+                  : "For TikTok, write a keyword-rich title, a lively 80 to 160 word description and exactly 5 strong relevant hashtags.",
+              "Use only the verified book facts and author guidance. Do not invent quotes, prices, reviews, awards, rankings, release status or plot claims. Do not use em dashes or en dashes.",
             ].join(" "),
           },
           { type: "input_image", image_url: imageDataUrl, detail: "high" },
-          { type: "input_image", image_url: coverUrl, detail: "high" },
+          { type: "input_image", image_url: book.coverUrl, detail: "high" },
         ],
       }],
-      max_output_tokens: 500,
+      max_output_tokens: 1200,
     }, { timeout: 45_000 });
     const parsed = record(JSON.parse(response.output_text || "{}"));
     const score = (value: unknown) =>
       typeof value === "number" && Number.isFinite(value)
         ? Math.min(100, Math.max(0, Math.round(value)))
         : 0;
+    const hashtagLimit = platform === "facebook" ? 8 : 5;
+    const hashtags = cleanStringArray(parsed.hashtags, hashtagLimit)
+      .map((tag) => tag.startsWith("#") ? tag : `#${tag.replace(/[^a-z0-9]+/gi, "")}`)
+      .filter((tag) => tag.length > 1);
     return {
-      decision: parsed.decision === "pass" ? "pass" : "review",
-      summary: cleanString(parsed.summary, 240) || "The automatic inspection could not provide a useful summary.",
-      promptAdherence: score(parsed.promptAdherence),
-      legibility: score(parsed.legibility),
-      coverFidelity: score(parsed.coverFidelity),
+      qualityCheck: {
+        decision: parsed.decision === "pass" ? "pass" : "review",
+        summary: cleanString(parsed.summary, 240) || "The automatic inspection could not provide a useful summary.",
+        promptAdherence: score(parsed.promptAdherence),
+        legibility: score(parsed.legibility),
+        coverFidelity: score(parsed.coverFidelity),
+      },
+      socialCopy: {
+        title: cleanString(parsed.socialTitle, 240) || fallback.title,
+        caption: cleanString(parsed.caption, 5000) || fallback.caption,
+        hashtags: hashtags.length ? hashtags : fallback.hashtags,
+      },
     };
   } catch {
     return {
-      decision: "review",
-      summary: "The poster was created, but the automatic inspection could not be completed.",
-      promptAdherence: 0,
-      legibility: 0,
-      coverFidelity: 0,
+      qualityCheck: {
+        decision: "review",
+        summary: "The poster was created, but the automatic inspection could not be completed.",
+        promptAdherence: 0,
+        legibility: 0,
+        coverFidelity: 0,
+      },
+      socialCopy: fallback,
     };
   }
 }
@@ -303,13 +375,16 @@ async function generatePoster(
     throw new Error("The image model returned no poster artwork.");
   }
   const imageDataUrl = `data:image/jpeg;base64,${imageCall.result}`;
+  const inspection = await inspectPoster(imageDataUrl, book, platform, guidance);
+  const socialCopy =
+    parseCopy(response.output_text, book, platform) ?? inspection.socialCopy;
   return {
     platform,
-    ...parseCopy(response.output_text, book),
+    ...socialCopy,
     visualDirection: "Generated directly from the author's current guidance.",
     imageDataUrl,
     sourceResponseId: response.id,
-    qualityCheck: await inspectPoster(imageDataUrl, book.coverUrl, guidance),
+    qualityCheck: inspection.qualityCheck,
   };
 }
 
