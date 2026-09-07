@@ -849,22 +849,47 @@ export default function SocialStudioPage() {
 
   async function requestDesign(outputType: CreativeOutput, requestedPlatforms: SocialPlatform[], revision = "", previousPlans: DesignPlan[] = []) {
     if (!selectedBook) throw new Error("Choose a book first.");
-    const response = await fetch("/api/social-studio/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        book: selectedBook,
-        campaignType: "custom",
-        platforms: requestedPlatforms,
-        instructions: instructions.trim(),
-        outputType,
-        revision,
-        previousPlans,
-      }),
-    });
-    const result = (await response.json()) as { posts?: GeneratedPost[]; error?: string };
-    if (!response.ok || !result.posts) throw new Error(result.error || "The design could not be generated.");
-    return result.posts;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 85_000);
+    try {
+      const response = await fetch("/api/social-studio/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          book: selectedBook,
+          campaignType: "custom",
+          platforms: requestedPlatforms,
+          instructions: instructions.trim(),
+          outputType,
+          revision,
+          previousPlans,
+        }),
+      });
+      const responseText = await response.text();
+      let result: { posts?: GeneratedPost[]; error?: string } | null = null;
+      try {
+        result = JSON.parse(responseText) as { posts?: GeneratedPost[]; error?: string };
+      } catch {
+        const infrastructureFailure = responseText.trim().toLowerCase().startsWith("an error occurred");
+        throw new Error(
+          infrastructureFailure
+            ? `Vercel ended the generation before NovelForge received a result (HTTP ${response.status}).`
+            : `The generation server returned an invalid response (HTTP ${response.status}).`,
+        );
+      }
+      if (!response.ok || !result.posts) {
+        throw new Error(result.error || `The design could not be generated (HTTP ${response.status}).`);
+      }
+      return result.posts;
+    } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") {
+        throw new Error("The generation took longer than 85 seconds and was stopped. No poster was created.");
+      }
+      throw caught;
+    } finally {
+      window.clearTimeout(timeout);
+    }
   }
 
   async function createCampaign(outputType: CreativeOutput) {
@@ -1076,8 +1101,8 @@ export default function SocialStudioPage() {
               </div>
 
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <button type="button" onClick={() => void createCampaign("image")} disabled={Boolean(busy) || !platforms.length} className="rounded-xl bg-pink-500 px-4 py-4 font-bold transition hover:bg-pink-400 disabled:opacity-40">{busy ? "Working..." : "Create Posters"}</button>
-                <button type="button" onClick={() => void createCampaign("video")} disabled={Boolean(busy) || !platforms.length} className="rounded-xl border border-violet-400/50 bg-violet-500/15 px-4 py-4 font-bold text-violet-100 transition hover:bg-violet-500/25 disabled:opacity-40">{busy ? "Working..." : "Create Videos"}</button>
+                <button type="button" onClick={() => void createCampaign("image")} disabled={Boolean(busy) || !platforms.length} className="rounded-xl bg-pink-500 px-4 py-4 font-bold transition hover:bg-pink-400 disabled:opacity-40">{busy === "image" ? "Planning posters..." : busy.startsWith("image-") ? `Rendering ${busy.slice(6)}...` : "Create Posters"}</button>
+                <button type="button" onClick={() => void createCampaign("video")} disabled={Boolean(busy) || !platforms.length} className="rounded-xl border border-violet-400/50 bg-violet-500/15 px-4 py-4 font-bold text-violet-100 transition hover:bg-violet-500/25 disabled:opacity-40">{busy === "video" ? "Planning videos..." : busy.startsWith("video-") ? `Rendering ${busy.slice(6)}...` : "Create Videos"}</button>
               </div>
 
               {error && <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</p>}
