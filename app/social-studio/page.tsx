@@ -127,7 +127,33 @@ async function normalizePoster(source: string, platform: SocialPlatform): Promis
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("This browser could not prepare the finished poster.");
+
+  const scale = Math.min(
+    width / image.naturalWidth,
+    height / image.naturalHeight,
+  );
+  const fittedWidth = image.naturalWidth * scale;
+  const fittedHeight = image.naturalHeight * scale;
+  const fittedX = (width - fittedWidth) / 2;
+  const fittedY = (height - fittedHeight) / 2;
+
+  context.save();
+  context.filter = "blur(32px) brightness(0.42) saturate(0.85)";
+  context.translate(width / 2, height / 2);
+  context.scale(1.12, 1.12);
+  context.translate(-width / 2, -height / 2);
   drawImageCover(context, image, width, height);
+  context.restore();
+
+  context.fillStyle = "rgba(0, 0, 0, 0.18)";
+  context.fillRect(0, 0, width, height);
+
+  context.save();
+  context.shadowColor = "rgba(0, 0, 0, 0.5)";
+  context.shadowBlur = 28;
+  context.drawImage(image, fittedX, fittedY, fittedWidth, fittedHeight);
+  context.restore();
+
   return canvas.toDataURL("image/jpeg", 0.96);
 }
 
