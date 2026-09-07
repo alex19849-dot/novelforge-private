@@ -433,7 +433,7 @@ function validatePlan(value: unknown, platform: SocialPlatform, outputType: Outp
     .slice(0, 5);
   const elements = Array.isArray(item.elements)
     ? item.elements
-        .slice(0, 36)
+        .slice(0, 24)
         .map((element, index) =>
           validateElement(element, index, expected.width, expected.height, duration),
         )
@@ -535,6 +535,15 @@ export async function POST(request: Request) {
     const body = (await request.json()) as CampaignRequest;
     const bookValue = record(body.book);
     const platforms = cleanPlatforms(body.platforms);
+    const feedPlatform: SocialPlatform | null = platforms.includes("instagram")
+      ? "instagram"
+      : platforms.includes("facebook")
+        ? "facebook"
+        : null;
+    const designPlatforms: SocialPlatform[] = [
+      ...(feedPlatform ? [feedPlatform] : []),
+      ...(platforms.includes("tiktok") ? ["tiktok" as const] : []),
+    ];
     const outputType: OutputType = body.outputType === "video" ? "video" : "image";
     const instructions = cleanString(body.instructions, 5000);
     const revision = cleanString(body.revision, 2500);
@@ -566,7 +575,7 @@ export async function POST(request: Request) {
     const prompt = [
       "You are the senior art director for NovelForge, creating premium commercial BookTok and romance advertising.",
       "Study the supplied genuine cover at high detail before planning. Derive a near-black or clean light base, one vivid primary accent and one contrasting secondary accent from its visually useful colours. Do not default to muddy brown, beige or dull maroon.",
-      schemaInstructions(platforms, outputType),
+      schemaInstructions(designPlatforms, outputType),
       "AUTHOR CONTROL",
       "The author's guidance is the complete creative brief. Include every requested element and omit everything they did not request. Never automatically add a Kindle, icons, trope list, footer, branding, ribbons, paint, particles, textures, scenery or props.",
       "If the author requests a broad motif such as gothic elements, vampire elements, sports elements or floral elements, interpret that request creatively using a small coordinated set of relevant SVG, texture and lighting layers. Those elements are authorised by the broad request. Do not add people or silhouettes.",
@@ -588,7 +597,7 @@ export async function POST(request: Request) {
       "FINAL INTERNAL CHECK BEFORE JSON",
       "Confirm the requested composition, every requested phrase, every requested icon and every requested motif is present. Confirm no unrequested semantic element was added. Confirm the hero is large, icons are recognisable, hierarchy is strong, safe margins hold and the result would not look sparse, corporate or generic.",
       `Output type: ${outputType}`,
-      `Platforms: ${platforms.join(", ")}`,
+      `Design platforms: ${designPlatforms.join(", ")}. Facebook and Instagram share the same 1080x1350 artwork when both are requested.`,
       `Campaign label for backward compatibility only: ${cleanString(body.campaignType, 100) || "custom"}`,
       `Verified book facts: ${JSON.stringify(book)}`,
       `Approved genuine quote: ${suppliedQuote || "None supplied. Do not create a quotation."}`,
@@ -600,7 +609,7 @@ export async function POST(request: Request) {
 
     const response = await openai.responses.create({
       model: SOCIAL_MODEL,
-      reasoning: { effort: "high" },
+      reasoning: { effort: "medium" },
       text: { verbosity: "low" },
       input: [
         {
@@ -616,14 +625,30 @@ export async function POST(request: Request) {
           ],
         },
       ],
-      max_output_tokens: 20000,
-    });
+      max_output_tokens: 12000,
+    }, { timeout: 75_000 });
 
     if (!response.output_text?.trim()) {
       throw new Error("The social designer returned an empty response.");
     }
 
-    const posts = validatePosts(extractJson(response.output_text), platforms, outputType);
+    const designedPosts = validatePosts(extractJson(response.output_text), designPlatforms, outputType);
+    const feedPost = designedPosts.find((post) => post.platform === feedPlatform);
+    const posts = platforms.map((platform) => {
+      const exact = designedPosts.find((post) => post.platform === platform);
+      if (exact) return exact;
+      if ((platform === "facebook" || platform === "instagram") && feedPost) {
+        return {
+          ...feedPost,
+          platform,
+          designPlan: {
+            ...feedPost.designPlan,
+            elements: feedPost.designPlan.elements.map((element) => ({ ...element })),
+          },
+        };
+      }
+      throw new Error(`The social designer omitted the ${platform} post.`);
+    });
     return NextResponse.json({ posts, outputType, generationNonce, designer: SOCIAL_MODEL });
   } catch (error) {
     return NextResponse.json(
