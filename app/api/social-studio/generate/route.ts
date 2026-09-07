@@ -3,160 +3,72 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-export const maxDuration = 180;
+export const maxDuration = 300;
 
-const SOCIAL_MODEL = "gpt-5.6-terra";
+const DIRECTOR_MODEL = "gpt-6-astra";
+const IMAGE_MODEL = "gpt-image-2";
+const CHECK_MODEL = "gpt-5.6-terra";
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 type SocialPlatform = "facebook" | "instagram" | "tiktok";
-type OutputType = "image" | "video";
-type BlendMode = "source-over" | "screen" | "overlay" | "multiply" | "soft-light";
-type ElementType = "cover" | "text" | "shape" | "svg" | "particles" | "texture";
+type CreativeOutput = "image" | "video";
 
 type CampaignRequest = {
   book?: unknown;
-  campaignType?: unknown;
   platforms?: unknown;
-  quote?: unknown;
   instructions?: unknown;
   outputType?: unknown;
   revision?: unknown;
-  previousPlans?: unknown;
+  previousResponseIds?: unknown;
 };
 
-type Motion = {
-  enter:
-    | "none"
-    | "fade"
-    | "slide-left"
-    | "slide-right"
-    | "slide-up"
-    | "slide-down"
-    | "zoom-in"
-    | "zoom-out"
-    | "rotate-in"
-    | "wipe";
-  enterStart: number;
-  enterEnd: number;
-  exit: "none" | "fade" | "slide-left" | "slide-right" | "slide-up" | "slide-down";
-  exitStart: number;
-  exitEnd: number;
-  loop: "none" | "float" | "pulse" | "drift" | "glow" | "shimmer" | "parallax" | "flicker";
-  intensity: number;
+type BookFacts = {
+  title: string;
+  author: string;
+  subgenre: string;
+  blurb: string;
+  tropes: string[];
+  kindleUnlimited: boolean;
+  amazonUrl: string;
+  coverUrl: string;
 };
 
-type SvgPath = {
-  d: string;
-  fill: string;
-  stroke: string;
-  strokeWidth: number;
-  lineCap: "round" | "square" | "butt";
-  lineJoin: "round" | "bevel" | "miter";
-};
-
-type TextHighlight = {
-  text: string;
-  colour: string;
-  font: "display" | "sans" | "accent";
-};
-
-type DesignElement = {
-  id: string;
-  purpose: string;
-  type: ElementType;
-  layer: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  opacity: number;
-  blendMode: BlendMode;
-  blur: number;
-  motion: Motion;
-  text?: string;
-  font?: "display" | "sans" | "accent";
-  fontSize?: number;
-  minimumFontSize?: number;
-  weight?: number;
-  colour?: string;
-  gradientColours?: string[];
-  align?: "left" | "center" | "right";
-  uppercase?: boolean;
-  lineHeight?: number;
-  letterSpacing?: number;
-  maxLines?: number;
-  stroke?: string;
-  strokeWidth?: number;
-  shadowColour?: string;
-  shadowBlur?: number;
-  shadowOffsetX?: number;
-  shadowOffsetY?: number;
-  highlights?: TextHighlight[];
-  presentation?: "flat" | "floating" | "kindle";
-  crop?: "contain" | "cover";
-  shadow?: number;
-  glow?: number;
-  glowColour?: string;
-  deviceDepth?: number;
-  deviceHighlight?: number;
-  reflection?: number;
-  shape?: "block" | "paint" | "line" | "ellipse" | "glow" | "gradient-band" | "spotlight";
-  fill?: string;
-  secondaryFill?: string;
-  radius?: number;
-  points?: number[];
-  viewBox?: number[];
-  paths?: SvgPath[];
-  particleStyle?: "dust" | "spark" | "confetti" | "bokeh" | "petal" | "ember";
-  count?: number;
-  textureStyle?: "grain" | "fog" | "smoke" | "splatter" | "scratches" | "paper" | "light-rays";
-  density?: number;
-  seed?: number;
-};
-
-type DesignPlan = {
-  width: number;
-  height: number;
-  safeMargin: number;
-  durationSeconds: number;
-  concept: string;
-  requestedElements: string[];
-  palette: {
-    base: string;
-    primary: string;
-    secondary: string;
-    text: string;
-    rationale: string;
-  };
-  background: {
-    angle: number;
-    colours: string[];
-    vignette: number;
-  };
-  elements: DesignElement[];
-};
-
-type GeneratedPost = {
-  platform: SocialPlatform;
+type SocialCopy = {
   title: string;
   caption: string;
   hashtags: string[];
+};
+
+type QualityCheck = {
+  decision: "pass" | "review";
+  summary: string;
+  promptAdherence: number;
+  legibility: number;
+  coverFidelity: number;
+};
+
+type GeneratedPost = SocialCopy & {
+  platform: SocialPlatform;
   visualDirection: string;
-  designPlan: DesignPlan;
+  imageDataUrl: string;
+  sourceResponseId: string;
+  qualityCheck: QualityCheck;
 };
 
 function cleanString(value: unknown, maximumLength = 5000): string {
-  return typeof value === "string" ? value.trim().slice(0, maximumLength) : "";
+  return typeof value === "string"
+    ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, maximumLength)
+    : "";
 }
 
 function cleanStringArray(value: unknown, maximumItems = 20): string[] {
   return Array.isArray(value)
-    ? value
-        .filter((item): item is string => typeof item === "string")
-        .map((item) => item.trim())
-        .filter(Boolean)
-        .slice(0, maximumItems)
+    ? [...new Set(
+        value
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => cleanString(item, 180))
+          .filter(Boolean),
+      )].slice(0, maximumItems)
     : [];
 }
 
@@ -174,361 +86,231 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function extractJson(text: string): unknown {
-  const cleaned = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-  const firstBrace = cleaned.indexOf("{");
-  const lastBrace = cleaned.lastIndexOf("}");
-  if (firstBrace < 0 || lastBrace <= firstBrace) {
-    throw new Error("The social designer returned no JSON object.");
-  }
-  return JSON.parse(cleaned.slice(firstBrace, lastBrace + 1));
+function platformSize(platform: SocialPlatform): `${number}x${number}` {
+  return platform === "tiktok" ? "1088x1920" : "1088x1360";
 }
 
-function numberValue(value: unknown, fallback: number, minimum: number, maximum: number) {
-  const parsed = typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  return Math.min(maximum, Math.max(minimum, parsed));
+function outputLabel(outputType: CreativeOutput): string {
+  return outputType === "video"
+    ? "Create the premium key artwork for a short social video. It must also work as the opening and closing frame."
+    : "Create one complete premium social-media poster.";
 }
 
-function enumValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
-  return typeof value === "string" && allowed.includes(value as T) ? (value as T) : fallback;
-}
-
-function colourValue(value: unknown, fallback: string): string {
-  const colour = cleanString(value, 60);
-  return /^(transparent|#[0-9a-f]{3,8}|rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\))$/i.test(
-    colour,
-  )
-    ? colour
-    : fallback;
-}
-
-function safeSvgPath(value: unknown): string {
-  const path = cleanString(value, 7000);
-  if (!path || /[<>"'`;{}]/.test(path)) return "";
-  return /^[MmLlHhVvCcSsQqTtAaZzEe0-9+.,\s-]+$/.test(path) ? path : "";
-}
-
-function dimensions(platform: SocialPlatform) {
-  return platform === "tiktok"
-    ? { width: 1080, height: 1920 }
-    : { width: 1080, height: 1350 };
-}
-
-function validateMotion(value: unknown, duration: number): Motion {
-  const item = record(value);
-  const enter = enumValue(
-    item.enter,
-    ["none", "fade", "slide-left", "slide-right", "slide-up", "slide-down", "zoom-in", "zoom-out", "rotate-in", "wipe"] as const,
-    "none",
-  );
-  const exit = enumValue(
-    item.exit,
-    ["none", "fade", "slide-left", "slide-right", "slide-up", "slide-down"] as const,
-    "none",
-  );
-  const loop = enumValue(
-    item.loop,
-    ["none", "float", "pulse", "drift", "glow", "shimmer", "parallax", "flicker"] as const,
-    "none",
-  );
-  const enterStart = numberValue(item.enterStart, 0, 0, duration);
-  const enterEnd = numberValue(item.enterEnd, duration ? Math.min(0.9, duration) : 0, enterStart, duration);
-  const exitStart = numberValue(item.exitStart, duration, 0, duration);
-  const exitEnd = numberValue(item.exitEnd, duration, exitStart, duration);
-  return {
-    enter,
-    enterStart,
-    enterEnd,
-    exit,
-    exitStart,
-    exitEnd,
-    loop,
-    intensity: numberValue(item.intensity, 0.35, 0, 1),
-  };
-}
-
-function validateSvgPaths(value: unknown): SvgPath[] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .slice(0, 20)
-    .map((rawPath) => {
-      const path = record(rawPath);
-      return {
-        d: safeSvgPath(path.d),
-        fill: colourValue(path.fill, "transparent"),
-        stroke: colourValue(path.stroke, "#ffffff"),
-        strokeWidth: numberValue(path.strokeWidth, 2.5, 0, 14),
-        lineCap: enumValue(path.lineCap, ["round", "square", "butt"] as const, "round"),
-        lineJoin: enumValue(path.lineJoin, ["round", "bevel", "miter"] as const, "round"),
-      };
-    })
-    .filter((path) => path.d);
-}
-
-function validateHighlights(value: unknown): TextHighlight[] {
-  if (!Array.isArray(value)) return [];
-  return value.slice(0, 8).map((rawHighlight) => {
-    const highlight = record(rawHighlight);
-    return {
-      text: cleanString(highlight.text, 120),
-      colour: colourValue(highlight.colour, "#ffffff"),
-      font: enumValue(highlight.font, ["display", "sans", "accent"] as const, "display"),
-    };
-  }).filter((highlight) => highlight.text);
-}
-
-function validateElement(
-  value: unknown,
-  index: number,
-  width: number,
-  height: number,
-  duration: number,
-): DesignElement {
-  const item = record(value);
-  const type = enumValue(
-    item.type,
-    ["cover", "text", "shape", "svg", "particles", "texture"] as const,
-    "shape",
-  );
-  const x = numberValue(item.x, 0, 0, width - 1);
-  const y = numberValue(item.y, 0, 0, height - 1);
-  const elementWidth = numberValue(item.width, 100, 1, width - x);
-  const elementHeight = numberValue(item.height, 100, 1, height - y);
-  const base: DesignElement = {
-    id: cleanString(item.id, 80) || `element-${index + 1}`,
-    purpose: cleanString(item.purpose, 240),
-    type,
-    layer: Math.round(numberValue(item.layer, index, 0, 100)),
-    x,
-    y,
-    width: elementWidth,
-    height: elementHeight,
-    rotation: numberValue(item.rotation, 0, -35, 35),
-    opacity: numberValue(item.opacity, 1, 0, 1),
-    blendMode: enumValue(
-      item.blendMode,
-      ["source-over", "screen", "overlay", "multiply", "soft-light"] as const,
-      "source-over",
-    ),
-    blur: numberValue(item.blur, 0, 0, 80),
-    motion: validateMotion(item.motion, duration),
-  };
-
-  if (type === "text") {
-    return {
-      ...base,
-      text: cleanString(item.text, 700),
-      font: enumValue(item.font, ["display", "sans", "accent"] as const, "sans"),
-      fontSize: numberValue(item.fontSize, 64, 22, 300),
-      minimumFontSize: numberValue(item.minimumFontSize, 30, 18, 180),
-      weight: Math.round(numberValue(item.weight, 800, 300, 900) / 100) * 100,
-      colour: colourValue(item.colour, "#ffffff"),
-      gradientColours: cleanStringArray(item.gradientColours, 5).map((colour) => colourValue(colour, "#ffffff")),
-      align: enumValue(item.align, ["left", "center", "right"] as const, "left"),
-      uppercase: item.uppercase === true,
-      lineHeight: numberValue(item.lineHeight, 0.98, 0.72, 1.5),
-      letterSpacing: numberValue(item.letterSpacing, 0, -3, 30),
-      maxLines: Math.round(numberValue(item.maxLines, 4, 1, 10)),
-      stroke: colourValue(item.stroke, "transparent"),
-      strokeWidth: numberValue(item.strokeWidth, 0, 0, 12),
-      shadowColour: colourValue(item.shadowColour, "transparent"),
-      shadowBlur: numberValue(item.shadowBlur, 0, 0, 60),
-      shadowOffsetX: numberValue(item.shadowOffsetX, 0, -30, 30),
-      shadowOffsetY: numberValue(item.shadowOffsetY, 0, -30, 30),
-      highlights: validateHighlights(item.highlights),
-    };
-  }
-
-  if (type === "cover") {
-    return {
-      ...base,
-      presentation: enumValue(item.presentation, ["flat", "floating", "kindle"] as const, "floating"),
-      crop: enumValue(item.crop, ["contain", "cover"] as const, "contain"),
-      shadow: numberValue(item.shadow, 0.75, 0, 1),
-      glow: numberValue(item.glow, 0.25, 0, 1),
-      glowColour: colourValue(item.glowColour, "#ffffff"),
-      deviceDepth: numberValue(item.deviceDepth, 0.65, 0, 1),
-      deviceHighlight: numberValue(item.deviceHighlight, 0.55, 0, 1),
-      reflection: numberValue(item.reflection, 0.25, 0, 1),
-    };
-  }
-
-  if (type === "shape") {
-    return {
-      ...base,
-      shape: enumValue(
-        item.shape,
-        ["block", "paint", "line", "ellipse", "glow", "gradient-band", "spotlight"] as const,
-        "block",
-      ),
-      fill: colourValue(item.fill, "transparent"),
-      secondaryFill: colourValue(item.secondaryFill, "transparent"),
-      stroke: colourValue(item.stroke, "transparent"),
-      strokeWidth: numberValue(item.strokeWidth, 0, 0, 30),
-      radius: numberValue(item.radius, 0, 0, Math.min(elementWidth, elementHeight) / 2),
-      points: Array.isArray(item.points)
-        ? item.points
-            .filter((point): point is number => typeof point === "number" && Number.isFinite(point))
-            .slice(0, 60)
-        : [],
-    };
-  }
-
-  if (type === "svg") {
-    const paths = validateSvgPaths(item.paths);
-    if (!paths.length) throw new Error(`The generated ${base.id} SVG contains no valid paths.`);
-    const rawViewBox = Array.isArray(item.viewBox)
-      ? item.viewBox.filter((number): number is number => typeof number === "number" && Number.isFinite(number)).slice(0, 4)
-      : [];
-    return {
-      ...base,
-      viewBox: rawViewBox.length === 4 ? rawViewBox : [0, 0, 100, 100],
-      paths,
-      shadowColour: colourValue(item.shadowColour, "transparent"),
-      shadowBlur: numberValue(item.shadowBlur, 0, 0, 60),
-    };
-  }
-
-  if (type === "particles") {
-    return {
-      ...base,
-      particleStyle: enumValue(
-        item.particleStyle,
-        ["dust", "spark", "confetti", "bokeh", "petal", "ember"] as const,
-        "dust",
-      ),
-      colour: colourValue(item.colour, "#ffffff"),
-      secondaryFill: colourValue(item.secondaryFill, "transparent"),
-      count: Math.round(numberValue(item.count, 18, 1, 100)),
-      seed: Math.round(numberValue(item.seed, index * 97 + 11, 0, 999999)),
-    };
-  }
-
-  return {
-    ...base,
-    textureStyle: enumValue(
-      item.textureStyle,
-      ["grain", "fog", "smoke", "splatter", "scratches", "paper", "light-rays"] as const,
-      "grain",
-    ),
-    colour: colourValue(item.colour, "#ffffff"),
-    secondaryFill: colourValue(item.secondaryFill, "transparent"),
-    density: numberValue(item.density, 0.4, 0.05, 1),
-    seed: Math.round(numberValue(item.seed, index * 101 + 17, 0, 999999)),
-  };
-}
-
-function validatePlan(value: unknown, platform: SocialPlatform, outputType: OutputType): DesignPlan {
-  const item = record(value);
-  const expected = dimensions(platform);
-  const duration = outputType === "video" ? numberValue(item.durationSeconds, 8, 5, 15) : 0;
-  const paletteValue = record(item.palette);
-  const backgroundValue = record(item.background);
-  const colours = cleanStringArray(backgroundValue.colours, 5)
-    .map((colour) => colourValue(colour, "#080910"))
+function fallbackCopy(book: BookFacts): SocialCopy {
+  const tags = [book.subgenre, ...book.tropes]
+    .map((value) => `#${value.replace(/[^a-z0-9]+/gi, "")}`)
+    .filter((value) => value.length > 1)
     .slice(0, 5);
-  const elements = Array.isArray(item.elements)
-    ? item.elements
-        .slice(0, 20)
-        .map((element, index) =>
-          validateElement(element, index, expected.width, expected.height, duration),
-        )
-        .sort((left, right) => left.layer - right.layer)
-    : [];
-
-  if (elements.filter((element) => element.type === "cover").length !== 1) {
-    throw new Error(`The ${platform} design must contain exactly one cover element.`);
-  }
-  if (!elements.some((element) => element.type === "text" && element.text)) {
-    throw new Error(`The ${platform} design contains no readable text.`);
-  }
-
   return {
-    width: expected.width,
-    height: expected.height,
-    safeMargin: numberValue(item.safeMargin, platform === "tiktok" ? 90 : 60, 44, 140),
-    durationSeconds: duration,
-    concept: cleanString(item.concept, 700),
-    requestedElements: cleanStringArray(item.requestedElements, 30),
-    palette: {
-      base: colourValue(paletteValue.base, "#080910"),
-      primary: colourValue(paletteValue.primary, "#ffffff"),
-      secondary: colourValue(paletteValue.secondary, "#b92f56"),
-      text: colourValue(paletteValue.text, "#ffffff"),
-      rationale: cleanString(paletteValue.rationale, 500),
-    },
-    background: {
-      angle: numberValue(backgroundValue.angle, 135, 0, 360),
-      colours: colours.length >= 2 ? colours : ["#050609", "#15111b", "#08090d"],
-      vignette: numberValue(backgroundValue.vignette, 0.5, 0, 1),
-    },
-    elements,
+    title: book.title,
+    caption: `${book.title} by ${book.author}`,
+    hashtags: tags,
   };
 }
 
-function validatePosts(value: unknown, platforms: SocialPlatform[], outputType: OutputType): GeneratedPost[] {
-  const rawPosts = record(value).posts;
-  if (!Array.isArray(rawPosts)) throw new Error("The social designer returned no platform posts.");
-
-  const posts = rawPosts.map((rawPost) => {
-    const post = record(rawPost);
-    const platform = cleanString(post.platform).toLowerCase();
-    if (platform !== "facebook" && platform !== "instagram" && platform !== "tiktok") {
-      throw new Error("The social designer returned an unknown platform.");
-    }
+function parseCopy(value: string, book: BookFacts): SocialCopy {
+  const fallback = fallbackCopy(book);
+  if (!value.trim()) return fallback;
+  try {
+    const parsed = record(JSON.parse(value));
     return {
-      platform,
-      title: cleanString(post.title, 300),
-      caption: cleanString(post.caption, 6000),
-      hashtags: cleanStringArray(post.hashtags, 10).map((tag) =>
-        tag.startsWith("#") ? tag : `#${tag.replace(/\s+/g, "")}`,
-      ),
-      visualDirection: cleanString(post.visualDirection, 1800),
-      designPlan: validatePlan(post.designPlan, platform, outputType),
-    } satisfies GeneratedPost;
-  });
-
-  for (const platform of platforms) {
-    if (!posts.some((post) => post.platform === platform)) {
-      throw new Error(`The social designer omitted the ${platform} post.`);
-    }
+      title: cleanString(parsed.title, 240) || fallback.title,
+      caption: cleanString(parsed.caption, 5000) || fallback.caption,
+      hashtags: cleanStringArray(parsed.hashtags, 8)
+        .map((tag) => tag.startsWith("#") ? tag : `#${tag.replace(/[^a-z0-9]+/gi, "")}`)
+        .filter((tag) => tag.length > 1),
+    };
+  } catch {
+    return fallback;
   }
-  return posts.filter((post) => platforms.includes(post.platform));
 }
 
-function schemaInstructions(platforms: SocialPlatform[], outputType: OutputType): string {
-  const sizes = platforms
-    .map((platform) => {
-      const size = dimensions(platform);
-      return `${platform} ${size.width}x${size.height}`;
-    })
-    .join(", ");
+function previousResponseId(value: unknown, platform: SocialPlatform): string {
+  return cleanString(record(value)[platform], 200);
+}
+
+function posterPrompt(
+  book: BookFacts,
+  platform: SocialPlatform,
+  outputType: CreativeOutput,
+  guidance: string,
+  revision: string,
+): string {
   return [
-    `Return one ${outputType} post for each platform: ${sizes}.`,
-    "Return JSON only: {\"posts\":[{\"platform\":\"facebook|instagram|tiktok\",\"title\":\"...\",\"caption\":\"...\",\"hashtags\":[\"#Example\"],\"visualDirection\":\"...\",\"designPlan\":{...}}]}.",
-    "designPlan requires width, height, safeMargin, durationSeconds, concept, requestedElements, palette, background and elements.",
-    "palette is {base,primary,secondary,text,rationale}. background is {angle,colours,vignette}.",
-    "Keep the JSON compact. Use no more than 16 purposeful elements per design.",
-    "Every element requires only id, type, x, y, width and height. Add other fields only when they visibly change the result. Omit defaults, empty arrays and unused properties.",
-    "Default element values are: purpose empty, layer array order, rotation 0, opacity 1, blendMode source-over, blur 0 and motion none.",
-    "motion is {enter,enterStart,enterEnd,exit,exitStart,exitEnd,loop,intensity}.",
-    "Element types: cover, text, shape, svg, particles, texture.",
-    "cover adds presentation flat|floating|kindle, crop, shadow, glow, glowColour, deviceDepth, deviceHighlight, reflection.",
-    "text adds text, font display|sans|accent, fontSize, minimumFontSize, weight, colour, gradientColours, align, uppercase, lineHeight, letterSpacing, maxLines, stroke, strokeWidth, shadowColour, shadowBlur, shadowOffsetX, shadowOffsetY and highlights.",
-    "Each highlight is {text,colour,font} and its text must exactly occur inside the parent text.",
-    "shape adds shape block|paint|line|ellipse|glow|gradient-band|spotlight, fill, secondaryFill, stroke, strokeWidth, radius and points.",
-    "svg adds viewBox [0,0,100,100], paths and shadowColour/shadowBlur. Each path is {d,fill,stroke,strokeWidth,lineCap,lineJoin}. SVG d may use only standard path commands and numbers. Never include XML, SVG tags, text, URLs, scripts or foreign objects.",
-    "particles adds particleStyle dust|spark|confetti|bokeh|petal|ember, colour, secondaryFill, count and seed.",
-    "texture adds textureStyle grain|fog|smoke|splatter|scratches|paper|light-rays, colour, secondaryFill, density and seed.",
-    outputType === "image"
-      ? "For images, omit motion entirely from every element."
-      : "For video, include motion only on layers that genuinely move. Static layers may omit it.",
-    "Use absolute pixel coordinates. Keep critical text and the cover within safeMargin. Decorative texture may bleed to the canvas edges.",
-  ].join("\n");
+    "You are creating finished commercial artwork for NovelForge, not a wireframe, dashboard, presentation slide or coded template.",
+    outputLabel(outputType),
+    platform === "tiktok"
+      ? "Create a native 9:16 portrait composition for TikTok. Keep important content away from interface areas near the right and bottom edges."
+      : "Create a native 4:5 portrait composition for a Facebook or Instagram feed.",
+    "AUTHOR CONTROL",
+    "The author's guidance below is the creative brief. Each generation must be art-directed specifically for that brief and must not reuse a fixed layout.",
+    "The author may request any combination of people, environments, rooms, landscapes, objects, props, devices, typography, icons, illustration, photography, collage, paint, texture, lighting or abstract graphics. Create what the guidance requests and make cohesive supporting decisions from its theme.",
+    "Do not impose a gothic, sports, office, floral, dark, Kindle, trope-list or any other default style. Do not add a permanent footer, fixed icon row, standard heading position or repeated composition.",
+    "Do not introduce irrelevant imagery. Every visible element must support the author's brief, the supplied cover or the verified book facts.",
+    "COVER FIDELITY",
+    "The supplied image is the genuine book cover. Use that exact cover as the hero. Preserve its artwork, title, author name, spelling, colours and proportions. Never redesign, rewrite, crop away or replace its contents.",
+    "If the guidance requests a Kindle or device, place the genuine cover naturally inside a large realistic dimensional device with matching perspective, screen reflections, rim lighting, contact shadow and environmental integration.",
+    "If no device is requested, present the genuine cover in the manner requested by the author.",
+    "DESIGN STANDARD",
+    "Create professional contemporary BookTok and romance advertising artwork with strong visual hierarchy, confident scale, deliberate spacing, readable typography, depth and a clear reading order.",
+    "Avoid corporate cards, dashboard boxes, tiny covers, generic icon rows, rigid left columns, excessive dead space, weak detached CTAs and flat template-like arrangements unless the author explicitly asks for one of those treatments.",
+    "Render requested wording clearly and accurately. Never invent a quote, price, review, award, ranking, release claim or promotion. A short original promotional hook may be created only when the author explicitly requests a hook without providing its wording, and it must be grounded in the supplied facts.",
+    "Do not use em dashes or en dashes.",
+    "The poster must feel like one integrated piece of finished artwork, not a background with separate items pasted on top.",
+    `Verified book facts: ${JSON.stringify({
+      title: book.title,
+      author: book.author,
+      subgenre: book.subgenre,
+      blurb: book.blurb,
+      tropes: book.tropes,
+      kindleUnlimited: book.kindleUnlimited,
+      amazonUrl: book.amazonUrl,
+    })}`,
+    `Author guidance: ${guidance}`,
+    revision
+      ? `Edit request: ${revision}. Edit the existing generated artwork. Keep everything not mentioned in this correction.`
+      : "This is a fresh generation. Do not imitate a previous NovelForge poster.",
+    "Use the image-generation tool now. After the image is complete, return only the requested social-copy JSON.",
+  ].join("\n\n");
+}
+
+async function inspectPoster(
+  imageDataUrl: string,
+  coverUrl: string,
+  guidance: string,
+): Promise<QualityCheck> {
+  try {
+    const response = await openai.responses.create({
+      model: CHECK_MODEL,
+      reasoning: { effort: "low" },
+      text: {
+        format: {
+          type: "json_schema",
+          name: "poster_quality_check",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              decision: { type: "string", enum: ["pass", "review"] },
+              summary: { type: "string" },
+              promptAdherence: { type: "number" },
+              legibility: { type: "number" },
+              coverFidelity: { type: "number" },
+            },
+            required: ["decision", "summary", "promptAdherence", "legibility", "coverFidelity"],
+          },
+        },
+      },
+      input: [{
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: [
+              "Inspect this generated social poster once.",
+              `Author guidance: ${guidance}`,
+              "The first image is the finished poster. The second image is the genuine cover reference.",
+              "Check prompt adherence, wording legibility and cover fidelity. Use scores from 0 to 100.",
+              "Mark review when any score is below 70. Keep the summary under 240 characters.",
+            ].join(" "),
+          },
+          { type: "input_image", image_url: imageDataUrl, detail: "high" },
+          { type: "input_image", image_url: coverUrl, detail: "high" },
+        ],
+      }],
+      max_output_tokens: 500,
+    }, { timeout: 45_000 });
+    const parsed = record(JSON.parse(response.output_text || "{}"));
+    const score = (value: unknown) =>
+      typeof value === "number" && Number.isFinite(value)
+        ? Math.min(100, Math.max(0, Math.round(value)))
+        : 0;
+    return {
+      decision: parsed.decision === "pass" ? "pass" : "review",
+      summary: cleanString(parsed.summary, 240) || "The automatic inspection could not provide a useful summary.",
+      promptAdherence: score(parsed.promptAdherence),
+      legibility: score(parsed.legibility),
+      coverFidelity: score(parsed.coverFidelity),
+    };
+  } catch {
+    return {
+      decision: "review",
+      summary: "The poster was created, but the automatic inspection could not be completed.",
+      promptAdherence: 0,
+      legibility: 0,
+      coverFidelity: 0,
+    };
+  }
+}
+
+async function generatePoster(
+  book: BookFacts,
+  platform: SocialPlatform,
+  outputType: CreativeOutput,
+  guidance: string,
+  revision: string,
+  priorResponseId: string,
+): Promise<GeneratedPost> {
+  const response = await openai.responses.create({
+    model: DIRECTOR_MODEL,
+    ...(revision && priorResponseId ? { previous_response_id: priorResponseId } : {}),
+    store: true,
+    reasoning: { effort: "low" },
+    text: {
+      format: {
+        type: "json_schema",
+        name: "social_copy",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            title: { type: "string" },
+            caption: { type: "string" },
+            hashtags: { type: "array", items: { type: "string" }, maxItems: 8 },
+          },
+          required: ["title", "caption", "hashtags"],
+        },
+      },
+    },
+    input: [{
+      role: "user",
+      content: [
+        { type: "input_text", text: posterPrompt(book, platform, outputType, guidance, revision) },
+        { type: "input_image", image_url: book.coverUrl, detail: "high" },
+      ],
+    }],
+    tools: [{
+      type: "image_generation",
+      model: IMAGE_MODEL,
+      action: revision && priorResponseId ? "edit" : "auto",
+      size: platformSize(platform),
+      quality: "medium",
+      output_format: "jpeg",
+      output_compression: 92,
+      background: "opaque",
+    }],
+    tool_choice: { type: "image_generation" },
+    max_output_tokens: 1400,
+  }, { timeout: 240_000 });
+
+  const imageCall = response.output.find(
+    (item): item is Extract<typeof item, { type: "image_generation_call" }> =>
+      item.type === "image_generation_call",
+  );
+  if (!imageCall?.result) {
+    throw new Error("The image model returned no poster artwork.");
+  }
+  const imageDataUrl = `data:image/jpeg;base64,${imageCall.result}`;
+  return {
+    platform,
+    ...parseCopy(response.output_text, book),
+    visualDirection: "Generated directly from the author's current guidance.",
+    imageDataUrl,
+    sourceResponseId: response.id,
+    qualityCheck: await inspectPoster(imageDataUrl, book.coverUrl, guidance),
+  };
 }
 
 export async function POST(request: Request) {
@@ -536,136 +318,65 @@ export async function POST(request: Request) {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: "OPENAI_API_KEY is not configured." }, { status: 500 });
     }
-
     const body = (await request.json()) as CampaignRequest;
     const bookValue = record(body.book);
     const platforms = cleanPlatforms(body.platforms);
-    const feedPlatform: SocialPlatform | null = platforms.includes("instagram")
-      ? "instagram"
-      : platforms.includes("facebook")
-        ? "facebook"
-        : null;
-    const designPlatforms: SocialPlatform[] = [
-      ...(feedPlatform ? [feedPlatform] : []),
-      ...(platforms.includes("tiktok") ? ["tiktok" as const] : []),
-    ];
-    const outputType: OutputType = body.outputType === "video" ? "video" : "image";
     const instructions = cleanString(body.instructions, 5000);
     const revision = cleanString(body.revision, 2500);
-    const suppliedQuote = cleanString(body.quote, 1200);
-    const coverUrl = cleanString(bookValue.coverUrl, 2000);
-    const book = {
+    const outputType: CreativeOutput = body.outputType === "video" ? "video" : "image";
+    const book: BookFacts = {
       title: cleanString(bookValue.title, 300),
       author: cleanString(bookValue.author, 300) || "Marlow Quinn",
       subgenre: cleanString(bookValue.subgenre, 300),
       blurb: cleanString(bookValue.blurb, 7000),
       tropes: cleanStringArray(bookValue.tropes, 20),
-      heat: cleanString(bookValue.heat, 50),
-      ending: cleanString(bookValue.ending, 100),
-      contentWarnings: cleanStringArray(bookValue.contentWarnings, 20),
       kindleUnlimited: bookValue.kindleUnlimited === true,
       amazonUrl: cleanString(bookValue.amazonUrl, 1000),
+      coverUrl: cleanString(bookValue.coverUrl, 3000),
     };
 
-    if (!book.title || !book.blurb || !coverUrl || !platforms.length || !instructions) {
+    if (!book.title || !book.blurb || !book.coverUrl || !platforms.length || !instructions) {
       return NextResponse.json(
         { error: "A book with its genuine cover, your guidance and at least one platform are required." },
         { status: 400 },
       );
     }
 
-    const previousPlans = Array.isArray(body.previousPlans) ? body.previousPlans.slice(0, 3) : [];
-    const previousPlanText = JSON.stringify(previousPlans).slice(0, 24000);
-    const generationNonce = crypto.randomUUID();
-    const prompt = [
-      "You are the senior art director for NovelForge, creating premium commercial BookTok and romance advertising.",
-      "Study the supplied genuine cover at high detail before planning. Derive a near-black or clean light base, one vivid primary accent and one contrasting secondary accent from its visually useful colours. Do not default to muddy brown, beige or dull maroon.",
-      schemaInstructions(designPlatforms, outputType),
-      "AUTHOR CONTROL",
-      "The author's guidance is the complete creative brief. Include every requested element and omit everything they did not request. Never automatically add a Kindle, icons, trope list, footer, branding, ribbons, paint, particles, textures, scenery or props.",
-      "If the author requests a broad motif such as gothic elements, vampire elements, sports elements or floral elements, interpret that request creatively using a small coordinated set of relevant SVG, texture and lighting layers. Those elements are authorised by the broad request. Do not add people or silhouettes.",
-      "If the author requests modern icons, create one recognisable, professionally proportioned SVG icon for each named item. Use smooth curves and complete shapes. A few disconnected slashes or abstract marks are never an icon. Keep all icons stylistically consistent.",
-      "Do not use any photographic or AI-generated background image. Build atmosphere from gradients, SVG artwork, procedural texture, glow, haze, particles and lighting only.",
-      "COMPOSITION QUALITY",
-      "Create a fresh composition for this specific brief. Do not select a template or repeat a default skeleton.",
-      "Make the real cover the dominant hero unless the author explicitly requests a type-led design. If Kindle is requested, make it large, dimensional and physically grounded with believable depth, edge highlights, glow, contact shadow and reflection.",
-      "Create one unmistakable reading order. Use scale aggressively. The hook or offer must be prominent, the cover must have presence, and supporting information must be secondary but feed-readable.",
-      "Integrate typography with artwork. Use large display type, controlled sans type and at most one short accent treatment. Use highlights for selected words. Avoid flat same-size text, corporate cards, dashboard rows, boxed labels and presentation-slide spacing.",
-      "Avoid dead space. Use intentional overlap between decorative layers and the hero, without covering important cover wording or making text collide.",
-      "SVG motifs must look intentional at the requested size. Use filled silhouettes or confident linework with enough detail to read immediately. Place related icons consistently, but do not put them inside generic corporate badges unless requested.",
-      "For image output, set all motion to none with zero timings. For video, animate independent layers with purposeful staggered entrances, restrained parallax, atmospheric drift and a stable readable final composition. Never apply one global zoom to a flat poster.",
-      "ACCURACY",
-      "All quotes must be supplied verbatim. Never invent a quote, price, review, award, ranking, release status, reader reaction, character or plot event.",
-      "When the author explicitly asks for a hook, headline or title without supplying its exact wording, create one short promotional hook grounded only in the blurb and known tropes. This is allowed. It must not masquerade as a quotation or factual claim.",
-      "Only show Kindle Unlimited wording when both the book data confirms eligibility and the author requests it. Reproduce requested URLs exactly.",
-      "Never use em dashes or en dashes.",
-      "FINAL INTERNAL CHECK BEFORE JSON",
-      "Confirm the requested composition, every requested phrase, every requested icon and every requested motif is present. Confirm no unrequested semantic element was added. Confirm the hero is large, icons are recognisable, hierarchy is strong, safe margins hold and the result would not look sparse, corporate or generic.",
-      `Output type: ${outputType}`,
-      `Design platforms: ${designPlatforms.join(", ")}. Facebook and Instagram share the same 1080x1350 artwork when both are requested.`,
-      `Campaign label for backward compatibility only: ${cleanString(body.campaignType, 100) || "custom"}`,
-      `Verified book facts: ${JSON.stringify(book)}`,
-      `Approved genuine quote: ${suppliedQuote || "None supplied. Do not create a quotation."}`,
-      `Author guidance: ${instructions}`,
-      `Requested correction: ${revision || "None. Create a fresh version."}`,
-      `Previous plans to revise or avoid repeating: ${previousPlanText || "None"}`,
-      `Fresh-generation nonce: ${generationNonce}`,
-    ].join("\n\n");
-
-    const response = await openai.responses.create({
-      model: SOCIAL_MODEL,
-      reasoning: { effort: "low" },
-      text: { verbosity: "low" },
-      input: [
-        {
-          role: "system",
-          content:
-            "Return strict JSON only. Follow the author's brief exactly. Inspect the genuine cover, create professional commercial art direction, and use supplied facts only.",
-        },
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: prompt },
-            { type: "input_image", image_url: coverUrl, detail: "high" },
-          ],
-        },
-      ],
-      max_output_tokens: 9000,
-    }, { timeout: 70_000 });
-
-    if (response.status === "incomplete") {
-      throw new Error("The social design plan stopped before completion. Please generate it again.");
-    }
-    if (!response.output_text?.trim()) {
-      throw new Error("The social designer returned an empty response.");
-    }
-
-    const designedPosts = validatePosts(extractJson(response.output_text), designPlatforms, outputType);
-    const feedPost = designedPosts.find((post) => post.platform === feedPlatform);
+    const feedPlatform: SocialPlatform | null = platforms.includes("instagram")
+      ? "instagram"
+      : platforms.includes("facebook")
+        ? "facebook"
+        : null;
+    const generationPlatforms: SocialPlatform[] = [
+      ...(feedPlatform ? [feedPlatform] : []),
+      ...(platforms.includes("tiktok") ? ["tiktok" as const] : []),
+    ];
+    const generated = await Promise.all(
+      generationPlatforms.map((platform) =>
+        generatePoster(
+          book,
+          platform,
+          outputType,
+          instructions,
+          revision,
+          previousResponseId(body.previousResponseIds, platform),
+        ),
+      ),
+    );
+    const feedPost = generated.find((post) => post.platform === feedPlatform);
     const posts = platforms.map((platform) => {
-      const exact = designedPosts.find((post) => post.platform === platform);
+      const exact = generated.find((post) => post.platform === platform);
       if (exact) return exact;
       if ((platform === "facebook" || platform === "instagram") && feedPost) {
-        return {
-          ...feedPost,
-          platform,
-          designPlan: {
-            ...feedPost.designPlan,
-            elements: feedPost.designPlan.elements.map((element) => ({ ...element })),
-          },
-        };
+        return { ...feedPost, platform };
       }
-      throw new Error(`The social designer omitted the ${platform} post.`);
+      throw new Error(`The image model omitted the ${platform} poster.`);
     });
-    return NextResponse.json({ posts, outputType, generationNonce, designer: SOCIAL_MODEL });
+
+    return NextResponse.json({ posts, outputType, director: DIRECTOR_MODEL, imageModel: IMAGE_MODEL });
   } catch (error) {
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "The social design could not be generated.",
-      },
+      { error: error instanceof Error ? error.message : "The poster could not be generated." },
       { status: 500 },
     );
   }
