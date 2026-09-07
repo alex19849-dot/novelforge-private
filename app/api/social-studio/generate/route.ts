@@ -86,8 +86,8 @@ function record(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function platformSize(platform: SocialPlatform): `${number}x${number}` {
-  return platform === "tiktok" ? "1088x1920" : "1088x1360";
+function platformSize(): "1024x1536" {
+  return "1024x1536";
 }
 
 function outputLabel(outputType: CreativeOutput): string {
@@ -140,8 +140,8 @@ function posterPrompt(
     "You are creating finished commercial artwork for NovelForge, not a wireframe, dashboard, presentation slide or coded template.",
     outputLabel(outputType),
     platform === "tiktok"
-      ? "Create a native 9:16 portrait composition for TikTok. Keep important content away from interface areas near the right and bottom edges."
-      : "Create a native 4:5 portrait composition for a Facebook or Instagram feed.",
+      ? "The tool output will be centre-cropped from 2:3 to a final 9:16 TikTok poster. Keep every important word, face, cover and call to action inside the central 84 percent of the width. Keep important content away from interface areas near the right and bottom edges. Compose specifically for that final crop."
+      : "The tool output will be centre-cropped from 2:3 to a final 4:5 Facebook or Instagram feed poster. Keep every important word, face, cover and call to action inside the central 83 percent of the height. Compose specifically for that final crop.",
     "AUTHOR CONTROL",
     "The author's guidance below is the creative brief. Each generation must be art-directed specifically for that brief and must not reuse a fixed layout.",
     "The author may request any combination of people, environments, rooms, landscapes, objects, props, devices, typography, icons, illustration, photography, collage, paint, texture, lighting or abstract graphics. Create what the guidance requests and make cohesive supporting decisions from its theme.",
@@ -285,7 +285,7 @@ async function generatePoster(
       type: "image_generation",
       model: IMAGE_MODEL,
       action: revision && priorResponseId ? "edit" : "auto",
-      size: platformSize(platform),
+      size: platformSize(),
       quality: "medium",
       output_format: "jpeg",
       output_compression: 92,
