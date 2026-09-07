@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
-const SOCIAL_MODEL = "gpt-6-astra";
+const SOCIAL_MODEL = "gpt-5.6-terra";
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 type SocialPlatform = "facebook" | "instagram" | "tiktok";
@@ -433,7 +433,7 @@ function validatePlan(value: unknown, platform: SocialPlatform, outputType: Outp
     .slice(0, 5);
   const elements = Array.isArray(item.elements)
     ? item.elements
-        .slice(0, 24)
+        .slice(0, 20)
         .map((element, index) =>
           validateElement(element, index, expected.width, expected.height, duration),
         )
@@ -512,7 +512,9 @@ function schemaInstructions(platforms: SocialPlatform[], outputType: OutputType)
     "Return JSON only: {\"posts\":[{\"platform\":\"facebook|instagram|tiktok\",\"title\":\"...\",\"caption\":\"...\",\"hashtags\":[\"#Example\"],\"visualDirection\":\"...\",\"designPlan\":{...}}]}.",
     "designPlan requires width, height, safeMargin, durationSeconds, concept, requestedElements, palette, background and elements.",
     "palette is {base,primary,secondary,text,rationale}. background is {angle,colours,vignette}.",
-    "Every element requires id, purpose, type, layer, x, y, width, height, rotation, opacity, blendMode, blur and motion.",
+    "Keep the JSON compact. Use no more than 16 purposeful elements per design.",
+    "Every element requires only id, type, x, y, width and height. Add other fields only when they visibly change the result. Omit defaults, empty arrays and unused properties.",
+    "Default element values are: purpose empty, layer array order, rotation 0, opacity 1, blendMode source-over, blur 0 and motion none.",
     "motion is {enter,enterStart,enterEnd,exit,exitStart,exitEnd,loop,intensity}.",
     "Element types: cover, text, shape, svg, particles, texture.",
     "cover adds presentation flat|floating|kindle, crop, shadow, glow, glowColour, deviceDepth, deviceHighlight, reflection.",
@@ -522,6 +524,9 @@ function schemaInstructions(platforms: SocialPlatform[], outputType: OutputType)
     "svg adds viewBox [0,0,100,100], paths and shadowColour/shadowBlur. Each path is {d,fill,stroke,strokeWidth,lineCap,lineJoin}. SVG d may use only standard path commands and numbers. Never include XML, SVG tags, text, URLs, scripts or foreign objects.",
     "particles adds particleStyle dust|spark|confetti|bokeh|petal|ember, colour, secondaryFill, count and seed.",
     "texture adds textureStyle grain|fog|smoke|splatter|scratches|paper|light-rays, colour, secondaryFill, density and seed.",
+    outputType === "image"
+      ? "For images, omit motion entirely from every element."
+      : "For video, include motion only on layers that genuinely move. Static layers may omit it.",
     "Use absolute pixel coordinates. Keep critical text and the cover within safeMargin. Decorative texture may bleed to the canvas edges.",
   ].join("\n");
 }
@@ -609,7 +614,7 @@ export async function POST(request: Request) {
 
     const response = await openai.responses.create({
       model: SOCIAL_MODEL,
-      reasoning: { effort: "medium" },
+      reasoning: { effort: "low" },
       text: { verbosity: "low" },
       input: [
         {
@@ -625,9 +630,12 @@ export async function POST(request: Request) {
           ],
         },
       ],
-      max_output_tokens: 12000,
-    }, { timeout: 75_000 });
+      max_output_tokens: 9000,
+    }, { timeout: 70_000 });
 
+    if (response.status === "incomplete") {
+      throw new Error("The social design plan stopped before completion. Please generate it again.");
+    }
     if (!response.output_text?.trim()) {
       throw new Error("The social designer returned an empty response.");
     }
