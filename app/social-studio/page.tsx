@@ -69,41 +69,63 @@ type GeneratedVideo = {
   extension: "mp4" | "webm";
 };
 
-const CAMPAIGN_OPTIONS: Array<{
-  id: CampaignType;
-  title: string;
-  description: string;
-}> = [
-  {
-    id: "book-spotlight",
-    title: "Book Spotlight",
-    description:
-      "A strong general promotion using the cover, blurb and main hooks.",
-  },
-  {
-    id: "trope-hook",
-    title: "Trope Hook",
-    description:
-      "Lead with the tropes readers search for and build the post around them.",
-  },
-  {
-    id: "quote-post",
-    title: "Quote Post",
-    description:
-      "Create a visual and caption around a genuine quote you provide.",
-  },
-  {
-    id: "kindle-unlimited",
-    title: "Kindle Unlimited",
-    description: "Promote the book as available to Kindle Unlimited readers.",
-  },
-  {
-    id: "backlist-revival",
-    title: "Backlist Revival",
-    description:
-      "Give an older title a fresh angle without pretending it is a new release.",
-  },
-];
+type CreativeOutput = "image" | "video";
+
+function normalisePromptText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9£$¢]+/g, " ").trim();
+}
+
+function extractPromptQuote(prompt: string): string {
+  const quoted = prompt.match(/[“"]([^”"]{12,1000})[”"]/u)?.[1]?.trim();
+  if (quoted) return quoted;
+
+  const labelled = prompt.match(/(?:^|\n)\s*(?:quote|exact quote)\s*:\s*(.+)$/imu)?.[1];
+  return labelled?.trim().replace(/^[“"]+|[”"]+$/g, "") ?? "";
+}
+
+function inferCampaignFromPrompt(prompt: string): CampaignType {
+  const normalised = normalisePromptText(prompt);
+  if (extractStaticOffer(prompt)) return "book-spotlight";
+  if (extractPromptQuote(prompt) || /\bquote\b/.test(normalised)) return "quote-post";
+  if (/\btrope|icons?|what to expect\b/.test(normalised)) return "trope-hook";
+  if (/\bkindle unlimited|\bku\b/.test(normalised)) return "kindle-unlimited";
+  if (/\bbacklist|older book|fresh angle\b/.test(normalised)) return "backlist-revival";
+  return "book-spotlight";
+}
+
+function inferTemplateFromPrompt(
+  prompt: string,
+  campaignType: CampaignType,
+  seed: number,
+): Exclude<PosterTemplate, "auto"> {
+  const normalised = normalisePromptText(prompt);
+  if (extractStaticOffer(prompt)) return "offer-promotion";
+  if (extractPromptQuote(prompt) || /\bquote led|quote poster\b/.test(normalised)) {
+    return "cinematic-quote";
+  }
+  if (/\btrope|icons?|what to expect\b/.test(normalised)) return "trope-showcase";
+  if (/\bno kindle|without (?:a )?kindle|cover only|editorial|asymmetrical\b/.test(normalised)) {
+    return "modern-editorial";
+  }
+  if (/\bkindle|device|ereader|e reader\b/.test(normalised)) return "kindle-hero";
+  return resolveStaticPosterTemplate("auto", campaignType, seed, prompt);
+}
+
+function bookForCreativePrompt(book: CatalogueBook, prompt: string): CatalogueBook {
+  const normalised = normalisePromptText(prompt);
+  const requestedTropes = book.tropes.filter((trope) =>
+    normalised.includes(normalisePromptText(trope)),
+  );
+  const heading = prompt.match(
+    /(?:^|\n)\s*(?:heading|headline|top text)\s*:\s*(.+)$/imu,
+  )?.[1]?.trim();
+
+  return {
+    ...book,
+    subgenre: heading || book.subgenre,
+    tropes: requestedTropes.length ? requestedTropes : book.tropes,
+  };
+}
 
 const PLATFORM_OPTIONS: Array<{
   id: SocialPlatform;
@@ -112,45 +134,6 @@ const PLATFORM_OPTIONS: Array<{
   { id: "facebook", label: "Facebook" },
   { id: "instagram", label: "Instagram" },
   { id: "tiktok", label: "TikTok" },
-];
-
-const POSTER_OPTIONS: Array<{
-  id: PosterTemplate;
-  title: string;
-  description: string;
-}> = [
-  {
-    id: "auto",
-    title: "Automatic",
-    description: "Matches the poster design to the campaign type.",
-  },
-  {
-    id: "cinematic-quote",
-    title: "Cinematic Quote",
-    description: "Large dramatic quote, atmospheric cover and Kindle hero.",
-  },
-  {
-    id: "trope-showcase",
-    title: "Trope Showcase",
-    description:
-      "Bold selling points, clean reading order and a dominant cover.",
-  },
-  {
-    id: "kindle-hero",
-    title: "Atmospheric Kindle Hero",
-    description:
-      "Cover-led artwork with lighting, depth, glow and reflections.",
-  },
-  {
-    id: "offer-promotion",
-    title: "Offer or Promotion",
-    description: "Price or promotion first, with a large cover and clear CTA.",
-  },
-  {
-    id: "modern-editorial",
-    title: "Modern Editorial",
-    description: "Asymmetrical display type, colour blocking and a cinematic cover.",
-  },
 ];
 
 const CATALOGUE_URL = "https://www.marlowquinn.com/api/books";
@@ -2575,7 +2558,7 @@ async function createProfessionalCampaignImage(input: {
   if (!context) throw new Error("This browser could not create the image.");
 
   const cover = await loadImage(input.book.coverUrl);
-  const suppliedText = `${input.post.title} ${input.post.caption} ${input.quote}`;
+  const suppliedText = `${input.post.title} ${input.post.caption} ${input.post.visualDirection} ${input.quote}`;
   const seed = seededNumber(
     `${input.book.slug}-${input.post.platform}-${input.template}-${suppliedText}`,
   );
@@ -4391,23 +4374,22 @@ export default function SocialStudioPage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [error, setError] = useState("");
   const [selectedBook, setSelectedBook] = useState<CatalogueBook | null>(null);
-  const [campaignType, setCampaignType] =
-    useState<CampaignType>("book-spotlight");
   const [platforms, setPlatforms] = useState<SocialPlatform[]>([
     "facebook",
     "instagram",
     "tiktok",
   ]);
-  const [quote, setQuote] = useState("");
   const [instructions, setInstructions] = useState("");
   const [generatedPosts, setGeneratedPosts] = useState<GeneratedPost[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationMode, setGenerationMode] = useState<CreativeOutput | null>(
+    null,
+  );
   const [generationError, setGenerationError] = useState("");
   const [copiedPlatform, setCopiedPlatform] = useState<SocialPlatform | null>(
     null,
   );
   const [mediaStyle] = useState<MediaStyle>("branded");
-  const [posterTemplate, setPosterTemplate] = useState<PosterTemplate>("auto");
   const [generatedMedia, setGeneratedMedia] = useState<GeneratedMedia[]>([]);
   const [creatingImageFor, setCreatingImageFor] =
     useState<SocialPlatform | null>(null);
@@ -4421,33 +4403,24 @@ export default function SocialStudioPage() {
   );
   const [makeTestMessage, setMakeTestMessage] = useState("");
   const [makeTestError, setMakeTestError] = useState("");
+  const [mediaEdits, setMediaEdits] = useState<
+    Partial<Record<SocialPlatform, string>>
+  >({});
 
   function chooseBook(book: CatalogueBook) {
     setSelectedBook(book);
-    setCampaignType("book-spotlight");
     setPlatforms(["facebook", "instagram", "tiktok"]);
-    setQuote("");
     setInstructions("");
     setGeneratedPosts([]);
     setGenerationError("");
-    setPosterTemplate("auto");
     setGeneratedMedia([]);
     setImageError("");
     setGeneratedVideos([]);
     setVideoError("");
     setMakeTestMessage("");
     setMakeTestError("");
+    setMediaEdits({});
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function chooseCampaignType(value: CampaignType) {
-    setCampaignType(value);
-    setGeneratedPosts([]);
-    setGenerationError("");
-    setGeneratedMedia([]);
-    setImageError("");
-    setGeneratedVideos([]);
-    setVideoError("");
   }
 
   function togglePlatform(platform: SocialPlatform) {
@@ -4464,17 +4437,31 @@ export default function SocialStudioPage() {
     );
   }
 
-  async function generateContent() {
+  async function generateContent(output: CreativeOutput) {
     if (!selectedBook || platforms.length === 0) return;
+    if (!instructions.trim()) {
+      setGenerationError("Describe the poster or video you want first.");
+      return;
+    }
 
-    if (campaignType === "quote-post" && !quote.trim()) {
-      setGenerationError("Paste a genuine quote for the quote campaign.");
+    const inferredCampaign = inferCampaignFromPrompt(instructions);
+    const promptQuote = extractPromptQuote(instructions);
+    if (inferredCampaign === "quote-post" && !promptQuote) {
+      setGenerationError(
+        "Put the exact book quote inside quotation marks so NovelForge uses the correct wording.",
+      );
       return;
     }
 
     setIsGenerating(true);
+    setGenerationMode(output);
     setGenerationError("");
     setGeneratedPosts([]);
+    setGeneratedMedia([]);
+    setGeneratedVideos((current) => {
+      current.forEach((video) => URL.revokeObjectURL(video.url));
+      return [];
+    });
 
     try {
       const response = await fetch("/api/social-studio/generate", {
@@ -4482,9 +4469,9 @@ export default function SocialStudioPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           book: selectedBook,
-          campaignType,
+          campaignType: inferredCampaign,
           platforms,
-          quote: quote.trim(),
+          quote: promptQuote,
           instructions: instructions.trim(),
         }),
       });
@@ -4498,10 +4485,24 @@ export default function SocialStudioPage() {
       }
 
       setGeneratedPosts(result.posts);
-      setGeneratedMedia([]);
       setImageError("");
-      setGeneratedVideos([]);
       setVideoError("");
+
+      if (output === "image") {
+        const images: GeneratedMedia[] = [];
+        for (const post of result.posts) {
+          setCreatingImageFor(post.platform);
+          images.push(await renderImage(post, instructions));
+        }
+        setGeneratedMedia(images);
+      } else {
+        const videos: GeneratedVideo[] = [];
+        for (const post of result.posts) {
+          setCreatingVideoFor(post.platform);
+          videos.push(await renderVideo(post, instructions));
+        }
+        setGeneratedVideos(videos);
+      }
     } catch (contentError) {
       setGenerationError(
         contentError instanceof Error
@@ -4510,7 +4511,83 @@ export default function SocialStudioPage() {
       );
     } finally {
       setIsGenerating(false);
+      setGenerationMode(null);
+      setCreatingImageFor(null);
+      setCreatingVideoFor(null);
     }
+  }
+
+  async function renderImage(
+    post: GeneratedPost,
+    creativePrompt: string,
+  ): Promise<GeneratedMedia> {
+    if (!selectedBook) throw new Error("Choose a book first.");
+    const promptQuote = extractPromptQuote(creativePrompt);
+    const inferredCampaign = inferCampaignFromPrompt(creativePrompt);
+    const generationSeed = seededNumber(
+      `${selectedBook.slug}-${post.platform}-${creativePrompt}-${Date.now()}`,
+    );
+    const selectedTemplate = inferTemplateFromPrompt(
+      creativePrompt,
+      inferredCampaign,
+      generationSeed,
+    );
+    const promptedBook = bookForCreativePrompt(selectedBook, creativePrompt);
+    const renderPost = {
+      ...post,
+      visualDirection: `${post.visualDirection}\n${creativePrompt}`.trim(),
+    };
+    const image = await createProfessionalCampaignImage({
+      book: promptedBook,
+      post: renderPost,
+      mediaStyle,
+      campaignType: inferredCampaign,
+      quote: promptQuote,
+      template: selectedTemplate,
+    });
+
+    return {
+      platform: post.platform,
+      style: mediaStyle,
+      template: image.template,
+      dataUrl: image.dataUrl,
+    };
+  }
+
+  async function renderVideo(
+    post: GeneratedPost,
+    creativePrompt: string,
+  ): Promise<GeneratedVideo> {
+    if (!selectedBook) throw new Error("Choose a book first.");
+    const promptQuote = extractPromptQuote(creativePrompt);
+    const inferredCampaign = inferCampaignFromPrompt(creativePrompt);
+    const generationSeed = seededNumber(
+      `${selectedBook.slug}-${post.platform}-${creativePrompt}-${Date.now()}`,
+    );
+    const selectedTemplate = inferTemplateFromPrompt(
+      creativePrompt,
+      inferredCampaign,
+      generationSeed,
+    );
+    const promptedBook = bookForCreativePrompt(selectedBook, creativePrompt);
+    const renderPost = {
+      ...post,
+      visualDirection: `${post.visualDirection}\n${creativePrompt}`.trim(),
+    };
+    const result = await createCoverFirstCampaignVideo({
+      book: promptedBook,
+      post: renderPost,
+      campaignType: inferredCampaign,
+      quote: promptQuote,
+      template: selectedTemplate,
+    });
+    const url = URL.createObjectURL(result.blob);
+    return {
+      platform: post.platform,
+      url,
+      mimeType: result.mimeType,
+      extension: result.mimeType.includes("mp4") ? "mp4" : "webm",
+    };
   }
 
   async function copyPost(post: GeneratedPost) {
@@ -4530,38 +4607,16 @@ export default function SocialStudioPage() {
     setImageError("");
 
     try {
-      const generationSeed = seededNumber(
-        `${selectedBook.slug}-${post.platform}-${Date.now()}`,
-      );
-      const selectedTemplate = resolveStaticPosterTemplate(
-        posterTemplate,
-        campaignType,
-        generationSeed,
-        `${post.title} ${post.caption} ${quote}`,
-      );
-
-      const image = await createProfessionalCampaignImage({
-        book: selectedBook,
+      const edit = mediaEdits[post.platform]?.trim();
+      const image = await renderImage(
         post,
-        mediaStyle,
-        campaignType,
-        quote,
-        template: selectedTemplate,
-      });
+        [instructions, edit].filter(Boolean).join("\n"),
+      );
 
       setGeneratedMedia((current) => [
         ...current.filter((item) => item.platform !== post.platform),
-        {
-          platform: post.platform,
-          style: mediaStyle,
-          template: image.template,
-          dataUrl: image.dataUrl,
-        },
+        image,
       ]);
-      setGeneratedVideos((current) =>
-        current.filter((item) => item.platform !== post.platform),
-      );
-      setVideoError("");
     } catch (mediaError) {
       setImageError(
         mediaError instanceof Error
@@ -4573,22 +4628,18 @@ export default function SocialStudioPage() {
     }
   }
 
-  async function createVideo(post: GeneratedPost, media: GeneratedMedia) {
+  async function createVideo(post: GeneratedPost) {
     if (!selectedBook) return;
 
     setCreatingVideoFor(post.platform);
     setVideoError("");
 
     try {
-      const result = await createCoverFirstCampaignVideo({
-        book: selectedBook,
+      const edit = mediaEdits[post.platform]?.trim();
+      const video = await renderVideo(
         post,
-        campaignType,
-        quote,
-        template: media.template,
-      });
-      const url = URL.createObjectURL(result.blob);
-      const extension = result.mimeType.includes("mp4") ? "mp4" : "webm";
+        [instructions, edit].filter(Boolean).join("\n"),
+      );
 
       setGeneratedVideos((current) => {
         const previous = current.find(
@@ -4599,10 +4650,7 @@ export default function SocialStudioPage() {
         return [
           ...current.filter((item) => item.platform !== post.platform),
           {
-            platform: post.platform,
-            url,
-            mimeType: result.mimeType,
-            extension,
+            ...video,
           },
         ];
       });
@@ -4919,7 +4967,7 @@ export default function SocialStudioPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.25em] text-pink-400">
-                      Campaign setup
+                      Selected book
                     </p>
                     <h2 className="mt-2 text-2xl font-bold">
                       {selectedBook.title}
@@ -4953,61 +5001,36 @@ export default function SocialStudioPage() {
             </div>
 
             <div className="p-5">
-              <h3 className="font-semibold">What are we promoting?</h3>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {CAMPAIGN_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => chooseCampaignType(option.id)}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      campaignType === option.id
-                        ? "border-pink-500 bg-pink-500/10"
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
-                    }`}
-                  >
-                    <span className="block font-semibold text-white">
-                      {option.title}
-                    </span>
-                    <span className="mt-1 block text-sm leading-5 text-neutral-400">
-                      {option.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              <h3 className="mt-6 font-semibold">Poster design</h3>
-              <p className="mt-2 text-sm leading-5 text-neutral-400">
-                Every design uses the real cover, book-matched colours and
-                cinematic effects. No generated people.
+              <label
+                htmlFor="campaign-instructions"
+                className="text-lg font-bold"
+              >
+                Describe what you want
+              </label>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
+                Write naturally. Include the exact quote, heading, tropes,
+                offer, colours, Kindle placement or movement you want. The
+                studio will work out the design and campaign type itself.
               </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {POSTER_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      setPosterTemplate(option.id);
-                      setGeneratedMedia([]);
-                      setImageError("");
-                      setGeneratedVideos([]);
-                      setVideoError("");
-                    }}
-                    className={`rounded-xl border p-4 text-left transition ${
-                      posterTemplate === option.id
-                        ? "border-pink-500 bg-pink-500/10"
-                        : "border-white/10 bg-white/5 hover:bg-white/10"
-                    }`}
-                  >
-                    <span className="block font-semibold">{option.title}</span>
-                    <span className="mt-1 block text-sm leading-5 text-neutral-400">
-                      {option.description}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              <textarea
+                id="campaign-instructions"
+                value={instructions}
+                onChange={(event) => {
+                  setInstructions(event.target.value);
+                  setGeneratedPosts([]);
+                  setGeneratedMedia([]);
+                  setGeneratedVideos((current) => {
+                    current.forEach((video) => URL.revokeObjectURL(video.url));
+                    return [];
+                  });
+                  setGenerationError("");
+                }}
+                rows={7}
+                placeholder={'For example: Create a bright modern trope poster. Make the Kindle huge on the left. Use large icons for ADHD Representation, Slow Burn and Found Family. Heading: Workplace Romance. Keep it clean with cyan and violet lighting.'}
+                className="mt-4 w-full resize-y rounded-2xl border border-white/15 bg-neutral-950 px-5 py-4 text-base leading-7 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
+              />
 
-              <h3 className="mt-6 font-semibold">Platforms</h3>
+              <h3 className="mt-6 font-semibold">Where is it going?</h3>
               <div className="mt-3 flex flex-wrap gap-3">
                 {PLATFORM_OPTIONS.map((platform) => {
                   const selected = platforms.includes(platform.id);
@@ -5030,69 +5053,34 @@ export default function SocialStudioPage() {
                 })}
               </div>
 
-              {campaignType === "quote-post" && (
-                <div className="mt-6">
-                  <label
-                    htmlFor="campaign-quote"
-                    className="block font-semibold"
-                  >
-                    Genuine book quote
-                  </label>
-                  <textarea
-                    id="campaign-quote"
-                    value={quote}
-                    onChange={(event) => {
-                      setQuote(event.target.value);
-                      setGeneratedPosts([]);
-                      setGenerationError("");
-                    }}
-                    rows={4}
-                    placeholder="Paste the exact quote from the book..."
-                    className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
-                  />
-                </div>
-              )}
-
-              <div className="mt-6">
-                <label
-                  htmlFor="campaign-instructions"
-                  className="block font-semibold"
-                >
-                  Anything specific?{" "}
-                  <span className="text-neutral-500">Optional</span>
-                </label>
-                <textarea
-                  id="campaign-instructions"
-                  value={instructions}
-                  onChange={(event) => {
-                    setInstructions(event.target.value);
-                    setGeneratedPosts([]);
-                    setGenerationError("");
-                  }}
-                  rows={3}
-                  placeholder="For example: focus on the jealousy and forced proximity..."
-                  className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
-                />
-              </div>
-
               {generationError && (
                 <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
                   {generationError}
                 </p>
               )}
 
-              <button
-                type="button"
-                onClick={() => void generateContent()}
-                disabled={isGenerating || platforms.length === 0}
-                className="mt-6 w-full rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:bg-pink-500/30 disabled:text-pink-100/60"
-              >
-                {isGenerating
-                  ? "Creating platform content..."
-                  : platforms.length === 0
-                    ? "Choose at least one platform"
-                    : "Generate Content"}
-              </button>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => void generateContent("image")}
+                  disabled={isGenerating || platforms.length === 0}
+                  className="rounded-xl bg-pink-500 px-4 py-4 font-bold text-white transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:bg-pink-500/30 disabled:text-pink-100/60"
+                >
+                  {isGenerating && generationMode === "image"
+                    ? "Creating posters..."
+                    : "Create Posters"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void generateContent("video")}
+                  disabled={isGenerating || platforms.length === 0}
+                  className="rounded-xl border border-violet-400/50 bg-violet-500/15 px-4 py-4 font-bold text-violet-100 transition hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                >
+                  {isGenerating && generationMode === "video"
+                    ? "Rendering videos..."
+                    : "Create Videos"}
+                </button>
+              </div>
 
               {generatedPosts.length > 0 && (
                 <div className="mt-8 space-y-5 border-t border-white/10 pt-6">
@@ -5157,19 +5145,6 @@ export default function SocialStudioPage() {
                           {post.hashtags.join(" ")}
                         </p>
 
-                        <button
-                          type="button"
-                          onClick={() => void createImage(post)}
-                          disabled={creatingImageFor !== null}
-                          className="mt-5 w-full rounded-xl bg-white px-4 py-3 font-semibold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-neutral-500"
-                        >
-                          {creatingImageFor === post.platform
-                            ? "Designing professional campaign poster..."
-                            : media
-                              ? "Create Another Poster"
-                              : "Create Professional Poster"}
-                        </button>
-
                         {media && (
                           <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3">
                             <img
@@ -5190,89 +5165,117 @@ export default function SocialStudioPage() {
                               onClick={() =>
                                 void publishImageToMake(post, media)
                               }
-                              disabled={
-                                testingMakeFor !== null ||
-                                post.platform === "tiktok"
-                              }
+                              disabled={testingMakeFor !== null}
                               className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
                             >
                               {testingMakeFor === post.platform
                                 ? "Uploading and sending to Make..."
-                                : post.platform === "tiktok"
-                                  ? "TikTok Publishing Comes Next"
-                                  : `Publish Image to ${
-                                      post.platform === "facebook"
-                                        ? "Facebook"
-                                        : "Instagram"
-                                    }`}
+                                : `Publish Image to ${
+                                    post.platform === "facebook"
+                                      ? "Facebook"
+                                      : post.platform === "instagram"
+                                        ? "Instagram"
+                                        : "TikTok"
+                                  }`}
                             </button>
+                          </div>
+                        )}
 
-                            {makeTestMessage.startsWith(post.platform) && (
-                              <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                                {makeTestMessage}
-                              </p>
-                            )}
-
-                            {makeTestError.startsWith(post.platform) && (
-                              <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                                {makeTestError}
-                              </p>
-                            )}
-
+                        {video && (
+                          <div className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-3">
+                            <video
+                              src={video.url}
+                              controls
+                              playsInline
+                              className="mx-auto max-h-[720px] w-auto rounded-xl"
+                            />
+                            <a
+                              href={video.url}
+                              download={`${selectedBook?.slug ?? "book"}-${post.platform}-video.${video.extension}`}
+                              className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
+                            >
+                              Download Finished Video
+                            </a>
                             <button
                               type="button"
-                              onClick={() => void createVideo(post, media)}
-                              disabled={creatingVideoFor !== null}
-                              className="mt-3 w-full rounded-xl border border-pink-500/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 transition hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                              onClick={() => void publishVideoToMake(post, video)}
+                              disabled={testingMakeFor !== null}
+                              className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
                             >
-                              {creatingVideoFor === post.platform
-                                ? "Rendering 11-second video..."
-                                : video
-                                  ? "Create Another Video"
-                                  : "Create Vertical Video"}
+                              {testingMakeFor === post.platform
+                                ? "Uploading and sending video to Make..."
+                                : post.platform === "facebook"
+                                  ? "Publish Video to Facebook"
+                                  : post.platform === "instagram"
+                                    ? "Publish Reel to Instagram"
+                                    : "Publish Video to TikTok"}
                             </button>
-
-                            {video && (
-                              <div className="mt-4 rounded-xl border border-white/10 bg-neutral-950 p-3">
-                                <video
-                                  src={video.url}
-                                  controls
-                                  playsInline
-                                  className="mx-auto max-h-[720px] w-auto rounded-lg"
-                                />
-                                <a
-                                  href={video.url}
-                                  download={`${selectedBook?.slug ?? "book"}-${post.platform}-video.${video.extension}`}
-                                  className="mt-3 flex w-full items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
-                                >
-                                  Download Finished Video
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void publishVideoToMake(post, video)
-                                  }
-                                  disabled={
-                                    testingMakeFor !== null ||
-                                    post.platform === "tiktok"
-                                  }
-                                  className="mt-3 w-full rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
-                                >
-                                  {testingMakeFor === post.platform
-                                    ? "Uploading and sending video to Make..."
-                                    : post.platform === "tiktok"
-                                      ? "TikTok Publishing Comes Next"
-                                      : post.platform === "facebook"
-                                        ? "Publish Video to Facebook"
-                                        : "Publish Reel to Instagram"}
-                                </button>
-                                <p className="mt-3 text-center text-xs leading-5 text-neutral-500">
-                                  Add platform music or trending audio when you
-                                  upload it.
-                                </p>
-                              </div>
-                            )}
+                            <p className="mt-3 text-center text-xs leading-5 text-neutral-500">
+                              Add platform music or trending audio after publishing.
+                            </p>
                           </div>
+                        )}
+
+                        {(media || video) && (
+                          <div className="mt-5 rounded-2xl border border-pink-500/25 bg-pink-500/5 p-4">
+                            <label
+                              htmlFor={`media-edit-${post.platform}`}
+                              className="font-semibold text-pink-100"
+                            >
+                              Change this result
+                            </label>
+                            <textarea
+                              id={`media-edit-${post.platform}`}
+                              value={mediaEdits[post.platform] ?? ""}
+                              onChange={(event) =>
+                                setMediaEdits((current) => ({
+                                  ...current,
+                                  [post.platform]: event.target.value,
+                                }))
+                              }
+                              rows={3}
+                              placeholder="For example: make the Kindle larger, use fewer words, move the quote above the cover, or make the animation faster."
+                              className="mt-3 w-full resize-y rounded-xl border border-white/10 bg-neutral-950 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
+                            />
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <button
+                                type="button"
+                                onClick={() => void createImage(post)}
+                                disabled={creatingImageFor !== null || creatingVideoFor !== null}
+                                className="rounded-xl bg-white px-4 py-3 font-semibold text-neutral-950 transition hover:bg-neutral-200 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-neutral-500"
+                              >
+                                {creatingImageFor === post.platform
+                                  ? "Updating poster..."
+                                  : media
+                                    ? "Update Poster"
+                                    : "Create Poster Version"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void createVideo(post)}
+                                disabled={creatingImageFor !== null || creatingVideoFor !== null}
+                                className="rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-100 transition hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-neutral-600"
+                              >
+                                {creatingVideoFor === post.platform
+                                  ? "Updating video..."
+                                  : video
+                                    ? "Update Video"
+                                    : "Create Video Version"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {makeTestMessage.startsWith(post.platform) && (
+                          <p className="mt-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                            {makeTestMessage}
+                          </p>
+                        )}
+
+                        {makeTestError.startsWith(post.platform) && (
+                          <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                            {makeTestError}
+                          </p>
                         )}
                       </article>
                     );
@@ -5362,7 +5365,7 @@ export default function SocialStudioPage() {
                       onClick={() => chooseBook(book)}
                       className="mt-5 w-full rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white transition hover:bg-pink-400"
                     >
-                      Create Campaign
+                      Use This Book
                     </button>
                   </div>
                 </article>
