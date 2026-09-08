@@ -242,6 +242,7 @@ async function createMotionVideo(
   platform: SocialPlatform,
   book: CatalogueBook,
   post: GeneratedPost,
+  guidance: string,
 ) {
   if (typeof MediaRecorder === "undefined") {
     throw new Error("This browser cannot render campaign videos.");
@@ -251,6 +252,7 @@ async function createMotionVideo(
   if (!mimeType) throw new Error("This browser has no supported video encoder.");
 
   const image = await loadImage(source);
+  const cover = await loadImage(book.coverUrl);
   const { width, height } = dimensions(platform);
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -278,7 +280,37 @@ async function createMotionVideo(
   const [accentRed, accentGreen, accentBlue] = posterAccent(image);
   const accent = `rgb(${accentRed}, ${accentGreen}, ${accentBlue})`;
   const accentSoft = `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0.28)`;
-  const tropes = book.tropes.filter(Boolean).slice(0, 4);
+  const lowerGuidance = guidance.toLowerCase();
+  const explicitTropes = guidance.match(
+    /(?:include|show|use|add)?\s*(?:the\s+)?tropes?\s*:?[\s]+(.+?)(?:\s+(?:down|along|stacked|beside|around|on\s+the|at\s+the|with\s+(?:modern|icons))|[.\n]|$)/i,
+  )?.[1]
+    .split(/\s*(?:,|;|\||\/)\s*/)
+    .map((value) => value.trim())
+    .filter((value) => value.length > 1 && value.length < 70)
+    .slice(0, 5) ?? [];
+  const requestedCatalogueTropes = book.tropes.filter((trope) =>
+    lowerGuidance.includes(trope.toLowerCase()),
+  );
+  const tropes = (
+    explicitTropes.length
+      ? explicitTropes
+      : requestedCatalogueTropes.length
+        ? requestedCatalogueTropes
+        : book.tropes
+  ).filter(Boolean).slice(0, 5);
+  const requestsKindle = /\b(kindle|e-reader|ereader|device)\b/i.test(guidance);
+  const requestsRight = /\b(?:cover|kindle|book)\b[^.\n]{0,35}\b(?:on\s+the\s+)?right\b/i.test(guidance);
+  const requestsLeft = /\b(?:cover|kindle|book)\b[^.\n]{0,35}\b(?:on\s+the\s+)?left\b/i.test(guidance);
+  const coverSide: "left" | "right" | "center" = requestsRight
+    ? "right"
+    : requestsLeft
+      ? "left"
+      : "center";
+  const smoky = /gothic|vampire|dark|smoke|mist|paranormal|night/i.test(guidance);
+  const fiery = /fire|flame|ember|hot|spicy|burn/i.test(guidance);
+  const icy = /ice|hockey|winter|snow|cold/i.test(guidance);
+  const floral = /flower|floral|rose|petal|spring|garden/i.test(guidance);
+  const energetic = /sport|football|hockey|energy|fast|action|bold/i.test(guidance);
   recorder.start(250);
 
   await new Promise<void>((resolve) => {
@@ -287,68 +319,26 @@ async function createMotionVideo(
       const progress = elapsed / duration;
       const fade = Math.min(1, elapsed / 0.45, (duration - elapsed) / 0.55);
 
-      let scale = 1.035;
-      let offsetX = 0;
-      let offsetY = 0;
-      if (elapsed < 2.25) {
-        const local = easeOutCubic(elapsed / 2.25);
-        scale = 1.16 - local * 0.1;
-        offsetY = (1 - local) * height * 0.035;
-      } else if (elapsed < 7.35) {
-        const local = (elapsed - 2.25) / 5.1;
-        scale = 1.13 + Math.sin(local * Math.PI) * 0.045;
-        offsetX = Math.sin(local * Math.PI * 2) * width * 0.035;
-        offsetY = (0.5 - local) * height * 0.055;
-      } else {
-        const local = easeOutCubic((elapsed - 7.35) / 3.15);
-        scale = 1.1 - local * 0.065;
-        offsetY = (1 - local) * -height * 0.025;
-      }
-
       context.save();
       context.clearRect(0, 0, width, height);
-      context.globalAlpha = Math.max(0, fade);
-      context.translate(width / 2 + offsetX, height / 2 + offsetY);
-      context.scale(scale, scale);
+      context.globalAlpha = fade;
+      context.filter = `blur(${platform === "tiktok" ? 26 : 21}px) brightness(0.62) saturate(1.32)`;
+      const backdropScale = 1.12 + 0.035 * Math.sin(progress * Math.PI);
+      context.translate(
+        width / 2 + Math.sin(progress * Math.PI * 2) * width * 0.022,
+        height / 2 + Math.cos(progress * Math.PI * 1.5) * height * 0.018,
+      );
+      context.scale(backdropScale, backdropScale);
       context.drawImage(image, -width / 2, -height / 2, width, height);
       context.restore();
-
-      const transitionDistance = Math.min(
-        Math.abs(elapsed - 2.25),
-        Math.abs(elapsed - 7.35),
-      );
-      if (transitionDistance < 0.16) {
-        const strength = 1 - transitionDistance / 0.16;
-        context.save();
-        context.globalCompositeOperation = "screen";
-        for (let band = 0; band < 9; band += 1) {
-          const bandHeight = height / 9;
-          const shift = (band % 2 === 0 ? 1 : -1) * width * 0.035 * strength;
-          context.globalAlpha = 0.2 * strength;
-          context.drawImage(
-            image,
-            0,
-            band * bandHeight,
-            width,
-            bandHeight,
-            shift,
-            band * bandHeight,
-            width,
-            bandHeight,
-          );
-        }
-        context.fillStyle = `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, ${0.22 * strength})`;
-        context.fillRect(0, 0, width, height);
-        context.restore();
-      }
 
       context.save();
       context.globalAlpha = fade;
       const cinematicShade = context.createLinearGradient(0, 0, 0, height);
-      cinematicShade.addColorStop(0, "rgba(0,0,0,0.38)");
-      cinematicShade.addColorStop(0.24, "rgba(0,0,0,0)");
-      cinematicShade.addColorStop(0.72, "rgba(0,0,0,0)");
-      cinematicShade.addColorStop(1, "rgba(0,0,0,0.52)");
+      cinematicShade.addColorStop(0, "rgba(0,0,0,0.42)");
+      cinematicShade.addColorStop(0.28, "rgba(0,0,0,0.08)");
+      cinematicShade.addColorStop(0.7, "rgba(0,0,0,0.15)");
+      cinematicShade.addColorStop(1, "rgba(0,0,0,0.58)");
       context.fillStyle = cinematicShade;
       context.fillRect(0, 0, width, height);
       context.restore();
@@ -372,107 +362,184 @@ async function createMotionVideo(
 
       for (const particle of particles) {
         const y = (particle.y - elapsed * particle.speed + height) % height;
+        const direction = icy ? -1 : 1;
+        const x = (particle.x + direction * elapsed * (energetic ? 34 : 8) + width) % width;
         context.globalAlpha = particle.alpha * fade * (0.55 + 0.45 * Math.sin(elapsed + particle.x));
-        context.fillStyle = bandedParticleColor(particle.x, width, accent);
+        context.fillStyle = particle.x % Math.max(1, width * 0.17) < width * 0.085 ? accent : "#ffffff";
+        if (fiery || floral || icy) {
+          context.save();
+          context.translate(x, y);
+          context.rotate(elapsed + particle.x);
+          context.fillRect(-particle.size * 0.55, -particle.size * 1.7, particle.size * 1.1, particle.size * 3.4);
+          context.restore();
+          continue;
+        }
         context.beginPath();
-        context.arc(particle.x, y, particle.size, 0, Math.PI * 2);
+        context.arc(x, y, particle.size, 0, Math.PI * 2);
         context.fill();
       }
       context.restore();
 
-      if (elapsed < 2.25) {
-        const local = clamp01((elapsed - 0.3) / 0.75) * clamp01((2.25 - elapsed) / 0.45);
+      if (smoky) {
         context.save();
-        context.globalAlpha = local;
+        context.globalCompositeOperation = "screen";
+        for (let cloud = 0; cloud < 4; cloud += 1) {
+          const cloudX = ((elapsed * (18 + cloud * 5) + cloud * width * 0.29) % (width * 1.4)) - width * 0.2;
+          const cloudY = height * (0.28 + cloud * 0.16 + 0.025 * Math.sin(elapsed + cloud));
+          const mist = context.createRadialGradient(cloudX, cloudY, 0, cloudX, cloudY, width * 0.32);
+          mist.addColorStop(0, `rgba(${accentRed},${accentGreen},${accentBlue},0.08)`);
+          mist.addColorStop(1, `rgba(${accentRed},${accentGreen},${accentBlue},0)`);
+          context.fillStyle = mist;
+          context.fillRect(0, cloudY - width * 0.34, width, width * 0.68);
+        }
+        context.restore();
+      }
+
+      const heroStart = 0.45;
+      const heroEntrance = easeOutCubic((elapsed - heroStart) / 0.95);
+      const heroAlpha = heroEntrance * fade;
+      const coverRatio = cover.naturalWidth / cover.naturalHeight;
+      let coverHeight = height * (coverSide === "center" ? 0.48 : 0.43);
+      let coverWidth = coverHeight * coverRatio;
+      const maximumCoverWidth = width * (coverSide === "center" ? 0.58 : 0.49);
+      if (coverWidth > maximumCoverWidth) {
+        coverWidth = maximumCoverWidth;
+        coverHeight = coverWidth / coverRatio;
+      }
+      const framePaddingX = requestsKindle ? width * 0.025 : width * 0.009;
+      const framePaddingTop = requestsKindle ? width * 0.025 : width * 0.009;
+      const framePaddingBottom = requestsKindle ? width * 0.065 : width * 0.009;
+      const frameWidth = coverWidth + framePaddingX * 2;
+      const frameHeight = coverHeight + framePaddingTop + framePaddingBottom;
+      const heroX = coverSide === "left" ? width * 0.31 : coverSide === "right" ? width * 0.69 : width * 0.5;
+      const heroY = height * (coverSide === "center" ? 0.49 : 0.52);
+      const entranceDirection = coverSide === "right" ? 1 : -1;
+      const animatedHeroX = heroX + (1 - heroEntrance) * entranceDirection * width * 0.42;
+      const heroScale = 0.82 + heroEntrance * 0.18 + 0.012 * Math.sin(elapsed * 1.15);
+      const heroRotation = entranceDirection * (1 - heroEntrance) * 0.11 + Math.sin(elapsed * 0.7) * 0.008;
+
+      context.save();
+      context.globalAlpha = Math.max(0, heroAlpha);
+      context.translate(animatedHeroX, heroY);
+      context.rotate(heroRotation);
+      context.scale(heroScale, heroScale);
+      context.shadowColor = accentSoft;
+      context.shadowBlur = 54;
+      context.shadowOffsetY = 28;
+      context.fillStyle = requestsKindle ? "#111318" : "rgba(255,255,255,0.9)";
+      context.beginPath();
+      context.roundRect(-frameWidth / 2, -frameHeight / 2, frameWidth, frameHeight, requestsKindle ? 28 : 8);
+      context.fill();
+      context.shadowColor = "transparent";
+      context.drawImage(
+        cover,
+        -coverWidth / 2,
+        -frameHeight / 2 + framePaddingTop,
+        coverWidth,
+        coverHeight,
+      );
+      if (requestsKindle) {
+        context.fillStyle = "rgba(255,255,255,0.42)";
+        context.font = `700 ${Math.max(16, framePaddingBottom * 0.34)}px Arial, sans-serif`;
         context.textAlign = "center";
         context.textBaseline = "middle";
-        context.fillStyle = "rgba(0,0,0,0.48)";
-        context.fillRect(0, height * 0.39, width, height * 0.22);
-        context.shadowColor = "rgba(0,0,0,0.9)";
-        context.shadowBlur = 28;
+        context.fillText("kindle", 0, frameHeight / 2 - framePaddingBottom * 0.46);
+        const reflection = context.createLinearGradient(-coverWidth / 2, 0, coverWidth / 2, 0);
+        reflection.addColorStop(0, "rgba(255,255,255,0)");
+        reflection.addColorStop(0.62, "rgba(255,255,255,0.12)");
+        reflection.addColorStop(0.8, "rgba(255,255,255,0)");
+        context.fillStyle = reflection;
+        context.fillRect(-coverWidth / 2, -frameHeight / 2 + framePaddingTop, coverWidth, coverHeight);
+      }
+      context.restore();
+
+      const hookAlpha = clamp01((elapsed - 0.15) / 0.65) * clamp01((4.2 - elapsed) / 0.55) * fade;
+      if (hookAlpha > 0) {
+        context.save();
+        context.globalAlpha = hookAlpha;
+        context.translate(0, (1 - easeOutCubic((elapsed - 0.15) / 0.65)) * -height * 0.04);
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.shadowColor = "rgba(0,0,0,0.95)";
+        context.shadowBlur = 34;
         context.fillStyle = "#ffffff";
         drawFittedVideoText(
           context,
           post.title.toUpperCase(),
           width / 2,
-          height * 0.49,
-          width * 0.84,
-          platform === "tiktok" ? 88 : 72,
-          42,
+          height * 0.105,
+          width * 0.86,
+          platform === "tiktok" ? 76 : 64,
+          34,
         );
         context.fillStyle = accent;
-        context.fillRect(width * 0.31, height * 0.555, width * 0.38, 8);
+        context.fillRect(width * 0.33, height * 0.145, width * 0.34, 7);
         context.restore();
       }
 
-      if (elapsed >= 2.25 && elapsed < 7.35 && tropes.length) {
-        const local = elapsed - 2.25;
-        const activeIndex = Math.min(tropes.length - 1, Math.floor(local / (5.1 / tropes.length)));
-        const beatLength = 5.1 / tropes.length;
+      if (elapsed >= 2.35 && elapsed < 8.0 && tropes.length) {
+        const local = elapsed - 2.35;
+        const beatLength = 5.65 / tropes.length;
+        const activeIndex = Math.min(tropes.length - 1, Math.floor(local / beatLength));
         const beat = (local - activeIndex * beatLength) / beatLength;
-        const entrance = easeOutCubic(beat / 0.34);
-        const exit = clamp01((1 - beat) / 0.18);
+        const tropeAlpha = easeOutCubic(beat / 0.24) * clamp01((1 - beat) / 0.16);
+        const textX = coverSide === "left" ? width * 0.76 : coverSide === "right" ? width * 0.24 : width * 0.5;
+        const textY = coverSide === "center" ? height * 0.76 : height * 0.51;
+        const textWidth = coverSide === "center" ? width * 0.82 : width * 0.4;
         context.save();
-        context.globalAlpha = entrance * exit;
-        const scrim = context.createLinearGradient(0, height * 0.56, width, height * 0.56);
-        scrim.addColorStop(0, "rgba(0,0,0,0.12)");
-        scrim.addColorStop(0.18, "rgba(0,0,0,0.78)");
-        scrim.addColorStop(0.82, "rgba(0,0,0,0.78)");
-        scrim.addColorStop(1, "rgba(0,0,0,0.12)");
-        context.fillStyle = scrim;
-        context.fillRect(0, height * 0.43, width, height * 0.24);
-        context.translate((1 - entrance) * width * 0.16, 0);
+        context.globalAlpha = tropeAlpha * fade;
+        context.translate(textX + (1 - easeOutCubic(beat / 0.24)) * width * 0.09, textY);
+        context.fillStyle = "rgba(0,0,0,0.66)";
+        context.beginPath();
+        context.roundRect(-textWidth / 2, -height * 0.075, textWidth, height * 0.15, 24);
+        context.fill();
+        drawTropeIcon(context, tropes[activeIndex], 0, -height * 0.024, Math.min(58, width * 0.055), accent);
         context.textAlign = "center";
         context.textBaseline = "middle";
         context.shadowColor = accentSoft;
-        context.shadowBlur = 36;
-        context.fillStyle = accent;
-        context.font = `900 ${platform === "tiktok" ? 31 : 25}px Arial, sans-serif`;
-        context.fillText(`TROPE ${activeIndex + 1}`, width / 2, height * 0.49);
+        context.shadowBlur = 32;
         context.fillStyle = "#ffffff";
         drawFittedVideoText(
           context,
           tropes[activeIndex].toUpperCase(),
-          width / 2,
-          height * 0.555,
-          width * 0.84,
-          platform === "tiktok" ? 90 : 74,
-          42,
+          0,
+          height * 0.038,
+          textWidth * 0.86,
+          platform === "tiktok" ? 53 : 45,
+          24,
         );
-        context.fillStyle = accent;
-        context.fillRect(width * 0.39, height * 0.62, width * 0.22, 7);
         context.restore();
       }
 
-      if (elapsed >= 7.35) {
-        const local = clamp01((elapsed - 7.55) / 0.75) * clamp01((duration - elapsed) / 0.5);
+      const ctaAlpha = clamp01((elapsed - 8.0) / 0.7) * clamp01((duration - elapsed) / 0.5) * fade;
+      if (ctaAlpha > 0) {
         context.save();
-        context.globalAlpha = local;
-        const footer = context.createLinearGradient(0, height * 0.69, 0, height);
+        context.globalAlpha = ctaAlpha;
+        const footer = context.createLinearGradient(0, height * 0.74, 0, height);
         footer.addColorStop(0, "rgba(0,0,0,0)");
-        footer.addColorStop(0.38, "rgba(0,0,0,0.82)");
-        footer.addColorStop(1, "rgba(0,0,0,0.94)");
+        footer.addColorStop(0.34, "rgba(0,0,0,0.86)");
+        footer.addColorStop(1, "rgba(0,0,0,0.98)");
         context.fillStyle = footer;
-        context.fillRect(0, height * 0.67, width, height * 0.33);
+        context.fillRect(0, height * 0.72, width, height * 0.28);
         context.textAlign = "center";
         context.textBaseline = "middle";
-        context.shadowColor = "rgba(0,0,0,0.9)";
-        context.shadowBlur = 24;
+        context.shadowColor = "rgba(0,0,0,0.95)";
+        context.shadowBlur = 26;
         context.fillStyle = "#ffffff";
         drawFittedVideoText(
           context,
           book.kindleUnlimited ? "AVAILABLE ON KINDLE UNLIMITED" : "DISCOVER IT ON AMAZON",
           width / 2,
-          height * 0.855,
-          width * 0.82,
-          platform === "tiktok" ? 54 : 44,
-          29,
+          height * 0.875,
+          width * 0.84,
+          platform === "tiktok" ? 50 : 42,
+          27,
         );
         context.fillStyle = accent;
-        context.fillRect(width * 0.28, height * 0.895, width * 0.44, 8);
+        context.fillRect(width * 0.29, height * 0.91, width * 0.42, 8);
         context.fillStyle = "#ffffff";
-        context.font = `700 ${platform === "tiktok" ? 31 : 26}px Arial, sans-serif`;
-        context.fillText("www.marlowquinn.com", width / 2, height * 0.935);
+        context.font = `700 ${platform === "tiktok" ? 30 : 25}px Arial, sans-serif`;
+        context.fillText("www.marlowquinn.com", width / 2, height * 0.95);
         context.restore();
       }
 
@@ -491,8 +558,100 @@ async function createMotionVideo(
   return { blob, mimeType };
 }
 
-function bandedParticleColor(x: number, width: number, accent: string) {
-  return x % Math.max(1, width * 0.17) < width * 0.085 ? accent : "#ffffff";
+function drawTropeIcon(
+  context: CanvasRenderingContext2D,
+  trope: string,
+  x: number,
+  y: number,
+  size: number,
+  colour: string,
+) {
+  const label = trope.toLowerCase();
+  context.save();
+  context.translate(x, y);
+  context.strokeStyle = colour;
+  context.fillStyle = colour;
+  context.lineWidth = Math.max(3, size * 0.09);
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.shadowColor = colour;
+  context.shadowBlur = 18;
+
+  if (/vampire|fang|blood/.test(label)) {
+    context.beginPath();
+    context.moveTo(-size * 0.42, -size * 0.25);
+    context.quadraticCurveTo(-size * 0.2, size * 0.35, 0, -size * 0.02);
+    context.quadraticCurveTo(size * 0.2, size * 0.35, size * 0.42, -size * 0.25);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(-size * 0.24, -size * 0.05);
+    context.lineTo(-size * 0.13, size * 0.32);
+    context.lineTo(-size * 0.02, -size * 0.02);
+    context.moveTo(size * 0.24, -size * 0.05);
+    context.lineTo(size * 0.13, size * 0.32);
+    context.lineTo(size * 0.02, -size * 0.02);
+    context.stroke();
+  } else if (/family|friends/.test(label)) {
+    [-0.32, 0, 0.32].forEach((offset, index) => {
+      context.beginPath();
+      context.arc(offset * size, index === 1 ? -size * 0.19 : -size * 0.08, size * 0.13, 0, Math.PI * 2);
+      context.stroke();
+    });
+    context.beginPath();
+    context.arc(0, size * 0.34, size * 0.5, Math.PI * 1.12, Math.PI * 1.88);
+    context.stroke();
+  } else if (/hockey/.test(label)) {
+    context.beginPath();
+    context.ellipse(0, size * 0.23, size * 0.36, size * 0.13, 0, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(-size * 0.35, -size * 0.38);
+    context.lineTo(size * 0.08, size * 0.14);
+    context.lineTo(size * 0.42, size * 0.08);
+    context.stroke();
+  } else if (/football/.test(label)) {
+    context.beginPath();
+    context.ellipse(0, 0, size * 0.46, size * 0.27, -0.35, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(-size * 0.15, -size * 0.12);
+    context.lineTo(size * 0.15, size * 0.12);
+    context.moveTo(-size * 0.05, -size * 0.12);
+    context.lineTo(-size * 0.12, size * 0.02);
+    context.moveTo(size * 0.08, -size * 0.03);
+    context.lineTo(0, size * 0.11);
+    context.stroke();
+  } else if (/forbidden|secret|locked|off.?limits/.test(label)) {
+    context.strokeRect(-size * 0.34, -size * 0.02, size * 0.68, size * 0.48);
+    context.beginPath();
+    context.arc(0, -size * 0.02, size * 0.27, Math.PI, 0);
+    context.stroke();
+  } else if (/burn|fire|heat|spicy/.test(label)) {
+    context.beginPath();
+    context.moveTo(0, size * 0.46);
+    context.bezierCurveTo(-size * 0.5, size * 0.18, -size * 0.18, -size * 0.24, size * 0.03, -size * 0.48);
+    context.bezierCurveTo(size * 0.12, -size * 0.16, size * 0.48, 0, 0, size * 0.46);
+    context.stroke();
+  } else if (/office|workplace|boss|coworker/.test(label)) {
+    context.strokeRect(-size * 0.43, -size * 0.2, size * 0.86, size * 0.58);
+    context.strokeRect(-size * 0.16, -size * 0.36, size * 0.32, size * 0.16);
+    context.beginPath();
+    context.moveTo(-size * 0.43, 0);
+    context.lineTo(size * 0.43, 0);
+    context.stroke();
+  } else if (/gay|awakening|bi|queer/.test(label)) {
+    context.beginPath();
+    context.arc(-size * 0.16, 0, size * 0.27, 0, Math.PI * 2);
+    context.arc(size * 0.16, 0, size * 0.27, 0, Math.PI * 2);
+    context.stroke();
+  } else {
+    context.beginPath();
+    context.moveTo(0, size * 0.4);
+    context.bezierCurveTo(-size * 0.55, size * 0.05, -size * 0.43, -size * 0.38, 0, -size * 0.14);
+    context.bezierCurveTo(size * 0.43, -size * 0.38, size * 0.55, size * 0.05, 0, size * 0.4);
+    context.stroke();
+  }
+  context.restore();
 }
 
 function parseResponseText(text: string, status: number) {
@@ -643,6 +802,7 @@ export default function SocialStudioPage() {
               media.platform,
               selectedBook,
               post,
+              instructions,
             );
             return {
               platform: media.platform,
@@ -688,6 +848,7 @@ export default function SocialStudioPage() {
           post.platform,
           selectedBook,
           updated,
+          instructions,
         );
         const replacement: GeneratedVideo = {
           platform: post.platform,
