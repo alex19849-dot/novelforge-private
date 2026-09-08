@@ -39,6 +39,38 @@ type QualityCheck = {
   coverFidelity: number;
 };
 
+type MotionRegionKind = "hook" | "hero" | "trope" | "cta" | "website" | "detail";
+type MotionMovement = "slow-push" | "dramatic-push" | "lateral-pan" | "diagonal-drift" | "gentle-pulse";
+type MotionEffect =
+  | "light-sweep"
+  | "mist"
+  | "particles"
+  | "embers"
+  | "ice-shards"
+  | "petals"
+  | "paint-streaks"
+  | "water-ripples"
+  | "lens-flare"
+  | "glitch";
+
+type MotionRegion = {
+  kind: MotionRegionKind;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type MotionMap = {
+  available: boolean;
+  summary: string;
+  accentColor: string;
+  movement: MotionMovement;
+  effects: MotionEffect[];
+  regions: MotionRegion[];
+};
+
 type GeneratedPost = {
   platform: SocialPlatform;
   title: string;
@@ -48,6 +80,7 @@ type GeneratedPost = {
   imageDataUrl: string;
   sourceResponseId: string;
   qualityCheck: QualityCheck;
+  motionMap?: MotionMap;
 };
 
 type GeneratedMedia = {
@@ -169,18 +202,19 @@ function recorderMimeType(): string {
   ].find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
 }
 
-function seededParticles(width: number, height: number) {
-  let seed = width + height;
+function seededParticles(width: number, height: number, seedSource: string) {
+  let seed = [...seedSource].reduce((total, character) => total + character.charCodeAt(0), width + height);
   const random = () => {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 4294967296;
   };
-  return Array.from({ length: 44 }, () => ({
+  return Array.from({ length: 52 }, () => ({
     x: random() * width,
     y: random() * height,
-    size: 1 + random() * 5,
-    speed: 18 + random() * 42,
-    alpha: 0.12 + random() * 0.28,
+    size: 1.5 + random() * 6,
+    speed: 12 + random() * 38,
+    drift: -18 + random() * 36,
+    alpha: 0.1 + random() * 0.34,
   }));
 }
 
@@ -192,57 +226,172 @@ function easeOutCubic(value: number) {
   return 1 - Math.pow(1 - clamp01(value), 3);
 }
 
-function drawFittedVideoText(
-  context: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maximumWidth: number,
-  startingSize: number,
-  minimumSize: number,
-) {
-  let size = startingSize;
-  context.font = `900 ${size}px Arial, sans-serif`;
-  while (size > minimumSize && context.measureText(text).width > maximumWidth) {
-    size -= 2;
-    context.font = `900 ${size}px Arial, sans-serif`;
-  }
-  context.fillText(text, x, y, maximumWidth);
+function easeInOutCubic(value: number) {
+  const position = clamp01(value);
+  return position < 0.5
+    ? 4 * position * position * position
+    : 1 - Math.pow(-2 * position + 2, 3) / 2;
 }
 
-function posterAccent(image: HTMLImageElement): [number, number, number] {
-  const sample = document.createElement("canvas");
-  sample.width = 32;
-  sample.height = 32;
-  const context = sample.getContext("2d", { willReadFrequently: true });
-  if (!context) return [236, 72, 153];
-  context.drawImage(image, 0, 0, 32, 32);
-  const pixels = context.getImageData(0, 0, 32, 32).data;
-  let best: [number, number, number] = [236, 72, 153];
-  let bestScore = 0;
-  for (let index = 0; index < pixels.length; index += 16) {
-    const red = pixels[index];
-    const green = pixels[index + 1];
-    const blue = pixels[index + 2];
-    const maximum = Math.max(red, green, blue);
-    const minimum = Math.min(red, green, blue);
-    const colour = maximum - minimum;
-    const brightness = (red + green + blue) / 3;
-    const score = colour * (1 - Math.abs(brightness - 155) / 190);
-    if (brightness > 45 && brightness < 235 && score > bestScore) {
-      bestScore = score;
-      best = [red, green, blue];
-    }
+function hexColour(value: string | undefined): [number, number, number] {
+  const match = value?.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  return match
+    ? [Number.parseInt(match[1], 16), Number.parseInt(match[2], 16), Number.parseInt(match[3], 16)]
+    : [236, 72, 153];
+}
+
+type CameraTarget = { x: number; y: number; scale: number };
+
+function cameraTarget(region: MotionRegion | null): CameraTarget {
+  if (!region) return { x: 0.5, y: 0.5, scale: 1 };
+  const centreX = region.x + region.width / 2;
+  const centreY = region.y + region.height / 2;
+  const maximumScale = region.kind === "hero"
+    ? 1.52
+    : region.kind === "trope" || region.kind === "detail"
+      ? 1.75
+      : 1.48;
+  const minimumScale = region.kind === "trope" || region.kind === "detail"
+    ? 1.5
+    : region.kind === "hero"
+      ? 1.3
+      : 1.26;
+  const usefulScale = Math.min(
+    maximumScale,
+    Math.max(minimumScale, 0.82 / Math.max(region.width, 0.2), 0.5 / Math.max(region.height, 0.14)),
+  );
+  return { x: centreX, y: centreY, scale: usefulScale };
+}
+
+function interpolateCamera(from: CameraTarget, to: CameraTarget, amount: number): CameraTarget {
+  const eased = easeInOutCubic(amount);
+  return {
+    x: from.x + (to.x - from.x) * eased,
+    y: from.y + (to.y - from.y) * eased,
+    scale: from.scale + (to.scale - from.scale) * eased,
+  };
+}
+
+function orderedMotionRegions(map: MotionMap | undefined): MotionRegion[] {
+  if (!map?.available) return [];
+  const first = (kind: MotionRegionKind) => map.regions.find((region) => region.kind === kind);
+  const hook = first("hook");
+  const hero = first("hero");
+  const tropes = map.regions.filter((region) => region.kind === "trope").slice(0, 5);
+  const detail = first("detail");
+  const cta = first("cta") ?? first("website");
+  return [hook, hero, ...tropes, detail, cta].filter((region): region is MotionRegion => Boolean(region));
+}
+
+function drawCameraFrame(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+  camera: CameraTarget,
+) {
+  const scaledWidth = width * camera.scale;
+  const scaledHeight = height * camera.scale;
+  const desiredX = width / 2 - camera.x * scaledWidth;
+  const desiredY = height / 2 - camera.y * scaledHeight;
+  const drawX = Math.min(0, Math.max(width - scaledWidth, desiredX));
+  const drawY = Math.min(0, Math.max(height - scaledHeight, desiredY));
+  context.drawImage(image, drawX, drawY, scaledWidth, scaledHeight);
+}
+
+function drawMotionEffects(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  elapsed: number,
+  progress: number,
+  effects: MotionEffect[],
+  particles: ReturnType<typeof seededParticles>,
+  colour: [number, number, number],
+) {
+  const [red, green, blue] = colour;
+  const accent = `rgb(${red},${green},${blue})`;
+
+  if (effects.includes("light-sweep") || effects.includes("lens-flare")) {
+    context.save();
+    context.globalCompositeOperation = "screen";
+    const sweepX = width * (-0.45 + progress * 1.9);
+    const sweep = context.createLinearGradient(sweepX - width * 0.3, 0, sweepX + width * 0.3, height);
+    sweep.addColorStop(0, "rgba(255,255,255,0)");
+    sweep.addColorStop(0.47, `rgba(${red},${green},${blue},0.02)`);
+    sweep.addColorStop(0.5, "rgba(255,255,255,0.16)");
+    sweep.addColorStop(0.53, `rgba(${red},${green},${blue},0.06)`);
+    sweep.addColorStop(1, "rgba(255,255,255,0)");
+    context.fillStyle = sweep;
+    context.fillRect(0, 0, width, height);
+    context.restore();
   }
-  return best;
+
+  if (effects.includes("mist")) {
+    context.save();
+    context.globalCompositeOperation = "screen";
+    for (let index = 0; index < 3; index += 1) {
+      const x = ((elapsed * (22 + index * 6) + index * width * 0.42) % (width * 1.5)) - width * 0.25;
+      const y = height * (0.3 + index * 0.2 + Math.sin(elapsed * 0.5 + index) * 0.025);
+      const mist = context.createRadialGradient(x, y, 0, x, y, width * 0.38);
+      mist.addColorStop(0, `rgba(${red},${green},${blue},0.07)`);
+      mist.addColorStop(1, `rgba(${red},${green},${blue},0)`);
+      context.fillStyle = mist;
+      context.fillRect(0, y - width * 0.4, width, width * 0.8);
+    }
+    context.restore();
+  }
+
+  const usesParticles = effects.some((effect) =>
+    ["particles", "embers", "ice-shards", "petals", "paint-streaks"].includes(effect),
+  );
+  if (usesParticles) {
+    context.save();
+    context.globalCompositeOperation = "screen";
+    for (const particle of particles) {
+      const direction = effects.includes("embers") ? -1 : 1;
+      const y = (particle.y + direction * elapsed * particle.speed + height) % height;
+      const x = (particle.x + elapsed * particle.drift + width) % width;
+      context.globalAlpha = particle.alpha * (0.7 + 0.3 * Math.sin(elapsed * 1.7 + particle.x));
+      context.fillStyle = effects.includes("ice-shards") ? "#dff7ff" : effects.includes("petals") ? accent : accent;
+      context.save();
+      context.translate(x, y);
+      context.rotate(elapsed * 0.9 + particle.x);
+      if (effects.includes("petals")) {
+        context.beginPath();
+        context.ellipse(0, 0, particle.size * 0.75, particle.size * 1.7, 0, 0, Math.PI * 2);
+        context.fill();
+      } else if (effects.includes("ice-shards") || effects.includes("paint-streaks")) {
+        context.fillRect(-particle.size * 0.45, -particle.size * 2.2, particle.size * 0.9, particle.size * 4.4);
+      } else {
+        context.beginPath();
+        context.arc(0, 0, particle.size, 0, Math.PI * 2);
+        context.fill();
+      }
+      context.restore();
+    }
+    context.restore();
+  }
+
+  if (effects.includes("water-ripples")) {
+    context.save();
+    context.strokeStyle = `rgba(${red},${green},${blue},0.18)`;
+    context.lineWidth = 3;
+    for (let ring = 0; ring < 4; ring += 1) {
+      const radius = ((elapsed * 70 + ring * 110) % (width * 0.55));
+      context.globalAlpha = 1 - radius / (width * 0.55);
+      context.beginPath();
+      context.ellipse(width * 0.5, height * 0.78, radius, radius * 0.2, 0, 0, Math.PI * 2);
+      context.stroke();
+    }
+    context.restore();
+  }
 }
 
 async function createMotionVideo(
   source: string,
   platform: SocialPlatform,
-  book: CatalogueBook,
   post: GeneratedPost,
-  guidance: string,
 ) {
   if (typeof MediaRecorder === "undefined") {
     throw new Error("This browser cannot render campaign videos.");
@@ -252,7 +401,6 @@ async function createMotionVideo(
   if (!mimeType) throw new Error("This browser has no supported video encoder.");
 
   const image = await loadImage(source);
-  const cover = await loadImage(book.coverUrl);
   const { width, height } = dimensions(platform);
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -260,7 +408,15 @@ async function createMotionVideo(
   const context = canvas.getContext("2d");
   if (!context) throw new Error("This browser could not render the campaign video.");
 
-  const stream = canvas.captureStream(30);
+  const frameRate = 30;
+  const duration = 8;
+  const totalFrames = frameRate * duration;
+  const stream = canvas.captureStream(0);
+  const videoTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack | undefined;
+  if (!videoTrack?.requestFrame) {
+    stream.getTracks().forEach((track) => track.stop());
+    throw new Error("This browser cannot render reliable poster animation.");
+  }
   const recorder = new MediaRecorder(stream, {
     mimeType,
     videoBitsPerSecond: 8_000_000,
@@ -274,424 +430,83 @@ async function createMotionVideo(
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
-  const duration = 8;
-  const start = performance.now();
-  const particles = seededParticles(width, height);
-  const [accentRed, accentGreen, accentBlue] = posterAccent(image);
-  const accent = `rgb(${accentRed}, ${accentGreen}, ${accentBlue})`;
-  const accentSoft = `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0.28)`;
-  const lowerGuidance = guidance.toLowerCase();
-  const requestedHook = guidance.match(
-    /(?:use\s+(?:the\s+)?hook|hook(?:\s+title)?)(?:\s+is|\s*:)[\s]*["“]?(.+?)["”]?(?:[.\n]|$)/i,
-  )?.[1]?.trim();
-  const explicitTropes = guidance.match(
-    /(?:include|show|use|add)?\s*(?:the\s+)?tropes?\s*:?[\s]+(.+?)(?:\s+(?:down|along|stacked|beside|around|on\s+the|at\s+the|with\s+(?:modern|icons))|[.\n]|$)/i,
-  )?.[1]
-    .split(/\s*(?:,|;|\||\/)\s*/)
-    .map((value) => value.trim())
-    .filter((value) => value.length > 1 && value.length < 70)
-    .slice(0, 5) ?? [];
-  const requestedCatalogueTropes = book.tropes.filter((trope) =>
-    lowerGuidance.includes(trope.toLowerCase()),
-  );
-  const tropes = (
-    explicitTropes.length
-      ? explicitTropes
-      : requestedCatalogueTropes.length
-        ? requestedCatalogueTropes
-        : book.tropes
-  ).filter(Boolean).slice(0, 5);
-  const requestsKindle = /\b(kindle|e-reader|ereader|device)\b/i.test(guidance);
-  const requestsRight = /\b(?:cover|kindle|book)\b[^.\n]{0,35}\b(?:on\s+the\s+)?right\b/i.test(guidance);
-  const requestsLeft = /\b(?:cover|kindle|book)\b[^.\n]{0,35}\b(?:on\s+the\s+)?left\b/i.test(guidance);
-  const coverSide: "left" | "right" | "center" = requestsRight
-    ? "right"
-    : requestsLeft
-      ? "left"
-      : "center";
-  const smoky = /gothic|vampire|dark|smoke|mist|paranormal|night/i.test(guidance);
-  const fiery = /fire|flame|ember|hot|spicy|burn/i.test(guidance);
-  const icy = /ice|hockey|winter|snow|cold/i.test(guidance);
-  const floral = /flower|floral|rose|petal|spring|garden/i.test(guidance);
-  const energetic = /sport|football|hockey|energy|fast|action|bold/i.test(guidance);
+  const motionMap = post.motionMap;
+  const regions = orderedMotionRegions(motionMap);
+  const fullFrame = cameraTarget(null);
+  const targets = regions.map(cameraTarget);
+  const effects = motionMap?.effects?.length ? motionMap.effects : ["light-sweep" as const];
+  const colour = hexColour(motionMap?.accentColor);
+  const particles = seededParticles(width, height, `${post.platform}-${post.title}-${motionMap?.summary ?? "poster"}`);
   recorder.start(250);
 
-  await new Promise<void>((resolve) => {
-    const frame = (now: number) => {
-      const elapsed = Math.min(duration, (now - start) / 1000);
-      const progress = elapsed / duration;
-      const fade = Math.min(1, elapsed / 0.45, (duration - elapsed) / 0.55);
+  await new Promise((resolve) => window.setTimeout(resolve, 120));
+  for (let frameIndex = 0; frameIndex < totalFrames; frameIndex += 1) {
+    const elapsed = frameIndex / frameRate;
+    const progress = elapsed / duration;
+    const movement = motionMap?.movement ?? "slow-push";
+    let camera = fullFrame;
 
-      context.save();
-      context.clearRect(0, 0, width, height);
-      context.globalAlpha = fade;
-      context.filter = `blur(${platform === "tiktok" ? 18 : 15}px) brightness(0.72) saturate(1.4)`;
-      const backdropScale = 1.12 + 0.035 * Math.sin(progress * Math.PI);
-      context.translate(
-        width / 2 + Math.sin(progress * Math.PI * 2) * width * 0.022,
-        height / 2 + Math.cos(progress * Math.PI * 1.5) * height * 0.018,
+    if (targets.length && elapsed >= 0.65 && elapsed < 6.65) {
+      const sequenceDuration = 6 / targets.length;
+      const sequenceTime = elapsed - 0.65;
+      const index = Math.min(targets.length - 1, Math.floor(sequenceTime / sequenceDuration));
+      const phase = (sequenceTime - index * sequenceDuration) / sequenceDuration;
+      camera = interpolateCamera(
+        index === 0 ? fullFrame : targets[index - 1],
+        targets[index],
+        Math.min(1, phase / 0.38),
       );
-      context.scale(backdropScale, backdropScale);
-      context.drawImage(image, -width / 2, -height / 2, width, height);
-      context.restore();
+      camera.scale += Math.max(0, phase - 0.38) * 0.035;
+    } else if (targets.length && elapsed >= 6.65) {
+      camera = interpolateCamera(targets[targets.length - 1], fullFrame, (elapsed - 6.65) / 0.7);
+    }
 
+    const breathing = Math.sin(progress * Math.PI * 2) * 0.012;
+    if (movement === "dramatic-push") camera.scale += progress * 0.055;
+    if (movement === "gentle-pulse") camera.scale += breathing;
+    if (movement === "lateral-pan") camera.x += Math.sin(progress * Math.PI * 2) * 0.025;
+    if (movement === "diagonal-drift") {
+      camera.x += Math.sin(progress * Math.PI) * 0.018;
+      camera.y += Math.cos(progress * Math.PI) * 0.018;
+    }
+
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = "#000000";
+    context.fillRect(0, 0, width, height);
+    drawCameraFrame(context, image, width, height, camera);
+    drawMotionEffects(context, width, height, elapsed, progress, effects, particles, colour);
+
+    const vignette = context.createRadialGradient(width / 2, height / 2, height * 0.12, width / 2, height / 2, height * 0.72);
+    vignette.addColorStop(0, "rgba(0,0,0,0)");
+    vignette.addColorStop(0.78, "rgba(0,0,0,0.02)");
+    vignette.addColorStop(1, "rgba(0,0,0,0.22)");
+    context.fillStyle = vignette;
+    context.fillRect(0, 0, width, height);
+
+    if (effects.includes("glitch") && Math.floor(elapsed * 8) % 19 === 0) {
       context.save();
-      context.globalAlpha = fade;
-      const cinematicShade = context.createLinearGradient(0, 0, 0, height);
-      cinematicShade.addColorStop(0, "rgba(0,0,0,0.42)");
-      cinematicShade.addColorStop(0.28, "rgba(0,0,0,0.08)");
-      cinematicShade.addColorStop(0.7, "rgba(0,0,0,0.15)");
-      cinematicShade.addColorStop(1, "rgba(0,0,0,0.58)");
-      context.fillStyle = cinematicShade;
+      context.globalAlpha = 0.16;
+      const sliceY = height * (0.18 + ((frameIndex * 17) % 57) / 100);
+      context.drawImage(canvas, 0, sliceY, width, height * 0.018, width * 0.014, sliceY, width, height * 0.018);
+      context.restore();
+    }
+
+    const fade = Math.min(1, elapsed / 0.32, (duration - elapsed) / 0.38);
+    if (fade < 1) {
+      context.fillStyle = `rgba(0,0,0,${1 - Math.max(0, fade)})`;
       context.fillRect(0, 0, width, height);
-      context.restore();
+    }
 
-      // Begin with the actual finished poster, then transition into its separate
-      // cover, trope and CTA layers. This keeps the generated design visible
-      // instead of replacing it with an empty generic video background.
-      const posterReveal = clamp01((1.3 - elapsed) / 0.32) * fade;
-      if (posterReveal > 0) {
-        const revealProgress = easeOutCubic(elapsed / 1.35);
-        context.save();
-        context.globalAlpha = posterReveal;
-        context.translate(width / 2, height / 2);
-        const revealScale = 1.055 - revealProgress * 0.055;
-        context.scale(revealScale, revealScale);
-        context.drawImage(image, -width / 2, -height / 2, width, height);
-        context.restore();
-      }
+    videoTrack.requestFrame();
+    await new Promise((resolve) => window.setTimeout(resolve, 1000 / frameRate));
+  }
 
-      context.save();
-      context.globalCompositeOperation = "screen";
-      const glowX = width * (-0.25 + progress * 1.5);
-      const glow = context.createRadialGradient(
-        glowX,
-        height * (0.28 + 0.18 * Math.sin(progress * Math.PI)),
-        0,
-        glowX,
-        height * 0.42,
-        width * 0.62,
-      );
-      glow.addColorStop(0, `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0.34)`);
-      glow.addColorStop(0.32, `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0.1)`);
-      glow.addColorStop(1, `rgba(${accentRed}, ${accentGreen}, ${accentBlue}, 0)`);
-      context.fillStyle = glow;
-      context.fillRect(0, 0, width, height);
-
-      for (const particle of particles) {
-        const y = (particle.y - elapsed * particle.speed + height) % height;
-        const direction = icy ? -1 : 1;
-        const x = (particle.x + direction * elapsed * (energetic ? 34 : 8) + width) % width;
-        context.globalAlpha = particle.alpha * fade * (0.55 + 0.45 * Math.sin(elapsed + particle.x));
-        context.fillStyle = particle.x % Math.max(1, width * 0.17) < width * 0.085 ? accent : "#ffffff";
-        if (fiery || floral || icy) {
-          context.save();
-          context.translate(x, y);
-          context.rotate(elapsed + particle.x);
-          context.fillRect(-particle.size * 0.55, -particle.size * 1.7, particle.size * 1.1, particle.size * 3.4);
-          context.restore();
-          continue;
-        }
-        context.beginPath();
-        context.arc(x, y, particle.size, 0, Math.PI * 2);
-        context.fill();
-      }
-      context.restore();
-
-      if (smoky) {
-        context.save();
-        context.globalCompositeOperation = "screen";
-        for (let cloud = 0; cloud < 4; cloud += 1) {
-          const cloudX = ((elapsed * (18 + cloud * 5) + cloud * width * 0.29) % (width * 1.4)) - width * 0.2;
-          const cloudY = height * (0.28 + cloud * 0.16 + 0.025 * Math.sin(elapsed + cloud));
-          const mist = context.createRadialGradient(cloudX, cloudY, 0, cloudX, cloudY, width * 0.32);
-          mist.addColorStop(0, `rgba(${accentRed},${accentGreen},${accentBlue},0.08)`);
-          mist.addColorStop(1, `rgba(${accentRed},${accentGreen},${accentBlue},0)`);
-          context.fillStyle = mist;
-          context.fillRect(0, cloudY - width * 0.34, width, width * 0.68);
-        }
-        context.restore();
-      }
-
-      const heroStart = 0.45;
-      const heroEntrance = easeOutCubic((elapsed - heroStart) / 0.95);
-      const heroAlpha = heroEntrance * fade;
-      const coverRatio = cover.naturalWidth / cover.naturalHeight;
-      let coverHeight = height * (coverSide === "center" ? 0.54 : 0.48);
-      let coverWidth = coverHeight * coverRatio;
-      const maximumCoverWidth = width * (coverSide === "center" ? 0.66 : 0.56);
-      if (coverWidth > maximumCoverWidth) {
-        coverWidth = maximumCoverWidth;
-        coverHeight = coverWidth / coverRatio;
-      }
-      const framePaddingX = requestsKindle ? width * 0.025 : width * 0.009;
-      const framePaddingTop = requestsKindle ? width * 0.025 : width * 0.009;
-      const framePaddingBottom = requestsKindle ? width * 0.065 : width * 0.009;
-      const frameWidth = coverWidth + framePaddingX * 2;
-      const frameHeight = coverHeight + framePaddingTop + framePaddingBottom;
-      const heroX = coverSide === "left" ? width * 0.31 : coverSide === "right" ? width * 0.69 : width * 0.5;
-      const heroY = height * (coverSide === "center" ? 0.49 : 0.52);
-      const entranceDirection = coverSide === "right" ? 1 : -1;
-      const animatedHeroX = heroX + (1 - heroEntrance) * entranceDirection * width * 0.42;
-      const heroScale = 0.82 + heroEntrance * 0.18 + 0.012 * Math.sin(elapsed * 1.15);
-      const heroRotation = entranceDirection * (1 - heroEntrance) * 0.11 + Math.sin(elapsed * 0.7) * 0.008;
-
-      context.save();
-      context.globalCompositeOperation = "screen";
-      context.globalAlpha = heroAlpha;
-      const heroGlow = context.createRadialGradient(
-        animatedHeroX,
-        heroY,
-        0,
-        animatedHeroX,
-        heroY,
-        frameWidth * 0.95,
-      );
-      heroGlow.addColorStop(0, `rgba(${accentRed},${accentGreen},${accentBlue},0.3)`);
-      heroGlow.addColorStop(0.45, `rgba(${accentRed},${accentGreen},${accentBlue},0.1)`);
-      heroGlow.addColorStop(1, `rgba(${accentRed},${accentGreen},${accentBlue},0)`);
-      context.fillStyle = heroGlow;
-      context.fillRect(0, 0, width, height);
-      context.restore();
-
-      context.save();
-      context.globalAlpha = Math.max(0, heroAlpha);
-      context.translate(animatedHeroX, heroY);
-      context.rotate(heroRotation);
-      context.scale(heroScale, heroScale);
-      context.shadowColor = accentSoft;
-      context.shadowBlur = 54;
-      context.shadowOffsetY = 28;
-      context.fillStyle = requestsKindle ? "#111318" : "rgba(255,255,255,0.9)";
-      context.beginPath();
-      context.roundRect(-frameWidth / 2, -frameHeight / 2, frameWidth, frameHeight, requestsKindle ? 28 : 8);
-      context.fill();
-      context.shadowColor = "transparent";
-      context.drawImage(
-        cover,
-        -coverWidth / 2,
-        -frameHeight / 2 + framePaddingTop,
-        coverWidth,
-        coverHeight,
-      );
-      if (requestsKindle) {
-        context.fillStyle = "rgba(255,255,255,0.42)";
-        context.font = `700 ${Math.max(16, framePaddingBottom * 0.34)}px Arial, sans-serif`;
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.fillText("kindle", 0, frameHeight / 2 - framePaddingBottom * 0.46);
-        const reflection = context.createLinearGradient(-coverWidth / 2, 0, coverWidth / 2, 0);
-        reflection.addColorStop(0, "rgba(255,255,255,0)");
-        reflection.addColorStop(0.62, "rgba(255,255,255,0.12)");
-        reflection.addColorStop(0.8, "rgba(255,255,255,0)");
-        context.fillStyle = reflection;
-        context.fillRect(-coverWidth / 2, -frameHeight / 2 + framePaddingTop, coverWidth, coverHeight);
-      }
-      context.restore();
-
-      const hookAlpha = requestedHook
-        ? clamp01((elapsed - 1.05) / 0.38) * clamp01((2.2 - elapsed) / 0.32) * fade
-        : 0;
-      if (hookAlpha > 0 && requestedHook) {
-        context.save();
-        context.globalAlpha = hookAlpha;
-        context.translate(0, (1 - easeOutCubic((elapsed - 1.05) / 0.5)) * -height * 0.04);
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.shadowColor = "rgba(0,0,0,0.95)";
-        context.shadowBlur = 34;
-        context.fillStyle = "#ffffff";
-        drawFittedVideoText(
-          context,
-          requestedHook.toUpperCase(),
-          width / 2,
-          height * 0.105,
-          width * 0.86,
-          platform === "tiktok" ? 94 : 78,
-          44,
-        );
-        context.fillStyle = accent;
-        context.fillRect(width * 0.33, height * 0.145, width * 0.34, 7);
-        context.restore();
-      }
-
-      const tropeStart = requestedHook ? 2.0 : 1.25;
-      const tropeEnd = 4.75;
-      if (elapsed >= tropeStart && elapsed < tropeEnd && tropes.length) {
-        const local = elapsed - tropeStart;
-        const beatLength = (tropeEnd - tropeStart) / tropes.length;
-        const activeIndex = Math.min(tropes.length - 1, Math.floor(local / beatLength));
-        const beat = (local - activeIndex * beatLength) / beatLength;
-        const tropeAlpha = easeOutCubic(beat / 0.24) * clamp01((1 - beat) / 0.16);
-        const textX = coverSide === "left" ? width * 0.76 : coverSide === "right" ? width * 0.24 : width * 0.5;
-        const textY = coverSide === "center" ? height * 0.76 : height * 0.51;
-        const textWidth = coverSide === "center" ? width * 0.86 : width * 0.43;
-        context.save();
-        context.globalAlpha = tropeAlpha * fade;
-        context.translate(textX + (1 - easeOutCubic(beat / 0.24)) * width * 0.09, textY);
-        context.fillStyle = "rgba(0,0,0,0.66)";
-        context.beginPath();
-        context.roundRect(-textWidth / 2, -height * 0.085, textWidth, height * 0.17, 24);
-        context.fill();
-        drawTropeIcon(context, tropes[activeIndex], 0, -height * 0.024, Math.min(58, width * 0.055), accent);
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.shadowColor = accentSoft;
-        context.shadowBlur = 32;
-        context.fillStyle = "#ffffff";
-        drawFittedVideoText(
-          context,
-          tropes[activeIndex].toUpperCase(),
-          0,
-          height * 0.038,
-          textWidth * 0.86,
-          platform === "tiktok" ? 64 : 54,
-          29,
-        );
-        context.restore();
-      }
-
-      const ctaAlpha = clamp01((elapsed - 4.55) / 0.5) * clamp01((duration - elapsed) / 0.45) * fade;
-      if (ctaAlpha > 0) {
-        context.save();
-        context.globalAlpha = ctaAlpha;
-        const footer = context.createLinearGradient(0, height * 0.74, 0, height);
-        footer.addColorStop(0, "rgba(0,0,0,0)");
-        footer.addColorStop(0.34, "rgba(0,0,0,0.86)");
-        footer.addColorStop(1, "rgba(0,0,0,0.98)");
-        context.fillStyle = footer;
-        context.fillRect(0, height * 0.72, width, height * 0.28);
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.shadowColor = "rgba(0,0,0,0.95)";
-        context.shadowBlur = 26;
-        context.fillStyle = "#ffffff";
-        drawFittedVideoText(
-          context,
-          book.kindleUnlimited ? "AVAILABLE ON KINDLE UNLIMITED" : "DISCOVER IT ON AMAZON",
-          width / 2,
-          height * 0.855,
-          width * 0.84,
-          platform === "tiktok" ? 50 : 42,
-          27,
-        );
-        context.fillStyle = accent;
-        context.fillRect(width * 0.29, height * 0.89, width * 0.42, 8);
-        context.fillStyle = "#ffffff";
-        context.font = `700 ${platform === "tiktok" ? 30 : 25}px Arial, sans-serif`;
-        context.fillText("www.marlowquinn.com", width / 2, height * 0.925);
-        context.restore();
-      }
-
-      if (elapsed < duration) {
-        requestAnimationFrame(frame);
-      } else {
-        resolve();
-      }
-    };
-    requestAnimationFrame(frame);
-  });
+  await new Promise((resolve) => window.setTimeout(resolve, 180));
 
   recorder.stop();
-  stream.getTracks().forEach((track) => track.stop());
   const blob = await finished;
+  stream.getTracks().forEach((track) => track.stop());
   return { blob, mimeType };
-}
-
-function drawTropeIcon(
-  context: CanvasRenderingContext2D,
-  trope: string,
-  x: number,
-  y: number,
-  size: number,
-  colour: string,
-) {
-  const label = trope.toLowerCase();
-  context.save();
-  context.translate(x, y);
-  context.strokeStyle = colour;
-  context.fillStyle = colour;
-  context.lineWidth = Math.max(3, size * 0.09);
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.shadowColor = colour;
-  context.shadowBlur = 18;
-
-  if (/vampire|fang|blood/.test(label)) {
-    context.beginPath();
-    context.moveTo(-size * 0.42, -size * 0.25);
-    context.quadraticCurveTo(-size * 0.2, size * 0.35, 0, -size * 0.02);
-    context.quadraticCurveTo(size * 0.2, size * 0.35, size * 0.42, -size * 0.25);
-    context.stroke();
-    context.beginPath();
-    context.moveTo(-size * 0.24, -size * 0.05);
-    context.lineTo(-size * 0.13, size * 0.32);
-    context.lineTo(-size * 0.02, -size * 0.02);
-    context.moveTo(size * 0.24, -size * 0.05);
-    context.lineTo(size * 0.13, size * 0.32);
-    context.lineTo(size * 0.02, -size * 0.02);
-    context.stroke();
-  } else if (/family|friends/.test(label)) {
-    [-0.32, 0, 0.32].forEach((offset, index) => {
-      context.beginPath();
-      context.arc(offset * size, index === 1 ? -size * 0.19 : -size * 0.08, size * 0.13, 0, Math.PI * 2);
-      context.stroke();
-    });
-    context.beginPath();
-    context.arc(0, size * 0.34, size * 0.5, Math.PI * 1.12, Math.PI * 1.88);
-    context.stroke();
-  } else if (/hockey/.test(label)) {
-    context.beginPath();
-    context.ellipse(0, size * 0.23, size * 0.36, size * 0.13, 0, 0, Math.PI * 2);
-    context.stroke();
-    context.beginPath();
-    context.moveTo(-size * 0.35, -size * 0.38);
-    context.lineTo(size * 0.08, size * 0.14);
-    context.lineTo(size * 0.42, size * 0.08);
-    context.stroke();
-  } else if (/football/.test(label)) {
-    context.beginPath();
-    context.ellipse(0, 0, size * 0.46, size * 0.27, -0.35, 0, Math.PI * 2);
-    context.stroke();
-    context.beginPath();
-    context.moveTo(-size * 0.15, -size * 0.12);
-    context.lineTo(size * 0.15, size * 0.12);
-    context.moveTo(-size * 0.05, -size * 0.12);
-    context.lineTo(-size * 0.12, size * 0.02);
-    context.moveTo(size * 0.08, -size * 0.03);
-    context.lineTo(0, size * 0.11);
-    context.stroke();
-  } else if (/forbidden|secret|locked|off.?limits/.test(label)) {
-    context.strokeRect(-size * 0.34, -size * 0.02, size * 0.68, size * 0.48);
-    context.beginPath();
-    context.arc(0, -size * 0.02, size * 0.27, Math.PI, 0);
-    context.stroke();
-  } else if (/burn|fire|heat|spicy/.test(label)) {
-    context.beginPath();
-    context.moveTo(0, size * 0.46);
-    context.bezierCurveTo(-size * 0.5, size * 0.18, -size * 0.18, -size * 0.24, size * 0.03, -size * 0.48);
-    context.bezierCurveTo(size * 0.12, -size * 0.16, size * 0.48, 0, 0, size * 0.46);
-    context.stroke();
-  } else if (/office|workplace|boss|coworker/.test(label)) {
-    context.strokeRect(-size * 0.43, -size * 0.2, size * 0.86, size * 0.58);
-    context.strokeRect(-size * 0.16, -size * 0.36, size * 0.32, size * 0.16);
-    context.beginPath();
-    context.moveTo(-size * 0.43, 0);
-    context.lineTo(size * 0.43, 0);
-    context.stroke();
-  } else if (/gay|awakening|bi|queer/.test(label)) {
-    context.beginPath();
-    context.arc(-size * 0.16, 0, size * 0.27, 0, Math.PI * 2);
-    context.arc(size * 0.16, 0, size * 0.27, 0, Math.PI * 2);
-    context.stroke();
-  } else {
-    context.beginPath();
-    context.moveTo(0, size * 0.4);
-    context.bezierCurveTo(-size * 0.55, size * 0.05, -size * 0.43, -size * 0.38, 0, -size * 0.14);
-    context.bezierCurveTo(size * 0.43, -size * 0.38, size * 0.55, size * 0.05, 0, size * 0.4);
-    context.stroke();
-  }
-  context.restore();
 }
 
 function parseResponseText(text: string, status: number) {
@@ -807,7 +622,7 @@ export default function SocialStudioPage() {
     }
   }
 
-  async function createCampaign(outputType: CreativeOutput) {
+  async function createCampaign() {
     if (!selectedBook) return;
     if (!instructions.trim()) {
       setError("Describe the poster or video you want in the guidance box.");
@@ -818,11 +633,11 @@ export default function SocialStudioPage() {
       return;
     }
 
-    setBusy(outputType);
+    setBusy("image");
     setError("");
     setMessage("");
     try {
-      const generated = await requestArtwork(outputType, platforms);
+      const generated = await requestArtwork("image", platforms);
       const normalized = await Promise.all(
         generated.map(async (post) => ({
           platform: post.platform,
@@ -831,33 +646,8 @@ export default function SocialStudioPage() {
       );
       setPosts(generated);
       setImages(normalized);
-
-      if (outputType === "video") {
-        const rendered = await Promise.all(
-          normalized.map(async (media) => {
-            const post = generated.find((item) => item.platform === media.platform);
-            if (!post) throw new Error(`The ${media.platform} video copy was missing.`);
-            const result = await createMotionVideo(
-              media.dataUrl,
-              media.platform,
-              selectedBook,
-              post,
-              instructions,
-            );
-            return {
-              platform: media.platform,
-              url: URL.createObjectURL(result.blob),
-              mimeType: result.mimeType,
-              extension: result.mimeType.includes("mp4") ? "mp4" as const : "webm" as const,
-            };
-          }),
-        );
-        videosRef.current.forEach((video) => URL.revokeObjectURL(video.url));
-        setVideos(rendered);
-      } else {
-        videosRef.current.forEach((video) => URL.revokeObjectURL(video.url));
-        setVideos([]);
-      }
+      videosRef.current.forEach((video) => URL.revokeObjectURL(video.url));
+      setVideos([]);
     } catch (creationError) {
       setError(creationError instanceof Error ? creationError.message : "The campaign could not be created.");
     } finally {
@@ -865,46 +655,60 @@ export default function SocialStudioPage() {
     }
   }
 
-  async function revise(post: GeneratedPost, outputType: CreativeOutput) {
+  async function revise(post: GeneratedPost) {
     const revision = edits[post.platform].trim();
     if (!revision) {
       setError("Describe the change you want first.");
       return;
     }
-    setBusy(`${outputType}-${post.platform}`);
+    setBusy(`image-${post.platform}`);
     setError("");
     setMessage("");
     try {
-      const [updated] = await requestArtwork(outputType, [post.platform], revision, [post]);
+      const [updated] = await requestArtwork("image", [post.platform], revision, [post]);
       const dataUrl = await normalizePoster(updated.imageDataUrl, updated.platform);
       setPosts((current) => current.map((item) => item.platform === post.platform ? updated : item));
       setImages((current) => [
         ...current.filter((item) => item.platform !== post.platform),
         { platform: post.platform, dataUrl },
       ]);
-      if (outputType === "video") {
-        const result = await createMotionVideo(
-          dataUrl,
-          post.platform,
-          selectedBook,
-          updated,
-          instructions,
-        );
-        const replacement: GeneratedVideo = {
-          platform: post.platform,
-          url: URL.createObjectURL(result.blob),
-          mimeType: result.mimeType,
-          extension: result.mimeType.includes("mp4") ? "mp4" : "webm",
-        };
-        setVideos((current) => {
-          current.filter((item) => item.platform === post.platform)
-            .forEach((item) => URL.revokeObjectURL(item.url));
-          return [...current.filter((item) => item.platform !== post.platform), replacement];
-        });
-      }
+      setVideos((current) => {
+        current.filter((item) => item.platform === post.platform)
+          .forEach((item) => URL.revokeObjectURL(item.url));
+        return current.filter((item) => item.platform !== post.platform);
+      });
       setEdits((current) => ({ ...current, [post.platform]: "" }));
     } catch (revisionError) {
       setError(revisionError instanceof Error ? revisionError.message : "The artwork could not be updated.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function animatePoster(post: GeneratedPost) {
+    const image = images.find((item) => item.platform === post.platform);
+    if (!image) {
+      setError("The approved poster could not be found.");
+      return;
+    }
+    setBusy(`animate-${post.platform}`);
+    setError("");
+    setMessage("");
+    try {
+      const result = await createMotionVideo(image.dataUrl, post.platform, post);
+      const replacement: GeneratedVideo = {
+        platform: post.platform,
+        url: URL.createObjectURL(result.blob),
+        mimeType: result.mimeType,
+        extension: result.mimeType.includes("mp4") ? "mp4" : "webm",
+      };
+      setVideos((current) => {
+        current.filter((item) => item.platform === post.platform)
+          .forEach((item) => URL.revokeObjectURL(item.url));
+        return [...current.filter((item) => item.platform !== post.platform), replacement];
+      });
+    } catch (animationError) {
+      setError(animationError instanceof Error ? animationError.message : "The poster could not be animated.");
     } finally {
       setBusy("");
     }
@@ -1068,12 +872,9 @@ export default function SocialStudioPage() {
               {error && <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{error}</p>}
               {message && <p className="mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-200">{message}</p>}
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                <button type="button" disabled={Boolean(busy)} onClick={() => void createCampaign("image")} className="rounded-xl bg-pink-500 px-4 py-4 font-bold transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-40">
+              <div className="mt-6">
+                <button type="button" disabled={Boolean(busy)} onClick={() => void createCampaign()} className="w-full rounded-xl bg-pink-500 px-4 py-4 font-bold transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-40">
                   {busy === "image" ? "Creating fresh posters..." : "Create Posters"}
-                </button>
-                <button type="button" disabled={Boolean(busy)} onClick={() => void createCampaign("video")} className="rounded-xl bg-violet-500 px-4 py-4 font-bold transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-40">
-                  {busy === "video" ? "Creating fresh videos..." : "Create Videos"}
                 </button>
               </div>
 
@@ -1106,21 +907,27 @@ export default function SocialStudioPage() {
                           <p className="mt-3 text-sm leading-6 text-pink-300">{post.hashtags.join(" ")}</p>
                         </div>
 
-                        <label htmlFor={`edit-${post.platform}`} className="mt-5 block font-semibold">Edit this {isVideo ? "video artwork" : "poster"}</label>
+                        <label htmlFor={`edit-${post.platform}`} className="mt-5 block font-semibold">Edit this poster</label>
                         <textarea id={`edit-${post.platform}`} value={edits[post.platform]} onChange={(event) => setEdits((current) => ({ ...current, [post.platform]: event.target.value }))} rows={3} placeholder="Describe only the changes you want..." className="mt-2 w-full resize-y rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500" />
-                        <button type="button" disabled={Boolean(busy)} onClick={() => void revise(post, isVideo ? "video" : "image")} className="mt-3 w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 font-semibold hover:bg-white/15 disabled:opacity-40">
-                          {busy === `${isVideo ? "video" : "image"}-${post.platform}` ? "Applying your changes..." : `Update ${isVideo ? "Video" : "Poster"}`}
+                        <button type="button" disabled={Boolean(busy)} onClick={() => void revise(post)} className="mt-3 w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 font-semibold hover:bg-white/15 disabled:opacity-40">
+                          {busy === `image-${post.platform}` ? "Applying your changes..." : "Update Poster"}
+                        </button>
+
+                        <button type="button" disabled={Boolean(busy) || !image} onClick={() => void animatePoster(post)} className="mt-3 w-full rounded-xl bg-violet-500 px-4 py-3 font-bold hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-40">
+                          {busy === `animate-${post.platform}` ? "Animating this exact poster..." : isVideo ? "Rebuild Animation" : "Animate This Poster"}
                         </button>
 
                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                          {isVideo ? (
-                            <a href={video.url} download={`${selectedBook.slug}-${post.platform}.${video.extension}`} className="flex items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400">Download Video</a>
-                          ) : image ? (
-                            <a href={image.dataUrl} download={`${selectedBook.slug}-${post.platform}.jpg`} className="flex items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400">Download Poster</a>
-                          ) : null}
-                          <button type="button" disabled={Boolean(busy) || post.platform === "tiktok"} onClick={() => void publish(post, isVideo ? "video" : "image")} className="rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-40">
-                            {busy === `publish-${post.platform}` ? "Publishing..." : post.platform === "tiktok" ? "TikTok publishing unavailable" : `Post to ${post.platform === "facebook" ? "Facebook" : "Instagram"}`}
+                          {image && <a href={image.dataUrl} download={`${selectedBook.slug}-${post.platform}.jpg`} className="flex items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400">Download Poster</a>}
+                          {isVideo && <a href={video.url} download={`${selectedBook.slug}-${post.platform}.${video.extension}`} className="flex items-center justify-center rounded-xl bg-violet-500 px-4 py-3 font-semibold hover:bg-violet-400">Download Video</a>}
+                          <button type="button" disabled={Boolean(busy) || post.platform === "tiktok" || !image} onClick={() => void publish(post, "image")} className="rounded-xl border border-pink-400/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:opacity-40">
+                            {busy === `publish-${post.platform}` ? "Publishing..." : post.platform === "tiktok" ? "Download for TikTok" : `Post Poster to ${post.platform === "facebook" ? "Facebook" : "Instagram"}`}
                           </button>
+                          {isVideo && (
+                            <button type="button" disabled={Boolean(busy) || post.platform === "tiktok"} onClick={() => void publish(post, "video")} className="rounded-xl border border-violet-400/40 bg-violet-500/10 px-4 py-3 font-semibold text-violet-200 hover:bg-violet-500/20 disabled:cursor-not-allowed disabled:opacity-40">
+                              {busy === `publish-${post.platform}` ? "Publishing..." : post.platform === "tiktok" ? "Download for TikTok" : `Post Video to ${post.platform === "facebook" ? "Facebook" : "Instagram"}`}
+                            </button>
+                          )}
                         </div>
                       </article>
                     );
