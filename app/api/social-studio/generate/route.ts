@@ -47,9 +47,42 @@ type QualityCheck = {
   coverFidelity: number;
 };
 
+type MotionRegionKind = "hook" | "hero" | "trope" | "cta" | "website" | "detail";
+type MotionMovement = "slow-push" | "dramatic-push" | "lateral-pan" | "diagonal-drift" | "gentle-pulse";
+type MotionEffect =
+  | "light-sweep"
+  | "mist"
+  | "particles"
+  | "embers"
+  | "ice-shards"
+  | "petals"
+  | "paint-streaks"
+  | "water-ripples"
+  | "lens-flare"
+  | "glitch";
+
+type MotionRegion = {
+  kind: MotionRegionKind;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type MotionMap = {
+  available: boolean;
+  summary: string;
+  accentColor: string;
+  movement: MotionMovement;
+  effects: MotionEffect[];
+  regions: MotionRegion[];
+};
+
 type InspectionResult = {
   qualityCheck: QualityCheck;
   socialCopy: SocialCopy;
+  motionMap: MotionMap;
 };
 
 type GeneratedPost = SocialCopy & {
@@ -58,7 +91,36 @@ type GeneratedPost = SocialCopy & {
   imageDataUrl: string;
   sourceResponseId: string;
   qualityCheck: QualityCheck;
+  motionMap: MotionMap;
 };
+
+const MOTION_REGION_KINDS = new Set<MotionRegionKind>([
+  "hook",
+  "hero",
+  "trope",
+  "cta",
+  "website",
+  "detail",
+]);
+const MOTION_MOVEMENTS = new Set<MotionMovement>([
+  "slow-push",
+  "dramatic-push",
+  "lateral-pan",
+  "diagonal-drift",
+  "gentle-pulse",
+]);
+const MOTION_EFFECTS = new Set<MotionEffect>([
+  "light-sweep",
+  "mist",
+  "particles",
+  "embers",
+  "ice-shards",
+  "petals",
+  "paint-streaks",
+  "water-ripples",
+  "lens-flare",
+  "glitch",
+]);
 
 function cleanString(value: unknown, maximumLength = 5000): string {
   return typeof value === "string"
@@ -152,6 +214,59 @@ function previousResponseId(value: unknown, platform: SocialPlatform): string {
   return cleanString(record(value)[platform], 200);
 }
 
+function unavailableMotionMap(summary: string): MotionMap {
+  return {
+    available: false,
+    summary,
+    accentColor: "#ec4899",
+    movement: "slow-push",
+    effects: ["light-sweep", "particles"],
+    regions: [],
+  };
+}
+
+function cleanMotionMap(value: unknown): MotionMap {
+  const source = record(value);
+  const movementValue = cleanString(source.movement, 40) as MotionMovement;
+  const movement = MOTION_MOVEMENTS.has(movementValue) ? movementValue : "slow-push";
+  const effects = cleanStringArray(source.effects, 4)
+    .filter((effect): effect is MotionEffect => MOTION_EFFECTS.has(effect as MotionEffect));
+  const coordinate = (coordinateValue: unknown) =>
+    typeof coordinateValue === "number" && Number.isFinite(coordinateValue)
+      ? Math.round(Math.min(1, Math.max(0, coordinateValue)) * 10_000) / 10_000
+      : 0;
+  const regions = Array.isArray(source.regions)
+    ? source.regions.flatMap((regionValue): MotionRegion[] => {
+        const region = record(regionValue);
+        const kind = cleanString(region.kind, 30) as MotionRegionKind;
+        if (!MOTION_REGION_KINDS.has(kind)) return [];
+        const width = coordinate(region.width);
+        const height = coordinate(region.height);
+        if (width < 0.04 || height < 0.025) return [];
+        const x = Math.min(coordinate(region.x), 1 - width);
+        const y = Math.min(coordinate(region.y), 1 - height);
+        return [{
+          kind,
+          label: cleanString(region.label, 120) || kind,
+          x,
+          y,
+          width,
+          height,
+        }];
+      }).slice(0, 8)
+    : [];
+  const accent = cleanString(source.accentColor, 20);
+  const available = source.available === true && regions.some((region) => region.kind === "hero");
+  return {
+    available,
+    summary: cleanString(source.summary, 320) || "Motion regions were detected from the finished poster.",
+    accentColor: /^#[0-9a-f]{6}$/i.test(accent) ? accent : "#ec4899",
+    movement,
+    effects: effects.length ? effects : ["light-sweep", "particles"],
+    regions: available ? regions : [],
+  };
+}
+
 function posterPrompt(
   book: BookFacts,
   platform: SocialPlatform,
@@ -229,6 +344,45 @@ async function inspectPoster(
                 items: { type: "string" },
                 maxItems: 8,
               },
+              motionMap: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  available: { type: "boolean" },
+                  summary: { type: "string" },
+                  accentColor: { type: "string" },
+                  movement: {
+                    type: "string",
+                    enum: ["slow-push", "dramatic-push", "lateral-pan", "diagonal-drift", "gentle-pulse"],
+                  },
+                  effects: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                      enum: ["light-sweep", "mist", "particles", "embers", "ice-shards", "petals", "paint-streaks", "water-ripples", "lens-flare", "glitch"],
+                    },
+                    maxItems: 4,
+                  },
+                  regions: {
+                    type: "array",
+                    maxItems: 8,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        kind: { type: "string", enum: ["hook", "hero", "trope", "cta", "website", "detail"] },
+                        label: { type: "string" },
+                        x: { type: "number" },
+                        y: { type: "number" },
+                        width: { type: "number" },
+                        height: { type: "number" },
+                      },
+                      required: ["kind", "label", "x", "y", "width", "height"],
+                    },
+                  },
+                },
+                required: ["available", "summary", "accentColor", "movement", "effects", "regions"],
+              },
             },
             required: [
               "decision",
@@ -239,6 +393,7 @@ async function inspectPoster(
               "socialTitle",
               "caption",
               "hashtags",
+              "motionMap",
             ],
           },
         },
@@ -265,6 +420,10 @@ async function inspectPoster(
               "Check prompt adherence, wording legibility and cover fidelity. Use scores from 0 to 100.",
               "Mark review when any score is below 70. Keep the summary under 240 characters.",
               "Also write the finished social post that accompanies this artwork. Create an engaging hook title, a substantial natural caption, a clear reading call to action and strong relevant hashtags.",
+              "Create a motion map for animating this exact finished poster without redrawing it. All coordinates must be normalized from 0 to 1 and describe top-left x, top-left y, width and height on the finished poster.",
+              "Mark the genuine cover or Kindle as one hero region. Mark the visible promotional hook, each separate trope treatment, the main CTA, website and any visually useful detail as separate regions only when actually visible.",
+              "Keep each box tight around its visible element but include a small breathing margin. Do not guess a region that is absent. Set available true only when the hero is confidently located.",
+              "Choose one camera movement and up to four effects that suit this poster's actual artwork and the author's guidance. Do not default every poster to gothic mist or particles. Use the poster's strongest vivid accent as a six-digit hex colour.",
               platform === "facebook"
                 ? "For Facebook, write 90 to 170 words and provide 6 to 8 relevant hashtags."
                 : platform === "instagram"
@@ -301,6 +460,7 @@ async function inspectPoster(
         caption: cleanString(parsed.caption, 5000) || fallback.caption,
         hashtags: hashtags.length ? hashtags : fallback.hashtags,
       },
+      motionMap: cleanMotionMap(parsed.motionMap),
     };
   } catch {
     return {
@@ -312,6 +472,7 @@ async function inspectPoster(
         coverFidelity: 0,
       },
       socialCopy: fallback,
+      motionMap: unavailableMotionMap("The poster was created, but its motion regions could not be inspected."),
     };
   }
 }
@@ -385,6 +546,7 @@ async function generatePoster(
     imageDataUrl,
     sourceResponseId: response.id,
     qualityCheck: inspection.qualityCheck,
+    motionMap: inspection.motionMap,
   };
 }
 
