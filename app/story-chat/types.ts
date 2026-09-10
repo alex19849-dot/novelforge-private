@@ -186,10 +186,24 @@ export type ChapterPlan = {
   updatedAt: string;
 };
 
+export type ChapterContractBeat = {
+  order: number;
+  instruction: string;
+  /** Optional allocation supplied only when the author's guidance supports it. */
+  approximateWordTarget?: number;
+};
+
+export type ChapterTargetWordRange = {
+  minimum: number;
+  preferred: number;
+  maximum: number;
+};
+
 /**
- * The only creative direction sent to the prose writer for one generation
- * call. Unlike a legacy ChapterPlan, this does not prescribe later sections
- * or prevent the author from changing direction between calls.
+ * The binding contract for one requested chapter. The original direction and
+ * ordered beats remain available to every initial, continuation and recovery
+ * call. The newer fields are optional only at the storage boundary so pending
+ * drafts created before this staged upgrade remain loadable.
  */
 export type SectionWritingBrief = {
   chapterNumber: number;
@@ -198,6 +212,11 @@ export type SectionWritingBrief = {
   povCharacter: string;
   authorDirection: string;
   continuationBoundary: string;
+  originalGuidance?: string;
+  requiredBeats?: ChapterContractBeat[];
+  endpoint?: string;
+  exclusions?: string[];
+  targetWordRange?: ChapterTargetWordRange;
 };
 
 export type ChapterWritingPart = "part1" | "part2";
@@ -215,6 +234,22 @@ export type ChapterQualityAssessment = {
   hardFailures: string[];
   repairInstructions: string[];
   summary: string;
+  /**
+   * Diagnostic findings only. They describe contract failures but never
+   * authorise automatic rewriting of accepted prose.
+   */
+  guidanceAdherence?: {
+    missingBeats: string[];
+    orderViolations: string[];
+    endpointViolations: string[];
+    inventedMajorEvents: string[];
+  };
+  wordCountCompliance?: {
+    actual: number;
+    minimum: number;
+    maximum: number;
+    withinRange: boolean;
+  };
   scores: {
     continuity: number;
     plotMovement: number;
@@ -223,6 +258,8 @@ export type ChapterQualityAssessment = {
     povAndTense: number;
     repetitionControl: number;
     hookStrength: number;
+    guidanceAdherence?: number;
+    endpointCompliance?: number;
   };
 };
 
