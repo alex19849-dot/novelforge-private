@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import type {
   ChapterQualityAssessment,
   GenerationDiagnostic,
+  SectionWritingBrief,
 } from "../../../story-chat/types";
 
 export const runtime = "nodejs";
@@ -27,9 +28,43 @@ type QualityRequest = {
   maximumWordCount?: unknown;
 };
 
+type Severity = "minor" | "moderate" | "major" | "critical";
+
 type QualityAssessment = ChapterQualityAssessment & {
+  overallStatus: "pass" | "pass_with_warnings" | "needs_attention";
+  findings: {
+    category:
+      | "guidance"
+      | "beat_order"
+      | "endpoint"
+      | "exclusion"
+      | "invented_event"
+      | "continuity"
+      | "pov_tense"
+      | "voice"
+      | "prose_repetition"
+      | "pacing"
+      | "word_count";
+    severity: Severity;
+    message: string;
+    beatOrder: number | null;
+  }[];
+  beatAssessments: {
+    order: number;
+    instruction: string;
+    status: "satisfied" | "partial" | "missing";
+    evidence: string;
+  }[];
+  guidanceAdherence: NonNullable<
+    ChapterQualityAssessment["guidanceAdherence"]
+  > & { exclusionViolations: string[] };
+  wordCountCompliance: NonNullable<
+    ChapterQualityAssessment["wordCountCompliance"]
+  >;
   scores: ChapterQualityAssessment["scores"] & {
     factualAuthenticity: number;
+    guidanceAdherence: number;
+    endpointCompliance: number;
   };
 };
 
@@ -38,13 +73,22 @@ const qualitySchema = {
   additionalProperties: false,
   required: [
     "passed",
+    "overallStatus",
     "hardFailures",
     "repairInstructions",
     "summary",
+    "findings",
+    "beatAssessments",
+    "guidanceAdherence",
+    "wordCountCompliance",
     "scores",
   ],
   properties: {
     passed: { type: "boolean" },
+    overallStatus: {
+      type: "string",
+      enum: ["pass", "pass_with_warnings", "needs_attention"],
+    },
     hardFailures: {
       type: "array",
       items: { type: "string" },
@@ -54,6 +98,73 @@ const qualitySchema = {
       items: { type: "string" },
     },
     summary: { type: "string" },
+    findings: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["category", "severity", "message", "beatOrder"],
+        properties: {
+          category: {
+            type: "string",
+            enum: [
+              "guidance", "beat_order", "endpoint", "exclusion",
+              "invented_event", "continuity", "pov_tense", "voice",
+              "prose_repetition", "pacing", "word_count",
+            ],
+          },
+          severity: {
+            type: "string",
+            enum: ["minor", "moderate", "major", "critical"],
+          },
+          message: { type: "string" },
+          beatOrder: { type: ["integer", "null"] },
+        },
+      },
+    },
+    beatAssessments: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["order", "instruction", "status", "evidence"],
+        properties: {
+          order: { type: "integer", minimum: 1 },
+          instruction: { type: "string" },
+          status: {
+            type: "string",
+            enum: ["satisfied", "partial", "missing"],
+          },
+          evidence: { type: "string" },
+        },
+      },
+    },
+    guidanceAdherence: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "missingBeats", "orderViolations", "endpointViolations",
+        "inventedMajorEvents", "exclusionViolations",
+      ],
+      properties: {
+        missingBeats: { type: "array", items: { type: "string" } },
+        orderViolations: { type: "array", items: { type: "string" } },
+        endpointViolations: { type: "array", items: { type: "string" } },
+        inventedMajorEvents: { type: "array", items: { type: "string" } },
+        exclusionViolations: { type: "array", items: { type: "string" } },
+      },
+    },
+    wordCountCompliance: {
+      type: "object",
+      additionalProperties: false,
+      required: ["actual", "minimum", "maximum", "withinRange"],
+      properties: {
+        actual: { type: "integer", minimum: 0 },
+        minimum: { type: "integer", minimum: 500 },
+        maximum: { type: "integer", minimum: 500 },
+        withinRange: { type: "boolean" },
+      },
+    },
     scores: {
       type: "object",
       additionalProperties: false,
@@ -66,6 +177,8 @@ const qualitySchema = {
         "povAndTense",
         "repetitionControl",
         "hookStrength",
+        "guidanceAdherence",
+        "endpointCompliance",
       ],
       properties: {
         continuity: { type: "number", minimum: 1, maximum: 10 },
@@ -76,6 +189,8 @@ const qualitySchema = {
         povAndTense: { type: "number", minimum: 1, maximum: 10 },
         repetitionControl: { type: "number", minimum: 1, maximum: 10 },
         hookStrength: { type: "number", minimum: 1, maximum: 10 },
+        guidanceAdherence: { type: "number", minimum: 1, maximum: 10 },
+        endpointCompliance: { type: "number", minimum: 1, maximum: 10 },
       },
     },
   },
@@ -96,6 +211,70 @@ function requestedWordCount(value: unknown, fallback: number): number {
     value <= 10000
     ? Math.round(value)
     : fallback;
+}
+
+function readChapterContract(value: string): Partial<SectionWritingBrief> {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const rawBeats = Array.isArray(parsed.requiredBeats)
+      ? parsed.requiredBeats
+      : [];
+    const requiredBeats = rawBeats
+      .filter(
+        (beat): beat is Record<string, unknown> =>
+          Boolean(beat) && typeof beat === "object" && !Array.isArray(beat),
+      )
+      .map((beat, index) => ({
+        order: index + 1,
+        instruction: cleanString(beat.instruction),
+        ...(typeof beat.approximateWordTarget === "number" &&
+        Number.isInteger(beat.approximateWordTarget) &&
+        beat.approximateWordTarget > 0
+          ? { approximateWordTarget: beat.approximateWordTarget }
+          : {}),
+      }))
+      .filter((beat) => Boolean(beat.instruction));
+    const rawRange =
+      parsed.targetWordRange &&
+      typeof parsed.targetWordRange === "object" &&
+      !Array.isArray(parsed.targetWordRange)
+        ? (parsed.targetWordRange as Record<string, unknown>)
+        : null;
+    const minimum = Number(rawRange?.minimum);
+    const preferred = Number(rawRange?.preferred);
+    const maximum = Number(rawRange?.maximum);
+    const targetWordRange =
+      Number.isInteger(minimum) &&
+      Number.isInteger(preferred) &&
+      Number.isInteger(maximum) &&
+      minimum >= 500 &&
+      maximum <= 10000 &&
+      minimum <= preferred &&
+      preferred <= maximum
+        ? { minimum, preferred, maximum }
+        : undefined;
+
+    return {
+      chapterNumber:
+        typeof parsed.chapterNumber === "number"
+          ? parsed.chapterNumber
+          : undefined,
+      chapterKind: parsed.chapterKind === "epilogue" ? "epilogue" : "chapter",
+      chapterTitle: cleanString(parsed.chapterTitle || parsed.title),
+      povCharacter: cleanString(parsed.povCharacter),
+      authorDirection: cleanString(parsed.authorDirection),
+      continuationBoundary: cleanString(parsed.continuationBoundary),
+      originalGuidance: cleanString(parsed.originalGuidance),
+      requiredBeats,
+      endpoint: cleanString(parsed.endpoint),
+      exclusions: Array.isArray(parsed.exclusions)
+        ? parsed.exclusions.map(cleanString).filter(Boolean)
+        : [],
+      targetWordRange,
+    };
+  } catch {
+    return {};
+  }
 }
 
 function qualityStoryState(value: unknown): unknown {
@@ -148,33 +327,8 @@ function duplicateParagraphFailures(content: string): string[] {
   return duplicates;
 }
 
-function mechanicalFailures(
-  content: string,
-  minimumWordCount: number,
-  maximumWordCount: number,
-): string[] {
+function mechanicalFailures(content: string): string[] {
   const failures: string[] = [];
-  const words = countWords(content);
-
-  if (words < minimumWordCount) {
-    failures.push(
-      "The chapter has " +
-        words +
-        " words, below the " +
-        minimumWordCount +
-        "-word minimum.",
-    );
-  }
-
-  if (words > maximumWordCount) {
-    failures.push(
-      "The chapter has " +
-        words +
-        " words, above the " +
-        maximumWordCount +
-        "-word maximum.",
-    );
-  }
 
   if (/^\s*chapter\s+\d+\b/im.test(content)) {
     failures.push("The prose contains an unwanted chapter heading.");
@@ -204,18 +358,21 @@ function mechanicalFailures(
 }
 
 function passes(assessment: QualityAssessment, mechanical: string[]): boolean {
+  const seriousFinding = assessment.findings.some(
+    (finding) =>
+      finding.severity === "major" || finding.severity === "critical",
+  );
+
   return (
     assessment.passed &&
+    assessment.overallStatus !== "needs_attention" &&
     mechanical.length === 0 &&
     assessment.hardFailures.length === 0 &&
+    !seriousFinding &&
     assessment.scores.continuity >= 7 &&
-    assessment.scores.factualAuthenticity >= 6 &&
-    assessment.scores.plotMovement >= 6 &&
-    assessment.scores.relationshipProgression >= 6 &&
-    assessment.scores.voiceDistinctiveness >= 6 &&
     assessment.scores.povAndTense >= 7 &&
-    assessment.scores.repetitionControl >= 6 &&
-    assessment.scores.hookStrength >= 6
+    assessment.scores.guidanceAdherence >= 7 &&
+    assessment.scores.endpointCompliance >= 7
   );
 }
 
@@ -253,14 +410,19 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as QualityRequest;
     const chapterBrief = cleanString(body.chapterBrief);
+    const contract = readChapterContract(chapterBrief);
     const chapterTitle = cleanString(body.chapterTitle);
     const povCharacter = cleanString(body.povCharacter);
     const chapterContent = cleanString(body.chapterContent);
-    const minimumWordCount = requestedWordCount(body.minimumWordCount, 2000);
+    const minimumWordCount =
+      contract.targetWordRange?.minimum ??
+      requestedWordCount(body.minimumWordCount, 2000);
     const maximumWordCount = Math.max(
       minimumWordCount,
-      requestedWordCount(body.maximumWordCount, 4000),
+      contract.targetWordRange?.maximum ??
+        requestedWordCount(body.maximumWordCount, 4000),
     );
+    const actualWordCount = countWords(chapterContent);
 
     if (!chapterBrief || !povCharacter || !chapterContent) {
       return NextResponse.json(
@@ -269,11 +431,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const mechanical = mechanicalFailures(
-      chapterContent,
-      minimumWordCount,
-      maximumWordCount,
-    );
+    const mechanical = mechanicalFailures(chapterContent);
+    const deterministicWordCount = {
+      actual: actualWordCount,
+      minimum: minimumWordCount,
+      maximum: maximumWordCount,
+      withinRange:
+        actualWordCount >= minimumWordCount &&
+        actualWordCount <= maximumWordCount,
+    };
     const response = await openai.responses.create({
       model: QUALITY_MODEL,
       reasoning: { effort: "low" },
@@ -281,34 +447,49 @@ export async function POST(request: Request) {
         {
           role: "system",
           content: [
-            "You are NovelForge's final commercial-romance quality assessor.",
-            "Assess the supplied completed chapter once. Never rewrite, repair, edit or reproduce its prose.",
-            "The Story Bible, canonical chapter plan and accepted continuity are binding.",
-            "Read both technical halves as one chapter. Check that Part 2 continues rather than restarting Part 1.",
-            "Hard-fail contradictory physical staging, impossible movements, repeated events, duplicated paragraphs, malformed prose, markdown, instruction-like text, obvious truncation, wrong POV or tense, invented canon and an unearned ending.",
-            "Hard-fail dialogue with unexplained topic changes or replies that have no intelligible link to the preceding line or action. Fail interchangeable lead voices, repeated emotional conclusions, filler paragraphs and repeated monitoring of a stable minor injury when nothing changes.",
-            "Hard-fail premature conscious attraction or invented prior desire in a gay-for-you or delayed-awareness arc. Involuntary attention, physical reaction, denial and changed behaviour may precede conscious acknowledgement.",
-            "Do not penalise an earned lack of kissing or sex in a slower chapter. Do require meaningful plot or relationship change.",
-            "Explicit adult MM content is allowed and must not be failed merely for being explicit. Every romantic or sexual character must be an adult aged eighteen or older.",
-            "Use repairInstructions only to describe possible later human-selected fixes. Do not perform them.",
-            "Set passed true only when the chapter is safe to accept unchanged.",
+            "You are NovelForge's completed-chapter diagnostic inspector. QA IS AN INSPECTOR, NOT AN AUTHOR.",
+            "Assess the chapter once. Never rewrite, edit, repair, regenerate or reproduce its prose. Never supply replacement scenes or dialogue, and never alter the Story Bible, continuity or Chapter Contract.",
+            "AUTHOR AUTHORITY: The complete Chapter Contract controls what must happen. Original guidance is the fallback authority when an extracted beat omits or weakens nuance. Do not substitute your preferred plot, emotion, stakes, style or ending.",
+            "Assess every required beat individually as satisfied, partial or missing. Vague similarity is not completion. Return exactly one beatAssessment for every supplied beat, using its supplied order and instruction.",
+            "Check meaningful beat-order violations, but ignore ordinary connective actions between beats.",
+            "Check whether the endpoint occurs and whether the chapter continues materially beyond it. Distinguish missing endpoint from endpoint overrun.",
+            "Check every explicit exclusion. Do not invent exclusions.",
+            "Flag only consequential invented events unsupported by the contract, original guidance, Story Bible or continuity. Dialogue, gestures, thoughts, humour, environmental interaction, attraction, minor reactions, micro-conflict and connective actions are normal creative freedom.",
+            "Check meaningful continuity contradictions involving facts, character and relationship states, time, location, previous events, unresolved threads and especially character knowledge. Do not flag harmless wording differences.",
+            "Check the specified POV character, person and tense. Distinguish real drift or head-hopping from dialogue, memories and grammatically necessary tense changes.",
+            "Use available voice profiles and established information to flag only clear narration or dialogue drift, inappropriate vocabulary, or characters becoming indistinguishable. Allow emotional range.",
+            "Inspect prose for patterns, not isolated examples: action-list narration, redundant emotional explanation, excessive staccato or one-line paragraphs, generic AI phrasing, repeated reactions or sentence structures, circular thought, exposition, purple prose, unnatural dialogue or lack of contractions, excessive comparisons, repeated mannerisms and inappropriate therapy-speak.",
+            "Assess causal scene flow and pacing across all required beats. Flag a bloated opening with a rushed ending, later beats crammed into a small final passage, beats merely mentioned rather than developed, padding, circular filler or an abrupt endpoint. Do not demand equal space per beat.",
+            "The supplied deterministic word count is authoritative. A trivial miss is minor. A material miss is moderate or major according to scale.",
+            "Major or critical findings include missing required scenes, exclusion violations, wrong POV, major continuity contradictions, substantial endpoint overrun or several missing beats. Minor findings include limited repetition, small style patterns and trivial word-count misses.",
+            "hardFailures contains only major or critical defects that make the chapter unsafe to accept unchanged. repairInstructions are concise diagnostic actions for a later author-selected recovery, never replacement prose.",
+            "Set overallStatus to pass for no findings, pass_with_warnings for minor or moderate findings only, and needs_attention for any major or critical finding. Set passed false for needs_attention and true otherwise.",
+            "Keep feedback concrete and evidence-based. Do not ask vaguely for more resonance, richer prose, higher stakes or a deeper relationship.",
+            "Explicit consensual adult content must not be failed merely for being explicit. Every romantic or sexual character must be eighteen or older.",
           ].join("\n"),
         },
         {
           role: "user",
           content: [
-            "STORY BIBLE",
+            "STORY BIBLE, FIXED CANON",
             JSON.stringify(body.storyBible ?? {}, null, 2),
-            "CONTINUITY BEFORE CHAPTER",
+            "CONTINUITY BEFORE CHAPTER, INCLUDING KNOWLEDGE AND VOICE DATA",
             JSON.stringify(qualityStoryState(body.storyState), null, 2),
-            "CANONICAL CHAPTER PLAN",
-            chapterBrief,
+            "COMPLETE CHAPTER CONTRACT, AUTHOR AUTHORITY",
+            JSON.stringify(contract, null, 2),
+            "ORIGINAL GUIDANCE, FALLBACK AUTHORITY",
+            contract.originalGuidance ||
+              contract.authorDirection ||
+              "No separate original guidance is available in this legacy plan.",
             "CHAPTER METADATA",
-            "Title: " + chapterTitle,
-            "POV: " + povCharacter,
-            "MECHANICAL FAILURES",
+            "Chapter: " + (contract.chapterNumber ?? "unknown"),
+            "Title: " + (chapterTitle || contract.chapterTitle),
+            "POV: " + (povCharacter || contract.povCharacter),
+            "AUTHORITATIVE DETERMINISTIC WORD COUNT",
+            JSON.stringify(deterministicWordCount, null, 2),
+            "DETERMINISTIC TECHNICAL FAILURES",
             JSON.stringify(mechanical, null, 2),
-            "UNTOUCHED COMPLETED CHAPTER",
+            "UNTOUCHED COMPLETED CHAPTER, INSPECT ONLY",
             chapterContent,
           ].join("\n\n"),
         },
@@ -317,12 +498,12 @@ export async function POST(request: Request) {
         verbosity: "low",
         format: {
           type: "json_schema",
-          name: "novelforge_single_quality_assessment",
+          name: "novelforge_contract_quality_assessment",
           strict: true,
           schema: qualitySchema,
         },
       },
-      max_output_tokens: 1800,
+      max_output_tokens: 5000,
     });
 
     const usage = response.usage;
@@ -400,15 +581,41 @@ export async function POST(request: Request) {
       );
     }
 
+    const contractBeats = contract.requiredBeats ?? [];
+    const beatAssessmentIsComplete =
+      assessment.beatAssessments.length === contractBeats.length &&
+      contractBeats.every(
+        (beat, index) =>
+          assessment.beatAssessments[index]?.order === beat.order &&
+          assessment.beatAssessments[index]?.instruction === beat.instruction,
+      );
+
+    if (!beatAssessmentIsComplete) {
+      diagnostic.status = "failed";
+      diagnostic.error =
+        "Terra did not assess every required chapter beat in contract order.";
+      diagnostics.push(diagnostic);
+      return NextResponse.json(
+        { error: diagnostic.error, chapterContent, diagnostics },
+        { status: 502 },
+      );
+    }
+
     diagnostics.push(diagnostic);
-    const accepted = passes(assessment, mechanical);
     const combinedHardFailures = Array.from(
       new Set([...mechanical, ...assessment.hardFailures]),
     );
+    const accepted = passes(assessment, mechanical);
     const quality: QualityAssessment = {
       ...assessment,
       passed: accepted,
+      overallStatus: accepted
+        ? assessment.findings.length > 0
+          ? "pass_with_warnings"
+          : "pass"
+        : "needs_attention",
       hardFailures: combinedHardFailures,
+      wordCountCompliance: deterministicWordCount,
     };
 
     return NextResponse.json({
@@ -416,7 +623,7 @@ export async function POST(request: Request) {
       chapterContent,
       quality,
       qualityWarnings: accepted
-        ? []
+        ? quality.findings.map((finding) => finding.message)
         : [...combinedHardFailures, ...assessment.repairInstructions],
       repaired: false,
       diagnostics,
@@ -438,4 +645,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
