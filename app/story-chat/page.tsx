@@ -36,6 +36,10 @@ type PendingChapterGeneration = {
   repetitionWarnings?: string[];
   minimumWordCount: number;
   maximumWordCount: number;
+  qualityReview?: QualityResponse["quality"];
+  qualityCheckedDraft?: string;
+  qualityOverrideReady?: boolean;
+  qualityTechnicalError?: string;
   diagnostics?: GenerationDiagnostic[];
 };
 
@@ -65,19 +69,49 @@ type QualityResponse = {
   repaired: boolean;
   quality: {
     passed: boolean;
+    overallStatus: "pass" | "pass_with_warnings" | "needs_attention";
     hardFailures: string[];
     repairInstructions: string[];
     summary: string;
+    findings: {
+      category: string;
+      severity: "minor" | "moderate" | "major" | "critical";
+      message: string;
+      beatOrder: number | null;
+    }[];
+    beatAssessments: {
+      order: number;
+      instruction: string;
+      status: "satisfied" | "partial" | "missing";
+      evidence: string;
+    }[];
+    guidanceAdherence: {
+      missingBeats: string[];
+      orderViolations: string[];
+      endpointViolations: string[];
+      inventedMajorEvents: string[];
+      exclusionViolations: string[];
+    };
+    wordCountCompliance: {
+      actual: number;
+      minimum: number;
+      maximum: number;
+      withinRange: boolean;
+    };
     scores: {
       continuity: number;
+      factualAuthenticity: number;
       plotMovement: number;
       relationshipProgression: number;
       voiceDistinctiveness: number;
       povAndTense: number;
       repetitionControl: number;
       hookStrength: number;
+      guidanceAdherence: number;
+      endpointCompliance: number;
     };
   };
+  qualityWarnings?: string[];
   diagnostics: GenerationDiagnostic[];
 };
 
@@ -323,6 +357,61 @@ function getRequestedWordCount(message: string): number | null {
   const wordCount = Number(match[1]);
 
   return Number.isFinite(wordCount) ? wordCount : null;
+}
+
+function getContractWordRange(chapterBrief: string): {
+  minimum: number;
+  maximum: number;
+} | null {
+  try {
+    const parsed = JSON.parse(chapterBrief) as Record<string, unknown>;
+    const range =
+      parsed.targetWordRange &&
+      typeof parsed.targetWordRange === "object" &&
+      !Array.isArray(parsed.targetWordRange)
+        ? (parsed.targetWordRange as Record<string, unknown>)
+        : null;
+    const minimum = Number(range?.minimum);
+    const maximum = Number(range?.maximum);
+
+    return Number.isInteger(minimum) &&
+      Number.isInteger(maximum) &&
+      minimum >= 500 &&
+      maximum <= 10000 &&
+      minimum <= maximum
+      ? { minimum, maximum }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function qualityReviewWarnings(quality: QualityResponse["quality"]): string[] {
+  const wordCount = quality.wordCountCompliance;
+  const warnings = [
+    `QA ${quality.overallStatus.replaceAll("_", " ").toUpperCase()}: ${quality.summary}`,
+    `Word count: ${wordCount.actual.toLocaleString()} (target ${wordCount.minimum.toLocaleString()} to ${wordCount.maximum.toLocaleString()}).`,
+    ...quality.beatAssessments
+      .filter((beat) => beat.status !== "satisfied")
+      .map(
+        (beat) =>
+          `Beat ${beat.order} ${beat.status}: ${beat.instruction}${
+            beat.evidence ? ` (${beat.evidence})` : ""
+          }`,
+      ),
+    ...quality.findings.map(
+      (finding) =>
+        `${finding.severity.toUpperCase()} ${finding.category.replaceAll("_", " ")}${
+          finding.beatOrder === null ? "" : `, beat ${finding.beatOrder}`
+        }: ${finding.message}`,
+    ),
+    ...quality.hardFailures.map((failure) => `MAJOR: ${failure}`),
+  ];
+
+  return [
+    ...Array.from(new Set(warnings)),
+    "Edit or use the recovery controls, or press Complete chapter again to accept this exact draft anyway.",
+  ];
 }
 
 type ChapterDeletionRequest =
@@ -576,6 +665,15 @@ function isPendingGeneration(
       isStringArray(pending.repetitionWarnings)) &&
     typeof pending.minimumWordCount === "number" &&
     typeof pending.maximumWordCount === "number" &&
+    (pending.qualityReview === undefined ||
+      (Boolean(pending.qualityReview) &&
+        typeof pending.qualityReview === "object")) &&
+    (pending.qualityCheckedDraft === undefined ||
+      typeof pending.qualityCheckedDraft === "string") &&
+    (pending.qualityOverrideReady === undefined ||
+      typeof pending.qualityOverrideReady === "boolean") &&
+    (pending.qualityTechnicalError === undefined ||
+      typeof pending.qualityTechnicalError === "string") &&
     (pending.diagnostics === undefined ||
       isDiagnosticArray(pending.diagnostics))
   );
@@ -922,9 +1020,37 @@ function isQualityResponse(value: unknown): value is QualityResponse {
     typeof response.repaired === "boolean" &&
     Boolean(quality) &&
     typeof quality?.passed === "boolean" &&
+    (quality?.overallStatus === "pass" ||
+      quality?.overallStatus === "pass_with_warnings" ||
+      quality?.overallStatus === "needs_attention") &&
     isStringArray(quality?.hardFailures) &&
     isStringArray(quality?.repairInstructions) &&
     typeof quality?.summary === "string" &&
+    Array.isArray(quality?.findings) &&
+    quality.findings.every(
+      (finding) =>
+        Boolean(finding) &&
+        typeof finding.message === "string" &&
+        (finding.severity === "minor" ||
+          finding.severity === "moderate" ||
+          finding.severity === "major" ||
+          finding.severity === "critical"),
+    ) &&
+    Array.isArray(quality?.beatAssessments) &&
+    quality.beatAssessments.every(
+      (beat) =>
+        typeof beat.order === "number" &&
+        typeof beat.instruction === "string" &&
+        (beat.status === "satisfied" ||
+          beat.status === "partial" ||
+          beat.status === "missing") &&
+        typeof beat.evidence === "string",
+    ) &&
+    Boolean(quality?.wordCountCompliance) &&
+    typeof quality.wordCountCompliance.actual === "number" &&
+    typeof quality.wordCountCompliance.minimum === "number" &&
+    typeof quality.wordCountCompliance.maximum === "number" &&
+    typeof quality.wordCountCompliance.withinRange === "boolean" &&
     Boolean(scores) &&
     typeof scores?.continuity === "number" &&
     typeof scores?.plotMovement === "number" &&
@@ -2076,6 +2202,10 @@ device.`,
         content.includes(pendingGeneration.lastSection)
           ? pendingGeneration.lastSection
           : undefined,
+      qualityReview: undefined,
+      qualityCheckedDraft: undefined,
+      qualityOverrideReady: undefined,
+      qualityTechnicalError: undefined,
     });
   }
 
@@ -2161,6 +2291,10 @@ device.`,
         draft: nextDraft,
         lastSection: data.section.trim(),
         repetitionWarnings: data.warnings,
+        qualityReview: undefined,
+        qualityCheckedDraft: undefined,
+        qualityOverrideReady: undefined,
+        qualityTechnicalError: undefined,
         diagnostics: [
           ...(workingPending.diagnostics ?? []),
           ...data.diagnostics,
@@ -2220,8 +2354,64 @@ device.`,
     }
 
     setIsThinking(true);
+    let qualityAttempted = false;
+    let qualityCompleted = false;
+    let qualityDiagnostics: GenerationDiagnostic[] = [];
 
     try {
+      const authorOverride =
+        pending.qualityOverrideReady === true &&
+        pending.qualityCheckedDraft === pending.draft;
+
+      if (!authorOverride) {
+        qualityAttempted = true;
+        const replacementNumber =
+          pending.generatedChapter.replaceChapterNumber;
+        const qualityResponse = await fetch("/api/story-chat/quality", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storyBible: baseStory.storyBible,
+            storyState: getStoryStateBeforeChapter(
+              baseStory.storyState,
+              replacementNumber,
+            ),
+            chapterBrief: pending.chapterBrief,
+            chapterTitle: pending.generatedChapter.title,
+            povCharacter: pending.generatedChapter.povCharacter,
+            chapterContent: pending.draft,
+            minimumWordCount: pending.minimumWordCount,
+            maximumWordCount: pending.maximumWordCount,
+          }),
+        });
+        const qualityData = await readApiJson(qualityResponse);
+
+        if (!isQualityResponse(qualityData)) {
+          throw new Error("The quality assessor returned an invalid response.");
+        }
+
+        qualityCompleted = true;
+        qualityDiagnostics = qualityData.diagnostics;
+
+        if (!qualityData.accepted || qualityData.quality.findings.length > 0) {
+          const reviewedPending: PendingChapterGeneration = {
+            ...pending,
+            qualityReview: qualityData.quality,
+            qualityCheckedDraft: pending.draft,
+            qualityOverrideReady: true,
+            qualityTechnicalError: undefined,
+            repetitionWarnings: qualityReviewWarnings(qualityData.quality),
+            diagnostics: [
+              ...(pending.diagnostics ?? []),
+              ...qualityData.diagnostics,
+            ],
+          };
+          savePendingGeneration(reviewedPending);
+          setReaderOpen(true);
+          return;
+        }
+      }
+
       const replacementNumber = pending.generatedChapter.replaceChapterNumber;
       const chapterStory = applyGeneratedChapter(
         baseStory,
@@ -2256,6 +2446,7 @@ device.`,
       });
       const allDiagnostics = [
         ...(pending.diagnostics ?? []),
+        ...qualityDiagnostics,
         ...ledgerData.diagnostics,
       ];
       const completedStory: StoryWorkspace = {
@@ -2291,6 +2482,22 @@ device.`,
         error instanceof Error
           ? error.message
           : "The chapter could not be completed.";
+      if (qualityAttempted && !qualityCompleted) {
+        savePendingGeneration({
+          ...pending,
+          qualityCheckedDraft: pending.draft,
+          qualityOverrideReady: true,
+          qualityTechnicalError: message,
+          repetitionWarnings: [
+            `QA could not run: ${message}`,
+            "The draft is preserved. Press Complete chapter to accept it anyway, or edit the draft and press Complete chapter to retry QA.",
+          ],
+          diagnostics: [
+            ...(pending.diagnostics ?? []),
+            ...(error instanceof ApiRequestError ? error.diagnostics : []),
+          ],
+        });
+      }
       const failedStory: StoryWorkspace = {
         ...baseStory,
         messages: [
@@ -2719,10 +2926,6 @@ device.`,
         return;
       }
 
-      const requestedWordCount = getRequestedWordCount(trimmedMessage);
-      const requestedTarget = requestedWordCount
-        ? Math.min(4000, Math.max(2000, requestedWordCount))
-        : null;
       const returnedChapter = data.generatedChapter;
       const returnedReplacement = returnedChapter.replaceChapterNumber;
       const nextChapterNumber =
@@ -2737,18 +2940,27 @@ device.`,
         returnedReplacement === nextChapterNumber && !replacementExists
           ? { ...returnedChapter, replaceChapterNumber: null }
           : returnedChapter;
+      const contractWordRange = getContractWordRange(data.chapterBrief);
+      const legacyRequestedWordCount = getRequestedWordCount(trimmedMessage);
+      const legacyRequestedTarget = legacyRequestedWordCount
+        ? Math.min(4000, Math.max(2000, legacyRequestedWordCount))
+        : null;
       const pending: PendingChapterGeneration = {
         storyId: plannedStory.id,
         generatedChapter,
         chapterBrief: data.chapterBrief,
         latestUserMessage: trimmedMessage,
         draft: "",
-        minimumWordCount: requestedTarget
-          ? Math.max(2000, Math.floor(requestedTarget * 0.95))
-          : 2000,
-        maximumWordCount: requestedTarget
-          ? Math.min(4000, Math.ceil(requestedTarget * 1.1))
-          : 4000,
+        minimumWordCount:
+          contractWordRange?.minimum ??
+          (legacyRequestedTarget
+            ? Math.max(2000, Math.floor(legacyRequestedTarget * 0.95))
+            : 2000),
+        maximumWordCount:
+          contractWordRange?.maximum ??
+          (legacyRequestedTarget
+            ? Math.min(4000, Math.ceil(legacyRequestedTarget * 1.1))
+            : 4000),
         diagnostics: [...preplanningDiagnostics, ...(data.diagnostics ?? [])],
       };
 
