@@ -111,6 +111,50 @@ function removeNegatedChapterProseRequests(message: string): string {
   );
 }
 
+function getExplicitChapterWordRange(message: string): {
+  minimum: number;
+  preferred: number;
+  maximum: number;
+} | null {
+  const normalised = message.replace(/,/g, "");
+  const rangeMatch = normalised.match(
+    /\b(\d{3,5})\s*(?:-|to|through)\s*(\d{3,5})\s*words?\b/i,
+  );
+
+  if (rangeMatch) {
+    const first = Number(rangeMatch[1]);
+    const second = Number(rangeMatch[2]);
+    const minimum = Math.min(first, second);
+    const maximum = Math.max(first, second);
+
+    if (minimum >= 500 && maximum <= 10000) {
+      return {
+        minimum,
+        preferred: Math.round((minimum + maximum) / 2),
+        maximum,
+      };
+    }
+  }
+
+  const singleMatch = normalised.match(/\b(\d{3,5})\s*words?\b/i);
+
+  if (!singleMatch) {
+    return null;
+  }
+
+  const preferred = Number(singleMatch[1]);
+
+  if (!Number.isFinite(preferred) || preferred < 500 || preferred > 10000) {
+    return null;
+  }
+
+  return {
+    minimum: Math.max(500, Math.floor(preferred * 0.95)),
+    preferred,
+    maximum: Math.min(10000, Math.ceil(preferred * 1.1)),
+  };
+}
+
 function getEndingExcerpt(text: string, maximumWords = 900): string {
   const words = text.trim().split(/\s+/).filter(Boolean);
 
@@ -558,6 +602,11 @@ const directSectionBriefSchema = {
         "povCharacter",
         "authorDirection",
         "continuationBoundary",
+        "originalGuidance",
+        "requiredBeats",
+        "endpoint",
+        "exclusions",
+        "targetWordRange",
       ],
       properties: {
         chapterNumber: { type: "integer" },
@@ -566,6 +615,39 @@ const directSectionBriefSchema = {
         povCharacter: { type: "string" },
         authorDirection: { type: "string" },
         continuationBoundary: { type: "string" },
+        originalGuidance: { type: "string" },
+        requiredBeats: {
+          type: "array",
+          minItems: 1,
+          maxItems: 30,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["order", "instruction", "approximateWordTarget"],
+            properties: {
+              order: { type: "integer" },
+              instruction: { type: "string" },
+              approximateWordTarget: {
+                anyOf: [{ type: "integer" }, { type: "null" }],
+              },
+            },
+          },
+        },
+        endpoint: { type: "string" },
+        exclusions: {
+          type: "array",
+          items: { type: "string" },
+        },
+        targetWordRange: {
+          type: "object",
+          additionalProperties: false,
+          required: ["minimum", "preferred", "maximum"],
+          properties: {
+            minimum: { type: "integer" },
+            preferred: { type: "integer" },
+            maximum: { type: "integer" },
+          },
+        },
       },
     },
   },
@@ -1547,15 +1629,57 @@ structured response and never describe internal processing.
 `.trim();
 
 const FOCUSED_DIRECT_CHAPTER_PLANNER_PROMPT = `
-You are NovelForge's section-preparation editor for commercial romance.
+You are NovelForge's chapter-contract editor for commercial romance.
 
-Return metadata and one SectionWritingBrief only, never novel prose and never a
-full chapter plan. The author controls the story one section at a time.
+Return metadata and one structured SectionWritingBrief chapter contract only,
+never novel prose and never a speculative chapter outline. The author controls
+what happens. The prose writer later controls how those requirements become
+immersive fiction.
 
-authorDirection must contain only what the user has asked to happen now.
-Preserve requested actions, dialogue, emotional movement, heat, ending point and
-deliberate changes exactly. Do not add a competing goal, later event, awareness
-limit or must-not-happen list.
+AUTHOR AUTHORITY
+
+The user's latest message is the binding chapter instruction. Preserve it
+losslessly in originalGuidance. Do not shorten it, polish it, paraphrase it,
+remove repetition from it or replace it with your interpretation.
+
+authorDirection is a backwards-compatible writing direction. Keep the user's
+requested actions, dialogue requirements, emotional movement, heat, order,
+ending point and deliberate changes intact. Do not add a competing goal, later
+event, awareness limit or invented development.
+
+ORDERED REQUIRED BEATS
+
+Extract every event or development the user explicitly requires into
+requiredBeats. Keep the intended order. Each instruction must remain concrete
+and specific. Do not collapse distinct requirements into generic summaries such
+as "tension increases", "the relationship develops" or "conflict escalates"
+when the user supplied the actual actions that create that change.
+
+requiredBeats records WHAT must happen, not HOW to write it. Do not invent
+dialogue, internal thoughts, descriptions, jokes, gestures, micro-actions or
+connective tissue. Do not add major events merely to make the contract feel
+complete. approximateWordTarget must be null unless the user allocated space to
+that beat or the supplied target makes an allocation explicit and unambiguous.
+
+ENDPOINT AND EXCLUSIONS
+
+endpoint is the precise boundary where this chapter must stop. Preserve an
+explicit "stop when", "end when", "stop before" or equivalent instruction
+exactly. Otherwise use the final explicitly requested beat as the endpoint. Do
+not invent a more dramatic ending and do not advance into a later scene.
+
+exclusions contains only explicit negative instructions or unmistakable limits
+from the user's guidance, such as no kiss, do not reveal the secret, do not
+resolve the argument or do not enter the next morning. Do not manufacture
+guardrails simply to fill the array.
+
+TARGET LENGTH
+
+targetWordRange must describe the actual requested chapter length. An explicit
+target in the latest message has highest priority. Otherwise use an established
+chapter-length requirement in the Story Bible or workspace. Only when neither
+exists, retain NovelForge's current operational range of 2,000 to 4,000 words
+with 3,000 preferred. Keep minimum <= preferred <= maximum.
 
 Use the Story Bible and accepted continuity to preserve identity, ages, POV,
 tense, individual knowledge, time, location and the exact point where accepted
@@ -1575,9 +1699,9 @@ chapterNumber is the next available number. For a rewrite,
 replaceChapterNumber is the requested existing number. Otherwise it is null.
 generatedChapter.content is always empty.
 
-If a request is broad, such as "write the next chapter", choose only the
-immediate opening development that follows causally from continuity. Do not
-outline the rest of the chapter and do not invent a filler event.
+If a request is broad, such as "write the next chapter", do not pretend the
+author supplied detailed beats. Create only the minimum concrete contract safely
+supported by the request and continuity. Do not invent filler events.
 
 Every romantic or sexual character is an adult aged eighteen or older. Record
 explicit adult direction directly. Keep the reply brief and return only the
@@ -2273,6 +2397,7 @@ workspace.`,
         ));
     const usesCompactChapterPlan =
       requestStage === "plan" && isWriterMode && intent !== "create_story";
+    const explicitChapterWordRange = getExplicitChapterWordRange(latestMessage);
 
     const requestedChapterNumber = getRequestedChapterNumber(latestMessage);
     const savedChapterPlans = currentStory.storyState.chapterPlans ?? [];
@@ -3001,6 +3126,14 @@ CURRENT STORY WORKSPACE
 
 ${JSON.stringify(planningWorkspace, null, 2)}
 
+EXPLICIT WORD TARGET FROM THE LATEST USER MESSAGE
+
+${
+  explicitChapterWordRange
+    ? JSON.stringify(explicitChapterWordRange, null, 2)
+    : "No explicit numeric word target was detected. Use an established story-level chapter target if one exists; otherwise use the current 2,000 to 4,000-word operational range with 3,000 preferred."
+}
+
 ${
   chatOnly && draftContext
     ? `UNFINISHED CHAPTER DRAFT, READ ONLY
@@ -3149,11 +3282,12 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
         if (usesCompactChapterPlan) {
           const directOutput = rawOutput as DirectSectionBriefOutput;
           const expectedChapterNumber =
-            directOutput.generatedChapter?.replaceChapterNumber ??
-            Math.max(
+            rewriteTarget?.number ??
+            (Math.max(
               0,
               ...currentStory.chapters.map((chapter) => chapter.number),
-            ) + 1;
+            ) +
+              1);
           const forcedKind = epilogueRequested ? "epilogue" : "chapter";
           const generatedChapter = {
             ...directOutput.generatedChapter,
@@ -3162,26 +3296,87 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
               ? "Epilogue"
               : cleanString(directOutput.generatedChapter.title),
             content: "",
+            replaceChapterNumber: rewriteTarget?.number ?? null,
           } as NonNullable<StoryChatResponse["generatedChapter"]>;
+          const rawRequiredBeats = Array.isArray(
+            directOutput.sectionBrief?.requiredBeats,
+          )
+            ? directOutput.sectionBrief.requiredBeats
+            : [];
+          const requiredBeats = rawRequiredBeats
+            .filter(
+              (beat) =>
+                Boolean(beat) &&
+                typeof beat === "object" &&
+                cleanString(beat.instruction),
+            )
+            .slice(0, 30)
+            .map((beat, index) => ({
+              order: index + 1,
+              instruction: cleanString(beat.instruction),
+              ...(typeof beat.approximateWordTarget === "number" &&
+              Number.isInteger(beat.approximateWordTarget) &&
+              beat.approximateWordTarget > 0
+                ? { approximateWordTarget: beat.approximateWordTarget }
+                : {}),
+            }));
+          const returnedTarget = directOutput.sectionBrief?.targetWordRange;
+          const returnedMinimum = Number(returnedTarget?.minimum);
+          const returnedPreferred = Number(returnedTarget?.preferred);
+          const returnedMaximum = Number(returnedTarget?.maximum);
+          const returnedRangeIsValid =
+            Number.isInteger(returnedMinimum) &&
+            Number.isInteger(returnedPreferred) &&
+            Number.isInteger(returnedMaximum) &&
+            returnedMinimum >= 500 &&
+            returnedMaximum <= 10000 &&
+            returnedMinimum <= returnedPreferred &&
+            returnedPreferred <= returnedMaximum;
+          const targetWordRange =
+            explicitChapterWordRange ??
+            (returnedRangeIsValid
+              ? {
+                  minimum: returnedMinimum,
+                  preferred: returnedPreferred,
+                  maximum: returnedMaximum,
+                }
+              : { minimum: 2000, preferred: 3000, maximum: 4000 });
+
+          if (
+            targetWordRange.minimum > targetWordRange.preferred ||
+            targetWordRange.preferred > targetWordRange.maximum
+          ) {
+            throw new Error("The model returned an invalid chapter word range.");
+          }
+
           const cleanBrief: SectionWritingBrief = {
             chapterNumber: expectedChapterNumber,
             chapterKind: forcedKind,
             chapterTitle: generatedChapter.title,
             povCharacter: cleanString(generatedChapter.povCharacter),
-            authorDirection:
-              cleanString(directOutput.sectionBrief?.authorDirection) ||
-              latestMessage,
+            authorDirection: latestMessage,
             continuationBoundary: cleanString(
               directOutput.sectionBrief?.continuationBoundary,
             ),
+            originalGuidance: latestMessage,
+            requiredBeats,
+            endpoint: cleanString(directOutput.sectionBrief?.endpoint),
+            exclusions: cleanStringArray(
+              directOutput.sectionBrief?.exclusions,
+            ),
+            targetWordRange,
           };
 
           if (
             !cleanBrief.chapterTitle ||
             !cleanBrief.povCharacter ||
-            !cleanBrief.authorDirection
+            !cleanBrief.authorDirection ||
+            !cleanBrief.continuationBoundary ||
+            !cleanBrief.originalGuidance ||
+            cleanBrief.requiredBeats?.length === 0 ||
+            !cleanBrief.endpoint
           ) {
-            throw new Error("The model returned an incomplete section brief.");
+            throw new Error("The model returned an incomplete chapter contract.");
           }
 
           parsedOutput = {
@@ -3267,7 +3462,10 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
       throw new Error("The model returned an incomplete story bible.");
     }
 
-    const chapterBrief = cleanString(parsedOutput.chapterBrief);
+    const chapterBrief =
+      isWriterMode && typeof parsedOutput.chapterBrief === "string"
+        ? parsedOutput.chapterBrief.trim()
+        : cleanString(parsedOutput.chapterBrief);
 
     const returnedStoryState = preservesWorkspaceExactly
       ? currentStory.storyState
@@ -3303,10 +3501,25 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
           cleanString(
             parsedOutput.generatedChapter.povCharacter,
           ).toLowerCase() ||
-        !cleanString(sectionBrief.authorDirection)
+        !cleanString(sectionBrief.authorDirection) ||
+        typeof sectionBrief.originalGuidance !== "string" ||
+        sectionBrief.originalGuidance.trim() !== latestMessage ||
+        !Array.isArray(sectionBrief.requiredBeats) ||
+        sectionBrief.requiredBeats.length === 0 ||
+        sectionBrief.requiredBeats.some(
+          (beat, index) =>
+            beat.order !== index + 1 || !cleanString(beat.instruction),
+        ) ||
+        !cleanString(sectionBrief.endpoint) ||
+        !Array.isArray(sectionBrief.exclusions) ||
+        !sectionBrief.targetWordRange ||
+        sectionBrief.targetWordRange.minimum >
+          sectionBrief.targetWordRange.preferred ||
+        sectionBrief.targetWordRange.preferred >
+          sectionBrief.targetWordRange.maximum
       ) {
         throw new Error(
-          "The section brief does not match the chapter request.",
+          "The chapter contract does not match the chapter request.",
         );
       }
 
@@ -3491,4 +3704,3 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     );
   }
 }
-
