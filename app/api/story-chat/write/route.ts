@@ -56,6 +56,44 @@ function cleanString(value: unknown): string {
 function readSectionBrief(value: string): Partial<SectionWritingBrief> {
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>;
+    const rawRequiredBeats = Array.isArray(parsed.requiredBeats)
+      ? parsed.requiredBeats
+      : [];
+    const requiredBeats = rawRequiredBeats
+      .filter(
+        (beat): beat is Record<string, unknown> =>
+          Boolean(beat) && typeof beat === "object" && !Array.isArray(beat),
+      )
+      .map((beat, index) => ({
+        order: index + 1,
+        instruction: cleanString(beat.instruction),
+        ...(typeof beat.approximateWordTarget === "number" &&
+        Number.isInteger(beat.approximateWordTarget) &&
+        beat.approximateWordTarget > 0
+          ? { approximateWordTarget: beat.approximateWordTarget }
+          : {}),
+      }))
+      .filter((beat) => Boolean(beat.instruction));
+    const rawTarget =
+      parsed.targetWordRange &&
+      typeof parsed.targetWordRange === "object" &&
+      !Array.isArray(parsed.targetWordRange)
+        ? (parsed.targetWordRange as Record<string, unknown>)
+        : null;
+    const minimum = Number(rawTarget?.minimum);
+    const preferred = Number(rawTarget?.preferred);
+    const maximum = Number(rawTarget?.maximum);
+    const targetWordRange =
+      Number.isInteger(minimum) &&
+      Number.isInteger(preferred) &&
+      Number.isInteger(maximum) &&
+      minimum >= 500 &&
+      maximum <= 10000 &&
+      minimum <= preferred &&
+      preferred <= maximum
+        ? { minimum, preferred, maximum }
+        : undefined;
+
     return {
       chapterNumber:
         typeof parsed.chapterNumber === "number"
@@ -68,10 +106,36 @@ function readSectionBrief(value: string): Partial<SectionWritingBrief> {
       continuationBoundary: cleanString(
         parsed.continuationBoundary || parsed.startingState,
       ),
+      originalGuidance: cleanString(parsed.originalGuidance),
+      requiredBeats,
+      endpoint: cleanString(parsed.endpoint),
+      exclusions: Array.isArray(parsed.exclusions)
+        ? parsed.exclusions.map(cleanString).filter(Boolean)
+        : [],
+      targetWordRange,
     };
   } catch {
     return {};
   }
+}
+
+function getTargetWordRange(
+  sectionBrief: Partial<SectionWritingBrief>,
+): NonNullable<SectionWritingBrief["targetWordRange"]> {
+  return (
+    sectionBrief.targetWordRange ?? {
+      minimum: 2000,
+      preferred: 3000,
+      maximum: 4000,
+    }
+  );
+}
+
+function getOutputTokenLimit(maximumWordCount: number): number {
+  return Math.min(
+    24000,
+    Math.max(4000, Math.ceil(maximumWordCount * 2) + 2000),
+  );
 }
 
 function countWords(text: string): number {
@@ -305,15 +369,37 @@ function getPrompt(input: {
   latestUserMessage: string;
 }): string {
   const sectionBrief = readSectionBrief(input.chapterBrief);
-  const sectionBriefForPrompt =
-    input.action === "start"
-      ? input.chapterBrief
-      : JSON.stringify({
-          chapterNumber: sectionBrief.chapterNumber,
-          chapterKind: sectionBrief.chapterKind,
-          chapterTitle: input.chapterTitle || sectionBrief.chapterTitle,
-          povCharacter: input.povCharacter,
-        });
+  const originalGuidance =
+    sectionBrief.originalGuidance ||
+    input.latestUserMessage ||
+    sectionBrief.authorDirection ||
+    "Open the chapter from the established continuity boundary.";
+  const requiredBeats = sectionBrief.requiredBeats?.length
+    ? sectionBrief.requiredBeats
+    : [
+        {
+          order: 1,
+          instruction: sectionBrief.authorDirection || originalGuidance,
+        },
+      ];
+  const targetWordRange = getTargetWordRange(sectionBrief);
+  const endpoint =
+    sectionBrief.endpoint ||
+    requiredBeats[requiredBeats.length - 1]?.instruction ||
+    "Stop at the final development explicitly requested by the author.";
+  const chapterContract = {
+    chapterNumber: sectionBrief.chapterNumber,
+    chapterKind: sectionBrief.chapterKind,
+    chapterTitle: input.chapterTitle || sectionBrief.chapterTitle,
+    povCharacter: input.povCharacter || sectionBrief.povCharacter,
+    authorDirection: sectionBrief.authorDirection || originalGuidance,
+    continuationBoundary: sectionBrief.continuationBoundary,
+    originalGuidance,
+    requiredBeats,
+    endpoint,
+    exclusions: sectionBrief.exclusions ?? [],
+    targetWordRange,
+  };
   const fullDraftContext = completeDraftContext(input.chapterDraft);
   const exactContinuationBoundary = endingExcerpt(input.chapterDraft, 350);
   const draftRepetitionReport = chapterRepetitionReport(input.chapterDraft);
@@ -321,34 +407,29 @@ function getPrompt(input: {
     input.storyState,
     input.povCharacter,
   );
-  const mandatoryGuidance = input.sectionInstruction
-    ? input.sectionInstruction
-    : input.action === "start"
-      ? sectionBrief.authorDirection ||
-        input.latestUserMessage ||
-        "Open the chapter from the established continuity boundary."
-      : input.action === "rewrite"
-        ? "Rewrite only the selected passage while preserving its narrative purpose and boundaries."
-        : "Continue directly from the current draft through only the immediate next development. Do not introduce a major new event without author direction.";
+  const manualRecoveryInstruction =
+    input.sectionInstruction || "No additional recovery instruction supplied.";
   const actionInstruction =
     input.action === "start"
-      ? "Begin from this section's continuity boundary: " +
-        (sectionBrief.continuationBoundary ||
-          "the exact accepted ending supplied in continuity") +
-        "."
+      ? `Write the complete requested chapter in one response. Begin from the continuity boundary: ${
+          sectionBrief.continuationBoundary ||
+          "the exact accepted ending supplied in continuity"
+        }. Include every REQUIRED BEAT in order, reach the precise ENDPOINT, and do not continue beyond it. The complete chapter must be ${targetWordRange.minimum.toLocaleString()} to ${targetWordRange.maximum.toLocaleString()} words; aim near ${targetWordRange.preferred.toLocaleString()} words.`
       : input.action === "rewrite"
-        ? "Replace SECTION TO REWRITE only. Preserve what happens immediately before and after it. Do not rewrite or advance any other part of the chapter."
-        : "Continue from the exact final moment of EXACT CONTINUATION BOUNDARY. Do not recap, restart, repeat its final sentence, jump forward without instruction or begin a different scene.";
+        ? "Replace SECTION TO REWRITE only. Preserve what happens immediately before and after it. The full Chapter Contract governs continuity and prohibitions, but do not add later required beats, rewrite the whole chapter or advance beyond the selected passage."
+        : `Continue from the exact final moment of EXACT CONTINUATION BOUNDARY. Compare the COMPLETE CURRENT CHAPTER DRAFT against every REQUIRED BEAT. Treat a beat as complete only when its specific required event is actually present on the page. Write only the remaining beats, in order, without repeating completed material. Bring the complete draft toward ${targetWordRange.minimum.toLocaleString()} to ${targetWordRange.maximum.toLocaleString()} total words, aiming near ${targetWordRange.preferred.toLocaleString()}, and stop at the ENDPOINT without advancing beyond it.`;
 
   return [
     "You are NovelForge. Write polished, immersive adult MM romance as a skilled human novelist would write it.",
     "THE JOB",
-    "CURRENT GUIDANCE controls what happens in this section. Follow its participants, order, emotional movement, heat and endpoint. The Story Bible and accepted continuity control established facts. A deliberate new instruction from the author may change an earlier plan.",
+    "The CHAPTER CONTRACT is author authority over what must happen. ORIGINAL GUIDANCE is its lossless fallback source of truth. Follow the requested participants, ordered beats, endpoint, exclusions and target length without simplifying, replacing or creatively reinterpreting them. The Story Bible and accepted continuity control established facts. A deliberate new instruction from the author may change an earlier plan.",
     "Read the complete current draft as finished novel prose. Continue from its exact final moment without recapping it, repeating its ending or skipping an interaction the reader expects to witness.",
     input.action === "rewrite"
       ? "Rewrite only the selected passage. Preserve what happens immediately before and after it."
-      : "Write only the requested section. Stay with the current scene until the requested beat has played out naturally, then stop.",
-    "Aim for 600 to 1,000 words. If CURRENT GUIDANCE asks to finish the chapter, write approximately 800 to 1,400 words and give the active scene a satisfying ending. Do not cram in another event simply to fill space.",
+      : input.action === "start"
+        ? "Write one complete chapter, not an instalment or sample. Silently inspect all required beats before drafting and allocate the available word budget across them so the opening is not over-expanded and later beats or the endpoint are not rushed."
+        : "Write only the requested recovery prose. Do not restart or recap the chapter.",
+    "Invent dialogue, micro-actions, internal thought, description and connective tissue freely when needed to dramatise the contract, but do not invent major events, alter beat order, cross an exclusion or advance beyond the endpoint.",
     "Return only novel prose followed by <END_SECTION> on its own line. Finish every sentence before the marker.",
     "NATURAL PROSE",
     "Use natural contractions in narration, internal thought and dialogue wherever a real person would use them. Write I'm, I'd, I'll, I've, it's, isn't, wasn't, don't, didn't, can't, won't, shouldn't, wouldn't, he's, they're and we're. Use a full form only for deliberate emphasis or because that particular character would naturally say it that way. A controlled, educated, wealthy, older, authoritative or professional man does not automatically speak or think stiffly.",
@@ -364,7 +445,7 @@ function getPrompt(input: {
     "People may interrupt, answer only part of a question, deflect, tease, swear, joke badly, become defensive, say the imperfect thing, leave implications unstated or go quiet. Preserve friction and subtext. Do not make every exchange emotionally tidy.",
     "Avoid exposition both speakers know, interview-style question chains, random topic changes, confirmation ladders, constant banter, interchangeable sarcasm, therapy language, mediator language, workplace-training language and speeches that explain what the scene already shows.",
     "PACE, FRESHNESS AND CONTINUITY",
-    "Every scene must advance character, relationship, conflict or plot, but it may also contain brief distinctive texture that makes the people and world feel lived in. Cut filler, transition waffle, repeated conclusions and generic reactions. Do not turn this into clipped or breathless prose merely to make it efficient.",
+    "Every scene must advance character, relationship, conflict or plot, but it may also contain brief distinctive texture that makes the people and world feel lived in. Maintain clear causal flow between beats and let transitions arise from character choices and consequences. Cut filler, transition waffle, repeated conclusions and generic reactions. Do not turn this into clipped, staccato or breathless prose merely to make it efficient.",
     "Treat the repetition report as guidance, not a rigid blacklist. Avoid a tracked pattern naturally. Do not contort sentences, drain the character's voice or replace one repeated phrase with a different cliché merely to satisfy a count.",
     "Carry forward established facts, knowledge, positions, timeline and relationship progress. Do not invent off-page conversations, emotional breakthroughs, prior attraction, sudden conflicts or convenient solutions.",
     "A stable minor injury belongs in continuity but not in the foreground. Mention it only if it changes, is directly aggravated or materially limits the current action. Do not repeatedly check, protect, worry about, discuss or reassure over a bandage, bruise, cut or other ordinary discomfort. Do not use routine caretaking as automatic proof of love.",
@@ -386,7 +467,10 @@ function getPrompt(input: {
     "CONTINUITY CHECKPOINT\n" +
       JSON.stringify(cleanStoryState(input.storyState), null, 2),
     "RECENT CHAPTER ENDINGS\n" + JSON.stringify(input.recentChapters, null, 2),
-    "CURRENT SECTION BRIEF, THIS SECTION ONLY\n" + sectionBriefForPrompt,
+    "COMPLETE CHAPTER CONTRACT, AUTHOR AUTHORITY\n" +
+      JSON.stringify(chapterContract, null, 2),
+    "ORIGINAL GUIDANCE, LOSSLESS FALLBACK SOURCE OF TRUTH\n" +
+      originalGuidance,
     input.chapterDraft
       ? "COMPLETE CURRENT CHAPTER DRAFT, READ ONLY\n" + fullDraftContext
       : "",
@@ -405,14 +489,12 @@ function getPrompt(input: {
       input.chapterTitle +
       "\nPOV: " +
       input.povCharacter,
-    input.action === "start"
-      ? "ORIGINAL SECTION REQUEST\n" +
-        (input.latestUserMessage || "No separate original request supplied.")
-      : "",
-    "CURRENT GUIDANCE, HIGHEST PRIORITY\n" + mandatoryGuidance,
+    "MANUAL RECOVERY INSTRUCTION\n" + manualRecoveryInstruction,
     "EXACT ACTION AND BOUNDARY\n" + actionInstruction,
-    "Before returning the prose, silently check that it sounds natural when read aloud, the conversation follows logically, the POV voice belongs to this character, contractions are natural, no thought is pointlessly repeated, and no stable injury has been turned into a recurring relationship ritual. Correct only actual problems. Do not flatten lively prose to satisfy a checklist. Return no analysis.",
-    "Complete the section, output <END_SECTION>, then stop.",
+    "Before returning the prose, silently check that the action-specific scope is complete, required beats are respected in order, the endpoint and exclusions are obeyed, the prose sounds natural when read aloud, the conversation follows logically, the POV voice belongs to this character, contractions are natural, no thought is pointlessly repeated, and no stable injury has been turned into a recurring relationship ritual. Correct only actual problems. Do not flatten lively prose to satisfy a checklist. Return no analysis.",
+    input.action === "start"
+      ? "Complete the chapter, output <END_SECTION>, then stop."
+      : "Complete the requested recovery prose, output <END_SECTION>, then stop.",
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -739,6 +821,9 @@ export async function POST(request: Request) {
     const povCharacter = cleanString(body.povCharacter);
     const chapterDraft = cleanString(body.chapterDraft);
     const sectionToRewrite = cleanString(body.sectionToRewrite);
+    const sectionBrief = readSectionBrief(chapterBrief);
+    const targetWordRange = getTargetWordRange(sectionBrief);
+    const maxOutputTokens = getOutputTokenLimit(targetWordRange.maximum);
 
     if (!chapterBrief || !povCharacter) {
       return NextResponse.json(
@@ -803,14 +888,14 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "You are NovelForge, writing polished adult MM romance as a skilled human novelist. Follow CURRENT GUIDANCE and accepted continuity, stay in the fixed POV and tense, and return only complete novel prose followed by <END_SECTION>. Write fluid contemporary prose with natural contractions. Make each character's voice distinct and each conversation logically connected, imperfect and alive. Let important moments breathe without filler, circular thought or repeated explanation. Treat repetition data as guidance rather than a rigid blacklist. Never foreground a stable minor injury or routine caretaking unless it materially affects the present action. When explicit intimacy is requested, make it vivid, physically clear, character-specific and consequential. Never use em dashes or en dashes, repeat completed material or add an unrequested escalation.",
+                "You are NovelForge, writing polished adult MM romance as a skilled human novelist. The complete Chapter Contract and its original author guidance govern the requested events, order, endpoint, exclusions and length. On a start action, write the complete requested chapter in one response. On continuation, infer completed and remaining beats from the complete draft and write only what remains. On rewrite, replace only the selected passage. Follow accepted continuity, stay in the fixed POV and tense, and return only complete novel prose followed by <END_SECTION>. Write fluid contemporary prose with natural contractions. Make each character's voice distinct and each conversation logically connected, imperfect and alive. Let important moments breathe without filler, circular thought or repeated explanation. Treat repetition data as guidance rather than a rigid blacklist. Never foreground a stable minor injury or routine caretaking unless it materially affects the present action. When explicit intimacy is requested, make it vivid, physically clear, character-specific and consequential. Never use em dashes or en dashes, repeat completed material or add an unrequested escalation.",
             },
             { role: "user", content: writingPrompt },
           ],
           text: {
             verbosity: "medium",
           },
-          max_output_tokens: 32000,
+          max_output_tokens: maxOutputTokens,
         });
         usage = response.usage as Usage | undefined;
 
