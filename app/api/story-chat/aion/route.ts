@@ -253,6 +253,7 @@ ${instructionAndPassage}
             { role: "user", content: prompt },
           ],
           max_tokens: 4000,
+          reasoning_effort: "none",
           temperature: 0.6,
           top_p: 0.9,
           frequency_penalty: 0,
@@ -338,4 +339,5 @@ ${instructionAndPassage}
     );
   }
 }
+
 
