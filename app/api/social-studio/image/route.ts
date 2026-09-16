@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const IMAGE_MODEL = "gpt-image-2";
+const IMAGE_MODEL = "gpt-image-2.5-flare";
 const BACKGROUND_CHECK_MODEL = "gpt-4.1-mini";
 
 type PosterTemplate =
