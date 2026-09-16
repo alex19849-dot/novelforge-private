@@ -11,6 +11,8 @@ const MAX_COMPLETION_TOKENS = 12000;
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+  maxRetries: 0,
+  timeout: 240_000,
 });
 
 type AionRequest = {
@@ -181,7 +183,7 @@ export async function POST(request: Request) {
       "Return the complete replacement passage and stop at its original endpoint.",
     ].join("\n\n");
 
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
+    for (let attempt = 1; attempt <= 1; attempt += 1) {
       const startedAt = Date.now();
       let usage: OpenRouterUsage | undefined;
 
@@ -265,4 +267,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
