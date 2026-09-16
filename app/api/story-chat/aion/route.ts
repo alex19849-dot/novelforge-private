@@ -244,7 +244,7 @@ export async function POST(request: Request) {
             error: message,
           }),
         );
-        if (!retryable || attempt === 2) {
+        if (!retryable || attempt === 1) {
           return NextResponse.json(
             { error: message, diagnostics },
             { status: retryable ? 502 : 422 },
