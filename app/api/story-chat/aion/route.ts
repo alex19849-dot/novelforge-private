@@ -1,14 +1,13 @@
-// NovelForge realism fix, 2026-08-28.
 import OpenAI from "openai";
-
 import { NextResponse } from "next/server";
 
 import type { GenerationDiagnostic } from "../../../story-chat/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 180;
+export const maxDuration = 300;
 
 const AION_MODEL = "aion-labs/aion-3.0";
+const MAX_COMPLETION_TOKENS = 12000;
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
@@ -23,41 +22,36 @@ type AionRequest = {
   povCharacter?: unknown;
 };
 
-type Usage = {
+type OpenRouterUsage = {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
   cost?: number;
 };
 
-class TechnicalAionError extends Error {}
+class RetryableAionError extends Error {}
 
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function stripAionPrefix(message: string): string {
-  return message.replace(/^\s*aion\s*[:,-]?\s*/i, "").trim();
+function stripAionPrefix(value: string): string {
+  return value.replace(/^\s*aion\s*[:,-]?\s*/i, "").trim();
 }
 
-function compactJson(value: unknown, maximumCharacters: number): string {
-  let serialized = "{}";
-
+function compactContext(value: unknown, maximumCharacters: number): string {
   try {
-    serialized = JSON.stringify(value ?? {}, null, 2);
+    const serialized = JSON.stringify(value ?? {}, null, 2);
+    return serialized.length <= maximumCharacters
+      ? serialized
+      : serialized.slice(0, maximumCharacters) + "\n[context shortened]";
   } catch {
     return "{}";
   }
-
-  if (serialized.length <= maximumCharacters) {
-    return serialized;
-  }
-
-  return `${serialized.slice(0, maximumCharacters)}\n[context shortened]`;
 }
 
-function normalise(text: string): string {
-  return text
+function normalise(value: string): string {
+  return value
     .toLowerCase()
     .replace(/[“”]/g, '"')
     .replace(/[‘’]/g, "'")
@@ -66,85 +60,69 @@ function normalise(text: string): string {
     .trim();
 }
 
-function repeatedWindowOccurrences(text: string, size: number): number {
-  const words = normalise(text).split(" ").filter(Boolean);
+function repeatedWindows(value: string, size: number): number {
+  const words = normalise(value).split(" ").filter(Boolean);
   const counts = new Map<string, number>();
-
   for (let index = 0; index + size <= words.length; index += 1) {
     const window = words.slice(index, index + size).join(" ");
     counts.set(window, (counts.get(window) ?? 0) + 1);
   }
-
-  let repeated = 0;
-
-  for (const count of counts.values()) {
-    if (count > 1) {
-      repeated += count - 1;
-    }
-  }
-
-  return repeated;
+  return Array.from(counts.values()).reduce(
+    (total, count) => total + Math.max(0, count - 1),
+    0,
+  );
 }
 
-function validateReply(reply: string): void {
+function validateReplacement(value: string): void {
   if (
-    /^\s{0,3}#{1,6}\s+\S+/mu.test(reply) ||
-    /```/.test(reply) ||
-    /<\/?think[^>]*>/i.test(reply) ||
-    /^\s*(?:rewrite|replacement|analysis|notes?|explanation|here(?:'s| is))\s*:/im.test(
-      reply,
-    )
+    /^\s{0,3}#{1,6}\s+\S+/mu.test(value) ||
+    value.includes(String.fromCharCode(96).repeat(3)) ||
+    /<\/?think[^>]*>/i.test(value) ||
+    /^\s*(?:rewrite|replacement|analysis|notes?|explanation|here(?:'s| is))\s*:/im.test(value)
   ) {
     throw new Error(
       "Aion returned commentary, markdown or reasoning instead of replacement prose.",
     );
   }
-
-  if (!/[.!?…”’']$/u.test(reply)) {
-    throw new Error("Aion returned an obviously incomplete passage.");
+  if (!/[.!?…”’')\]]$/u.test(value)) {
+    throw new RetryableAionError("Aion returned an obviously incomplete passage.");
   }
-
-  if (repeatedWindowOccurrences(reply, 16) >= 4) {
+  if (repeatedWindows(value, 16) >= 4) {
     throw new Error(
       "Aion repeated substantial prose inside the replacement. The response was discarded.",
     );
   }
 }
 
-function isTechnicalFailure(error: unknown): boolean {
-  if (error instanceof TechnicalAionError) {
+function isRetryable(error: unknown): boolean {
+  if (
+    error instanceof RetryableAionError ||
+    error instanceof OpenAI.APIConnectionError ||
+    error instanceof TypeError
+  ) {
     return true;
   }
-
-  if (error instanceof OpenAI.APIConnectionError) {
-    return true;
-  }
-
-  if (error instanceof OpenAI.APIError) {
-    return (
-      error.status === undefined ||
+  return (
+    error instanceof OpenAI.APIError &&
+    (error.status === undefined ||
       error.status === 408 ||
       error.status === 409 ||
       error.status === 429 ||
-      (typeof error.status === "number" && error.status >= 500)
-    );
-  }
-
-  return error instanceof TypeError;
+      (typeof error.status === "number" && error.status >= 500))
+  );
 }
 
-function makeDiagnostic(input: {
+function diagnostic(input: {
   status: "succeeded" | "failed";
-  usage?: Usage;
-  durationMs: number;
+  startedAt: number;
   attempt: number;
+  usage?: OpenRouterUsage;
   error?: string;
 }): GenerationDiagnostic {
   const inputTokens = input.usage?.prompt_tokens ?? 0;
   const outputTokens = input.usage?.completion_tokens ?? 0;
-  const costUsd =
+  const reportedCost =
     typeof input.usage?.cost === "number" ? input.usage.cost : null;
-
   return {
     stage: "aion_passage_rewrite",
     provider: "openrouter",
@@ -153,9 +131,9 @@ function makeDiagnostic(input: {
     inputTokens,
     outputTokens,
     totalTokens: input.usage?.total_tokens ?? inputTokens + outputTokens,
-    costUsd,
-    costType: costUsd === null ? "unavailable" : "reported",
-    durationMs: input.durationMs,
+    costUsd: reportedCost,
+    costType: reportedCost === null ? "unavailable" : "reported",
+    durationMs: Math.max(0, Date.now() - input.startedAt),
     attempt: input.attempt,
     ...(input.error ? { error: input.error } : {}),
   };
@@ -187,59 +165,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const prompt = `
-You are Aion, NovelForge's specialist passage editor for commercial adult MM
-romance.
-
-The user has supplied a bounded passage and requested a replacement. Rewrite
-only that passage. Return replacement novel prose only, with no introduction,
-explanation, label, markdown, notes or alternatives. Preserve its purpose and
-outcome unless the user explicitly changes them. Do not continue beyond the
-pasted moment or rewrite the surrounding chapter.
-
-Every romantic or sexual character is an adult aged eighteen or older. Follow
-the requested heat, length, tone and emphasis directly. When explicit prose is
-requested, make it physically legible, emotionally specific and particular to
-these characters. Avoid a standard escalation ladder, anatomy inventory, stock
-dirty talk, repeated reassurance and an automatic tenderness script.
-
-Preserve POV, tense, factual continuity, physical staging and the established
-emotional progression. Continuity is not narrative emphasis: do not keep
-foregrounding a stable treated minor injury, bandage, ordinary tiredness,
-clothing detail or object unless it changes, materially constrains this passage
-or the user's instruction makes it important.
-
-Every dialogue line must respond intelligibly to the preceding line or visible
-action, including a deliberate evasion or triggered subject change. Keep each
-speaker's syntax, vocabulary, swearing, humour and conflict tactic distinct.
-Remove therapist talk, confirmation ladders, interchangeable banter, random
-topic changes and exposition both speakers know.
-
-Every paragraph must change action, knowledge, decision, pressure or
-relationship, or add irreplaceable character-specific texture. Remove routine
-choreography, repeated emotional processing, generic reactions and filler. Use
-natural contractions, complete sentences and no em dashes or en dashes. Do not
-invent prior attraction, romance, sex, knowledge or off-page events.
-
-POV CHARACTER:
-${povCharacter || "Use the POV established by the pasted passage."}
-
-STORY BIBLE:
-${compactJson(body.storyBible, 7000)}
-
-CURRENT SECTION BRIEF:
-${chapterBrief ? chapterBrief.slice(0, 4000) : "No separate brief supplied."}
-
-CURRENT CONTINUITY STATE:
-${compactJson(body.storyState, 5000)}
-
-USER'S INSTRUCTION AND EXACT PASSAGE:
-${instructionAndPassage}
-    `.trim();
+    const prompt = [
+      "You are NovelForge's specialist bounded-passage editor for commercial adult MM romance.",
+      "Rewrite only the exact passage supplied by the author. Return the complete replacement passage only. Do not return analysis, reasoning, labels, markdown, alternatives or notes.",
+      "The author's requested maximum expansion is a hard limit. Preserve all prose and events that are not being changed, replace the requested material naturally, and do not continue beyond the pasted endpoint.",
+      "Every romantic or sexual character is an adult aged eighteen or older. Follow the requested heat, tone and emphasis directly. Keep explicit adult intimacy physically clear, emotionally specific and particular to these characters, without a generic escalation sequence, anatomy inventory, stock dialogue, repeated reassurance or automatic tenderness.",
+      "Preserve POV, tense, established voice, factual continuity, physical staging and emotional progression. Do not invent prior attraction, sex, knowledge or off-page events.",
+      "Use natural contractions and complete contemporary sentences. Never use em dashes or en dashes. Keep dialogue causally connected. Remove filler, repetitive emotional explanation, therapy language and interchangeable banter.",
+      "POV CHARACTER:\n" +
+        (povCharacter || "Use the POV established by the supplied passage."),
+      "COMPLETE CHAPTER CONTRACT:\n" +
+        (chapterBrief || "No separate Chapter Contract was supplied."),
+      "STORY BIBLE:\n" + compactContext(body.storyBible, 9000),
+      "CONTINUITY STATE:\n" + compactContext(body.storyState, 7000),
+      "CURRENT CHAPTER DRAFT, CONTEXT ONLY:\n" +
+        cleanString(body.chapterDraft).slice(-12000),
+      "AUTHOR INSTRUCTION AND EXACT PASSAGE:\n" + instructionAndPassage,
+      "Return the complete replacement passage and stop at its original endpoint.",
+    ].join("\n\n");
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const startedAt = Date.now();
-      let usage: Usage | undefined;
+      let usage: OpenRouterUsage | undefined;
 
       try {
         const response = await openrouter.chat.completions.create({
@@ -248,27 +195,25 @@ ${instructionAndPassage}
             {
               role: "system",
               content:
-                "Return only the requested replacement prose. Every romantic or sexual character is an adult aged eighteen or older. Preserve POV, tense, distinct voice, factual continuity and physical staging. Cut filler, incoherent dialogue and unnecessary injury or caretaking emphasis.",
+                "Return only one complete replacement passage. Reason internally as required by the provider, but never expose reasoning. Obey the author's hard length and passage boundaries.",
             },
             { role: "user", content: prompt },
           ],
-          max_tokens: 4000,
-          reasoning_effort: "none",
+          max_tokens: MAX_COMPLETION_TOKENS,
           temperature: 0.6,
           top_p: 0.9,
           frequency_penalty: 0,
           presence_penalty: 0,
         });
 
-        usage = response.usage as Usage | undefined;
+        usage = response.usage as OpenRouterUsage | undefined;
         const choice = response.choices[0];
 
         if (choice?.finish_reason === "length") {
-          throw new Error(
+          throw new RetryableAionError(
             "Aion reached its output limit before finishing the replacement.",
           );
         }
-
         if (choice?.finish_reason === "content_filter") {
           throw new Error(
             "The writing provider stopped Aion's replacement with a content filter.",
@@ -276,49 +221,33 @@ ${instructionAndPassage}
         }
 
         const reply = choice?.message?.content?.trim();
-
         if (!reply) {
-          throw new TechnicalAionError("Aion returned an empty response.");
+          throw new RetryableAionError("Aion returned an empty response.");
         }
 
-        validateReply(reply);
-
+        validateReplacement(reply);
         diagnostics.push(
-          makeDiagnostic({
-            status: "succeeded",
-            usage,
-            durationMs: Date.now() - startedAt,
-            attempt,
-          }),
+          diagnostic({ status: "succeeded", startedAt, attempt, usage }),
         );
-
-        return NextResponse.json({
-          reply,
-          diagnostics,
-        });
+        return NextResponse.json({ reply, diagnostics });
       } catch (error) {
-        const aionError =
+        const message =
           error instanceof Error
-            ? error
-            : new Error("Aion could not rewrite the passage.");
-        const retryable = isTechnicalFailure(error);
-
+            ? error.message
+            : "Aion could not rewrite the passage.";
+        const retryable = isRetryable(error);
         diagnostics.push(
-          makeDiagnostic({
+          diagnostic({
             status: "failed",
-            usage,
-            durationMs: Date.now() - startedAt,
+            startedAt,
             attempt,
-            error: aionError.message,
+            usage,
+            error: message,
           }),
         );
-
         if (!retryable || attempt === 2) {
           return NextResponse.json(
-            {
-              error: aionError.message,
-              diagnostics,
-            },
+            { error: message, diagnostics },
             { status: retryable ? 502 : 422 },
           );
         }
