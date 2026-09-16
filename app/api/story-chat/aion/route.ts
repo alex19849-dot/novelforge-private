@@ -84,9 +84,6 @@ function validateReplacement(value: string): void {
       "Aion returned commentary, markdown or reasoning instead of replacement prose.",
     );
   }
-  if (!/[.!?…”’')\]]$/u.test(value)) {
-    throw new RetryableAionError("Aion returned an obviously incomplete passage.");
-  }
   if (repeatedWindows(value, 16) >= 4) {
     throw new Error(
       "Aion repeated substantial prose inside the replacement. The response was discarded.",
@@ -268,5 +265,4 @@ export async function POST(request: Request) {
     );
   }
 }
-
 
