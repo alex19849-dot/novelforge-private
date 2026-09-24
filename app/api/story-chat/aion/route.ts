@@ -6,7 +6,7 @@ import type { GenerationDiagnostic } from "../../../story-chat/types";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const AION_MODEL = "aion-labs/aion-3.0";
+const AION_MODEL = "aion-labs/aion-3.5";
 const MAX_COMPLETION_TOKENS = 12000;
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
