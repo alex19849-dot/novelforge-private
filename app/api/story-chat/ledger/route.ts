@@ -450,6 +450,33 @@ for how conclusions form. forbiddenHabits must block generic reactions,
 borrowed traits and habits that would make two POVs swappable. Do not rely on
 empty labels such as witty, guarded, dry, dominant or confident.
 
+RELATIONSHIP AND INTIMACY PROGRESSION
+
+Maintain relationshipStates as an operational progression ledger, not a vague
+romance summary. For each central pairing, preserve the current trust level,
+what each person consciously knows or denies, secrecy or public status,
+jealousy or possessiveness already demonstrated, concrete future plans,
+unresolved relational pressure and the latest behaviour that proves a change.
+Do not report that they are simply closer, conflicted or developing feelings.
+
+Track sexual progression accurately enough to prevent accidental repetition or
+unearned escalation. Each chapter's intimacyMilestone must record, when present,
+who initiated, the significant acts or boundary crossed, established roles or
+deliberate role changes, the scene's emotional mode, what was genuinely new,
+and the immediate relational consequence. Do not turn explicit prose into an
+anatomy inventory. Record only details needed to preserve character, consent,
+continuity and future scene freshness. If no new milestone occurred, state that
+plainly rather than restating the furthest previous act.
+
+STRUCTURAL AND NUMERICAL CONTINUITY
+
+Treat scores, dates, match numbers, playoff series, contracts, travel times,
+injury durations, ages and other countable structures as hard continuity. Check
+that a sequence is possible before preserving it. If completed prose contains
+an impossible or contradictory sequence, record the conflict explicitly in
+unresolvedThreads and timeline. Never silently repair it or invent missing
+events to make the numbers work.
+
 CHAPTER ENTRIES
 
 Return one chapterEntries item for every supplied chapter, in chapter-number
@@ -677,4 +704,5 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
   );
   }
 }
+
 
