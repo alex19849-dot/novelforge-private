@@ -459,7 +459,11 @@ export async function POST(request: Request) {
             "Check the specified POV character, person and tense. Distinguish real drift or head-hopping from dialogue, memories and grammatically necessary tense changes.",
             "Use available voice profiles and established information to flag only clear narration or dialogue drift, inappropriate vocabulary, or characters becoming indistinguishable. Allow emotional range.",
             "Inspect prose for patterns, not isolated examples: action-list narration, redundant emotional explanation, excessive staccato or one-line paragraphs, generic AI phrasing, repeated reactions or sentence structures, circular thought, exposition, purple prose, unnatural dialogue or lack of contractions, excessive comparisons, repeated mannerisms and inappropriate therapy-speak.",
+            "Compare relationship and intimacy movement against the continuity ledger. Flag a repeated sexual shape, role, emotional function, reassurance loop or supposedly new boundary that the ledger shows has already occurred. Flag an intimacy beat that is physically present but produces none of the relational consequence explicitly required by the contract.",
+            "Validate countable real-world structures instead of accepting fluent wording. Scores, dates, ages, elapsed time, match or playoff numbering, contracts, travel, injury recovery and professional procedures must be internally possible. An impossible sequence is a major continuity defect even when every requested beat appears.",
             "Assess causal scene flow and pacing across all required beats. Flag a bloated opening with a rushed ending, later beats crammed into a small final passage, beats merely mentioned rather than developed, padding, circular filler or an abrupt endpoint. Do not demand equal space per beat.",
+            "For a final chapter or epilogue, compare the completed prose with unresolvedThreads and the Story Bible's promised outcome. Flag only materially open romantic, career, public-status, living-arrangement, antagonist or commitment threads that this ending was expected to close. Do not demand closure for an intentionally continuing series thread.",
+            "A chapter-ending hook must be a concrete development, decision, reveal, invitation, demand, physical escalation or external consequence that can causally carry into the next chapter. Atmospheric unease or a dramatic-sounding final sentence alone is not a strong hook. Do not require a cliffhanger from an epilogue.",
             "The supplied deterministic word count is authoritative. A trivial miss is minor. A material miss is moderate or major according to scale.",
             "Major or critical findings include missing required scenes, exclusion violations, wrong POV, major continuity contradictions, substantial endpoint overrun or several missing beats. Minor findings include limited repetition, small style patterns and trivial word-count misses.",
             "hardFailures contains only major or critical defects that make the chapter unsafe to accept unchanged. repairInstructions are concise diagnostic actions for a later author-selected recovery, never replacement prose.",
@@ -645,3 +649,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
