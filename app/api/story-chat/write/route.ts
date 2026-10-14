@@ -15,8 +15,16 @@ const WRITING_MODEL = "gpt-6-astra";
 const INPUT_COST_PER_MILLION_TOKENS = 10;
 const CACHED_INPUT_COST_PER_MILLION_TOKENS = 1;
 const OUTPUT_COST_PER_MILLION_TOKENS = 50;
+const AION_MODEL = "aion-labs/aion-3.5";
+const AION_MARKER_PREFIX = "[[AION_SCENE_";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+});
+const openrouter = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+  maxRetries: 0,
+  timeout: 240_000,
 });
 
 type SectionAction = "start" | "continue" | "rewrite";
@@ -45,6 +53,19 @@ type Usage = {
   output_tokens_details?: {
     reasoning_tokens?: number;
   };
+};
+
+type SpecialistScene = {
+  marker: string;
+  instruction: string;
+  wordTarget: number;
+};
+
+type OpenRouterUsage = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  cost?: number;
 };
 
 class TechnicalWriterError extends Error {}
@@ -136,6 +157,188 @@ function getOutputTokenLimit(maximumWordCount: number): number {
     24000,
     Math.max(4000, Math.ceil(maximumWordCount * 2) + 2000),
   );
+}
+
+function explicitSpecialistScenes(
+  sectionBrief: Partial<SectionWritingBrief>,
+): SpecialistScene[] {
+  const explicitPattern =
+    /\b(?:explicit|graphic|open[ -]door|on[ -]page sex|sex scene|hate sex|rough sex|full sex|oral sex|anal sex|blowjob|handjob|penetrat(?:e|es|ed|ing|ion|ive)|orgasm|climax(?:es|ed|ing)?)\b/i;
+  const negativePattern =
+    /\b(?:no sex|do not have sex|don't have sex|must not have sex|fade to black|closed door)\b/i;
+  const beats = sectionBrief.requiredBeats ?? [];
+
+  return beats
+    .filter(
+      (beat) =>
+        explicitPattern.test(beat.instruction) &&
+        !negativePattern.test(beat.instruction),
+    )
+    .slice(0, 3)
+    .map((beat, index) => ({
+      marker: `${AION_MARKER_PREFIX}${index + 1}]]`,
+      instruction: beat.instruction,
+      wordTarget:
+        typeof beat.approximateWordTarget === "number"
+          ? Math.max(500, Math.min(1800, beat.approximateWordTarget))
+          : 900,
+    }));
+}
+
+function aionDiagnostic(input: {
+  status: "succeeded" | "failed";
+  usage?: OpenRouterUsage;
+  durationMs: number;
+  attempt: number;
+  error?: string;
+}): GenerationDiagnostic {
+  const inputTokens = input.usage?.prompt_tokens ?? 0;
+  const outputTokens = input.usage?.completion_tokens ?? 0;
+  const reportedCost =
+    typeof input.usage?.cost === "number" ? input.usage.cost : null;
+
+  return {
+    stage: "aion_automatic_intimacy_scene",
+    provider: "openrouter",
+    model: AION_MODEL,
+    status: input.status,
+    inputTokens,
+    outputTokens,
+    totalTokens: input.usage?.total_tokens ?? inputTokens + outputTokens,
+    costUsd: reportedCost,
+    costType: reportedCost === null ? "unavailable" : "reported",
+    durationMs: input.durationMs,
+    attempt: input.attempt,
+    ...(input.error ? { error: input.error } : {}),
+  };
+}
+
+function markerContext(draft: string, marker: string): {
+  before: string;
+  after: string;
+} {
+  const markerIndex = draft.indexOf(marker);
+  if (markerIndex < 0) {
+    throw new Error(`Astra did not place the required specialist marker ${marker}.`);
+  }
+
+  return {
+    before: draft.slice(Math.max(0, markerIndex - 9000), markerIndex).trim(),
+    after: draft
+      .slice(markerIndex + marker.length, markerIndex + marker.length + 6000)
+      .trim(),
+  };
+}
+
+function validateSpecialistScene(scene: string): void {
+  if (!scene || countWords(scene) < 350) {
+    throw new Error("Aion returned an incomplete intimacy scene.");
+  }
+  if (
+    /^\s{0,3}#{1,6}\s+\S+/mu.test(scene) ||
+    /```/.test(scene) ||
+    /<\/?think[^>]*>/i.test(scene) ||
+    /^\s*(?:rewrite|replacement|analysis|notes?|explanation)\s*:/im.test(scene)
+  ) {
+    throw new Error("Aion returned commentary or formatting instead of novel prose.");
+  }
+  if (/[—–]/u.test(scene)) {
+    throw new Error("Aion returned prohibited long dashes.");
+  }
+  if (repeatedWindowOccurrences(scene, 16) >= 4) {
+    throw new Error("Aion repeated substantial prose inside the intimacy scene.");
+  }
+}
+
+async function writeSpecialistScene(input: {
+  scene: SpecialistScene;
+  assembledDraft: string;
+  storyBible: unknown;
+  storyState: unknown;
+  chapterBrief: string;
+  povCharacter: string;
+  diagnostics: GenerationDiagnostic[];
+}): Promise<string> {
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error(
+      "This chapter contains an explicit scene, but OPENROUTER_API_KEY is not configured for the automatic Aion handoff.",
+    );
+  }
+
+  const context = markerContext(input.assembledDraft, input.scene.marker);
+  const prompt = [
+    "You are NovelForge's specialist intimacy writer for commercial adult MM romance.",
+    "Write only the missing scene represented by the supplied marker. Return finished novel prose only, with no heading, marker, analysis, notes or markdown.",
+    "Every romantic and sexual character is an adult aged eighteen or older. The scene is consensual. Follow the requested heat and acts directly, vividly and moment by moment.",
+    "Preserve the fixed first-person POV, tense, character voices, physical staging, established boundaries and continuity. Begin exactly after BEFORE THE MARKER and end exactly before AFTER THE MARKER so the inserted prose reads as one uninterrupted chapter.",
+    "Make the intimacy particular to these men and this stage of their relationship. It must reveal character, change the relationship or raise the emotional stakes. Avoid a generic escalation sequence, anatomy inventory, recycled dirty talk, repeated reassurance, automatic soft aftercare and abrupt emotional breakthroughs that the contract does not authorise.",
+    "Use natural contractions and complete contemporary sentences. Never use em dashes or en dashes. Do not recap earlier prose, repeat the first line after the marker or continue into later chapter beats.",
+    `TARGET LENGTH: approximately ${input.scene.wordTarget} words. Finish the scene cleanly even if exact length varies.`,
+    "SCENE REQUIREMENT:\n" + input.scene.instruction,
+    "POV CHARACTER:\n" + input.povCharacter,
+    "CHAPTER CONTRACT:\n" + input.chapterBrief,
+    "STORY BIBLE:\n" + JSON.stringify(input.storyBible ?? {}, null, 2),
+    "CONTINUITY STATE:\n" +
+      JSON.stringify(cleanStoryState(input.storyState), null, 2),
+    "BEFORE THE MARKER:\n" + context.before,
+    "AFTER THE MARKER:\n" + context.after,
+  ].join("\n\n");
+
+  const startedAt = Date.now();
+  let usage: OpenRouterUsage | undefined;
+
+  try {
+    const response = await openrouter.chat.completions.create({
+      model: AION_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Return only the complete missing intimacy scene. Reason internally but never expose reasoning. Preserve the supplied boundaries exactly.",
+        },
+        { role: "user", content: prompt },
+      ],
+      max_tokens: Math.min(8000, Math.max(2500, input.scene.wordTarget * 3)),
+      temperature: 0.65,
+      top_p: 0.9,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+    });
+    usage = response.usage as OpenRouterUsage | undefined;
+    const choice = response.choices[0];
+
+    if (choice?.finish_reason === "length") {
+      throw new Error("Aion reached its output limit before finishing the intimacy scene.");
+    }
+    if (choice?.finish_reason === "content_filter") {
+      throw new Error("Aion's provider stopped the intimacy scene with a content filter.");
+    }
+
+    const prose = choice?.message?.content?.trim() ?? "";
+    validateSpecialistScene(prose);
+    input.diagnostics.push(
+      aionDiagnostic({
+        status: "succeeded",
+        usage,
+        durationMs: Date.now() - startedAt,
+        attempt: 1,
+      }),
+    );
+    return prose;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Aion could not write the intimacy scene.";
+    input.diagnostics.push(
+      aionDiagnostic({
+        status: "failed",
+        usage,
+        durationMs: Date.now() - startedAt,
+        attempt: 1,
+        error: message,
+      }),
+    );
+    throw new Error(message);
+  }
 }
 
 function countWords(text: string): number {
@@ -367,6 +570,7 @@ function getPrompt(input: {
   sectionToRewrite: string;
   sectionInstruction: string;
   latestUserMessage: string;
+  specialistScenes: SpecialistScene[];
 }): string {
   const sectionBrief = readSectionBrief(input.chapterBrief);
   const originalGuidance =
@@ -418,6 +622,20 @@ function getPrompt(input: {
       : input.action === "rewrite"
         ? "Replace SECTION TO REWRITE only. Preserve what happens immediately before and after it. The full Chapter Contract governs continuity and prohibitions, but do not add later required beats, rewrite the whole chapter or advance beyond the selected passage."
         : `Continue from the exact final moment of EXACT CONTINUATION BOUNDARY. Compare the COMPLETE CURRENT CHAPTER DRAFT against every REQUIRED BEAT. Treat a beat as complete only when its specific required event is actually present on the page. Write only the remaining beats, in order, without repeating completed material. Bring the complete draft toward ${targetWordRange.minimum.toLocaleString()} to ${targetWordRange.maximum.toLocaleString()} total words, aiming near ${targetWordRange.preferred.toLocaleString()}, and stop at the ENDPOINT without advancing beyond it.`;
+  const specialistBudget = input.specialistScenes.reduce(
+    (total, scene) => total + scene.wordTarget,
+    0,
+  );
+  const specialistInstruction = input.specialistScenes.length
+    ? [
+        "AUTOMATIC SPECIALIST HANDOFF",
+        "The explicit intimacy beats listed below will be written by NovelForge's specialist model after this response.",
+        "At the exact chronological position of each listed beat, output its marker on a line by itself. Do not write, summarise or fade through the missing sexual action. Continue with later prose only when the chapter contract requires later beats.",
+        "Make the prose immediately before and after every marker join naturally once the marker is replaced. Do not refer to a missing scene, a handoff or a marker in the narration.",
+        `Reserve approximately ${specialistBudget.toLocaleString()} words of the complete chapter target for specialist scenes. Keep the non-specialist prose compact enough that the final assembled chapter remains within the contract range.`,
+        JSON.stringify(input.specialistScenes, null, 2),
+      ].join("\n\n")
+    : "";
 
   return [
     "You are NovelForge. Write polished, immersive adult MM romance as a skilled human novelist would write it.",
@@ -454,6 +672,7 @@ function getPrompt(input: {
     "Let attraction, awareness, emotional attachment and physical escalation develop at the pace established by the Story Bible, current guidance and events already shown. Do not force the next romantic milestone merely because the characters share a scene.",
     "When CURRENT GUIDANCE calls for explicit intimacy, write it openly, vividly and moment by moment. Keep the bodies and movement physically clear. Make the language, tempo, humour, hunger, vulnerability, power and aftermath specific to these men and this point in their relationship.",
     "Do not use a standard escalation sequence, anatomy inventory, recycled dirty talk, repeated reassurance, procedural checklists or an automatic soft aftercare scene. Intimacy must reveal character, change the relationship or create a consequence, and it must not repeat the shape or language of an earlier encounter.",
+    specialistInstruction,
     "POV",
     "Use the Story Bible's POV and tense. Default to first-person present only if neither is specified. Remain in " +
       input.povCharacter +
@@ -822,6 +1041,8 @@ export async function POST(request: Request) {
     const chapterDraft = cleanString(body.chapterDraft);
     const sectionToRewrite = cleanString(body.sectionToRewrite);
     const sectionBrief = readSectionBrief(chapterBrief);
+    const specialistScenes =
+      action === "start" ? explicitSpecialistScenes(sectionBrief) : [];
     const targetWordRange = getTargetWordRange(sectionBrief);
     const maxOutputTokens = getOutputTokenLimit(targetWordRange.maximum);
 
@@ -872,6 +1093,7 @@ export async function POST(request: Request) {
       sectionToRewrite,
       sectionInstruction: cleanString(body.sectionInstruction),
       latestUserMessage: cleanString(body.latestUserMessage),
+      specialistScenes,
     });
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -928,12 +1150,9 @@ export async function POST(request: Request) {
           chapterTitle,
           povCharacter,
         );
-        validateSection(section);
-        const warnings = repetitionWarnings(
-          chapterDraft,
-          section,
-          sectionToRewrite,
-        );
+        if (!specialistScenes.length) {
+          validateSection(section);
+        }
 
         diagnostics.push(
           diagnostic({
@@ -944,11 +1163,61 @@ export async function POST(request: Request) {
           }),
         );
 
+        let assembledSection = section;
+        if (specialistScenes.length) {
+          try {
+            for (const scene of specialistScenes) {
+              const replacement = await writeSpecialistScene({
+                scene,
+                assembledDraft: assembledSection,
+                storyBible: body.storyBible ?? {},
+                storyState: body.storyState ?? {},
+                chapterBrief,
+                povCharacter,
+                diagnostics,
+              });
+              assembledSection = assembledSection.replace(scene.marker, replacement);
+            }
+          } catch (error) {
+            return NextResponse.json(
+              {
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : "The automatic Aion handoff failed.",
+                preservedDraft: chapterDraft || null,
+                diagnostics,
+              },
+              { status: 502 },
+            );
+          }
+        }
+
+        if (assembledSection.includes(AION_MARKER_PREFIX)) {
+          return NextResponse.json(
+            {
+              error:
+                "The chapter still contains an unresolved Aion scene marker, so NovelForge refused to save an incomplete draft.",
+              preservedDraft: chapterDraft || null,
+              diagnostics,
+            },
+            { status: 502 },
+          );
+        }
+
+        validateSection(assembledSection);
+        const warnings = repetitionWarnings(
+          chapterDraft,
+          assembledSection,
+          sectionToRewrite,
+        );
+
         return NextResponse.json({
-          section,
-          wordCount: countWords(section),
+          section: assembledSection,
+          wordCount: countWords(assembledSection),
           warnings,
           action,
+          specialistScenesWritten: specialistScenes.length,
           diagnostics,
         });
       } catch (error) {
@@ -995,3 +1264,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
