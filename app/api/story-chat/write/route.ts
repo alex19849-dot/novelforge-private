@@ -161,17 +161,23 @@ function getOutputTokenLimit(maximumWordCount: number): number {
 
 function explicitSpecialistScenes(
   sectionBrief: Partial<SectionWritingBrief>,
+  latestUserMessage: string,
 ): SpecialistScene[] {
   const explicitPattern =
-    /\b(?:explicit|graphic|open[ -]door|on[ -]page sex|sex scene|hate sex|rough sex|full sex|oral sex|anal sex|blowjob|handjob|penetrat(?:e|es|ed|ing|ion|ive)|orgasm|climax(?:es|ed|ing)?)\b/i;
+    /\b(?:explicit|graphic|open[ -]door|on[ -]page sex|sex scene|hate sex|rough sex|full sex|oral sex|anal sex|blow[ -]?job|hand[ -]?job|penetrat(?:e|es|ed|ing|ion|ive)|orgasm|climax(?:es|ed|ing)?|masturbat\w*|wank\w*|jerk(?:ing|s|ed)?\s+(?:each other\s+)?off|perking\s+off|hands?\s+(?:inside|down)\s+(?:his|their|the|each other's)?\s*boxers|(?:get|gets|getting)\s+each other off)\b/i;
   const negativePattern =
-    /\b(?:no sex|do not have sex|don't have sex|must not have sex|fade to black|closed door)\b/i;
+    /\b(?:fade to black|closed door|do not depict (?:intimacy|sexual contact)|no sexual contact)\b/i;
   const beats = sectionBrief.requiredBeats ?? [];
+  const originalGuidance = sectionBrief.originalGuidance || latestUserMessage;
+  const guidanceRequestsExplicit = explicitPattern.test(originalGuidance);
+  const sexualBeatPattern =
+    /\b(?:physical encounter|sexual encounter|intimacy|intimate contact|touch(?:ing)?\s+(?:each other|over clothes|under clothes)|boxers|arousal|pleasure|hands?\s+(?:inside|down)|manual stimulation)\b/i;
 
   return beats
     .filter(
       (beat) =>
-        explicitPattern.test(beat.instruction) &&
+        (explicitPattern.test(beat.instruction) ||
+          (guidanceRequestsExplicit && sexualBeatPattern.test(beat.instruction))) &&
         !negativePattern.test(beat.instruction),
     )
     .slice(0, 3)
@@ -271,7 +277,7 @@ async function writeSpecialistScene(input: {
     "Write only the missing scene represented by the supplied marker. Return finished novel prose only, with no heading, marker, analysis, notes or markdown.",
     "Every romantic and sexual character is an adult aged eighteen or older. The scene is consensual. Follow the requested heat and acts directly, vividly and moment by moment.",
     "Preserve the fixed first-person POV, tense, character voices, physical staging, established boundaries and continuity. Begin exactly after BEFORE THE MARKER and end exactly before AFTER THE MARKER so the inserted prose reads as one uninterrupted chapter.",
-    "Make the intimacy particular to these men and this stage of their relationship. It must reveal character, change the relationship or raise the emotional stakes. Avoid a generic escalation sequence, anatomy inventory, recycled dirty talk, repeated reassurance, automatic soft aftercare and abrupt emotional breakthroughs that the contract does not authorise.",
+    "Make the intimacy particular to these men and this stage of their relationship. It must reveal character, change the relationship or raise the emotional stakes. Let touch move naturally according to position, desire and response rather than returning repeatedly to waists and arms; avoid an anatomy inventory. Avoid a generic escalation sequence, recycled dirty talk, repeated reassurance, automatic soft aftercare and abrupt emotional breakthroughs that the contract does not authorise.",
     "Use natural contractions and complete contemporary sentences. Never use em dashes or en dashes. Do not recap earlier prose, repeat the first line after the marker or continue into later chapter beats.",
     "When relevant supporting characters are present in this bounded scene, let them act and speak according to the supplied context instead of being described only through the POV character. If this scene also ends the chapter, land on its final live moment without an explanatory recap or generic thought about what comes next. Preserve the author's exact endpoint and do not invent additional beats.",
     `TARGET LENGTH: approximately ${input.scene.wordTarget} words. Finish the scene cleanly even if exact length varies.`,
@@ -672,7 +678,7 @@ function getPrompt(input: {
     "A stable minor injury belongs in continuity but not in the foreground. Mention it only if it changes, is directly aggravated or materially limits the current action. Do not repeatedly check, protect, worry about, discuss or reassure over a bandage, bruise, cut or other ordinary discomfort. Do not use routine caretaking as automatic proof of love.",
     "ROMANCE AND HIGH HEAT",
     "Every romantic or sexual character is an adult aged eighteen or older.",
-    "Let attraction, awareness, emotional attachment and physical escalation develop at the pace established by the Story Bible, current guidance and events already shown. Do not force the next romantic milestone merely because the characters share a scene.",
+    "Let attraction, awareness, emotional attachment and physical escalation develop at the pace established by the Story Bible, current guidance and events already shown. Do not force the next romantic milestone merely because the characters share a scene. Vary purposeful hand placement according to the bodies' positions and what each person wants or responds to; do not repeatedly default to touching waists and arms or turn touch into an anatomy inventory.",
     "When CURRENT GUIDANCE calls for explicit intimacy, write it openly, vividly and moment by moment. Keep the bodies and movement physically clear. Make the language, tempo, humour, hunger, vulnerability, power and aftermath specific to these men and this point in their relationship.",
     "Do not use a standard escalation sequence, anatomy inventory, recycled dirty talk, repeated reassurance, procedural checklists or an automatic soft aftercare scene. Intimacy must reveal character, change the relationship or create a consequence, and it must not repeat the shape or language of an earlier encounter.",
     specialistInstruction,
@@ -1044,8 +1050,11 @@ export async function POST(request: Request) {
     const chapterDraft = cleanString(body.chapterDraft);
     const sectionToRewrite = cleanString(body.sectionToRewrite);
     const sectionBrief = readSectionBrief(chapterBrief);
+    const latestUserMessage = cleanString(body.latestUserMessage);
     const specialistScenes =
-      action === "start" ? explicitSpecialistScenes(sectionBrief) : [];
+      action === "start"
+        ? explicitSpecialistScenes(sectionBrief, latestUserMessage)
+        : [];
     const targetWordRange = getTargetWordRange(sectionBrief);
     const maxOutputTokens = getOutputTokenLimit(targetWordRange.maximum);
 
@@ -1053,6 +1062,22 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "A current section brief and POV character are required." },
         { status: 400 },
+      );
+    }
+
+    if (
+      action === "start" &&
+      !specialistScenes.length &&
+      /\b(?:explicit|graphic|open[ -]door|on[ -]page sex|sex scene|hand[ -]?job|masturbat\w*|wank\w*|jerk(?:ing|s|ed)?\s+(?:each other\s+)?off|perking\s+off|hands?\s+(?:inside|down)\s+(?:his|their|the|each other's)?\s*boxers)\b/i.test(
+        sectionBrief.originalGuidance || latestUserMessage,
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "The chapter requests on-page intimacy, but no required beat identifies where to place the Aion handoff. Revise the Chapter Contract before writing so the scene cannot fade to black.",
+        },
+        { status: 422 },
       );
     }
 
