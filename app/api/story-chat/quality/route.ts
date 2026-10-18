@@ -510,7 +510,7 @@ export async function POST(request: Request) {
           schema: qualitySchema,
         },
       },
-      max_output_tokens: 5000,
+      max_output_tokens: 12000,
     });
 
     const usage = response.usage;
