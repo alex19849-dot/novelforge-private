@@ -50,6 +50,7 @@ type WriterResponse = {
   wordCount: number;
   warnings: string[];
   action: SectionAction;
+  specialistScenesPending?: boolean;
   diagnostics: GenerationDiagnostic[];
 };
 
@@ -2219,11 +2220,12 @@ device.`,
     savePendingGeneration(workingPending);
 
     try {
+      const resumingSpecialist = workingPending.draft.includes("[[AION_SCENE_");
       if (action === "continue" && !workingPending.draft.trim()) {
         throw new Error("There is no chapter draft to continue.");
       }
 
-      if (action === "rewrite" && !workingPending.lastSection?.trim()) {
+      if (!resumingSpecialist && action === "rewrite" && !workingPending.lastSection?.trim()) {
         throw new Error("There is no previous generated section to rewrite.");
       }
 
@@ -2239,66 +2241,107 @@ device.`,
           : baseStory.chapters
               .filter((chapter) => chapter.number < replacementNumber)
               .slice(-2);
-      const response = await fetch("/api/story-chat/write", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          storyBible: baseStory.storyBible,
-          storyState: writingStoryState,
-          recentChapters,
-          chapterBrief: workingPending.chapterBrief,
-          chapterTitle: workingPending.generatedChapter.title,
-          povCharacter: workingPending.generatedChapter.povCharacter,
-          chapterDraft: workingPending.draft,
-          sectionToRewrite:
-            action === "rewrite" ? (workingPending.lastSection ?? "") : "",
-          sectionInstruction,
-          latestUserMessage: workingPending.latestUserMessage,
-        }),
-      });
-      const data = await readApiJson(response);
+      let nextDraft = workingPending.draft.trim();
+      let warnings: string[] = workingPending.repetitionWarnings ?? [];
+      let lastGeneratedSection = "";
 
-      if (!isWriterResponse(data) || data.action !== action) {
-        throw new Error("The writer returned an invalid chapter section.");
+      if (!resumingSpecialist) {
+        const response = await fetch("/api/story-chat/write", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            storyBible: baseStory.storyBible,
+            storyState: writingStoryState,
+            recentChapters,
+            chapterBrief: workingPending.chapterBrief,
+            chapterTitle: workingPending.generatedChapter.title,
+            povCharacter: workingPending.generatedChapter.povCharacter,
+            chapterDraft: workingPending.draft,
+            sectionToRewrite:
+              action === "rewrite" ? (workingPending.lastSection ?? "") : "",
+            sectionInstruction,
+            latestUserMessage: workingPending.latestUserMessage,
+          }),
+        });
+        const data = await readApiJson(response);
+
+        if (!isWriterResponse(data) || data.action !== action) {
+          throw new Error("The writer returned an invalid chapter section.");
+        }
+        lastGeneratedSection = data.section.trim();
+
+        if (action === "start") {
+          nextDraft = data.section.trim();
+        } else if (action === "continue") {
+          nextDraft = (nextDraft + "\n\n" + data.section.trim()).trim();
+        } else {
+          const oldSection = workingPending.lastSection ?? "";
+          const sectionStart = nextDraft.lastIndexOf(oldSection);
+
+          if (sectionStart < 0) {
+            throw new Error(
+              "The previous section changed and could not be replaced safely.",
+            );
+          }
+
+          nextDraft =
+            nextDraft.slice(0, sectionStart) +
+            data.section.trim() +
+            nextDraft.slice(sectionStart + oldSection.length);
+          nextDraft = nextDraft.trim();
+        }
+        warnings = data.warnings;
+        workingPending = {
+          ...workingPending,
+          draft: nextDraft,
+          diagnostics: [...(workingPending.diagnostics ?? []), ...data.diagnostics],
+        };
+        savePendingGeneration(workingPending);
       }
 
-      let nextDraft = workingPending.draft.trim();
-
-      if (action === "start") {
-        nextDraft = data.section.trim();
-      } else if (action === "continue") {
-        nextDraft = (nextDraft + "\n\n" + data.section.trim()).trim();
-      } else {
-        const oldSection = workingPending.lastSection ?? "";
-        const sectionStart = nextDraft.lastIndexOf(oldSection);
-
-        if (sectionStart < 0) {
-          throw new Error(
-            "The previous section changed and could not be replaced safely.",
-          );
+      while (nextDraft.includes("[[AION_SCENE_")) {
+        const response = await fetch("/api/story-chat/write", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            phase: "fill_specialist",
+            action: "start",
+            storyBible: baseStory.storyBible,
+            storyState: writingStoryState,
+            chapterBrief: workingPending.chapterBrief,
+            chapterTitle: workingPending.generatedChapter.title,
+            povCharacter: workingPending.generatedChapter.povCharacter,
+            chapterDraft: nextDraft,
+            latestUserMessage: workingPending.latestUserMessage,
+          }),
+        });
+        const data = await readApiJson(response);
+        if (!isWriterResponse(data) || data.action !== "start" ||
+            data.section.trim() === nextDraft) {
+          throw new Error("Aion returned an invalid or unchanged chapter draft.");
         }
-
-        nextDraft =
-          nextDraft.slice(0, sectionStart) +
-          data.section.trim() +
-          nextDraft.slice(sectionStart + oldSection.length);
-        nextDraft = nextDraft.trim();
+        nextDraft = data.section.trim();
+        warnings = data.warnings;
+        workingPending = {
+          ...workingPending,
+          draft: nextDraft,
+          diagnostics: [...(workingPending.diagnostics ?? []), ...data.diagnostics],
+        };
+        savePendingGeneration(workingPending);
       }
 
       workingPending = {
         ...workingPending,
         draft: nextDraft,
-        lastSection: data.section.trim(),
-        repetitionWarnings: data.warnings,
+        lastSection: action === "start" || resumingSpecialist
+          ? nextDraft
+          : lastGeneratedSection,
+        repetitionWarnings: warnings,
         qualityReview: undefined,
         qualityCheckedDraft: undefined,
         qualityOverrideReady: undefined,
         qualityTechnicalError: undefined,
-        diagnostics: [
-          ...(workingPending.diagnostics ?? []),
-          ...data.diagnostics,
-        ],
       };
       savePendingGeneration(workingPending);
       setSectionInstruction("");
@@ -2332,7 +2375,9 @@ device.`,
             content:
               "I couldn't write that section: " +
               message +
-              " Your existing chapter draft has been preserved.",
+              (workingPending.draft.includes("[[AION_SCENE_")
+                ? " Astra's draft is saved. Press Complete chapter to retry only the Aion scene."
+                : " Your existing chapter draft has been preserved."),
           },
         ],
         updatedAt: new Date().toISOString(),
@@ -2350,6 +2395,12 @@ device.`,
     baseStory: StoryWorkspace,
   ) {
     if (!pending.draft.trim()) {
+      await writeChapterSection(pending, baseStory, "start");
+      return;
+    }
+
+    if (pending.draft.includes("[[AION_SCENE_")) {
+      await writeChapterSection(pending, baseStory, "continue");
       return;
     }
 
@@ -3437,7 +3488,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
                       void writeChapterSection(
                         pendingForCurrentStory,
                         story,
-                        "continue",
+                        pendingForCurrentStory.draft.trim() ? "continue" : "start",
                       )
                   : undefined
               }
