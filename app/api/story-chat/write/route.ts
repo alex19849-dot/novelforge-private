@@ -305,7 +305,7 @@ async function writeSpecialistScene(input: {
         },
         { role: "user", content: prompt },
       ],
-      max_tokens: Math.min(8000, Math.max(12000, input.scene.wordTarget * 3)),
+      max_tokens: Math.min(8000, Math.max(2500, input.scene.wordTarget * 3)),
       temperature: 0.65,
       top_p: 0.9,
       frequency_penalty: 0,
