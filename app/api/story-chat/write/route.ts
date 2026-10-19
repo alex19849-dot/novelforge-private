@@ -30,6 +30,7 @@ const openrouter = new OpenAI({
 type SectionAction = "start" | "continue" | "rewrite";
 
 type WriterRequest = {
+  phase?: unknown;
   storyBible?: unknown;
   storyState?: unknown;
   recentChapters?: unknown;
@@ -305,7 +306,7 @@ async function writeSpecialistScene(input: {
         },
         { role: "user", content: prompt },
       ],
-      max_tokens: Math.min(8000, Math.max(2500, input.scene.wordTarget * 3)),
+      max_tokens: Math.min(18000, Math.max(12000, input.scene.wordTarget * 9)),
       temperature: 0.65,
       top_p: 0.9,
       frequency_penalty: 0,
@@ -1051,6 +1052,7 @@ export async function POST(request: Request) {
     const sectionToRewrite = cleanString(body.sectionToRewrite);
     const sectionBrief = readSectionBrief(chapterBrief);
     const latestUserMessage = cleanString(body.latestUserMessage);
+    const phase = cleanString(body.phase);
     const specialistScenes =
       action === "start"
         ? explicitSpecialistScenes(sectionBrief, latestUserMessage)
@@ -1063,6 +1065,68 @@ export async function POST(request: Request) {
         { error: "A current section brief and POV character are required." },
         { status: 400 },
       );
+    }
+
+    if (phase === "fill_specialist") {
+      if (action !== "start" || !chapterDraft || !specialistScenes.length) {
+        return NextResponse.json(
+          { error: "A saved chapter with a pending specialist scene is required." },
+          { status: 409 },
+        );
+      }
+
+      const nextScene = specialistScenes.find((scene) =>
+        chapterDraft.includes(scene.marker),
+      );
+      if (!nextScene) {
+        return NextResponse.json(
+          { error: "The saved chapter has no recognised Aion marker to resume." },
+          { status: 409 },
+        );
+      }
+
+      try {
+        const replacement = await writeSpecialistScene({
+          scene: nextScene,
+          assembledDraft: chapterDraft,
+          storyBible: body.storyBible ?? {},
+          storyState: body.storyState ?? {},
+          chapterBrief,
+          povCharacter,
+          diagnostics,
+        });
+        const section = chapterDraft.replace(nextScene.marker, replacement);
+        const specialistScenesPending = specialistScenes.some((scene) =>
+          section.includes(scene.marker),
+        );
+
+        if (!specialistScenesPending) {
+          validateSection(section);
+        }
+
+        return NextResponse.json({
+          section,
+          wordCount: countWords(section),
+          warnings: specialistScenesPending
+            ? []
+            : repetitionWarnings("", section, ""),
+          action: "start",
+          specialistScenesPending,
+          diagnostics,
+        });
+      } catch (error) {
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "The automatic Aion handoff failed.",
+            preservedDraft: chapterDraft,
+            diagnostics,
+          },
+          { status: 502 },
+        );
+      }
     }
 
     if (
@@ -1193,32 +1257,17 @@ export async function POST(request: Request) {
 
         let assembledSection = section;
         if (specialistScenes.length) {
-          try {
-            for (const scene of specialistScenes) {
-              const replacement = await writeSpecialistScene({
-                scene,
-                assembledDraft: assembledSection,
-                storyBible: body.storyBible ?? {},
-                storyState: body.storyState ?? {},
-                chapterBrief,
-                povCharacter,
-                diagnostics,
-              });
-              assembledSection = assembledSection.replace(scene.marker, replacement);
-            }
-          } catch (error) {
-            return NextResponse.json(
-              {
-                error:
-                  error instanceof Error
-                    ? error.message
-                    : "The automatic Aion handoff failed.",
-                preservedDraft: chapterDraft || null,
-                diagnostics,
-              },
-              { status: 502 },
-            );
+          for (const scene of specialistScenes) {
+            markerContext(assembledSection, scene.marker);
           }
+          return NextResponse.json({
+            section: assembledSection,
+            wordCount: countWords(assembledSection),
+            warnings: [],
+            action,
+            specialistScenesPending: true,
+            diagnostics,
+          });
         }
 
         if (assembledSection.includes(AION_MARKER_PREFIX)) {
