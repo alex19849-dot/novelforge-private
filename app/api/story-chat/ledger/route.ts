@@ -422,6 +422,15 @@ same person or object, categorising the reaction, recalling the same evidence
 and reaching the same conclusion again. Record the conclusion already completed
 and what genuinely new evidence would be required before it can return.
 
+For each meaningful relationship disagreement or request for reassurance, record
+the subject and its on-page outcome in the latest chapter entry's repeatedBeats
+and, where it changes the relationship, in relationshipStates. Distinguish a
+settled question from an ongoing external problem: the problem may remain open
+while the couple's answer to it is settled. Remove the settled question from
+unresolvedThreads. Do not keep it open merely because one character could
+plausibly feel insecure again. A later chapter may revisit it only after a
+specific new event changes what either character knows, wants or can do.
+
 Also track repeated setting inventories, routine choreography, list-like action
 reporting, successive identical sentence openings, recycled jokes, gestures,
 attraction observations, reassurance loops, injury monitoring and protective
@@ -432,6 +441,9 @@ repetitionWarnings must be concise cumulative instructions. Retain useful
 warnings, merge duplicates and remove ones that no longer apply. repeatedBeats
 must name each chapter's completed conclusions, exchanges, sensory
 introductions and action patterns that must not be replayed.
+Write settled exchanges as concrete facts, for example "They agreed X after Y;
+do not ask for reassurance about X again without a new event", rather than
+generic warnings such as "avoid repeated reassurance".
 
 CHARACTER VOICE
 
