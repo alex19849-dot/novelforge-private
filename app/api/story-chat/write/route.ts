@@ -383,6 +383,16 @@ function cleanStoryState(value: unknown): unknown {
     currentScene: state.currentScene ?? null,
     relationshipProgression: state.relationshipProgression ?? [],
     repetitionMemory: state.repetitionMemory ?? null,
+    settledChapterExchanges: Array.isArray(state.chapterLedger)
+      ? state.chapterLedger.slice(-8).map((entry: unknown) => {
+          const chapter = entry as Record<string, unknown>;
+          return {
+            chapterNumber: chapter.chapterNumber,
+            relationshipShift: chapter.relationshipShift,
+            completedBeats: chapter.repeatedBeats ?? [],
+          };
+        })
+      : [],
   };
 }
 
@@ -676,6 +686,7 @@ function getPrompt(input: {
     "At scene and chapter boundaries, land on the strongest live action, exchange, decision, discovery or consequence, then stop at the specified endpoint. Do not append a recap, a paragraph explaining the meaning or feeling of what just happened, or a generic thought wondering what comes next. Allow implications and unresolved tension to remain. Vary the shape of endings; do not routinely finish with ominous reflection or a rhetorical question. Preserve any explicitly requested final beat or line.",
     "Treat the repetition report as guidance, not a rigid blacklist. Avoid a tracked pattern naturally. Do not contort sentences, drain the character's voice or replace one repeated phrase with a different cliché merely to satisfy a count.",
     "Carry forward established facts, knowledge, positions, timeline and relationship progress. Do not invent off-page conversations, emotional breakthroughs, prior attraction, sudden conflicts or convenient solutions.",
+    "Treat a relationship question answered on page as settled continuity, even if its external cause remains unresolved. Check the completed exchanges and conclusions in the continuity ledger before writing another emotional conversation. Do not have either character seek the same reassurance or argue toward the same answer again with changed wording. Show lingering feelings through new behaviour, humour, intimacy or a concrete choice. Revisit the subject only when the author's current instruction explicitly requires it or a specific new event changes the facts or stakes; then give the exchange new information and an actual consequence. Do not invent neediness to fill a scene.",
     "A stable minor injury belongs in continuity but not in the foreground. Mention it only if it changes, is directly aggravated or materially limits the current action. Do not repeatedly check, protect, worry about, discuss or reassure over a bandage, bruise, cut or other ordinary discomfort. Do not use routine caretaking as automatic proof of love.",
     "ROMANCE AND HIGH HEAT",
     "Every romantic or sexual character is an adult aged eighteen or older.",
