@@ -2146,6 +2146,16 @@ and staging explicit enough that the prose cannot teleport characters or
 contradict positions. Do not restart conversations, arrivals, attraction
 observations, conflicts or reveals.
 
+Before planning a relationship discussion, compare its subject with completed
+exchanges and conclusions in the chapter ledger and repetition warnings. If
+the characters already reached an answer, do not plan another request for the
+same reassurance or another conversation that reaches the same answer. An
+external problem can remain unresolved while their answer to each other is
+settled. Show its lingering effect through new behaviour or a concrete choice.
+Reopen the subject only when the author's request explicitly calls for it or
+a specific new event changes the facts or stakes; make that event and the new
+outcome clear in the plan. Do not invent insecurity to create a scene.
+
 Base the plan only on the saved Story Bible, accepted continuity, previous
 chapters and the user's request. Preserve ages, locations, possessions, family
 facts and timeline. Do not invent convenient rules, messages, documents,
