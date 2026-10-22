@@ -11,12 +11,15 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const WRITING_MODEL = "cognitivecomputations/dolphin-mistral-24b-venice-edition";
-const INPUT_COST_PER_MILLION_TOKENS = 0.2;
-const CACHED_INPUT_COST_PER_MILLION_TOKENS = 0.2;
-const OUTPUT_COST_PER_MILLION_TOKENS = 0.9;
+const WRITING_MODEL = "gpt-6-astra";
+const INPUT_COST_PER_MILLION_TOKENS = 10;
+const CACHED_INPUT_COST_PER_MILLION_TOKENS = 1;
+const OUTPUT_COST_PER_MILLION_TOKENS = 50;
 const AION_MODEL = "aion-labs/aion-3.5";
 const AION_MARKER_PREFIX = "[[AION_SCENE_";
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
@@ -42,7 +45,6 @@ type WriterRequest = {
 };
 
 type Usage = {
-  cost?: number;
   input_tokens?: number;
   output_tokens?: number;
   total_tokens?: number;
@@ -153,7 +155,7 @@ function getTargetWordRange(
 
 function getOutputTokenLimit(maximumWordCount: number): number {
   return Math.min(
-    8192,
+    24000,
     Math.max(4000, Math.ceil(maximumWordCount * 2) + 2000),
   );
 }
@@ -1027,14 +1029,14 @@ function diagnostic(input: {
 
   return {
     stage: "chapter_section_writing",
-    provider: "openrouter",
+    provider: "openai",
     model: WRITING_MODEL,
     status: input.status,
     inputTokens,
     outputTokens,
     totalTokens: input.usage?.total_tokens ?? inputTokens + outputTokens,
-    costUsd: input.usage?.cost ?? (input.usage ? costUsd : null),
-    costType: input.usage?.cost !== undefined ? "reported" : "estimated",
+    costUsd,
+    costType: "estimated",
     durationMs: input.durationMs,
     attempt: input.attempt,
     ...(input.error ? { error: input.error } : {}),
@@ -1045,9 +1047,9 @@ export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
 
   try {
-    if (!process.env.OPENROUTER_API_KEY) {
+    if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { error: "OPENROUTER_API_KEY is not configured." },
+        { error: "OPENAI_API_KEY is not configured." },
         { status: 500 },
       );
     }
@@ -1197,100 +1199,32 @@ export async function POST(request: Request) {
       specialistScenes,
     });
 
-    let shortDraft = "";
-    const minimumChapterWords = targetWordRange.minimum;
-
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const startedAt = Date.now();
       let usage: Usage | undefined;
 
       try {
-        const response = await openrouter.chat.completions.create({
+        const response = await openai.responses.create({
           model: WRITING_MODEL,
-          messages: [
+          reasoning: {
+            effort: "low",
+          },
+          input: [
             {
               role: "system",
               content:
                 "You are NovelForge, writing polished adult MM romance as a skilled human novelist. The complete Chapter Contract and its original author guidance govern the requested events, order, endpoint, exclusions and length. On a start action, write the complete requested chapter in one response. On continuation, infer completed and remaining beats from the complete draft and write only what remains. On rewrite, replace only the selected passage. Follow accepted continuity, stay in the fixed POV and tense, and return only complete novel prose followed by <END_SECTION>. Write fluid contemporary prose with natural contractions. Make each character's voice distinct and each conversation logically connected, imperfect and alive. Let important moments breathe without filler, circular thought or repeated explanation. Treat repetition data as guidance rather than a rigid blacklist. Never foreground a stable minor injury or routine caretaking unless it materially affects the present action. When explicit intimacy is requested, make it vivid, physically clear, character-specific and consequential. Never use em dashes or en dashes, repeat completed material or add an unrequested escalation.",
             },
             { role: "user", content: writingPrompt },
-            ...(shortDraft
-              ? [
-                  { role: "assistant" as const, content: shortDraft + "\n<END_SECTION>" },
-                  {
-                    role: "user" as const,
-                    content:
-                      `The draft above is ${countWords(shortDraft)} words, below the Chapter Contract minimum of ${minimumChapterWords}. Replace it with ONE COMPLETE chapter of ${minimumChapterWords} to ${targetWordRange.maximum} words, aiming for ${targetWordRange.preferred}. Do not append a continuation after the endpoint. Develop the existing required beats through on-page action, dialogue and selective POV thought. Preserve the same ordered events, character knowledge, endpoint and exclusions. Do not add new plot events, recap, repeated exchanges or filler to reach the length. Allocate enough space to each beat before drafting. Return the entire replacement chapter, followed by <END_SECTION>.`,
-                  },
-                ]
-              : []),
           ],
-          max_tokens: maxOutputTokens,
+          text: {
+            verbosity: "medium",
+          },
+          max_output_tokens: maxOutputTokens,
         });
-        const providerUsage = response.usage as
-          | (OpenRouterUsage & {
-              completion_tokens_details?: { reasoning_tokens?: number };
-            })
-          | undefined;
-        usage = providerUsage
-          ? {
-              input_tokens: providerUsage.prompt_tokens,
-              output_tokens: providerUsage.completion_tokens,
-              total_tokens: providerUsage.total_tokens,
-              output_tokens_details: providerUsage.completion_tokens_details,
-              ...(typeof providerUsage.cost === "number" &&
-              Number.isFinite(providerUsage.cost)
-                ? { cost: providerUsage.cost }
-                : {}),
-            }
-          : undefined;
-        const choice = response.choices[0];
+        usage = response.usage as Usage | undefined;
 
-        // A token limit is an unfinished draft, not an empty provider failure.
-        // Preserve it for review without launching another automatic request.
-        if (
-          choice?.finish_reason === "length" &&
-          choice.message.content?.trim() &&
-          action !== "rewrite" &&
-          !specialistScenes.length
-        ) {
-          const partial = extractCompletedSection(
-            choice.message.content.replace(/\s*<END_SECTION>\s*$/i, "") +
-              "\n<END_SECTION>",
-            chapterTitle,
-            povCharacter,
-          );
-          const keepEarlierDraft =
-            action === "start" && countWords(shortDraft) > countWords(partial);
-          const preserved = keepEarlierDraft ? shortDraft : partial;
-          const warning = keepEarlierDraft
-            ? `The correction reached the model's output limit and returned a shorter draft. The fuller ${countWords(preserved)}-word earlier draft is preserved; the Chapter Contract requires at least ${minimumChapterWords}.`
-            : `The model reached its ${maxOutputTokens.toLocaleString()}-token output limit. Its ${countWords(preserved)}-word response is preserved as an UNFINISHED draft and may end mid-sentence. It is not a completed chapter. Review it and use the existing continuation controls only if more prose is needed to reach the Chapter Contract endpoint. No further automatic request was made.`;
-
-          diagnostics.push(
-            diagnostic({
-              status: "failed",
-              usage,
-              durationMs: Date.now() - startedAt,
-              attempt,
-              error: "Output token limit reached; draft preserved for review.",
-            }),
-          );
-
-          return NextResponse.json({
-            section: preserved,
-            wordCount: countWords(preserved),
-            warnings: [
-              warning,
-              ...repetitionWarnings(chapterDraft, preserved, ""),
-            ],
-            action,
-            specialistScenesWritten: 0,
-            diagnostics,
-          });
-        }
-
-        if (choice?.finish_reason !== "stop") {
+        if (response.status === "incomplete") {
           const reasoningTokens =
             usage?.output_tokens_details?.reasoning_tokens ?? 0;
           const visibleOutputTokens = Math.max(
@@ -1300,14 +1234,13 @@ export async function POST(request: Request) {
 
           throw new Error(
             `The writing model did not complete the section because ${
-              choice?.finish_reason === "length"
-                ? "it reached the model output limit"
-                : choice?.finish_reason ?? "the response was interrupted"
+              response.incomplete_details?.reason ??
+              "the response was interrupted"
             }. It used ${reasoningTokens.toLocaleString()} hidden reasoning tokens and approximately ${visibleOutputTokens.toLocaleString()} visible output tokens.`,
           );
         }
 
-        const raw = choice?.message.content;
+        const raw = response.output_text;
 
         if (!raw?.trim()) {
           throw new TechnicalWriterError(
@@ -1315,7 +1248,7 @@ export async function POST(request: Request) {
           );
         }
 
-        let section = extractCompletedSection(
+        const section = extractCompletedSection(
           raw,
           chapterTitle,
           povCharacter,
@@ -1332,21 +1265,6 @@ export async function POST(request: Request) {
             attempt,
           }),
         );
-
-        const needsLengthRecovery =
-          action === "start" &&
-          !specialistScenes.length &&
-          countWords(section) < minimumChapterWords;
-
-        if (needsLengthRecovery && attempt === 1) {
-          shortDraft = section;
-          continue;
-        }
-
-        // Keep the fuller valid draft if the corrective response is even shorter.
-        if (needsLengthRecovery && countWords(shortDraft) > countWords(section)) {
-          section = shortDraft;
-        }
 
         let assembledSection = section;
         if (specialistScenes.length) {
@@ -1382,12 +1300,6 @@ export async function POST(request: Request) {
           sectionToRewrite,
         );
 
-        if (needsLengthRecovery) {
-          warnings.unshift(
-            `The model stopped early twice. This draft has ${countWords(assembledSection)} words; the Chapter Contract requires at least ${minimumChapterWords}. The draft is preserved for review, but it has not met the requested length.`,
-          );
-        }
-
         return NextResponse.json({
           section: assembledSection,
           wordCount: countWords(assembledSection),
@@ -1414,19 +1326,6 @@ export async function POST(request: Request) {
         );
 
         if (!retryable || attempt === 2) {
-          if (shortDraft) {
-            return NextResponse.json({
-              section: shortDraft,
-              wordCount: countWords(shortDraft),
-              warnings: [
-                `The length-correction attempt failed: ${writerError.message}. The earlier ${countWords(shortDraft)}-word draft is preserved for review; the Chapter Contract requires at least ${minimumChapterWords}.`,
-                ...repetitionWarnings("", shortDraft, ""),
-              ],
-              action,
-              specialistScenesWritten: 0,
-              diagnostics,
-            });
-          }
           const status = retryable ? 502 : 422;
 
           return NextResponse.json(
@@ -1453,7 +1352,5 @@ export async function POST(request: Request) {
     );
   }
 }
-
-
 
 
