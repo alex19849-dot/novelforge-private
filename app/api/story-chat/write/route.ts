@@ -1197,6 +1197,9 @@ export async function POST(request: Request) {
       specialistScenes,
     });
 
+    let shortDraft = "";
+    const minimumChapterWords = targetWordRange.minimum;
+
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       const startedAt = Date.now();
       let usage: Usage | undefined;
@@ -1211,6 +1214,16 @@ export async function POST(request: Request) {
                 "You are NovelForge, writing polished adult MM romance as a skilled human novelist. The complete Chapter Contract and its original author guidance govern the requested events, order, endpoint, exclusions and length. On a start action, write the complete requested chapter in one response. On continuation, infer completed and remaining beats from the complete draft and write only what remains. On rewrite, replace only the selected passage. Follow accepted continuity, stay in the fixed POV and tense, and return only complete novel prose followed by <END_SECTION>. Write fluid contemporary prose with natural contractions. Make each character's voice distinct and each conversation logically connected, imperfect and alive. Let important moments breathe without filler, circular thought or repeated explanation. Treat repetition data as guidance rather than a rigid blacklist. Never foreground a stable minor injury or routine caretaking unless it materially affects the present action. When explicit intimacy is requested, make it vivid, physically clear, character-specific and consequential. Never use em dashes or en dashes, repeat completed material or add an unrequested escalation.",
             },
             { role: "user", content: writingPrompt },
+            ...(shortDraft
+              ? [
+                  { role: "assistant" as const, content: shortDraft + "\n<END_SECTION>" },
+                  {
+                    role: "user" as const,
+                    content:
+                      `The draft above is ${countWords(shortDraft)} words, below the Chapter Contract minimum of ${minimumChapterWords}. Replace it with ONE COMPLETE chapter of ${minimumChapterWords} to ${targetWordRange.maximum} words, aiming for ${targetWordRange.preferred}. Do not append a continuation after the endpoint. Develop the existing required beats through on-page action, dialogue and selective POV thought. Preserve the same ordered events, character knowledge, endpoint and exclusions. Do not add new plot events, recap, repeated exchanges or filler to reach the length. Allocate enough space to each beat before drafting. Return the entire replacement chapter, followed by <END_SECTION>.`,
+                  },
+                ]
+              : []),
           ],
           max_tokens: maxOutputTokens,
         });
@@ -1258,7 +1271,7 @@ export async function POST(request: Request) {
           );
         }
 
-        const section = extractCompletedSection(
+        let section = extractCompletedSection(
           raw,
           chapterTitle,
           povCharacter,
@@ -1275,6 +1288,21 @@ export async function POST(request: Request) {
             attempt,
           }),
         );
+
+        const needsLengthRecovery =
+          action === "start" &&
+          !specialistScenes.length &&
+          countWords(section) < minimumChapterWords;
+
+        if (needsLengthRecovery && attempt === 1) {
+          shortDraft = section;
+          continue;
+        }
+
+        // Keep the fuller valid draft if the corrective response is even shorter.
+        if (needsLengthRecovery && countWords(shortDraft) > countWords(section)) {
+          section = shortDraft;
+        }
 
         let assembledSection = section;
         if (specialistScenes.length) {
@@ -1310,6 +1338,12 @@ export async function POST(request: Request) {
           sectionToRewrite,
         );
 
+        if (needsLengthRecovery) {
+          warnings.unshift(
+            `The model stopped early twice. This draft has ${countWords(assembledSection)} words; the Chapter Contract requires at least ${minimumChapterWords}. The draft is preserved for review, but it has not met the requested length.`,
+          );
+        }
+
         return NextResponse.json({
           section: assembledSection,
           wordCount: countWords(assembledSection),
@@ -1336,6 +1370,19 @@ export async function POST(request: Request) {
         );
 
         if (!retryable || attempt === 2) {
+          if (shortDraft) {
+            return NextResponse.json({
+              section: shortDraft,
+              wordCount: countWords(shortDraft),
+              warnings: [
+                `The length-correction attempt failed: ${writerError.message}. The earlier ${countWords(shortDraft)}-word draft is preserved for review; the Chapter Contract requires at least ${minimumChapterWords}.`,
+                ...repetitionWarnings("", shortDraft, ""),
+              ],
+              action,
+              specialistScenesWritten: 0,
+              diagnostics,
+            });
+          }
           const status = retryable ? 502 : 422;
 
           return NextResponse.json(
@@ -1362,5 +1409,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
