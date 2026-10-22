@@ -1246,6 +1246,50 @@ export async function POST(request: Request) {
           : undefined;
         const choice = response.choices[0];
 
+        // A token limit is an unfinished draft, not an empty provider failure.
+        // Preserve it for review without launching another automatic request.
+        if (
+          choice?.finish_reason === "length" &&
+          choice.message.content?.trim() &&
+          action !== "rewrite" &&
+          !specialistScenes.length
+        ) {
+          const partial = extractCompletedSection(
+            choice.message.content.replace(/\s*<END_SECTION>\s*$/i, "") +
+              "\n<END_SECTION>",
+            chapterTitle,
+            povCharacter,
+          );
+          const keepEarlierDraft =
+            action === "start" && countWords(shortDraft) > countWords(partial);
+          const preserved = keepEarlierDraft ? shortDraft : partial;
+          const warning = keepEarlierDraft
+            ? `The correction reached the model's output limit and returned a shorter draft. The fuller ${countWords(preserved)}-word earlier draft is preserved; the Chapter Contract requires at least ${minimumChapterWords}.`
+            : `The model reached its ${maxOutputTokens.toLocaleString()}-token output limit. Its ${countWords(preserved)}-word response is preserved as an UNFINISHED draft and may end mid-sentence. It is not a completed chapter. Review it and use the existing continuation controls only if more prose is needed to reach the Chapter Contract endpoint. No further automatic request was made.`;
+
+          diagnostics.push(
+            diagnostic({
+              status: "failed",
+              usage,
+              durationMs: Date.now() - startedAt,
+              attempt,
+              error: "Output token limit reached; draft preserved for review.",
+            }),
+          );
+
+          return NextResponse.json({
+            section: preserved,
+            wordCount: countWords(preserved),
+            warnings: [
+              warning,
+              ...repetitionWarnings(chapterDraft, preserved, ""),
+            ],
+            action,
+            specialistScenesWritten: 0,
+            diagnostics,
+          });
+        }
+
         if (choice?.finish_reason !== "stop") {
           const reasoningTokens =
             usage?.output_tokens_details?.reasoning_tokens ?? 0;
@@ -1409,6 +1453,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 
