@@ -11,15 +11,12 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const WRITING_MODEL = "gpt-6-astra";
-const INPUT_COST_PER_MILLION_TOKENS = 10;
-const CACHED_INPUT_COST_PER_MILLION_TOKENS = 1;
-const OUTPUT_COST_PER_MILLION_TOKENS = 50;
+const WRITING_MODEL = "meta/muse-glimmer-30b";
+const INPUT_COST_PER_MILLION_TOKENS = 0.30;
+const CACHED_INPUT_COST_PER_MILLION_TOKENS = 0.04;
+const OUTPUT_COST_PER_MILLION_TOKENS = 1.20;
 const AION_MODEL = "aion-labs/aion-3.5";
 const AION_MARKER_PREFIX = "[[AION_SCENE_";
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
@@ -45,6 +42,7 @@ type WriterRequest = {
 };
 
 type Usage = {
+  cost?: number;
   input_tokens?: number;
   output_tokens?: number;
   total_tokens?: number;
@@ -155,7 +153,7 @@ function getTargetWordRange(
 
 function getOutputTokenLimit(maximumWordCount: number): number {
   return Math.min(
-    24000,
+    16384,
     Math.max(4000, Math.ceil(maximumWordCount * 2) + 2000),
   );
 }
@@ -1021,7 +1019,7 @@ function diagnostic(input: {
   const outputTokens = input.usage?.output_tokens ?? 0;
   const cachedTokens = input.usage?.input_tokens_details?.cached_tokens ?? 0;
   const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
-  const costUsd =
+  const estimatedCostUsd =
     (uncachedTokens * INPUT_COST_PER_MILLION_TOKENS +
       cachedTokens * CACHED_INPUT_COST_PER_MILLION_TOKENS +
       outputTokens * OUTPUT_COST_PER_MILLION_TOKENS) /
@@ -1029,14 +1027,14 @@ function diagnostic(input: {
 
   return {
     stage: "chapter_section_writing",
-    provider: "openai",
+    provider: "openrouter",
     model: WRITING_MODEL,
     status: input.status,
     inputTokens,
     outputTokens,
     totalTokens: input.usage?.total_tokens ?? inputTokens + outputTokens,
-    costUsd,
-    costType: "estimated",
+    costUsd: input.usage?.cost ?? estimatedCostUsd,
+    costType: input.usage?.cost === undefined ? "estimated" : "reported",
     durationMs: input.durationMs,
     attempt: input.attempt,
     ...(input.error ? { error: input.error } : {}),
@@ -1047,9 +1045,9 @@ export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
 
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENROUTER_API_KEY) {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY is not configured." },
+        { error: "OPENROUTER_API_KEY is not configured." },
         { status: 500 },
       );
     }
@@ -1204,12 +1202,21 @@ export async function POST(request: Request) {
       let usage: Usage | undefined;
 
       try {
-        const response = await openai.responses.create({
-          model: WRITING_MODEL,
-          reasoning: {
-            effort: "low",
+        // OpenRouter extensions are passed through the OpenAI-compatible client.
+        const museOptions = {
+          top_k: 64,
+          repetition_penalty: 1.0,
+          min_p: 0,
+          reasoning: { effort: "low" },
+          provider: {
+            only: ["DeepInfra"],
+            allow_fallbacks: false,
+            require_parameters: true,
           },
-          input: [
+        };
+        const response = await openrouter.chat.completions.create({
+          model: WRITING_MODEL,
+          messages: [
             {
               role: "system",
               content:
@@ -1217,14 +1224,35 @@ export async function POST(request: Request) {
             },
             { role: "user", content: writingPrompt },
           ],
-          text: {
-            verbosity: "medium",
-          },
-          max_output_tokens: maxOutputTokens,
+          max_tokens: maxOutputTokens,
+          temperature: 1.0,
+          top_p: 0.95,
+          frequency_penalty: 0,
+          presence_penalty: 0,
+          ...museOptions,
         });
-        usage = response.usage as Usage | undefined;
+        const providerUsage = response.usage as
+          | (OpenRouterUsage & {
+              prompt_tokens_details?: { cached_tokens?: number };
+              completion_tokens_details?: { reasoning_tokens?: number };
+            })
+          | undefined;
+        usage = providerUsage
+          ? {
+              input_tokens: providerUsage.prompt_tokens,
+              output_tokens: providerUsage.completion_tokens,
+              total_tokens: providerUsage.total_tokens,
+              input_tokens_details: providerUsage.prompt_tokens_details,
+              output_tokens_details: providerUsage.completion_tokens_details,
+              ...(typeof providerUsage.cost === "number" &&
+              Number.isFinite(providerUsage.cost)
+                ? { cost: providerUsage.cost }
+                : {}),
+            }
+          : undefined;
+        const choice = response.choices[0];
 
-        if (response.status === "incomplete") {
+        if (choice?.finish_reason !== "stop") {
           const reasoningTokens =
             usage?.output_tokens_details?.reasoning_tokens ?? 0;
           const visibleOutputTokens = Math.max(
@@ -1234,13 +1262,16 @@ export async function POST(request: Request) {
 
           throw new Error(
             `The writing model did not complete the section because ${
-              response.incomplete_details?.reason ??
-              "the response was interrupted"
+              choice?.finish_reason === "length"
+                ? "it reached the model output limit"
+                : choice?.finish_reason === "content_filter"
+                  ? "the provider applied a content filter"
+                  : choice?.finish_reason ?? "the response was interrupted"
             }. It used ${reasoningTokens.toLocaleString()} hidden reasoning tokens and approximately ${visibleOutputTokens.toLocaleString()} visible output tokens.`,
           );
         }
 
-        const raw = response.output_text;
+        const raw = choice?.message?.content;
 
         if (!raw?.trim()) {
           throw new TechnicalWriterError(
@@ -1352,5 +1383,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
