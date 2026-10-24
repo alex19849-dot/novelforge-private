@@ -187,6 +187,8 @@ export type ChapterPlan = {
 };
 
 export type ChapterContractBeat = {
+  /** Explicit specialist routing; absent only in contracts saved before this field existed. */
+  specialistWriter?: "aion" | null;
   order: number;
   instruction: string;
   /** Optional allocation supplied only when the author's guidance supports it. */
@@ -353,3 +355,4 @@ export type StoryChatResponse = {
   /** A separately saved book seeded from the current story. */
   createdStory?: StoryWorkspace | null;
 };
+
