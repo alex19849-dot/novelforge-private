@@ -11,6 +11,7 @@ import {
   type SetStateAction,
 } from "react";
 import type { StoryChapter } from "../types";
+import type { PassageRewriteRequest } from "../passageRewrite";
 
 type ReaderTheme = "light" | "sepia" | "dark";
 type ReaderWidth = "narrow" | "medium" | "wide";
@@ -31,6 +32,8 @@ type ChapterPanelProps = {
   chapters: StoryChapter[];
   readerOpen: boolean;
   onCloseReader: () => void;
+  onRewritePassage?: (request: PassageRewriteRequest) => Promise<void>;
+  isWriting?: boolean;
   onSaveChapter: (
     chapterId: string,
     updates: {
@@ -87,6 +90,8 @@ export default function ChapterPanel({
   readerOpen,
   onCloseReader,
   onSaveChapter,
+  onRewritePassage,
+  isWriting = false,
   readerTheme,
   setReaderTheme,
   readerFontSize,
@@ -111,6 +116,13 @@ export default function ChapterPanel({
   const [controlsVisible, setControlsVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [guidanceVisible, setGuidanceVisible] = useState(false);
+  const [rewritePassageText, setRewritePassageText] = useState("");
+  const [rewriteInstruction, setRewriteInstruction] = useState("rewrite this");
+  const [rewriteChapterId, setRewriteChapterId] = useState<string | null>(null);
+  const [rewriteRunning, setRewriteRunning] = useState(false);
+  const [rewriteMessage, setRewriteMessage] = useState("");
+  const [rewriteError, setRewriteError] = useState("");
+  const rewriteRunningRef = useRef(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
@@ -214,6 +226,8 @@ export default function ChapterPanel({
     readerFontSize,
     readerLineHeight,
     resizeEditArea,
+    chapters,
+    draftWorkspace?.content,
   ]);
 
   useEffect(() => {
@@ -233,7 +247,17 @@ export default function ChapterPanel({
     setIsEditing(false);
     setEditingChapterId(null);
     setActiveChapterId(orderedChapters[0]?.id ?? null);
-  }, [storyId, orderedChapters]);
+    setRewritePassageText("");
+    setRewriteChapterId(null);
+    setRewriteError("");
+    setRewriteMessage("");
+  }, [storyId]);
+
+  useEffect(() => {
+    if (!navigationItems.some((item) => item.id === activeChapterId)) {
+      setActiveChapterId(navigationItems[0]?.id ?? null);
+    }
+  }, [navigationItems, activeChapterId]);
 
   useLayoutEffect(() => {
     if (!readerOpen || restoredStoryRef.current === storyId) return;
@@ -278,6 +302,7 @@ export default function ChapterPanel({
   function handleScroll() {
     const reader = readerRef.current;
     if (!reader) return;
+    if (rewriteRunningRef.current) pendingScrollRestoreRef.current = reader.scrollTop;
     window.localStorage.setItem(progressKey(storyId), String(reader.scrollTop));
     const marker = reader.scrollTop + reader.clientHeight * 0.3;
     let closestId = orderedChapters[0]?.id ?? null;
@@ -325,8 +350,45 @@ export default function ChapterPanel({
     });
   }
 
+  function toggleGuidance() {
+    if (!guidanceVisible) {
+      setRewriteChapterId(activeChapterId ?? activeChapter?.id ?? null);
+      setRewriteError("");
+      setRewriteMessage("");
+    }
+    setGuidanceVisible((visible) => !visible);
+    setSettingsVisible(false);
+  }
+
+  async function applyPassageRewrite() {
+    if (!onRewritePassage || rewriteRunningRef.current || isWriting) return;
+    const chapterId = rewriteChapterId ?? activeChapterId ?? activeChapter?.id;
+    const content = chapterId === "__draft__" ? draftWorkspace?.content
+      : orderedChapters.find((chapter) => chapter.id === chapterId)?.content;
+    if (!chapterId || content === undefined) {
+      setRewriteError("Choose the chapter containing this passage first.");
+      return;
+    }
+    rewriteRunningRef.current = true;
+    setRewriteRunning(true);
+    setRewriteError("");
+    setRewriteMessage("");
+    pendingScrollRestoreRef.current = readerRef.current?.scrollTop ?? null;
+    try {
+      await onRewritePassage({ chapterId, sourceContent: content,
+        passage: rewritePassageText, instruction: rewriteInstruction });
+      setRewritePassageText("");
+      setRewriteMessage("Passage updated in the chapter.");
+    } catch (error) {
+      setRewriteError(error instanceof Error ? error.message : "The passage could not be rewritten.");
+    } finally {
+      rewriteRunningRef.current = false;
+      setRewriteRunning(false);
+    }
+  }
+
   function startEditing() {
-    if (!readerRef.current) return;
+    if (!readerRef.current || rewriteRunningRef.current) return;
     const chapterId = activeChapterId ?? activeChapter?.id;
     const chapter = chapterId ? chapterRefs.current.get(chapterId) : null;
     if (chapterId && chapter) {
@@ -667,10 +729,10 @@ export default function ChapterPanel({
                 <button
                   type="button"
                   onClick={startEditing}
-                  disabled={
+                  disabled={rewriteRunning || (
                     !activeChapter &&
                     !(activeChapterId === "__draft__" && draftWorkspace)
-                  }
+                  )}
                   className="rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
                 >
                   Edit
@@ -682,7 +744,7 @@ export default function ChapterPanel({
 
         {controlsVisible && !isEditing && (
           <footer
-            className={`absolute inset-x-0 bottom-0 z-40 border-t px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur ${chromeClasses}`}
+            className={`absolute inset-x-0 bottom-0 z-40 max-h-[65dvh] overflow-y-auto border-t px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur ${chromeClasses}`}
           >
             {settingsVisible && (
               <div className="mx-auto mb-2 max-w-2xl space-y-3 rounded-xl border border-current/10 p-3">
@@ -773,6 +835,49 @@ export default function ChapterPanel({
               </div>
             )}
 
+            {guidanceVisible && onRewritePassage && (
+              <div className="mx-auto mb-3 max-w-3xl space-y-2">
+                <p className="text-sm font-semibold">
+                  Rewrite passage in {rewriteChapterId === "__draft__" ? "current draft"
+                    : navigationItems.find((item) => item.id === rewriteChapterId)?.label ?? "current chapter"}
+                </p>
+                <label className="block text-xs">
+                  Passage to rewrite
+                  <textarea
+                    aria-label="Passage to rewrite"
+                    value={rewritePassageText}
+                    onChange={(event) => setRewritePassageText(event.target.value)}
+                    disabled={rewriteRunning}
+                    placeholder="Paste the exact section copied from this chapter."
+                    rows={4}
+                    className="mt-1 w-full resize-y rounded-xl border border-current/20 bg-transparent px-3 py-2 text-sm outline-none focus:border-pink-500 disabled:opacity-50"
+                  />
+                </label>
+                <label className="block text-xs">
+                  Rewrite instruction
+                  <textarea
+                    aria-label="Rewrite instruction"
+                    value={rewriteInstruction}
+                    onChange={(event) => setRewriteInstruction(event.target.value)}
+                    disabled={rewriteRunning}
+                    placeholder="rewrite this, or AION: rewrite this, followed by what you want changed"
+                    rows={2}
+                    className="mt-1 w-full resize-y rounded-xl border border-current/20 bg-transparent px-3 py-2 text-sm outline-none focus:border-pink-500 disabled:opacity-50"
+                  />
+                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs opacity-70">Use AION: at the start of your instruction to choose Aion.</p>
+                  <button type="button" onClick={() => void applyPassageRewrite()}
+                    disabled={isWriting || rewriteRunning || !rewritePassageText.trim()}
+                    className="shrink-0 rounded-lg bg-pink-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40">
+                    {rewriteRunning ? "Rewriting..." : "Rewrite passage"}
+                  </button>
+                </div>
+                {rewriteError && <p role="alert" className="text-sm text-red-500">{rewriteError}</p>}
+                {rewriteMessage && <p role="status" className="text-sm text-emerald-600">{rewriteMessage}</p>}
+              </div>
+            )}
+
             {draftWorkspace && guidanceVisible && (
               <div className="mx-auto mb-2 max-w-3xl">
                 <textarea
@@ -837,18 +942,15 @@ export default function ChapterPanel({
                   Plan
                 </button>
               )}
+              {(onRewritePassage || draftWorkspace) && (
+                <button type="button" onClick={toggleGuidance}
+                  aria-expanded={guidanceVisible}
+                  className="rounded-lg border border-current/15 px-3 py-2 text-sm font-semibold">
+                  Guide
+                </button>
+              )}
               {draftWorkspace && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setGuidanceVisible((visible) => !visible);
-                      setSettingsVisible(false);
-                    }}
-                    className="rounded-lg border border-current/15 px-3 py-2 text-sm font-semibold"
-                  >
-                    Guide
-                  </button>
                   <button
                     type="button"
                     disabled={
@@ -929,3 +1031,4 @@ export default function ChapterPanel({
     </section>
   );
 }
+
