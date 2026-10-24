@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
 
@@ -9,6 +9,7 @@ import ChatPanel from "./components/ChatPanel";
 import ChapterPanel from "./components/ChapterPanel";
 
 import BiblePanel from "./components/BiblePanel";
+import { findPassageRange, replacePassage, type PassageRewriteRequest } from "./passageRewrite";
 
 import type {
   ActiveTab,
@@ -1286,6 +1287,12 @@ export default function StoryChatPage() {
     useState<PendingChapterGeneration | null>(null);
 
   const [sectionInstruction, setSectionInstruction] = useState("");
+  const passageRewriteBusy = useRef(false);
+  const currentStoryRef = useRef(story);
+  const currentPendingRef = useRef(pendingGeneration);
+  currentStoryRef.current = story;
+  currentPendingRef.current = pendingGeneration;
+
 
   const [stories, setStories] = useState<
     {
@@ -1937,6 +1944,86 @@ device.`,
     setActiveTab("chat");
 
     setIsThinking(false);
+  }
+
+  async function rewritePassage(request: PassageRewriteRequest): Promise<void> {
+    const sourceStory = currentStoryRef.current;
+    if (!sourceStory || isThinking || passageRewriteBusy.current) {
+      throw new Error("Wait for the current writing request to finish.");
+    }
+    const isDraft = request.chapterId === "__draft__";
+    const sourcePending = currentPendingRef.current;
+    const chapter = sourceStory.chapters.find((item) => item.id === request.chapterId);
+    const sourceContent = isDraft && sourcePending?.storyId === sourceStory.id
+      ? sourcePending.draft : chapter?.content;
+    if (sourceContent !== request.sourceContent) {
+      throw new Error("This chapter has changed. Copy the passage again before rewriting.");
+    }
+    findPassageRange(request.sourceContent, request.passage);
+    const chapterNumber = isDraft ? sourcePending?.generatedChapter.replaceChapterNumber : chapter?.number;
+    const plan = sourceStory.storyState.chapterPlans?.find((item) => item.chapterNumber === chapterNumber);
+    passageRewriteBusy.current = true;
+    setIsThinking(true);
+    try {
+      const response = await fetch("/api/story-chat/rewrite", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chapterContent: request.sourceContent,
+          passage: request.passage, instruction: request.instruction,
+          povCharacter: isDraft ? sourcePending?.generatedChapter.povCharacter : chapter?.povCharacter,
+          storyBible: sourceStory.storyBible,
+          storyState: getStoryStateBeforeChapter(sourceStory.storyState, chapterNumber ?? null),
+          chapterBrief: isDraft ? sourcePending?.chapterBrief : plan ? JSON.stringify(plan) : "",
+        }),
+      });
+      const payload = await readApiJson(response);
+      if (!payload || typeof payload !== "object") throw new Error("The writer returned an invalid response.");
+      const data = payload as { replacement?: unknown; diagnostics?: unknown };
+      if (typeof data.replacement !== "string" || !data.replacement.trim() || !Array.isArray(data.diagnostics)) {
+        throw new Error("The writer returned an invalid replacement. Your chapter is unchanged.");
+      }
+      const latestStory = currentStoryRef.current;
+      const latestPending = currentPendingRef.current;
+      const latestChapter = latestStory?.chapters.find((item) => item.id === request.chapterId);
+      if (!latestStory || latestStory.id !== sourceStory.id ||
+          (isDraft ? latestPending?.storyId !== sourceStory.id || latestPending.draft !== request.sourceContent
+            : latestChapter?.content !== request.sourceContent)) {
+        throw new Error("The chapter changed while the rewrite was running. The rewrite was not applied; your latest edits are kept.");
+      }
+      const content = replacePassage(request.sourceContent, request.passage, data.replacement);
+      const diagnostics = data.diagnostics as GenerationDiagnostic[];
+      if (isDraft && latestPending) {
+        const nextPending: PendingChapterGeneration = {
+          ...latestPending, draft: content, lastSection: undefined,
+          repetitionWarnings: [], qualityReview: undefined, qualityCheckedDraft: undefined,
+          qualityOverrideReady: undefined, qualityTechnicalError: undefined,
+          diagnostics: [...(latestPending.diagnostics ?? []), ...diagnostics],
+        };
+        currentPendingRef.current = nextPending;
+        savePendingGeneration(nextPending);
+      }
+      const now = new Date().toISOString();
+      const dirtyChapter = latestStory.storyState.continuityDirtyFromChapter;
+      const nextStory: StoryWorkspace = {
+        ...latestStory,
+        chapters: isDraft ? latestStory.chapters : latestStory.chapters.map((item) =>
+          item.id === request.chapterId ? { ...item, content, updatedAt: now } : item),
+        storyState: {
+          ...latestStory.storyState, lastGenerationDiagnostics: diagnostics,
+          ...(!isDraft && latestChapter ? {
+            continuityDirtyFromChapter: Math.min(dirtyChapter ?? latestChapter.number, latestChapter.number),
+          } : {}),
+        },
+        updatedAt: now,
+      };
+      currentStoryRef.current = nextStory;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStory));
+      setStory(nextStory);
+      // Existing story and draft effects sync these edits to the signed-in account.
+    } finally {
+      passageRewriteBusy.current = false;
+      setIsThinking(false);
+    }
   }
 
   function updateChapter(
@@ -3457,6 +3544,8 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
                 setIsMenuOpen(true);
               }}
               onSaveChapter={updateChapter}
+              onRewritePassage={rewritePassage}
+              isWriting={isThinking}
               readerTheme={readerTheme}
               setReaderTheme={setReaderTheme}
               readerFontSize={readerFontSize}
@@ -3613,3 +3702,4 @@ disabled:opacity-40"
     </main>
   );
 }
+
