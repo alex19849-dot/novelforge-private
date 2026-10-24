@@ -623,10 +623,11 @@ const directSectionBriefSchema = {
           items: {
             type: "object",
             additionalProperties: false,
-            required: ["order", "instruction", "approximateWordTarget"],
+            required: ["order", "instruction", "approximateWordTarget", "specialistWriter"],
             properties: {
               order: { type: "integer" },
               instruction: { type: "string" },
+              specialistWriter: { anyOf: [{ type: "string", enum: ["aion"] }, { type: "null" }] },
               approximateWordTarget: {
                 anyOf: [{ type: "integer" }, { type: "null" }],
               },
@@ -1648,6 +1649,18 @@ ending point and deliberate changes intact. Do not add a competing goal, later
 event, awareness limit or invented development.
 
 ORDERED REQUIRED BEATS
+
+Every required beat must include specialistWriter: "aion" or null. This is a
+routing field, separate from the prose instruction. Preserve the author's
+explicit per-beat specialist labels in this field: a beat labelled EXPLICIT or
+AION is assigned "aion". All ordinary beats are null. Read the original author
+guidance when assigning the field, not just your paraphrased instruction. If
+one labelled beat needs several contract beats to preserve its requested
+sequence, retain its specialist assignment on those corresponding beats. Do
+not assign unrelated earlier or later beats to the specialist merely because
+the chapter contains a labelled beat. Ordinary non-explicit kissing alone does
+not require a specialist assignment. Preserve the author's requested events,
+boundaries and existing adult-content safeguards without adding new acts.
 
 Extract every event or development the user explicitly requires into
 requiredBeats. Keep the intended order. Each instruction must remain concrete
@@ -3324,6 +3337,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
             .map((beat, index) => ({
               order: index + 1,
               instruction: cleanString(beat.instruction),
+              specialistWriter: beat.specialistWriter === "aion" ? "aion" as const : null,
               ...(typeof beat.approximateWordTarget === "number" &&
               Number.isInteger(beat.approximateWordTarget) &&
               beat.approximateWordTarget > 0
@@ -3714,3 +3728,4 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     );
   }
 }
+
