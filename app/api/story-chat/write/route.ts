@@ -89,6 +89,11 @@ function readSectionBrief(value: string): Partial<SectionWritingBrief> {
       .map((beat, index) => ({
         order: index + 1,
         instruction: cleanString(beat.instruction),
+        ...(beat.specialistWriter === "aion"
+          ? { specialistWriter: "aion" as const }
+          : beat.specialistWriter === null
+            ? { specialistWriter: null }
+            : {}),
         ...(typeof beat.approximateWordTarget === "number" &&
         Number.isInteger(beat.approximateWordTarget) &&
         beat.approximateWordTarget > 0
@@ -167,7 +172,7 @@ function explicitSpecialistScenes(
   const explicitPattern =
     /\b(?:explicit|graphic|open[ -]door|on[ -]page sex|sex scene|hate sex|rough sex|full sex|oral sex|anal sex|blow[ -]?job|hand[ -]?job|penetrat(?:e|es|ed|ing|ion|ive)|orgasm|climax(?:es|ed|ing)?|masturbat\w*|wank\w*|jerk(?:ing|s|ed)?\s+(?:each other\s+)?off|perking\s+off|hands?\s+(?:inside|down)\s+(?:his|their|the|each other's)?\s*boxers|(?:get|gets|getting)\s+each other off)\b/i;
   const negativePattern =
-    /\b(?:fade to black|closed door|do not depict (?:intimacy|sexual contact)|no sexual contact)\b/i;
+    /\b(?:do not depict (?:intimacy|sexual contact)|no sexual contact)\b/i;
   const beats = sectionBrief.requiredBeats ?? [];
   const originalGuidance = sectionBrief.originalGuidance || latestUserMessage;
   const guidanceRequestsExplicit = explicitPattern.test(originalGuidance);
@@ -177,9 +182,11 @@ function explicitSpecialistScenes(
   return beats
     .filter(
       (beat) =>
-        (explicitPattern.test(beat.instruction) ||
-          (guidanceRequestsExplicit && sexualBeatPattern.test(beat.instruction))) &&
-        !negativePattern.test(beat.instruction),
+        beat.specialistWriter === "aion" ||
+        (beat.specialistWriter === undefined &&
+          (explicitPattern.test(beat.instruction) ||
+            (guidanceRequestsExplicit && sexualBeatPattern.test(beat.instruction))) &&
+          !negativePattern.test(beat.instruction)),
     )
     .slice(0, 3)
     .map((beat, index) => ({
@@ -1158,7 +1165,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error:
-            "The chapter requests on-page intimacy, but no required beat identifies where to place the Aion handoff. Revise the Chapter Contract before writing so the scene cannot fade to black.",
+            "The Chapter Contract has no Aion assignment for the requested specialist beat. Recreate the contract with the updated planner so its routing fields are included. Your draft is unchanged.",
         },
         { status: 422 },
       );
@@ -1360,6 +1367,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 
