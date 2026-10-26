@@ -14,6 +14,7 @@ type SocialPlatform = "facebook" | "instagram" | "tiktok";
 type CreativeOutput = "image" | "video";
 
 type CampaignRequest = {
+  contentType?: unknown;
   book?: unknown;
   platforms?: unknown;
   instructions?: unknown;
@@ -273,6 +274,7 @@ function posterPrompt(
   outputType: CreativeOutput,
   guidance: string,
   revision: string,
+  contentType = "book_promotion",
 ): string {
   return [
     "You are creating finished commercial artwork for NovelForge, not a wireframe, dashboard, presentation slide or coded template.",
@@ -286,7 +288,9 @@ function posterPrompt(
     "Do not impose a gothic, sports, office, floral, dark, Kindle, trope-list or any other default style. Do not add a permanent footer, fixed icon row, standard heading position or repeated composition.",
     "Do not introduce irrelevant imagery. Every visible element must support the author's brief, the supplied cover or the verified book facts.",
     "COVER FIDELITY",
-    "The supplied image is the genuine book cover. Use that exact cover as the hero. Preserve its artwork, title, author name, spelling, colours and proportions. Never redesign, rewrite, crop away or replace its contents.",
+    ["book_promotion", "new_release"].includes(contentType)
+      ? "The supplied image is the genuine book cover. Use that exact cover as the hero. Preserve its artwork, title, author name, spelling, colours and proportions. Never redesign, rewrite, crop away or replace its contents."
+      : "The supplied genuine cover is a factual reference, not a mandatory layout element. Create the requested hook, humour, question or character-conflict artwork. Include the exact cover only when the creative brief asks for it. Do not force a book advert, device or sales footer onto reader-engagement artwork. If the cover is used, preserve it exactly.",
     "If the guidance requests a Kindle or device, place the genuine cover naturally inside a large realistic dimensional device with matching perspective, screen reflections, rim lighting, contact shadow and environmental integration.",
     "If no device is requested, present the genuine cover in the manner requested by the author.",
     "DESIGN STANDARD",
@@ -317,6 +321,7 @@ async function inspectPoster(
   book: BookFacts,
   platform: SocialPlatform,
   guidance: string,
+  contentType = "book_promotion",
 ): Promise<InspectionResult> {
   const fallback = fallbackCopy(book, platform);
   try {
@@ -418,6 +423,9 @@ async function inspectPoster(
               })}`,
               "The first image is the finished poster. The second image is the genuine cover reference.",
               "Check prompt adherence, wording legibility and cover fidelity. Use scores from 0 to 100.",
+              !["book_promotion", "new_release"].includes(contentType)
+                ? "This is hook or reader-engagement artwork. A cover is optional unless the guidance requires it. When no cover is required or shown, score coverFidelity as 100 (not applicable) and do not mark review merely because there is no cover."
+                : "The genuine book cover should be present and faithful.",
               "Mark review when any score is below 70. Keep the summary under 240 characters.",
               "Also write the finished social post that accompanies this artwork. Create an engaging hook title, a substantial natural caption, a clear reading call to action and strong relevant hashtags.",
               "Create a motion map for animating this exact finished poster without redrawing it. All coordinates must be normalized from 0 to 1 and describe top-left x, top-left y, width and height on the finished poster.",
@@ -484,6 +492,7 @@ async function generatePoster(
   guidance: string,
   revision: string,
   priorResponseId: string,
+  contentType = "book_promotion",
 ): Promise<GeneratedPost> {
   const response = await openai.responses.create({
     model: DIRECTOR_MODEL,
@@ -510,7 +519,7 @@ async function generatePoster(
     input: [{
       role: "user",
       content: [
-        { type: "input_text", text: posterPrompt(book, platform, outputType, guidance, revision) },
+        { type: "input_text", text: posterPrompt(book, platform, outputType, guidance, revision, contentType) },
         { type: "input_image", image_url: book.coverUrl, detail: "high" },
       ],
     }],
@@ -536,7 +545,7 @@ async function generatePoster(
     throw new Error("The image model returned no poster artwork.");
   }
   const imageDataUrl = `data:image/jpeg;base64,${imageCall.result}`;
-  const inspection = await inspectPoster(imageDataUrl, book, platform, guidance);
+  const inspection = await inspectPoster(imageDataUrl, book, platform, guidance, contentType);
   const socialCopy =
     parseCopy(response.output_text, book, platform) ?? inspection.socialCopy;
   return {
@@ -597,6 +606,7 @@ export async function POST(request: Request) {
           instructions,
           revision,
           previousResponseId(body.previousResponseIds, platform),
+          cleanString(body.contentType, 60) || "book_promotion",
         ),
       ),
     );
@@ -618,3 +628,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

@@ -11,12 +11,13 @@ type Editor = {
   platform: SocialPlatform; postType: string; title: string; caption: string; hashtags: string;
   date: string; time: string; source?: string; mediaType: 'image' | 'video' | null; mimeType?: string;
   file?: File; mediaBlob?: Blob; removeMedia: boolean;
+  creativeBrief: string; plannedMediaType: 'image' | 'video' | '';
 };
 const inputClass = 'mt-1 w-full rounded-xl border border-white/15 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-pink-500';
 const buttonClass = 'rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40';
 const editable = (post: CalendarPost) => ['draft', 'approved'].includes(post.status);
 
-export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Book[]; seed: CalendarSeed | null; onSeedUsed: () => void }) {
+export default function SocialCalendar({ books, seed, onSeedUsed, onGenerateMedia }: { books: Book[]; seed: CalendarSeed | null; onSeedUsed: () => void; onGenerateMedia: (post: CalendarPost) => Promise<{ blob: Blob; mimeType: string; qualityNotes: string }> }) {
   const [posts, setPosts] = useState<CalendarPost[]>([]);
   const [start, setStart] = useState(() => londonDate());
   const [selected, setSelected] = useState(() => londonDate());
@@ -27,6 +28,15 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [planStart, setPlanStart] = useState(() => addDays(londonDate(), 1));
+  const [planBook, setPlanBook] = useState('all');
+  const [planPlatforms, setPlanPlatforms] = useState<SocialPlatform[]>([...SOCIAL_PLATFORMS]);
+  const [planGuidance, setPlanGuidance] = useState('');
+  const [planning, setPlanning] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const [mediaProgress, setMediaProgress] = useState('');
+  const generatingRef = useRef(false);
+  const pauseMediaRef = useRef(false);
   const savingRef = useRef(false);
   const accountRef = useRef<string | null>(null);
   const days = useMemo(() => calendarDays(start), [start]);
@@ -42,6 +52,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   }, [visiblePosts]);
   const selectedPosts = postsByDate.get(selected) ?? [];
   const drafts = useMemo(() => visiblePosts.filter(post => !post.scheduled_at), [visiblePosts]);
+  const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
 
   async function load() {
     setLoading(true);
@@ -72,30 +83,32 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       platform: initial?.platform ?? 'facebook', postType: initial?.media_type === 'video' ? 'video' : 'premise_hook',
       title: initial?.title ?? '', caption: initial?.caption ?? '', hashtags: initial?.hashtags.join(' ') ?? '', date, time: '19:00',
       source: initial?.mediaSource, mediaBlob: initial?.mediaBlob, mediaType: initial?.media_type ?? null, mimeType: initial?.mimeType, removeMedia: false,
+      creativeBrief: '', plannedMediaType: initial?.media_type ?? '',
     };
   }
   useEffect(() => {
-    if (!seed) return;
+    if (!seed || generatingRef.current) return;
     // Do not silently replace an editor that contains unsaved work.
     if (editor) return;
     setEditor(fresh(selected, seed)); setNotice(''); setError(''); onSeedUsed();
     document.getElementById('social-calendar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [seed, editor]);
+  }, [seed, editor, planning, mediaBusy]);
 
   function edit(post: CalendarPost) {
-    if (editor || savingRef.current) return;
+    if (editor || savingRef.current || generatingRef.current) return;
     setEditor({
       id: post.id, existing: post, campaignId: post.campaign_id, bookSlug: post.book_slug, bookTitle: post.book_title,
       platform: post.platform, postType: post.post_type, title: post.title, caption: post.caption, hashtags: post.hashtags.join(' '),
       date: post.scheduled_at ? londonDate(post.scheduled_at) : '', time: post.scheduled_at ? londonTime(post.scheduled_at) : '19:00',
       mediaType: post.media_type, removeMedia: false,
+      creativeBrief: post.creative_brief ?? '', plannedMediaType: post.planned_media_type ?? '',
     });
     setError(''); setNotice(''); setConfirmDelete(false);
   }
   function field<K extends keyof Editor>(key: K, value: Editor[K]) { setEditor(current => current ? { ...current, [key]: value } : null); }
 
   async function save(approve: boolean) {
-    if (!editor || savingRef.current) return;
+    if (!editor || savingRef.current || generatingRef.current) return;
     savingRef.current = true; setSaving(true); setError(''); setNotice('');
     let uploadedPath: string | null = null;
     let databaseAttempted = false;
@@ -127,6 +140,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         book_slug: editor.bookSlug, book_title: editor.bookTitle, platform: editor.platform, post_type: editor.postType,
         title: editor.title.trim(), caption: editor.caption.trim(), hashtags, media_path: mediaPath, media_type: mediaType,
         scheduled_at: scheduledAt, status: approve ? 'approved' : 'draft',
+        creative_brief: editor.creativeBrief.trim(), planned_media_type: editor.plannedMediaType || null,
       };
       databaseAttempted = true;
       const result = editor.existing
@@ -153,6 +167,78 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Deletion failed.'); }
     finally { savingRef.current = false; setSaving(false); }
   }
+  async function generateMonth() {
+    if (generatingRef.current || savingRef.current || editor) return;
+    generatingRef.current = true; setPlanning(true); setError(''); setNotice('');
+    let storageKey = '';
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) throw new Error('Sign in again before generating your month.');
+      storageKey = `novelforge-social-batch:${data.session.user.id}:${planStart}`;
+      const runId = localStorage.getItem(storageKey) || crypto.randomUUID();
+      localStorage.setItem(storageKey, runId);
+      const response = await fetch('/api/social-studio/plan', {
+        method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId, start: planStart, platforms: planPlatforms, books: planBook === 'all' ? [] : [planBook], guidance: planGuidance }),
+        signal: AbortSignal.timeout(290000),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        if (!result.inProgress && (response.status === 409 || result.runStatus === 'failed')) localStorage.removeItem(storageKey);
+        throw new Error(result.error || 'The AI batch failed. Check the calendar before retrying.');
+      }
+      localStorage.removeItem(storageKey);
+      await load(); setStart(planStart); setSelected(planStart);
+      setNotice(result.message || `${result.created} AI-written platform drafts saved across 30 days. Review the copy, then generate their artwork and videos.`);
+    } catch (failure) {
+      setError(failure instanceof Error && failure.name !== 'TimeoutError' ? failure.message : 'The AI batch is still processing or timed out. Refresh the calendar first; using Generate 30 days again checks the same batch before creating anything new.');
+    } finally { generatingRef.current = false; setPlanning(false); }
+  }
+
+  async function generateMedia(onlyPost?: CalendarPost) {
+    if (generatingRef.current || savingRef.current || editor) return;
+    generatingRef.current = true; pauseMediaRef.current = false; setMediaBusy(true); setError(''); setNotice('');
+    const end = addDays(start, 30);
+    const inRange = (post: CalendarPost) => post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < end;
+    const candidates = posts.filter(post => (!onlyPost || post.id === onlyPost.id) && (onlyPost || inRange(post)) && post.status === 'draft' && post.planned_media_type && !post.media_path);
+    const groups = new Map<string, CalendarPost[]>();
+    for (const post of candidates) {
+      // Facebook/Instagram use the same aspect ratio, so one campaign image can serve both.
+      const key = `${post.campaign_id}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`;
+      groups.set(key, [...(groups.get(key) ?? []), post]);
+    }
+    let completed = 0;
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) throw new Error('Sign in again before creating media.');
+      for (const group of groups.values()) {
+        if (pauseMediaRef.current) break;
+        const first = group[0];
+        setMediaProgress(`Creating artwork/video ${completed + 1} of ${groups.size}: ${first.book_title}`);
+        const existing = posts.find(post => post.campaign_id === first.campaign_id && Boolean(post.media_path) && post.media_type === first.planned_media_type && post.creative_brief === first.creative_brief && (post.platform === 'tiktok') === (first.platform === 'tiktok'));
+        let path = existing?.media_path;
+        let qualityNotes = existing?.quality_notes ?? '';
+        if (!path) {
+          const media = await onGenerateMedia(first);
+          if (media.blob.size > 50 * 1024 * 1024) throw new Error('The generated media exceeds the existing 50 MB storage limit.');
+          const extension = media.mimeType === 'video/mp4' ? 'mp4' : 'jpg';
+          path = `${data.user.id}/calendar/${first.campaign_id}-${crypto.randomUUID()}.${extension}`;
+          const { error: uploadError } = await supabase.storage.from('social-media').upload(path, media.blob, { contentType: media.mimeType, upsert: false });
+          if (uploadError) throw new Error(uploadError.message);
+          qualityNotes = media.qualityNotes;
+        }
+        for (const post of group) {
+          const { data: updated, error: updateError } = await supabase.from('social_posts').update({ media_path: path, media_type: post.planned_media_type, quality_notes: qualityNotes }).eq('id', post.id).eq('version', post.version).eq('status', 'draft').select().single();
+          if (updateError) throw new Error('This draft changed while its media was generated. Refresh the calendar before continuing.');
+          setPosts(current => current.map(item => item.id === updated.id ? updated : item));
+        }
+        completed += 1;
+      }
+      setNotice(pauseMediaRef.current ? 'Paused after the current item. Completed media is saved; generate missing artwork/videos to resume.' : groups.size ? 'AI artwork and videos saved. Review the finished posts before approving them.' : 'There is no missing AI media in these 30 days.');
+    } catch (failure) { setError(`${failure instanceof Error ? failure.message : 'Media creation failed.'} Completed posts are saved. Refresh, then resume missing media.`); }
+    finally { generatingRef.current = false; setMediaBusy(false); setMediaProgress(''); }
+  }
+
   function card(post: CalendarPost) {
     const url = post.media_path ? supabase.storage.from('social-media').getPublicUrl(post.media_path).data.publicUrl : null;
     return <article key={post.id} className="rounded-xl border border-white/10 bg-neutral-950 p-4">
@@ -162,14 +248,35 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-300">{post.caption || 'Caption to write'}</p>
       <p className="mt-2 break-words text-sm text-pink-300">{post.hashtags.join(' ')}</p>
       {url && (post.media_type === 'video' ? <video src={url} controls preload="none" className="mt-3 max-h-64 rounded-lg" /> : <img src={url} loading="lazy" alt={post.title || 'Post artwork'} className="mt-3 max-h-64 rounded-lg" />)}
-      {editable(post) && <button type="button" disabled={Boolean(editor) || saving} onClick={() => edit(post)} className={`${buttonClass} mt-3`}>Edit / reschedule</button>}
+      {post.quality_notes && <p className="mt-3 text-sm text-amber-200">Artwork review: {post.quality_notes}</p>}
+      {post.creative_brief && <details className="mt-3 text-sm text-neutral-400"><summary className="cursor-pointer">AI creative brief</summary><p className="mt-2 whitespace-pre-wrap">{post.creative_brief}</p></details>}
+      {post.status === 'draft' && post.planned_media_type && !post.media_path && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={() => void generateMedia(post)} className={`${buttonClass} mt-3 mr-3 bg-violet-600`}>AI: create {post.planned_media_type === 'video' ? 'video' : 'artwork'}</button>}
+      {editable(post) && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={() => edit(post)} className={`${buttonClass} mt-3`}>Edit / reschedule</button>}
     </article>;
   }
 
   return <section id="social-calendar" aria-labelledby="calendar-title" className="mb-7 scroll-mt-28 rounded-2xl border border-pink-500/30 bg-neutral-900 p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-pink-400">Plan ahead</p><h2 id="calendar-title" className="mt-1 text-2xl font-bold">Your 30-day calendar</h2><p className="mt-2 text-sm text-neutral-400">Save, edit and approve posts here. Times are UK time. Automatic publishing is not enabled yet.</p></div>
-      <div className="flex gap-2"><button type="button" disabled={Boolean(editor) || saving || loading} onClick={() => { setEditor(fresh()); setConfirmDelete(false); setNotice(''); }} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400 disabled:opacity-40">New draft</button><button type="button" disabled={loading || saving || Boolean(editor)} onClick={() => void load()} className={buttonClass}>Refresh</button></div>
+      <div><p className="text-xs font-semibold uppercase tracking-widest text-pink-400">Plan ahead</p><h2 id="calendar-title" className="mt-1 text-2xl font-bold">Your 30-day calendar</h2><p className="mt-2 text-sm text-neutral-400">Let your AI create the month, then review and approve its posts. Times are UK time. Automatic publishing is not enabled yet.</p></div>
+      <div className="flex gap-2"><button type="button" disabled={Boolean(editor) || saving || loading || planning || mediaBusy} onClick={() => { setEditor(fresh()); setConfirmDelete(false); setNotice(''); }} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400 disabled:opacity-40">Manual draft</button><button type="button" disabled={loading || saving || Boolean(editor) || planning || mediaBusy} onClick={() => void load()} className={buttonClass}>Refresh</button></div>
+    </div>
+    <div className="mt-5 rounded-2xl border border-pink-500/25 bg-pink-500/5 p-4">
+      <h3 className="text-lg font-bold">Let your AI create the month</h3>
+      <p className="mt-2 text-sm text-neutral-300">30 book-specific daily ideas, with separate captions and five hashtags for each selected platform. Hooks, tropes, character conflict, humour, reader questions and promotion are mixed automatically.</p>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <label className="text-sm">First posting day<input type="date" value={planStart} min={londonDate()} onChange={event => setPlanStart(event.target.value)} disabled={planning || mediaBusy} className={inputClass} /></label>
+        <label className="text-sm">Books to feature<select value={planBook} onChange={event => setPlanBook(event.target.value)} disabled={planning || mediaBusy} className={inputClass}><option value="all">Rotate all my books</option>{books.map(book => <option key={book.slug} value={book.slug}>{book.title}</option>)}</select></label>
+        <fieldset className="flex flex-wrap gap-4 sm:col-span-2" disabled={planning || mediaBusy}><legend className="mb-2 text-sm">Platforms</legend>{SOCIAL_PLATFORMS.map(value => <label className="flex items-center gap-2 text-sm capitalize" key={value}><input type="checkbox" checked={planPlatforms.includes(value)} onChange={event => setPlanPlatforms(current => event.target.checked ? [...current,value] : current.filter(item => item !== value))} />{value}</label>)}</fieldset>
+        <label className="text-sm sm:col-span-2">Extra direction (optional)<textarea rows={3} maxLength={3000} value={planGuidance} onChange={event => setPlanGuidance(event.target.value)} disabled={planning || mediaBusy} placeholder="For example, focus on my hockey books, use more jealousy hooks, or promote a specific release..." className={inputClass} /></label>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <button type="button" disabled={planning || mediaBusy || saving || Boolean(editor) || loading || !books.length || !planPlatforms.length} onClick={() => void generateMonth()} className="rounded-xl bg-pink-500 px-5 py-3 font-bold hover:bg-pink-400 disabled:opacity-40">{planning ? 'AI is creating your 30 days...' : 'Generate 30 days'}</button>
+        <button type="button" disabled={planning || mediaBusy || saving || Boolean(editor) || loading || !missingMediaGroups} onClick={() => void generateMedia()} className="rounded-xl bg-violet-600 px-5 py-3 font-bold hover:bg-violet-500 disabled:opacity-40">Generate missing artwork/videos ({missingMediaGroups})</button>
+        {mediaBusy && <button type="button" onClick={() => { pauseMediaRef.current = true; setMediaProgress(current => `${current} (pausing after this item)`); }} className={buttonClass}>Pause after current item</button>}
+      </div>
+      <p className="mt-3 text-xs text-neutral-400">Uses your existing AI API credits. Copy is saved first; artwork/video generation is a separate paid AI step. The button shows how many media items it will create (up to 60 for a full month across all three networks). Keep this page open while media is generated. Completed media is saved, so you can pause and resume. Existing dates are kept, and nothing is published automatically yet.</p>
+      {planning && <p role="status" className="mt-3 text-sm text-pink-200">Creating and saving up to {planPlatforms.length * 30} platform drafts. This may take a few minutes.</p>}
+      {mediaProgress && <p role="status" className="mt-3 text-sm text-violet-200">{mediaProgress}</p>}
     </div>
     <div aria-live="polite">{error && <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}{notice && <p className="mt-4 text-sm text-emerald-300">{notice}</p>}{seed && editor && <p className="mt-3 text-sm text-amber-200">A generated post is waiting. Save or close your current editor to open it.</p>}</div>
     <div className="mt-5 flex flex-wrap items-end gap-3">
@@ -198,6 +305,8 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         <label className="text-sm">Title / TikTok photo title<input maxLength={240} value={editor.title} onChange={event => field('title', event.target.value)} className={inputClass} /></label>
         <label className="text-sm sm:col-span-2">Caption<textarea rows={6} maxLength={10000} value={editor.caption} onChange={event => field('caption', event.target.value)} className={inputClass} /></label>
         <label className="text-sm sm:col-span-2">Hashtags<input value={editor.hashtags} onChange={event => field('hashtags', event.target.value)} className={inputClass} /></label>
+        <label className="text-sm">AI media format<select value={editor.plannedMediaType} onChange={event => field('plannedMediaType', event.target.value as Editor['plannedMediaType'])} className={inputClass}><option value="">Text only</option><option value="image">Image</option><option value="video">Animated video</option></select></label>
+        <label className="text-sm sm:col-span-2">AI creative brief<textarea rows={4} maxLength={5000} value={editor.creativeBrief} onChange={event => field('creativeBrief', event.target.value)} className={inputClass} /></label>
         <label className="text-sm sm:col-span-2">Image or MP4 video<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4" onChange={event => { const file = event.target.files?.[0]; if (file) setEditor(current => current ? { ...current, file, mediaBlob: undefined, source: undefined, removeMedia: false, mediaType: file.type.startsWith('video/') ? 'video' : 'image' } : null); }} className={inputClass} /></label>
         <div className="text-sm text-neutral-400 sm:col-span-2">{editor.file ? editor.file.name : editor.source ? 'Generated media will be saved with this draft.' : editor.existing?.media_path && !editor.removeMedia ? 'Existing media is attached.' : 'No media attached.'}{(editor.source || editor.file || editor.existing?.media_path) && !editor.removeMedia && <button type="button" className="ml-3 underline" onClick={() => setEditor(current => current ? { ...current, file: undefined, mediaBlob: undefined, source: undefined, mediaType: null, removeMedia: true } : null)}>Remove attachment</button>}</div>
       </fieldset>
