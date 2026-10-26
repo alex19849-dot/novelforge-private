@@ -1,0 +1,181 @@
+import OpenAI from 'openai';
+import { FatalError, getWorkflowMetadata } from 'workflow';
+import { createHash } from 'node:crypto';
+import { jobAdmin } from '../lib/social-job-db';
+import { planRequest } from '../lib/social-plan-request';
+import { plannedFormat, plannedTime, validateAiDays } from '../lib/social-planner';
+import { addDays, londonDate, londonSchedule } from '../lib/social-calendar';
+import type { CalendarPost, SocialPlatform } from '../lib/social-calendar';
+import type { PlanBook } from '../lib/social-planner';
+import { inspectPoster, posterPrompt } from '../lib/social-artwork';
+import { renderSocialMedia } from '../lib/social-render';
+
+type Assignment={dayIndex:number;date:string;postType:string;book:string};
+type Job={id:string;user_id:string;status:string;job_type:'plan'|'media';start_date:string;cancel_requested:boolean;config:{books:PlanBook[];platforms:SocialPlatform[];guidance:string}};
+type Task={id:string;run_id:string;user_id:string;status:string;response_id:string|null;request:{assignments?:Assignment[];posts?:CalendarPost[]};result:Record<string,unknown>};
+const ai=()=>new OpenAI({apiKey:process.env.OPENAI_API_KEY,timeout:30000,maxRetries:0});
+async function context(runId:string,taskId?:string) {
+  const db=jobAdmin();
+  const {data:job,error}=await db.from('social_generation_runs').select('*').eq('id',runId).single();
+  if(error||!job) throw new FatalError('This background job no longer exists.');
+  if(!taskId) return {db,job:job as Job,task:null as Task|null};
+  const {data:task,error:taskError}=await db.from('social_generation_tasks').select('*').eq('id',taskId).eq('run_id',runId).eq('user_id',job.user_id).single();
+  if(taskError||!task) throw new FatalError('This background task no longer exists.');
+  return {db,job:job as Job,task:task as Task};
+}
+async function recordProgress(job:Job) {
+  const db=jobAdmin();
+  const {data:tasks,error}=await db.from('social_generation_tasks').select('status').eq('run_id',job.id).eq('user_id',job.user_id);
+  if(error) throw new Error('Progress could not be saved.');
+  const {count,error:countError}=await db.from('social_posts').select('id',{head:true,count:'exact'}).eq('generation_run_id',job.id).eq('user_id',job.user_id);
+  if(countError) throw new Error('Progress could not be counted.');
+  const {error:updateError}=await db.from('social_generation_runs').update({completed_tasks:tasks.filter(t=>['completed','skipped'].includes(t.status)).length,created_count:count??0,updated_at:new Date().toISOString()}).eq('id',job.id).eq('user_id',job.user_id);
+  if(updateError) throw new Error('Progress could not be saved.');
+}
+export async function describeJob(runId:string) {
+  'use step';
+  const {db,job}=await context(runId);
+  const {error:registrationError}=await db.from('social_generation_runs').update({workflow_run_id:getWorkflowMetadata().workflowRunId}).eq('id',runId).eq('user_id',job.user_id).is('workflow_run_id',null);
+  if(registrationError) throw new Error('The worker could not save its run reference.');
+  const {data,error}=await db.from('social_generation_tasks').select('id').eq('run_id',runId).eq('user_id',job.user_id).order('ordinal');
+  if(error) throw new Error('The task queue could not be read.');
+  return data.map(t=>t.id);
+}
+export async function prepareTask(runId:string,taskId:string):Promise<'stop'|'skip'|'run'> {
+  'use step';
+  const {db,job,task}=await context(runId,taskId);
+  if(job.status!=='generating'||job.cancel_requested) return 'stop';
+  if(['completed','skipped'].includes(task.status)) return 'skip';
+  const {error}=await db.from('social_generation_tasks').update({status:'running'}).eq('id',taskId).eq('user_id',job.user_id);
+  if(error) throw new Error('The task could not be started.');
+  return 'run';
+}
+export async function submitTask(runId:string,taskId:string):Promise<string|null> {
+  'use step';
+  const {db,job,task}=await context(runId,taskId);
+  if(task.response_id) return task.response_id;
+  let request:OpenAI.Responses.ResponseCreateParamsNonStreaming;
+  if(job.job_type==='plan') {
+    const assignments=task.request.assignments!;
+    const {data:existing,error}=await db.from('social_posts').select('scheduled_at,platform').eq('user_id',job.user_id).gte('scheduled_at',londonSchedule(assignments[0].date,'00:00')).lt('scheduled_at',londonSchedule(addDays(assignments.at(-1)!.date,1),'00:00')).neq('status','cancelled');
+    if(error) throw new FatalError('The calendar could not be checked. No new AI request was started.');
+    const occupied=new Set(existing.map(p=>`${londonDate(p.scheduled_at)}:${p.platform}`));
+    const open=assignments.filter(day=>job.config.platforms.some(platform=>!occupied.has(`${day.date}:${platform}`)&&Date.parse(plannedTime(job.start_date,day.dayIndex,platform))>Date.now()));
+    if(!open.length) {
+      const {error:skipError}=await db.from('social_generation_tasks').update({status:'skipped'}).eq('id',taskId).eq('user_id',job.user_id);
+      if(skipError) throw new FatalError('The completed date range could not be recorded.');
+      await recordProgress(job); return null;
+    }
+    request=planRequest(job.config.platforms,open,job.config.books,job.config.guidance);
+    const {error:saveError}=await db.from('social_generation_tasks').update({request:{assignments:open}}).eq('id',taskId).eq('user_id',job.user_id);
+    if(saveError) throw new FatalError('The batch could not be saved before generation.');
+  } else {
+    const posts=task.request.posts!;const first=posts[0];
+    // Reuse a completed feed/portrait asset when another platform still needs it.
+    const {data:existing,error}=await db.from('social_posts').select('*').eq('user_id',job.user_id).eq('campaign_id',first.campaign_id).not('media_path','is',null);
+    if(error) throw new FatalError('Existing artwork could not be checked.');
+    const match=(existing as CalendarPost[]).find(p=>p.media_type===first.planned_media_type&&p.creative_brief===first.creative_brief&&(p.platform==='tiktok')===(first.platform==='tiktok'));
+    if(match) { await attachMedia(job,task,match.media_path!,match.quality_notes??''); return null; }
+    const book=job.config.books.find(b=>b.slug===first.book_slug)!;
+    request={model:'gpt-6-astra',background:true,store:true,reasoning:{effort:'low'},max_output_tokens:1000,
+      input:[{role:'user',content:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief,'',first.post_type)},{type:'input_image',image_url:book.coverUrl,detail:'high'}]}],
+      tools:[{type:'image_generation',model:'gpt-image-2',size:'1024x1536',quality:'medium',output_format:'jpeg',output_compression:92,background:'opaque'}],tool_choice:{type:'image_generation'}};
+  }
+  try { return (await ai().responses.create(request)).id; }
+  catch(error) {
+    // Do not blindly resubmit an ambiguous paid request after a network error.
+    // Only an explicit 429 is safe to retry before any response was accepted.
+    if(error instanceof OpenAI.APIError&&error.status===429) throw new Error('The AI is busy. Retrying shortly.');
+    throw new FatalError(error instanceof OpenAI.APIError&&error.status===401?'The AI API key needs attention.':error instanceof OpenAI.APIError&&error.status===400?'The AI rejected this request. Check the brief or model configuration.':'The AI request could not be confirmed. It was not automatically submitted again to avoid duplicate charges.');
+  }
+}
+export async function rememberResponse(runId:string,taskId:string,responseId:string) {
+  'use step';
+  const {db,job}=await context(runId,taskId);
+  const {error}=await db.from('social_generation_tasks').update({response_id:responseId}).eq('id',taskId).eq('user_id',job.user_id);
+  if(error) throw new Error('The AI response reference could not be saved.');
+}
+export async function pollResponse(runId:string,taskId:string,responseId:string) {
+  'use step';
+  await context(runId,taskId);
+  const response=await ai().responses.retrieve(responseId);
+  return response.status??'failed';
+}
+function campaignId(taskId:string,index:number) {
+  const hex=createHash('sha256').update(`${taskId}:${index}`).digest('hex');
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-8${hex.slice(17,20)}-${hex.slice(20,32)}`;
+}
+async function attachMedia(job:Job,task:Task,path:string,notes:string) {
+  const db=jobAdmin();let saved=0;
+  for(const post of task.request.posts!) {
+    // Optimistic version checks protect edits, approvals and reschedules made while AI runs.
+    const {data,error}=await db.from('social_posts').update({media_path:path,media_type:post.planned_media_type,quality_notes:notes}).eq('id',post.id).eq('user_id',job.user_id).eq('version',post.version).eq('status','draft').is('media_path',null).select('id');
+    if(error) throw new Error('Generated artwork could not be attached.');
+    saved+=data.length;
+  }
+  const {error}=await db.from('social_generation_tasks').update({status:'completed',result:{path,saved,message:saved?'Saved':'The draft changed during generation; the saved artwork was kept without replacing your edits.'}}).eq('id',task.id).eq('user_id',job.user_id);
+  if(error) throw new Error('The saved media progress could not be recorded.');
+  await recordProgress(job);
+}
+export async function persistTask(runId:string,taskId:string,responseId:string) {
+  'use step';
+  const {db,job,task}=await context(runId,taskId);
+  if(task.status==='completed') return;
+  // Large base64 images never enter the workflow event log or the browser.
+  const response=await ai().responses.retrieve(responseId);
+  if(response.status!=='completed') throw new FatalError('The AI response is not complete.');
+  if(job.job_type==='plan') {
+    let days;
+    try { days=validateAiDays(JSON.parse(response.output_text),job.config.platforms,task.request.assignments!.map(d=>d.dayIndex)); }
+    catch { throw new FatalError('The AI returned incomplete content for this batch. Other saved batches are kept.'); }
+    for(const day of days) {
+      const assignment=task.request.assignments!.find(d=>d.dayIndex===day.dayIndex)!;
+      const book=job.config.books.find(b=>b.slug===assignment.book)!;
+      for(const platform of job.config.platforms) {
+        const scheduled=plannedTime(job.start_date,day.dayIndex,platform);
+        if(Date.parse(scheduled)<=Date.now()) continue;
+        const {count,error:checkError}=await db.from('social_posts').select('id',{head:true,count:'exact'}).eq('user_id',job.user_id).eq('platform',platform).gte('scheduled_at',londonSchedule(assignment.date,'00:00')).lt('scheduled_at',londonSchedule(addDays(assignment.date,1),'00:00')).neq('status','cancelled');
+        if(checkError) throw new Error('The calendar could not be checked before saving.');
+        if(count) continue;
+        const copy=day.posts.find(p=>p.platform===platform)!;
+        const {error}=await db.from('social_posts').insert({campaign_id:campaignId(taskId,day.dayIndex),generation_run_id:runId,user_id:job.user_id,book_slug:book.slug,book_title:book.title,platform,post_type:assignment.postType,title:copy.title,caption:copy.caption,hashtags:copy.hashtags,creative_brief:day.creativeBrief,planned_media_type:plannedFormat(assignment.postType,platform),scheduled_at:scheduled,status:'draft'});
+        if(error&&error.code!=='23505') throw new Error('Generated drafts could not be saved. Retrying the saved response.');
+      }
+    }
+    const {error}=await db.from('social_generation_tasks').update({status:'completed'}).eq('id',taskId).eq('user_id',job.user_id);
+    if(error) throw new Error('Batch progress could not be saved.');
+    await recordProgress(job);
+  } else {
+    const first=task.request.posts![0];const book=job.config.books.find(b=>b.slug===first.book_slug)!;
+    const image=response.output.find(item=>item.type==='image_generation_call');
+    if(!image||image.type!=='image_generation_call'||!image.result) throw new FatalError('The AI returned no artwork for this item.');
+    const extension=first.planned_media_type==='video'?'mp4':'jpg';
+    const path=`${job.user_id}/calendar/${taskId}.${extension}`;
+    const {data:files,error:listError}=await db.storage.from('social-media').list(`${job.user_id}/calendar`,{search:`${taskId}.${extension}`,limit:1});
+    if(listError) throw new Error('Media storage could not be checked.');
+    if(!files.some(f=>f.name===`${taskId}.${extension}`)) {
+      const media=await renderSocialMedia(Buffer.from(image.result,'base64'),first.platform==='tiktok',first.planned_media_type==='video');
+      if(media.length>50*1024*1024) throw new FatalError('This media exceeds the 50 MB storage limit.');
+      const {error}=await db.storage.from('social-media').upload(path,media,{contentType:extension==='mp4'?'video/mp4':'image/jpeg',upsert:false});
+      if(error&&error.statusCode!=='409') throw new Error('The generated media could not be uploaded. Retrying the same saved image.');
+    }
+    const inspection=await inspectPoster(`data:image/jpeg;base64,${image.result}`,{...book,author:'Marlow Quinn'},first.platform,first.creative_brief!,first.post_type);
+    const notes=inspection.qualityCheck.decision==='review'?inspection.qualityCheck.summary:'';
+    await attachMedia(job,task,path,notes);
+  }
+}
+export async function failTask(runId:string,taskId:string,message:string) {
+  'use step';
+  const {db,job}=await context(runId,taskId);
+  const {error}=await db.from('social_generation_tasks').update({status:'failed',error_message:message.slice(0,600)}).eq('id',taskId).eq('user_id',job.user_id);
+  if(error) throw new Error('The task error could not be saved.');
+}
+export async function finishJob(runId:string,paused:boolean) {
+  'use step';
+  const {db,job}=await context(runId);
+  await recordProgress(job);
+  const {data:failed,error}=await db.from('social_generation_tasks').select('error_message').eq('run_id',runId).eq('user_id',job.user_id).eq('status','failed');
+  if(error) throw new Error('The final job status could not be checked.');
+  const {error:updateError}=await db.from('social_generation_runs').update({status:paused?'paused':failed.length?'failed':'completed',error_message:failed.length?`${failed.length} item(s) need attention. ${failed[0].error_message}`:'',updated_at:new Date().toISOString()}).eq('id',runId).eq('user_id',job.user_id);
+  if(updateError) throw new Error('The final job status could not be saved.');
+}

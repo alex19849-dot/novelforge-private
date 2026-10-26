@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { addDays, calendarDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
 import type { CalendarPost, CalendarSeed, SocialPlatform } from '../../lib/social-calendar';
 
+type BackgroundJob = { id:string; start_date:string; job_type:'plan'|'media'; status:'generating'|'completed'|'failed'|'paused'; completed_tasks:number; total_tasks:number; created_count:number; error_message:string; cancel_requested:boolean };
+
 type Book = { slug: string; title: string };
 type Editor = {
   id: string; existing: CalendarPost | null; campaignId: string; bookSlug: string; bookTitle: string;
@@ -17,7 +19,7 @@ const inputClass = 'mt-1 w-full rounded-xl border border-white/15 bg-neutral-950
 const buttonClass = 'rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40';
 const editable = (post: CalendarPost) => ['draft', 'approved'].includes(post.status);
 
-export default function SocialCalendar({ books, seed, onSeedUsed, onGenerateMedia }: { books: Book[]; seed: CalendarSeed | null; onSeedUsed: () => void; onGenerateMedia: (post: CalendarPost) => Promise<{ blob: Blob; mimeType: string; qualityNotes: string }> }) {
+export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Book[]; seed: CalendarSeed | null; onSeedUsed: () => void }) {
   const [posts, setPosts] = useState<CalendarPost[]>([]);
   const [start, setStart] = useState(() => londonDate());
   const [selected, setSelected] = useState(() => londonDate());
@@ -34,11 +36,11 @@ export default function SocialCalendar({ books, seed, onSeedUsed, onGenerateMedi
   const [planGuidance, setPlanGuidance] = useState('');
   const [planning, setPlanning] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
-  const [mediaProgress, setMediaProgress] = useState('');
+  const [job, setJob] = useState<BackgroundJob | null>(null);
   const generatingRef = useRef(false);
-  const pauseMediaRef = useRef(false);
   const savingRef = useRef(false);
   const accountRef = useRef<string | null>(null);
+  const loadingRef = useRef(false);
   const days = useMemo(() => calendarDays(start), [start]);
   const visiblePosts = useMemo(() => posts.filter(post => platform === 'all' || post.platform === platform), [posts, platform]);
   const postsByDate = useMemo(() => {
@@ -54,9 +56,10 @@ export default function SocialCalendar({ books, seed, onSeedUsed, onGenerateMedi
   const drafts = useMemo(() => visiblePosts.filter(post => !post.scheduled_at), [visiblePosts]);
   const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
 
-  async function load() {
-    setLoading(true);
-    setError('');
+  async function load(silent = false) {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    if (!silent) { setLoading(true); setError(''); }
     try {
       const { data } = await supabase.auth.getUser();
       if (!data.user) throw new Error('Sign in to NovelForge to load your calendar.');
@@ -64,17 +67,34 @@ export default function SocialCalendar({ books, seed, onSeedUsed, onGenerateMedi
       const { data: rows, error: queryError } = await supabase.from('social_posts').select('*').eq('user_id', data.user.id).order('scheduled_at', { ascending: true, nullsFirst: false });
       if (queryError) throw new Error(calendarError(queryError));
       if (accountRef.current === data.user.id) setPosts(rows ?? []);
+      const { data: session } = await supabase.auth.getSession();
+      if (session.session) {
+        const response = await fetch('/api/social-studio/jobs', { headers: {Authorization:`Bearer ${session.session.access_token}`}, cache:'no-store' });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Background progress could not be loaded.');
+        if (accountRef.current === data.user.id) {
+          const current = result.job as BackgroundJob | null;
+          setJob(current);
+          const active = current?.status === 'generating';
+          generatingRef.current = active;
+          setPlanning(active && current?.job_type === 'plan');
+          setMediaBusy(active && current?.job_type === 'media');
+        }
+      }
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Your calendar could not be loaded.'); }
-    finally { setLoading(false); }
+    finally { loadingRef.current = false; if (!silent) setLoading(false); }
   }
   useEffect(() => {
     void load();
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session || (accountRef.current && accountRef.current !== session.user.id)) {
-        setPosts([]); setEditor(null); accountRef.current = null;
+        setPosts([]); setEditor(null); setJob(null); setPlanning(false); setMediaBusy(false); generatingRef.current = false; accountRef.current = null;
       }
     });
-    return () => data.subscription.unsubscribe();
+    const interval = window.setInterval(() => { void load(true); }, 10000);
+    const onFocus = () => { void load(true); };
+    window.addEventListener('focus', onFocus);
+    return () => { data.subscription.unsubscribe(); window.clearInterval(interval); window.removeEventListener('focus', onFocus); };
   }, []);
 
   function fresh(date = selected, initial?: CalendarSeed): Editor {
@@ -167,76 +187,48 @@ export default function SocialCalendar({ books, seed, onSeedUsed, onGenerateMedi
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Deletion failed.'); }
     finally { savingRef.current = false; setSaving(false); }
   }
-  async function generateMonth() {
+  async function startGeneration(kind:'plan'|'media', onlyPost?:CalendarPost) {
     if (generatingRef.current || savingRef.current || editor) return;
-    generatingRef.current = true; setPlanning(true); setError(''); setNotice('');
-    let storageKey = '';
+    generatingRef.current = true; setError(''); setNotice('');
+    if (kind === 'plan') setPlanning(true); else setMediaBusy(true);
+    const firstDay = kind === 'plan' ? planStart : start;
+    let accepted = false;
     try {
       const { data } = await supabase.auth.getSession();
-      if (!data.session) throw new Error('Sign in again before generating your month.');
-      storageKey = `novelforge-social-batch:${data.session.user.id}:${planStart}`;
+      if (!data.session) throw new Error('Sign in again before starting generation.');
+      const storageKey = `novelforge-background:${data.session.user.id}:${kind}:${firstDay}:${onlyPost?.id ?? 'all'}`;
       const runId = localStorage.getItem(storageKey) || crypto.randomUUID();
       localStorage.setItem(storageKey, runId);
-      const response = await fetch('/api/social-studio/plan', {
-        method: 'POST', headers: { Authorization: `Bearer ${data.session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ runId, start: planStart, platforms: planPlatforms, books: planBook === 'all' ? [] : [planBook], guidance: planGuidance }),
-        signal: AbortSignal.timeout(290000),
+      const response = await fetch(`/api/social-studio/${kind === 'plan' ? 'plan' : 'media'}`, {
+        method:'POST', headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({runId,start:firstDay,platforms:planPlatforms,books:planBook === 'all' ? [] : [planBook],guidance:planGuidance,postId:onlyPost?.id}),
+        signal:AbortSignal.timeout(55000),
       });
       const result = await response.json();
-      if (!response.ok) {
-        if (!result.inProgress && (response.status === 409 || result.runStatus === 'failed')) localStorage.removeItem(storageKey);
-        throw new Error(result.error || 'The AI batch failed. Check the calendar before retrying.');
-      }
+      if (!response.ok) { if(response.status !== 504) localStorage.removeItem(storageKey); throw new Error(result.error || 'The job could not be started.'); }
       localStorage.removeItem(storageKey);
-      await load(); setStart(planStart); setSelected(planStart);
-      setNotice(result.message || `${result.created} AI-written platform drafts saved across 30 days. Review the copy, then generate their artwork and videos.`);
-    } catch (failure) {
-      setError(failure instanceof Error && failure.name !== 'TimeoutError' ? failure.message : 'The AI batch is still processing or timed out. Refresh the calendar first; using Generate 30 days again checks the same batch before creating anything new.');
-    } finally { generatingRef.current = false; setPlanning(false); }
-  }
-
-  async function generateMedia(onlyPost?: CalendarPost) {
-    if (generatingRef.current || savingRef.current || editor) return;
-    generatingRef.current = true; pauseMediaRef.current = false; setMediaBusy(true); setError(''); setNotice('');
-    const end = addDays(start, 30);
-    const inRange = (post: CalendarPost) => post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < end;
-    const candidates = posts.filter(post => (!onlyPost || post.id === onlyPost.id) && (onlyPost || inRange(post)) && post.status === 'draft' && post.planned_media_type && !post.media_path);
-    const groups = new Map<string, CalendarPost[]>();
-    for (const post of candidates) {
-      // Facebook/Instagram use the same aspect ratio, so one campaign image can serve both.
-      const key = `${post.campaign_id}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`;
-      groups.set(key, [...(groups.get(key) ?? []), post]);
+      accepted = result.status === 'generating';
+      if (kind === 'plan') { setStart(firstDay); setSelected(firstDay); }
+      setNotice(result.message || (accepted ? 'Generation started in the background. You can leave NovelForge or close this tab. Your progress and completed posts are saved automatically.' : 'This job has already finished. Refresh to see its saved results.'));
+      await load(true);
+    } catch(failure) {
+      setError(failure instanceof Error && failure.name !== 'TimeoutError' ? failure.message : 'The start request timed out. Refresh to check whether your background job started before pressing Generate again.');
+    } finally {
+      if (!accepted) { generatingRef.current = false; setPlanning(false); setMediaBusy(false); }
     }
-    let completed = 0;
+  }
+  const generateMonth = () => startGeneration('plan');
+  const generateMedia = (post?:CalendarPost) => startGeneration('media',post);
+  async function pauseGeneration() {
+    if (!job) return;
     try {
-      const { data } = await supabase.auth.getUser();
-      if (!data.user) throw new Error('Sign in again before creating media.');
-      for (const group of groups.values()) {
-        if (pauseMediaRef.current) break;
-        const first = group[0];
-        setMediaProgress(`Creating artwork/video ${completed + 1} of ${groups.size}: ${first.book_title}`);
-        const existing = posts.find(post => post.campaign_id === first.campaign_id && Boolean(post.media_path) && post.media_type === first.planned_media_type && post.creative_brief === first.creative_brief && (post.platform === 'tiktok') === (first.platform === 'tiktok'));
-        let path = existing?.media_path;
-        let qualityNotes = existing?.quality_notes ?? '';
-        if (!path) {
-          const media = await onGenerateMedia(first);
-          if (media.blob.size > 50 * 1024 * 1024) throw new Error('The generated media exceeds the existing 50 MB storage limit.');
-          const extension = media.mimeType === 'video/mp4' ? 'mp4' : 'jpg';
-          path = `${data.user.id}/calendar/${first.campaign_id}-${crypto.randomUUID()}.${extension}`;
-          const { error: uploadError } = await supabase.storage.from('social-media').upload(path, media.blob, { contentType: media.mimeType, upsert: false });
-          if (uploadError) throw new Error(uploadError.message);
-          qualityNotes = media.qualityNotes;
-        }
-        for (const post of group) {
-          const { data: updated, error: updateError } = await supabase.from('social_posts').update({ media_path: path, media_type: post.planned_media_type, quality_notes: qualityNotes }).eq('id', post.id).eq('version', post.version).eq('status', 'draft').select().single();
-          if (updateError) throw new Error('This draft changed while its media was generated. Refresh the calendar before continuing.');
-          setPosts(current => current.map(item => item.id === updated.id ? updated : item));
-        }
-        completed += 1;
-      }
-      setNotice(pauseMediaRef.current ? 'Paused after the current item. Completed media is saved; generate missing artwork/videos to resume.' : groups.size ? 'AI artwork and videos saved. Review the finished posts before approving them.' : 'There is no missing AI media in these 30 days.');
-    } catch (failure) { setError(`${failure instanceof Error ? failure.message : 'Media creation failed.'} Completed posts are saved. Refresh, then resume missing media.`); }
-    finally { generatingRef.current = false; setMediaBusy(false); setMediaProgress(''); }
+      const {data} = await supabase.auth.getSession();
+      if (!data.session) throw new Error('Sign in to pause this job.');
+      const response = await fetch('/api/social-studio/jobs',{method:'POST',headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({runId:job.id})});
+      const result = await response.json();
+      if(!response.ok) throw new Error(result.error);
+      await load(true); setNotice('Pausing after the current item. Completed posts and media will be kept.');
+    } catch(failure) { setError(failure instanceof Error ? failure.message : 'The job could not be paused.'); }
   }
 
   function card(post: CalendarPost) {
@@ -272,11 +264,16 @@ export default function SocialCalendar({ books, seed, onSeedUsed, onGenerateMedi
       <div className="mt-4 flex flex-wrap gap-3">
         <button type="button" disabled={planning || mediaBusy || saving || Boolean(editor) || loading || !books.length || !planPlatforms.length} onClick={() => void generateMonth()} className="rounded-xl bg-pink-500 px-5 py-3 font-bold hover:bg-pink-400 disabled:opacity-40">{planning ? 'AI is creating your 30 days...' : 'Generate 30 days'}</button>
         <button type="button" disabled={planning || mediaBusy || saving || Boolean(editor) || loading || !missingMediaGroups} onClick={() => void generateMedia()} className="rounded-xl bg-violet-600 px-5 py-3 font-bold hover:bg-violet-500 disabled:opacity-40">Generate missing artwork/videos ({missingMediaGroups})</button>
-        {mediaBusy && <button type="button" onClick={() => { pauseMediaRef.current = true; setMediaProgress(current => `${current} (pausing after this item)`); }} className={buttonClass}>Pause after current item</button>}
+        {job?.status === 'generating' && <button type="button" disabled={job.cancel_requested} onClick={() => void pauseGeneration()} className={buttonClass}>{job.cancel_requested ? 'Pausing after current item...' : 'Pause after current item'}</button>}
       </div>
-      <p className="mt-3 text-xs text-neutral-400">Uses your existing AI API credits. Copy is saved first; artwork/video generation is a separate paid AI step. The button shows how many media items it will create (up to 60 for a full month across all three networks). Keep this page open while media is generated. Completed media is saved, so you can pause and resume. Existing dates are kept, and nothing is published automatically yet.</p>
-      {planning && <p role="status" className="mt-3 text-sm text-pink-200">Creating and saving up to {planPlatforms.length * 30} platform drafts. This may take a few minutes.</p>}
-      {mediaProgress && <p role="status" className="mt-3 text-sm text-violet-200">{mediaProgress}</p>}
+      <p className="mt-3 text-xs text-neutral-400">Uses your existing AI API credits. Copy is saved first; artwork/video generation is a separate paid AI step. The button shows how many media items it will create (up to 60 for a full month across all three networks). Generation runs in the background. You can leave this page or close the tab. Completed content is saved automatically; pause and resume missing items whenever you like. Existing dates are kept, and nothing is published automatically yet.</p>
+      {job && <div role="status" className="mt-3 rounded-xl border border-white/15 p-3 text-sm">
+        <p className="font-semibold">{job.job_type === 'plan' ? '30-day content' : 'Artwork / videos'}: {job.status === 'generating' ? 'running in the background' : job.status}</p>
+        <p className="mt-1 text-neutral-300">{job.completed_tasks} of {job.total_tasks} {job.job_type === 'plan' ? 'batches' : 'media items'} saved{job.job_type === 'plan' ? ` · ${job.created_count} platform drafts` : ''}.</p>
+        {job.status === 'generating' && <p className="mt-1 text-emerald-300">You can close NovelForge. Come back later to review the results.</p>}
+        {job.error_message && <p className="mt-2 text-amber-200">{job.error_message} Use Generate again to fill missing dates or media.</p>}
+        {job.status === 'paused' && <p className="mt-2 text-neutral-300">Saved items are kept. Use Generate again to fill missing dates or media.</p>}
+      </div>}
     </div>
     <div aria-live="polite">{error && <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}{notice && <p className="mt-4 text-sm text-emerald-300">{notice}</p>}{seed && editor && <p className="mt-3 text-sm text-amber-200">A generated post is waiting. Save or close your current editor to open it.</p>}</div>
     <div className="mt-5 flex flex-wrap items-end gap-3">

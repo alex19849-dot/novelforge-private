@@ -8,12 +8,12 @@ export const CONTENT_MIX = [
 ];
 export type PlanBook = { slug: string; title: string; blurb: string; tropes: string[]; subgenre: string; kindleUnlimited: boolean; amazonUrl: string; coverUrl: string };
 export type AiDay = { dayIndex: number; hook: string; creativeBrief: string; posts: { platform: SocialPlatform; title: string; caption: string; hashtags: string[] }[] };
-export function validateAiDays(value: unknown, platforms: SocialPlatform[]): AiDay[] {
+export function validateAiDays(value: unknown, platforms: SocialPlatform[], indices: number[] = Array.from({length:30}, (_,i) => i)): AiDay[] {
   const days = (value as {days?: AiDay[]})?.days;
-  if (!Array.isArray(days) || days.length !== 30) throw new Error('The AI did not return all 30 days. No drafts were saved.');
+  if (!Array.isArray(days) || days.length !== indices.length) throw new Error('The AI did not return all 30 days. No drafts were saved.');
   const seen = new Set<number>();
   for (const day of days) {
-    if (!Number.isInteger(day.dayIndex) || day.dayIndex < 0 || day.dayIndex > 29 || seen.has(day.dayIndex)) throw new Error('The AI repeated or omitted a day. No drafts were saved.');
+    if (!Number.isInteger(day.dayIndex) || !indices.includes(day.dayIndex) || seen.has(day.dayIndex)) throw new Error('The AI repeated or omitted a day. No drafts were saved.');
     seen.add(day.dayIndex);
     if (!day.hook?.trim() || !day.creativeBrief?.trim() || day.creativeBrief.length > 5000 || !Array.isArray(day.posts) || day.posts.length !== platforms.length) throw new Error('The AI returned an incomplete campaign. No drafts were saved.');
     const found = new Set<string>();

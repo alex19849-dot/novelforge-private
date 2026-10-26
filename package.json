@@ -5,13 +5,17 @@
     "start": "next start"
   },
   "dependencies": {
+    "@ffmpeg-installer/linux-x64": "4.1.0",
     "@supabase/supabase-js": "^2.50.0",
     "docx": "^9.5.1",
     "next": "latest",
     "openai": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "typescript": "latest"
+    "server-only": "0.0.1",
+    "sharp": "0.35.5",
+    "typescript": "latest",
+    "workflow": "5.2.3"
   },
   "devDependencies": {
     "@types/node": "latest",

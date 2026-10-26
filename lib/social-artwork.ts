@@ -1,0 +1,629 @@
+import OpenAI from "openai";
+
+import { NextResponse } from "next/server";
+
+
+const DIRECTOR_MODEL = "gpt-6-astra";
+const IMAGE_MODEL = "gpt-image-2";
+const CHECK_MODEL = "gpt-5.6-terra";
+const openai = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+type SocialPlatform = "facebook" | "instagram" | "tiktok";
+type CreativeOutput = "image" | "video";
+
+type CampaignRequest = {
+  contentType?: unknown;
+  book?: unknown;
+  platforms?: unknown;
+  instructions?: unknown;
+  outputType?: unknown;
+  revision?: unknown;
+  previousResponseIds?: unknown;
+};
+
+type BookFacts = {
+  title: string;
+  author: string;
+  subgenre: string;
+  blurb: string;
+  tropes: string[];
+  kindleUnlimited: boolean;
+  amazonUrl: string;
+  coverUrl: string;
+};
+
+type SocialCopy = {
+  title: string;
+  caption: string;
+  hashtags: string[];
+};
+
+type QualityCheck = {
+  decision: "pass" | "review";
+  summary: string;
+  promptAdherence: number;
+  legibility: number;
+  coverFidelity: number;
+};
+
+type MotionRegionKind = "hook" | "hero" | "trope" | "cta" | "website" | "detail";
+type MotionMovement = "slow-push" | "dramatic-push" | "lateral-pan" | "diagonal-drift" | "gentle-pulse";
+type MotionEffect =
+  | "light-sweep"
+  | "mist"
+  | "particles"
+  | "embers"
+  | "ice-shards"
+  | "petals"
+  | "paint-streaks"
+  | "water-ripples"
+  | "lens-flare"
+  | "glitch";
+
+type MotionRegion = {
+  kind: MotionRegionKind;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+type MotionMap = {
+  available: boolean;
+  summary: string;
+  accentColor: string;
+  movement: MotionMovement;
+  effects: MotionEffect[];
+  regions: MotionRegion[];
+};
+
+type InspectionResult = {
+  qualityCheck: QualityCheck;
+  socialCopy: SocialCopy;
+  motionMap: MotionMap;
+};
+
+type GeneratedPost = SocialCopy & {
+  platform: SocialPlatform;
+  visualDirection: string;
+  imageDataUrl: string;
+  sourceResponseId: string;
+  qualityCheck: QualityCheck;
+  motionMap: MotionMap;
+};
+
+const MOTION_REGION_KINDS = new Set<MotionRegionKind>([
+  "hook",
+  "hero",
+  "trope",
+  "cta",
+  "website",
+  "detail",
+]);
+const MOTION_MOVEMENTS = new Set<MotionMovement>([
+  "slow-push",
+  "dramatic-push",
+  "lateral-pan",
+  "diagonal-drift",
+  "gentle-pulse",
+]);
+const MOTION_EFFECTS = new Set<MotionEffect>([
+  "light-sweep",
+  "mist",
+  "particles",
+  "embers",
+  "ice-shards",
+  "petals",
+  "paint-streaks",
+  "water-ripples",
+  "lens-flare",
+  "glitch",
+]);
+
+function cleanString(value: unknown, maximumLength = 5000): string {
+  return typeof value === "string"
+    ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, maximumLength)
+    : "";
+}
+
+function cleanStringArray(value: unknown, maximumItems = 20): string[] {
+  return Array.isArray(value)
+    ? [...new Set(
+        value
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => cleanString(item, 180))
+          .filter(Boolean),
+      )].slice(0, maximumItems)
+    : [];
+}
+
+function cleanPlatforms(value: unknown): SocialPlatform[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value)].filter(
+    (item): item is SocialPlatform =>
+      item === "facebook" || item === "instagram" || item === "tiktok",
+  );
+}
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function platformSize(): "1024x1536" {
+  return "1024x1536";
+}
+
+function outputLabel(outputType: CreativeOutput): string {
+  return outputType === "video"
+    ? "Create the premium key artwork for a short social video. It must also work as the opening and closing frame."
+    : "Create one complete premium social-media poster.";
+}
+
+function fallbackCopy(book: BookFacts, platform: SocialPlatform): SocialCopy {
+  const tags = [book.subgenre, ...book.tropes]
+    .map((value) => `#${value.replace(/[^a-z0-9]+/gi, "")}`)
+    .filter((value) => value.length > 1)
+    .slice(0, platform === "facebook" ? 8 : 5);
+  const tropeText = book.tropes.slice(0, 4).join(", ");
+  const availability = book.kindleUnlimited
+    ? "Available to read on Kindle Unlimited."
+    : "Discover it on Amazon.";
+  return {
+    title: `Meet your next ${book.subgenre || "romance"} obsession`,
+    caption: [
+      `Looking for your next ${book.subgenre || "romance"}?`,
+      `${book.title} by ${book.author}${tropeText ? ` features ${tropeText}` : ""}.`,
+      availability,
+      book.amazonUrl,
+    ].filter(Boolean).join("\n\n"),
+    hashtags: tags,
+  };
+}
+
+function parseCopy(
+  value: string,
+  book: BookFacts,
+  platform: SocialPlatform,
+): SocialCopy | null {
+  const fallback = fallbackCopy(book, platform);
+  if (!value.trim()) return null;
+  try {
+    const parsed = record(JSON.parse(value));
+    const caption = cleanString(parsed.caption, 5000);
+    const hashtags = cleanStringArray(parsed.hashtags, 8)
+      .map((tag) => tag.startsWith("#") ? tag : `#${tag.replace(/[^a-z0-9]+/gi, "")}`)
+      .filter((tag) => tag.length > 1);
+    if (caption.split(/\s+/).filter(Boolean).length < 45 || hashtags.length < 5) {
+      return null;
+    }
+    return {
+      title: cleanString(parsed.title, 240) || fallback.title,
+      caption,
+      hashtags: hashtags.slice(0, platform === "facebook" ? 8 : 5),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function previousResponseId(value: unknown, platform: SocialPlatform): string {
+  return cleanString(record(value)[platform], 200);
+}
+
+function unavailableMotionMap(summary: string): MotionMap {
+  return {
+    available: false,
+    summary,
+    accentColor: "#ec4899",
+    movement: "slow-push",
+    effects: ["light-sweep", "particles"],
+    regions: [],
+  };
+}
+
+function cleanMotionMap(value: unknown): MotionMap {
+  const source = record(value);
+  const movementValue = cleanString(source.movement, 40) as MotionMovement;
+  const movement = MOTION_MOVEMENTS.has(movementValue) ? movementValue : "slow-push";
+  const effects = cleanStringArray(source.effects, 4)
+    .filter((effect): effect is MotionEffect => MOTION_EFFECTS.has(effect as MotionEffect));
+  const coordinate = (coordinateValue: unknown) =>
+    typeof coordinateValue === "number" && Number.isFinite(coordinateValue)
+      ? Math.round(Math.min(1, Math.max(0, coordinateValue)) * 10_000) / 10_000
+      : 0;
+  const regions = Array.isArray(source.regions)
+    ? source.regions.flatMap((regionValue): MotionRegion[] => {
+        const region = record(regionValue);
+        const kind = cleanString(region.kind, 30) as MotionRegionKind;
+        if (!MOTION_REGION_KINDS.has(kind)) return [];
+        const width = coordinate(region.width);
+        const height = coordinate(region.height);
+        if (width < 0.04 || height < 0.025) return [];
+        const x = Math.min(coordinate(region.x), 1 - width);
+        const y = Math.min(coordinate(region.y), 1 - height);
+        return [{
+          kind,
+          label: cleanString(region.label, 120) || kind,
+          x,
+          y,
+          width,
+          height,
+        }];
+      }).slice(0, 8)
+    : [];
+  const accent = cleanString(source.accentColor, 20);
+  const available = source.available === true && regions.some((region) => region.kind === "hero");
+  return {
+    available,
+    summary: cleanString(source.summary, 320) || "Motion regions were detected from the finished poster.",
+    accentColor: /^#[0-9a-f]{6}$/i.test(accent) ? accent : "#ec4899",
+    movement,
+    effects: effects.length ? effects : ["light-sweep", "particles"],
+    regions: available ? regions : [],
+  };
+}
+
+export function posterPrompt(
+  book: BookFacts,
+  platform: SocialPlatform,
+  outputType: CreativeOutput,
+  guidance: string,
+  revision: string,
+  contentType = "book_promotion",
+): string {
+  return [
+    "You are creating finished commercial artwork for NovelForge, not a wireframe, dashboard, presentation slide or coded template.",
+    outputLabel(outputType),
+    platform === "tiktok"
+      ? "The tool output will be centre-cropped from 2:3 to a final 9:16 TikTok poster. Keep every important word, face, cover and call to action inside the central 84 percent of the width. Keep important content away from interface areas near the right and bottom edges. Compose specifically for that final crop."
+      : "The tool output will be centre-cropped from 2:3 to a final 4:5 Facebook or Instagram feed poster. Keep every important word, face, cover and call to action inside the central 83 percent of the height. Compose specifically for that final crop.",
+    "AUTHOR CONTROL",
+    "The author's guidance below is the creative brief. Each generation must be art-directed specifically for that brief and must not reuse a fixed layout.",
+    "The author may request any combination of people, environments, rooms, landscapes, objects, props, devices, typography, icons, illustration, photography, collage, paint, texture, lighting or abstract graphics. Create what the guidance requests and make cohesive supporting decisions from its theme.",
+    "Do not impose a gothic, sports, office, floral, dark, Kindle, trope-list or any other default style. Do not add a permanent footer, fixed icon row, standard heading position or repeated composition.",
+    "Do not introduce irrelevant imagery. Every visible element must support the author's brief, the supplied cover or the verified book facts.",
+    "COVER FIDELITY",
+    ["book_promotion", "new_release"].includes(contentType)
+      ? "The supplied image is the genuine book cover. Use that exact cover as the hero. Preserve its artwork, title, author name, spelling, colours and proportions. Never redesign, rewrite, crop away or replace its contents."
+      : "The supplied genuine cover is a factual reference, not a mandatory layout element. Create the requested hook, humour, question or character-conflict artwork. Include the exact cover only when the creative brief asks for it. Do not force a book advert, device or sales footer onto reader-engagement artwork. If the cover is used, preserve it exactly.",
+    "If the guidance requests a Kindle or device, place the genuine cover naturally inside a large realistic dimensional device with matching perspective, screen reflections, rim lighting, contact shadow and environmental integration.",
+    "If no device is requested, present the genuine cover in the manner requested by the author.",
+    "DESIGN STANDARD",
+    "Create professional contemporary BookTok and romance advertising artwork with strong visual hierarchy, confident scale, deliberate spacing, readable typography, depth and a clear reading order.",
+    "Avoid corporate cards, dashboard boxes, tiny covers, generic icon rows, rigid left columns, excessive dead space, weak detached CTAs and flat template-like arrangements unless the author explicitly asks for one of those treatments.",
+    "Render requested wording clearly and accurately. Never invent a quote, price, review, award, ranking, release claim or promotion. A short original promotional hook may be created only when the author explicitly requests a hook without providing its wording, and it must be grounded in the supplied facts.",
+    "Do not use em dashes or en dashes.",
+    "The poster must feel like one integrated piece of finished artwork, not a background with separate items pasted on top.",
+    `Verified book facts: ${JSON.stringify({
+      title: book.title,
+      author: book.author,
+      subgenre: book.subgenre,
+      blurb: book.blurb,
+      tropes: book.tropes,
+      kindleUnlimited: book.kindleUnlimited,
+      amazonUrl: book.amazonUrl,
+    })}`,
+    `Author guidance: ${guidance}`,
+    revision
+      ? `Edit request: ${revision}. Edit the existing generated artwork. Keep everything not mentioned in this correction.`
+      : "This is a fresh generation. Do not imitate a previous NovelForge poster.",
+    "Use the image-generation tool now. After the image is complete, return only the requested social-copy JSON.",
+  ].join("\n\n");
+}
+
+export async function inspectPoster(
+  imageDataUrl: string,
+  book: BookFacts,
+  platform: SocialPlatform,
+  guidance: string,
+  contentType = "book_promotion",
+): Promise<InspectionResult> {
+  const fallback = fallbackCopy(book, platform);
+  try {
+    const response = await openai().responses.create({
+      model: CHECK_MODEL,
+      reasoning: { effort: "low" },
+      text: {
+        format: {
+          type: "json_schema",
+          name: "poster_quality_check",
+          strict: true,
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              decision: { type: "string", enum: ["pass", "review"] },
+              summary: { type: "string" },
+              promptAdherence: { type: "number" },
+              legibility: { type: "number" },
+              coverFidelity: { type: "number" },
+              socialTitle: { type: "string" },
+              caption: { type: "string" },
+              hashtags: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 8,
+              },
+              motionMap: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  available: { type: "boolean" },
+                  summary: { type: "string" },
+                  accentColor: { type: "string" },
+                  movement: {
+                    type: "string",
+                    enum: ["slow-push", "dramatic-push", "lateral-pan", "diagonal-drift", "gentle-pulse"],
+                  },
+                  effects: {
+                    type: "array",
+                    items: {
+                      type: "string",
+                      enum: ["light-sweep", "mist", "particles", "embers", "ice-shards", "petals", "paint-streaks", "water-ripples", "lens-flare", "glitch"],
+                    },
+                    maxItems: 4,
+                  },
+                  regions: {
+                    type: "array",
+                    maxItems: 8,
+                    items: {
+                      type: "object",
+                      additionalProperties: false,
+                      properties: {
+                        kind: { type: "string", enum: ["hook", "hero", "trope", "cta", "website", "detail"] },
+                        label: { type: "string" },
+                        x: { type: "number" },
+                        y: { type: "number" },
+                        width: { type: "number" },
+                        height: { type: "number" },
+                      },
+                      required: ["kind", "label", "x", "y", "width", "height"],
+                    },
+                  },
+                },
+                required: ["available", "summary", "accentColor", "movement", "effects", "regions"],
+              },
+            },
+            required: [
+              "decision",
+              "summary",
+              "promptAdherence",
+              "legibility",
+              "coverFidelity",
+              "socialTitle",
+              "caption",
+              "hashtags",
+              "motionMap",
+            ],
+          },
+        },
+      },
+      input: [{
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: [
+              "Inspect this generated social poster once.",
+              `Platform: ${platform}.`,
+              `Author guidance: ${guidance}`,
+              `Verified book facts: ${JSON.stringify({
+                title: book.title,
+                author: book.author,
+                subgenre: book.subgenre,
+                blurb: book.blurb,
+                tropes: book.tropes,
+                kindleUnlimited: book.kindleUnlimited,
+                amazonUrl: book.amazonUrl,
+              })}`,
+              "The first image is the finished poster. The second image is the genuine cover reference.",
+              "Check prompt adherence, wording legibility and cover fidelity. Use scores from 0 to 100.",
+              !["book_promotion", "new_release"].includes(contentType)
+                ? "This is hook or reader-engagement artwork. A cover is optional unless the guidance requires it. When no cover is required or shown, score coverFidelity as 100 (not applicable) and do not mark review merely because there is no cover."
+                : "The genuine book cover should be present and faithful.",
+              "Mark review when any score is below 70. Keep the summary under 240 characters.",
+              "Also write the finished social post that accompanies this artwork. Create an engaging hook title, a substantial natural caption, a clear reading call to action and strong relevant hashtags.",
+              "Create a motion map for animating this exact finished poster without redrawing it. All coordinates must be normalized from 0 to 1 and describe top-left x, top-left y, width and height on the finished poster.",
+              "Mark the genuine cover or Kindle as one hero region. Mark the visible promotional hook, each separate trope treatment, the main CTA, website and any visually useful detail as separate regions only when actually visible.",
+              "Keep each box tight around its visible element but include a small breathing margin. Do not guess a region that is absent. Set available true only when the hero is confidently located.",
+              "Choose one camera movement and up to four effects that suit this poster's actual artwork and the author's guidance. Do not default every poster to gothic mist or particles. Use the poster's strongest vivid accent as a six-digit hex colour.",
+              platform === "facebook"
+                ? "For Facebook, write 90 to 170 words and provide 6 to 8 relevant hashtags."
+                : platform === "instagram"
+                  ? "For Instagram, write 70 to 140 words and provide exactly 5 strong relevant hashtags."
+                  : "For TikTok, write a keyword-rich title, a lively 80 to 160 word description and exactly 5 strong relevant hashtags.",
+              "Use only the verified book facts and author guidance. Do not invent quotes, prices, reviews, awards, rankings, release status or plot claims. Do not use em dashes or en dashes.",
+            ].join(" "),
+          },
+          { type: "input_image", image_url: imageDataUrl, detail: "high" },
+          { type: "input_image", image_url: book.coverUrl, detail: "high" },
+        ],
+      }],
+      max_output_tokens: 1200,
+    }, { timeout: 45_000, maxRetries: 0 });
+    const parsed = record(JSON.parse(response.output_text || "{}"));
+    const score = (value: unknown) =>
+      typeof value === "number" && Number.isFinite(value)
+        ? Math.min(100, Math.max(0, Math.round(value)))
+        : 0;
+    const hashtagLimit = platform === "facebook" ? 8 : 5;
+    const hashtags = cleanStringArray(parsed.hashtags, hashtagLimit)
+      .map((tag) => tag.startsWith("#") ? tag : `#${tag.replace(/[^a-z0-9]+/gi, "")}`)
+      .filter((tag) => tag.length > 1);
+    return {
+      qualityCheck: {
+        decision: parsed.decision === "pass" ? "pass" : "review",
+        summary: cleanString(parsed.summary, 240) || "The automatic inspection could not provide a useful summary.",
+        promptAdherence: score(parsed.promptAdherence),
+        legibility: score(parsed.legibility),
+        coverFidelity: score(parsed.coverFidelity),
+      },
+      socialCopy: {
+        title: cleanString(parsed.socialTitle, 240) || fallback.title,
+        caption: cleanString(parsed.caption, 5000) || fallback.caption,
+        hashtags: hashtags.length ? hashtags : fallback.hashtags,
+      },
+      motionMap: cleanMotionMap(parsed.motionMap),
+    };
+  } catch {
+    return {
+      qualityCheck: {
+        decision: "review",
+        summary: "The poster was created, but the automatic inspection could not be completed.",
+        promptAdherence: 0,
+        legibility: 0,
+        coverFidelity: 0,
+      },
+      socialCopy: fallback,
+      motionMap: unavailableMotionMap("The poster was created, but its motion regions could not be inspected."),
+    };
+  }
+}
+
+async function generatePoster(
+  book: BookFacts,
+  platform: SocialPlatform,
+  outputType: CreativeOutput,
+  guidance: string,
+  revision: string,
+  priorResponseId: string,
+  contentType = "book_promotion",
+): Promise<GeneratedPost> {
+  const response = await openai().responses.create({
+    model: DIRECTOR_MODEL,
+    ...(revision && priorResponseId ? { previous_response_id: priorResponseId } : {}),
+    store: true,
+    reasoning: { effort: "low" },
+    text: {
+      format: {
+        type: "json_schema",
+        name: "social_copy",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            title: { type: "string" },
+            caption: { type: "string" },
+            hashtags: { type: "array", items: { type: "string" }, maxItems: 8 },
+          },
+          required: ["title", "caption", "hashtags"],
+        },
+      },
+    },
+    input: [{
+      role: "user",
+      content: [
+        { type: "input_text", text: posterPrompt(book, platform, outputType, guidance, revision, contentType) },
+        { type: "input_image", image_url: book.coverUrl, detail: "high" },
+      ],
+    }],
+    tools: [{
+      type: "image_generation",
+      model: IMAGE_MODEL,
+      action: revision && priorResponseId ? "edit" : "auto",
+      size: platformSize(),
+      quality: "medium",
+      output_format: "jpeg",
+      output_compression: 92,
+      background: "opaque",
+    }],
+    tool_choice: { type: "image_generation" },
+    max_output_tokens: 1400,
+  }, { timeout: 240_000 });
+
+  const imageCall = response.output.find(
+    (item): item is Extract<typeof item, { type: "image_generation_call" }> =>
+      item.type === "image_generation_call",
+  );
+  if (!imageCall?.result) {
+    throw new Error("The image model returned no poster artwork.");
+  }
+  const imageDataUrl = `data:image/jpeg;base64,${imageCall.result}`;
+  const inspection = await inspectPoster(imageDataUrl, book, platform, guidance, contentType);
+  const socialCopy =
+    parseCopy(response.output_text, book, platform) ?? inspection.socialCopy;
+  return {
+    platform,
+    ...socialCopy,
+    visualDirection: "Generated directly from the author's current guidance.",
+    imageDataUrl,
+    sourceResponseId: response.id,
+    qualityCheck: inspection.qualityCheck,
+    motionMap: inspection.motionMap,
+  };
+}
+
+export async function handleArtwork(request: Request) {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json({ error: "OPENAI_API_KEY is not configured." }, { status: 500 });
+    }
+    const body = (await request.json()) as CampaignRequest;
+    const bookValue = record(body.book);
+    const platforms = cleanPlatforms(body.platforms);
+    const instructions = cleanString(body.instructions, 5000);
+    const revision = cleanString(body.revision, 2500);
+    const outputType: CreativeOutput = body.outputType === "video" ? "video" : "image";
+    const book: BookFacts = {
+      title: cleanString(bookValue.title, 300),
+      author: cleanString(bookValue.author, 300) || "Marlow Quinn",
+      subgenre: cleanString(bookValue.subgenre, 300),
+      blurb: cleanString(bookValue.blurb, 7000),
+      tropes: cleanStringArray(bookValue.tropes, 20),
+      kindleUnlimited: bookValue.kindleUnlimited === true,
+      amazonUrl: cleanString(bookValue.amazonUrl, 1000),
+      coverUrl: cleanString(bookValue.coverUrl, 3000),
+    };
+
+    if (!book.title || !book.blurb || !book.coverUrl || !platforms.length || !instructions) {
+      return NextResponse.json(
+        { error: "A book with its genuine cover, your guidance and at least one platform are required." },
+        { status: 400 },
+      );
+    }
+
+    const feedPlatform: SocialPlatform | null = platforms.includes("instagram")
+      ? "instagram"
+      : platforms.includes("facebook")
+        ? "facebook"
+        : null;
+    const generationPlatforms: SocialPlatform[] = [
+      ...(feedPlatform ? [feedPlatform] : []),
+      ...(platforms.includes("tiktok") ? ["tiktok" as const] : []),
+    ];
+    const generated = await Promise.all(
+      generationPlatforms.map((platform) =>
+        generatePoster(
+          book,
+          platform,
+          outputType,
+          instructions,
+          revision,
+          previousResponseId(body.previousResponseIds, platform),
+          cleanString(body.contentType, 60) || "book_promotion",
+        ),
+      ),
+    );
+    const feedPost = generated.find((post) => post.platform === feedPlatform);
+    const posts = platforms.map((platform) => {
+      const exact = generated.find((post) => post.platform === platform);
+      if (exact) return exact;
+      if ((platform === "facebook" || platform === "instagram") && feedPost) {
+        return { ...feedPost, platform };
+      }
+      throw new Error(`The image model omitted the ${platform} poster.`);
+    });
+
+    return NextResponse.json({ posts, outputType, director: DIRECTOR_MODEL, imageModel: IMAGE_MODEL });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "The poster could not be generated." },
+      { status: 500 },
+    );
+  }
+}
+

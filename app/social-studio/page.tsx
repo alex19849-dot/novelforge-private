@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import BufferConnection from "./BufferConnection";
 import SocialCalendar from "./SocialCalendar";
-import type { CalendarPost, CalendarSeed } from "../../lib/social-calendar";
+import type { CalendarSeed } from "../../lib/social-calendar";
 
 type CatalogueBook = {
   slug: string;
@@ -590,9 +590,8 @@ export default function SocialStudioPage() {
     requestedPlatforms: SocialPlatform[],
     revision = "",
     priorPosts: GeneratedPost[] = [],
-    calendarBrief?: { book: CatalogueBook; instructions: string; contentType: string },
   ) {
-    const book = calendarBrief?.book ?? selectedBook;
+    const book = selectedBook;
     if (!book) throw new Error("Choose a book first.");
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 285_000);
@@ -605,8 +604,7 @@ export default function SocialStudioPage() {
         body: JSON.stringify({
           book,
           platforms: requestedPlatforms,
-          instructions: calendarBrief?.instructions ?? instructions.trim(),
-          contentType: calendarBrief?.contentType,
+          instructions: instructions.trim(),
           outputType,
           revision,
           previousResponseIds: Object.fromEntries(
@@ -630,23 +628,6 @@ export default function SocialStudioPage() {
     }
   }
 
-  async function generateCalendarMedia(post: CalendarPost) {
-    const book = catalogue?.books.find(item => item.slug === post.book_slug);
-    if (!book) throw new Error(`The catalogue no longer contains ${post.book_title}. Choose its book before generating media.`);
-    if (!post.creative_brief?.trim()) throw new Error("This post has no AI creative brief. Add one in its editor first.");
-    const outputType = post.planned_media_type === "video" ? "video" : "image";
-    const [generated] = await requestArtwork(outputType, [post.platform], "", [], {
-      book, instructions: post.creative_brief, contentType: post.post_type,
-    });
-    const normalized = await normalizePoster(generated.imageDataUrl, post.platform);
-    const notes = generated.qualityCheck.decision === "review" ? generated.qualityCheck.summary : "";
-    if (outputType === "video") {
-      const result = await createMotionVideo(normalized, post.platform, generated);
-      if (!result.mimeType.includes("mp4")) throw new Error("This browser created WebM. Use current Chrome or Edge for automatic MP4 creation.");
-      return { blob: result.blob, mimeType: "video/mp4", qualityNotes: notes };
-    }
-    return { blob: await (await fetch(normalized)).blob(), mimeType: "image/jpeg", qualityNotes: notes };
-  }
 
   async function createCampaign() {
     if (!selectedBook) return;
@@ -857,7 +838,7 @@ export default function SocialStudioPage() {
 
       <section className="mx-auto max-w-6xl px-5 py-8">
         <BufferConnection />
-        <SocialCalendar books={catalogue?.books ?? []} seed={calendarSeed} onSeedUsed={() => setCalendarSeed(null)} onGenerateMedia={generateCalendarMedia} />
+        <SocialCalendar books={catalogue?.books ?? []} seed={calendarSeed} onSeedUsed={() => setCalendarSeed(null)} />
         {selectedBook ? (
           <section className="overflow-hidden rounded-3xl border border-pink-500/30 bg-neutral-900 shadow-2xl">
             <div className="flex gap-4 border-b border-white/10 p-5 sm:gap-6">

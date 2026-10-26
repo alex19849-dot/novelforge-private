@@ -1,0 +1,5 @@
+node_modules/
+.next/
+.workflow-data/
+app/.well-known/workflow/
+/.swc
