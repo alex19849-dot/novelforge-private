@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
 import BufferConnection from "./BufferConnection";
+import SocialCalendar from "./SocialCalendar";
+import type { CalendarSeed } from "../../lib/social-calendar";
 
 type CatalogueBook = {
   slug: string;
@@ -94,6 +96,7 @@ type GeneratedVideo = {
   url: string;
   mimeType: string;
   extension: "mp4" | "webm";
+  blob: Blob;
 };
 
 const CATALOGUE_URL = "https://www.marlowquinn.com/api/books";
@@ -526,6 +529,7 @@ function parseResponseText(text: string, status: number) {
 export default function SocialStudioPage() {
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [catalogueError, setCatalogueError] = useState("");
+  const [calendarSeed, setCalendarSeed] = useState<CalendarSeed | null>(null);
   const [selectedBook, setSelectedBook] = useState<CatalogueBook | null>(null);
   const [platforms, setPlatforms] = useState<SocialPlatform[]>([
     "facebook",
@@ -702,6 +706,7 @@ export default function SocialStudioPage() {
         url: URL.createObjectURL(result.blob),
         mimeType: result.mimeType,
         extension: result.mimeType.includes("mp4") ? "mp4" : "webm",
+        blob: result.blob,
       };
       setVideos((current) => {
         current.filter((item) => item.platform === post.platform)
@@ -831,6 +836,7 @@ export default function SocialStudioPage() {
 
       <section className="mx-auto max-w-6xl px-5 py-8">
         <BufferConnection />
+        <SocialCalendar books={catalogue?.books ?? []} seed={calendarSeed} onSeedUsed={() => setCalendarSeed(null)} />
         {selectedBook ? (
           <section className="overflow-hidden rounded-3xl border border-pink-500/30 bg-neutral-900 shadow-2xl">
             <div className="flex gap-4 border-b border-white/10 p-5 sm:gap-6">
@@ -920,6 +926,8 @@ export default function SocialStudioPage() {
                         </button>
 
                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <button type="button" disabled={Boolean(busy) || Boolean(calendarSeed) || !image} onClick={() => { setCalendarSeed({ book_slug: selectedBook.slug, book_title: selectedBook.title, platform: post.platform, title: post.title, caption: post.caption, hashtags: post.hashtags, mediaSource: image!.dataUrl, media_type: "image", mimeType: "image/jpeg" }); document.getElementById("social-calendar")?.scrollIntoView({ behavior: "smooth" }); }} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-40">Save poster to calendar</button>
+                          {isVideo && <button type="button" disabled={Boolean(busy) || Boolean(calendarSeed)} onClick={() => { setCalendarSeed({ book_slug: selectedBook.slug, book_title: selectedBook.title, platform: post.platform, title: post.title, caption: post.caption, hashtags: post.hashtags, mediaSource: video.url, mediaBlob: video.blob, media_type: "video", mimeType: video.mimeType.split(";")[0] }); document.getElementById("social-calendar")?.scrollIntoView({ behavior: "smooth" }); }} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-40">Save video to calendar</button>}
                           {image && <a href={image.dataUrl} download={`${selectedBook.slug}-${post.platform}.jpg`} className="flex items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400">Download Poster</a>}
                           {isVideo && <a href={video.url} download={`${selectedBook.slug}-${post.platform}.${video.extension}`} className="flex items-center justify-center rounded-xl bg-violet-500 px-4 py-3 font-semibold hover:bg-violet-400">Download Video</a>}
                           <button type="button" disabled={Boolean(busy) || post.platform === "tiktok" || !image} onClick={() => void publish(post, "image")} className="rounded-xl border border-pink-400/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:opacity-40">
@@ -966,3 +974,4 @@ export default function SocialStudioPage() {
     </main>
   );
 }
+
