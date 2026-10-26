@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
+import BufferConnection from "./BufferConnection";
 
 type CatalogueBook = {
   slug: string;
@@ -829,6 +830,7 @@ export default function SocialStudioPage() {
       </header>
 
       <section className="mx-auto max-w-6xl px-5 py-8">
+        <BufferConnection />
         {selectedBook ? (
           <section className="overflow-hidden rounded-3xl border border-pink-500/30 bg-neutral-900 shadow-2xl">
             <div className="flex gap-4 border-b border-white/10 p-5 sm:gap-6">
