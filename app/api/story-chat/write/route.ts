@@ -71,6 +71,26 @@ type OpenRouterUsage = {
 
 class TechnicalWriterError extends Error {}
 
+class ChapterLengthError extends Error {
+  constructor(message: string, readonly preservedDraft: string) {
+    super(message);
+    this.name = "ChapterLengthError";
+  }
+}
+
+function validateChapterLength(
+  draft: string,
+  target: NonNullable<SectionWritingBrief["targetWordRange"]>,
+): void {
+  const words = countWords(draft);
+  if (words < target.minimum || words > target.maximum) {
+    throw new ChapterLengthError(
+      `The chapter is ${words.toLocaleString()} words; the Chapter Contract requires ${target.minimum.toLocaleString()} to ${target.maximum.toLocaleString()}. The draft is preserved for review. No automatic rewrite was started.`,
+      draft,
+    );
+  }
+}
+
 function cleanString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -188,7 +208,6 @@ function explicitSpecialistScenes(
             (guidanceRequestsExplicit && sexualBeatPattern.test(beat.instruction))) &&
           !negativePattern.test(beat.instruction)),
     )
-    .slice(0, 3)
     .map((beat, index) => ({
       marker: `${AION_MARKER_PREFIX}${index + 1}]]`,
       instruction: beat.instruction,
@@ -296,6 +315,8 @@ async function writeSpecialistScene(input: {
     "POV CHARACTER:\n" + input.povCharacter,
     "CHAPTER CONTRACT:\n" + input.chapterBrief,
     "STORY BIBLE:\n" + JSON.stringify(input.storyBible ?? {}, null, 2),
+    "CHARACTER VOICE PROFILES, ACTIVE POV FIRST:\n" +
+      JSON.stringify(cleanVoiceProfiles(input.storyState, input.povCharacter), null, 2),
     "CONTINUITY STATE:\n" +
       JSON.stringify(cleanStoryState(input.storyState), null, 2),
     "BEFORE THE MARKER:\n" + context.before,
@@ -1130,6 +1151,7 @@ export async function POST(request: Request) {
 
         if (!specialistScenesPending) {
           validateSection(section);
+          validateChapterLength(section, targetWordRange);
         }
 
         return NextResponse.json({
@@ -1149,10 +1171,10 @@ export async function POST(request: Request) {
               error instanceof Error
                 ? error.message
                 : "The automatic Aion handoff failed.",
-            preservedDraft: chapterDraft,
+            preservedDraft: error instanceof ChapterLengthError ? error.preservedDraft : chapterDraft,
             diagnostics,
           },
-          { status: 502 },
+          { status: error instanceof ChapterLengthError ? 422 : 502 },
         );
       }
     }
@@ -1272,6 +1294,12 @@ export async function POST(request: Request) {
         );
         if (!specialistScenes.length) {
           validateSection(section);
+          if (action === "start" || action === "continue") {
+            const completeDraft = action === "continue"
+              ? `${chapterDraft}\n\n${section}`.trim()
+              : section;
+            validateChapterLength(completeDraft, targetWordRange);
+          }
         }
 
         diagnostics.push(
@@ -1348,7 +1376,7 @@ export async function POST(request: Request) {
           return NextResponse.json(
             {
               error: writerError.message,
-              preservedDraft: chapterDraft || null,
+              preservedDraft: error instanceof ChapterLengthError ? error.preservedDraft : chapterDraft || null,
               diagnostics,
             },
             { status },
@@ -1369,6 +1397,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 

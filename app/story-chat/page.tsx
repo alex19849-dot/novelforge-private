@@ -699,7 +699,11 @@ function parseRemotePendingGeneration(
 class ApiRequestError extends Error {
   diagnostics: GenerationDiagnostic[];
 
-  constructor(message: string, diagnostics: GenerationDiagnostic[] = []) {
+  constructor(
+    message: string,
+    diagnostics: GenerationDiagnostic[] = [],
+    readonly preservedDraft?: string,
+  ) {
     super(message);
     this.name = "ApiRequestError";
     this.diagnostics = diagnostics;
@@ -741,7 +745,10 @@ async function readApiJson(response: Response): Promise<unknown> {
         ? data.diagnostics
         : [];
 
-    throw new ApiRequestError(errorMessage, diagnostics);
+    const preservedDraft = data && typeof data === "object" &&
+      "preservedDraft" in data && typeof data.preservedDraft === "string"
+      ? data.preservedDraft : undefined;
+    throw new ApiRequestError(errorMessage, diagnostics, preservedDraft);
   }
 
   return data;
@@ -2435,6 +2442,18 @@ device.`,
       setActiveTab("chapters");
       setReaderOpen(true);
     } catch (error) {
+      if (error instanceof ApiRequestError && error.preservedDraft !== undefined) {
+        workingPending = {
+          ...workingPending,
+          draft: error.preservedDraft,
+          lastSection: undefined,
+          qualityReview: undefined,
+          qualityCheckedDraft: undefined,
+          qualityOverrideReady: undefined,
+          qualityTechnicalError: undefined,
+        };
+        savePendingGeneration(workingPending);
+      }
       if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
         workingPending = {
           ...workingPending,
@@ -3702,4 +3721,5 @@ disabled:opacity-40"
     </main>
   );
 }
+
 

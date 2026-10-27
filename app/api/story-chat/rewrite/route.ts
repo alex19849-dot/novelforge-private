@@ -79,6 +79,7 @@ export async function POST(request: Request) {
       "Follow AUTHOR INSTRUCTION. The chapter, Bible, continuity and contract are context, not requests to generate a chapter. Preserve the passage's POV, tense, voice, established facts and positions. Match its beginning and ending to the unchanged surrounding prose. Do not repeat either boundary, add later events or return the rest of the chapter. Preserve the passage's approximate length unless the author requests a different length. Every romantic or sexual character is an adult aged eighteen or older.",
       "Use natural contractions, fluid contemporary prose and individual character voices. Dialogue must make sense on the first read, with a clear connection between replies. Let sarcasm arise from words and immediate context. Mix ordinary responses with selective humour; avoid chains of polished retorts, shared bureaucratic jokes, therapy language, explanations of jokes and elaborate comparisons that obscure meaning. Preserve emotional intensity and subtext without making the literal exchange confusing. Never use em dashes or en dashes.",
       "Where attraction belongs, make observations particular to what this POV character finds appealing, grounded in canon, without inventories, forced escalation or repeated favourite features. Preserve existing clothes and room conditions. Choose details for this scene rather than defaulting to paper napkins, open windows or the same muted-colour outfits. Do not change facts merely to create variety.",
+      "Keep the reader inside the fixed POV character's immediate experience. Weave his private reactions, interpretations, withheld words and decisions through the live scene, rather than mainly reporting outward movements and surroundings. Prefer a revealing thought in his own voice over incidental set dressing. Retain enough physical orientation to follow the action, and let environmental details matter to what he notices or does. Do not add a thought after every line, pause for an internal essay, explain every feeling or repeat an established conclusion. Each response should develop with the unfolding interaction.",
       "POV CHARACTER:\n" + text(body.povCharacter),
       "STORY BIBLE:\n" + JSON.stringify(body.storyBible ?? {}),
       "CONTINUITY AND CHARACTER VOICE PROFILES:\n" + JSON.stringify(body.storyState ?? {}),
@@ -139,3 +140,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message, diagnostics }, { status: called ? 502 : 400 });
   }
 }
+

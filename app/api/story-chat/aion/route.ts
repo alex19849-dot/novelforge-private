@@ -174,6 +174,7 @@ export async function POST(request: Request) {
       "Let physical contact follow the characters' positions, desire and responses. Avoid repeatedly placing hands at waists or arms; vary purposeful touch naturally without an anatomy inventory or an invented act beyond the author's request.",
       "If a recurring supporting character is present and relevant within the selected passage, let them participate through their own dialogue, choices or responses instead of existing only in the POV character's description. Do not force incidental extras to speak, invent a new event, or alter the author's requested interaction.",
       "If the selected passage ends a scene or chapter, finish at its strongest live action, exchange, decision, discovery or consequence within the original endpoint. Do not add a recap, an explanation of what the moment means or feels like, or generic speculation about what comes next. Preserve any final beat or line the author explicitly requested.",
+      "Keep the reader inside the fixed POV character's immediate experience. Weave his private reactions, interpretations, withheld words and decisions through the live scene, rather than mainly reporting outward movements and surroundings. Prefer a revealing thought in his own voice over incidental set dressing. Retain enough physical orientation to follow the action, and let environmental details matter to what he notices or does. Do not add a thought after every line, pause for an internal essay, explain every feeling or repeat an established conclusion. Each response should develop with the unfolding interaction.",
       "POV CHARACTER:\n" +
         (povCharacter || "Use the POV established by the supplied passage."),
       "COMPLETE CHAPTER CONTRACT:\n" +
@@ -270,3 +271,4 @@ export async function POST(request: Request) {
     );
   }
 }
+
