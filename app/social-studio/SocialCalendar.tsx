@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { readyForApproval } from '../../lib/social-approval';
 import { addDays, calendarDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
 import type { CalendarPost, CalendarSeed, SocialPlatform } from '../../lib/social-calendar';
 
@@ -30,6 +31,8 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [bulkAction, setBulkAction] = useState<'approve'|'undo'|null>(null);
+  const [undoBatch, setUndoBatch] = useState<CalendarPost[]>([]);
   const [planStart, setPlanStart] = useState(() => addDays(londonDate(), 1));
   const [planBook, setPlanBook] = useState('all');
   const [planPlatforms, setPlanPlatforms] = useState<SocialPlatform[]>([...SOCIAL_PLATFORMS]);
@@ -41,6 +44,8 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const savingRef = useRef(false);
   const accountRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
+  const initialRangeRef = useRef(false);
+  const writeRevisionRef = useRef(0);
   const days = useMemo(() => calendarDays(start), [start]);
   const visiblePosts = useMemo(() => posts.filter(post => platform === 'all' || post.platform === platform), [posts, platform]);
   const postsByDate = useMemo(() => {
@@ -52,6 +57,9 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     }
     return groups;
   }, [visiblePosts]);
+  const calendarDrafts = visiblePosts.filter(post => post.status === 'draft' && post.scheduled_at && days.includes(londonDate(post.scheduled_at)));
+  const readyPosts = calendarDrafts.filter(post => readyForApproval(post));
+  const blockedDrafts = calendarDrafts.length - readyPosts.length;
   const selectedPosts = postsByDate.get(selected) ?? [];
   const drafts = useMemo(() => visiblePosts.filter(post => !post.scheduled_at), [visiblePosts]);
   const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
@@ -59,6 +67,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   async function load(silent = false) {
     if (loadingRef.current) return;
     loadingRef.current = true;
+    const readRevision = writeRevisionRef.current;
     if (!silent) { setLoading(true); setError(''); }
     try {
       const { data } = await supabase.auth.getUser();
@@ -66,7 +75,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       accountRef.current = data.user.id;
       const { data: rows, error: queryError } = await supabase.from('social_posts').select('*').eq('user_id', data.user.id).order('scheduled_at', { ascending: true, nullsFirst: false });
       if (queryError) throw new Error(calendarError(queryError));
-      if (accountRef.current === data.user.id) setPosts(rows ?? []);
+      if (accountRef.current === data.user.id && readRevision === writeRevisionRef.current) setPosts(rows ?? []);
       const { data: session } = await supabase.auth.getSession();
       if (session.session) {
         const response = await fetch('/api/social-studio/jobs', { headers: {Authorization:`Bearer ${session.session.access_token}`}, cache:'no-store' });
@@ -75,6 +84,12 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         if (accountRef.current === data.user.id) {
           const current = result.job as BackgroundJob | null;
           setJob(current);
+          if(!initialRangeRef.current) {
+            initialRangeRef.current = true;
+            if(current?.start_date && addDays(current.start_date,30) > londonDate()) {
+              setStart(current.start_date); setSelected(current.start_date > londonDate() ? current.start_date : londonDate());
+            }
+          }
           if(current && current.status !== 'generating') setNotice(previous => previous.startsWith('Generation started in the background.') ? '' : previous);
           const active = current?.status === 'generating';
           generatingRef.current = active;
@@ -89,7 +104,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     void load();
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session || (accountRef.current && accountRef.current !== session.user.id)) {
-        setPosts([]); setEditor(null); setJob(null); setPlanning(false); setMediaBusy(false); generatingRef.current = false; accountRef.current = null;
+        setPosts([]); setEditor(null); setJob(null); setUndoBatch([]); initialRangeRef.current = false; setPlanning(false); setMediaBusy(false); generatingRef.current = false; accountRef.current = null;
       }
     });
     const interval = window.setInterval(() => { void load(true); }, 10000);
@@ -178,6 +193,35 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       setError(failure instanceof Error ? failure.message : 'Your post could not be saved.');
     } finally { savingRef.current = false; setSaving(false); }
   }
+  async function setBatchApproval(approve:boolean) {
+    if(savingRef.current || generatingRef.current || editor) return;
+    const batch = approve ? readyPosts.filter(post => readyForApproval(post)) : undoBatch;
+    if(!batch.length) return;
+    writeRevisionRef.current += 1;
+    savingRef.current = true; setSaving(true); setBulkAction(approve?'approve':'undo'); setError(''); setNotice('');
+    try {
+      const {data:auth} = await supabase.auth.getUser();
+      if(!auth.user) throw new Error('Sign in again before approving posts.');
+      const accountId = auth.user.id;
+      const {data,error:batchError} = await supabase.rpc('social_set_ready_posts_approval', {
+        p_posts:batch.map(post=>({id:post.id,version:post.version})),p_approve:approve,
+      });
+      if(batchError) throw new Error(batchError.code==='PGRST202'?'Bulk approval is being deployed. Refresh in a moment.':calendarError(batchError));
+      if(accountRef.current !== accountId) return;
+      writeRevisionRef.current += 1;
+      const changed = (data ?? []) as CalendarPost[];
+      const byId = new Map(changed.map(post=>[post.id,post]));
+      setPosts(current=>current.map(post=>byId.get(post.id) ?? post));
+      setUndoBatch(approve ? changed : []);
+      const skipped = batch.length - changed.length;
+      setNotice(approve
+        ? `${changed.length} posts approved in one go.${skipped ? ` ${skipped} changed or were not ready and were left untouched.` : ''} You can still edit them. Automatic publishing is not enabled yet.`
+        : `${changed.length} posts returned to drafts.${skipped ? ` ${skipped} changed since approval and were left untouched.` : ''}`);
+      if(skipped) await load(true);
+    } catch(failure) { setError(failure instanceof Error ? failure.message : 'The posts could not be updated.'); }
+    finally { savingRef.current = false; setSaving(false); setBulkAction(null); }
+  }
+
   async function remove() {
     if (!editor?.existing || savingRef.current) return;
     savingRef.current = true; setSaving(true); setError('');
@@ -283,6 +327,14 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       <button type="button" className={buttonClass} onClick={() => { const date = londonDate(); setStart(date); setSelected(date); }}>Today</button>
       <button type="button" className={buttonClass} onClick={() => { const date = addDays(start, 30); setStart(date); setSelected(date); }}>Next 30 days</button>
       <label className="text-sm">Platform<select value={platform} onChange={event => setPlatform(event.target.value)} className={inputClass}><option value="all">All platforms</option>{SOCIAL_PLATFORMS.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+    </div>
+    <div className="mt-4 rounded-xl border border-emerald-400/25 bg-emerald-500/5 p-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" disabled={loading || saving || planning || mediaBusy || Boolean(editor) || !readyPosts.length} onClick={() => void setBatchApproval(true)} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold hover:bg-emerald-500 disabled:opacity-40">{bulkAction==='approve' ? 'Approving your posts...' : `Approve all ready posts (${readyPosts.length})`}</button>
+        {undoBatch.length > 0 && <button type="button" disabled={saving || planning || mediaBusy || Boolean(editor)} onClick={() => void setBatchApproval(false)} className={buttonClass}>{bulkAction==='undo' ? 'Undoing approval...' : 'Undo last bulk approval'}</button>}
+      </div>
+      <p className="mt-2 text-sm text-neutral-300">Approves ready drafts in these 30 days{platform==='all'?' across all platforms':` for ${platform}`}. Individual posts can still be edited.</p>
+      {blockedDrafts > 0 && <p className="mt-2 text-sm text-amber-200">{blockedDrafts} draft{blockedDrafts===1?' needs':'s need'} a future time, a valid caption or missing media before approval.</p>}
     </div>
     {loading ? <p className="mt-5 text-neutral-400">Loading your saved posts...</p> : <>
       <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7">
