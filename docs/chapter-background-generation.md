@@ -8,7 +8,7 @@ Once the request is accepted, changing tabs, switching phone apps, closing the p
 
 Apply `supabase/migrations/20261027152347_story_background_generation.sql`, then deploy this branch to `story-chat`. Keep the existing `SUPABASE_SERVICE_ROLE_KEY`, public Supabase URL/key, OpenAI key, OpenRouter key and Vercel Workflow configuration. No extra paid service or new API key is required.
 
-The live migration has NOT been applied. Automatic approval review blocked it pending explicit authorization to change the live database. This branch must remain separate until that approval and migration are complete.
+Alex explicitly approved the live database change and activation on 27 October 2026. The migration is applied and recorded in migration history. Live permission checks confirm owner-scoped reads, denied client writes/finalization and server-only finalization. The migration endpoint returned expired-request errors, so the same approved SQL was applied through the database SQL connector after confirming the failed attempts had made no changes.
 
 ## Recovery and ownership
 
