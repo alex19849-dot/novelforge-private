@@ -162,7 +162,7 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
     const {data:files,error:listError}=await db.storage.from('social-media').list(`${job.user_id}/calendar`,{search:`${taskId}.${extension}`,limit:1});
     if(listError) throw new Error('Media storage could not be checked.');
     if(!files.some(f=>f.name===`${taskId}.${extension}`)) {
-      const media=await renderSocialMedia(artworkSource,first.platform==='tiktok',first.planned_media_type==='video');
+      const media=await renderSocialMedia(artworkSource,first.platform==='tiktok',first.planned_media_type==='video',task.request.asset_mode==='original_cover_overlay'?'contain':'cover');
       if(media.length>50*1024*1024) throw new FatalError('This media exceeds the 50 MB storage limit.');
       const {error}=await db.storage.from('social-media').upload(path,media,{contentType:extension==='mp4'?'video/mp4':'image/jpeg',upsert:false});
       if(error&&error.statusCode!=='409') throw new Error('The generated media could not be uploaded. Retrying the same saved image.');

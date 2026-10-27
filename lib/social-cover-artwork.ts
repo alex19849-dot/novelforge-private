@@ -1,5 +1,5 @@
 import sharp from 'sharp';
-/** Artwork dimensions are translated back to the AI's 2:3 canvas before compositing. */
+/** Reserve a central cover region on the AI's 2:3 artwork canvas. */
 export function originalCoverLayout(portrait:boolean) {
   const width=1080,height=portrait?1920:1350;
   const coverWidth=portrait?648:464,coverHeight=Math.round(coverWidth*1.5);
@@ -12,7 +12,7 @@ export function originalCoverBackgroundPrompt(brief:string,portrait:boolean,book
   const box=originalCoverLayout(portrait);
   return [
     'Create finished background artwork and promotional typography for an adult romance book advertisement. Objects, ice, lighting and typography only. No people, bodies, faces, or intimate imagery.',
-    `The book is ${bookTitle}. The final format is ${portrait?'9:16 vertical TikTok':'4:5 Facebook/Instagram feed'}, centre-cropped from your 1024x1536 canvas.`,
+    `The book is ${bookTitle}. The final format is ${portrait?'9:16 vertical TikTok':'4:5 Facebook/Instagram feed'}, with your full 1024x1536 canvas fitted inside it without cropping. Keep every word at least 80 pixels away from the edges of that canvas.`,
     `IMPORTANT: The application inserts the genuine book-cover file separately after generation. Do not draw, copy, fetch, recreate or alter any cover. Do not render a blank cover, device, mockup or placeholder box. Leave the central rectangle x=${box.left}, y=${box.top}, width=${box.width}, height=${box.height} on your 1024x1536 canvas free of text and foreground objects. Continue the background naturally behind that region.`,
     'Place the requested main hook above that region and the supporting text / availability line below it. Keep all text legible and away from crop edges. Treat all cover-compositing instructions in the brief as instructions for the application, not for image generation.',
     'Preserve the specific colour, atmosphere, objects and exact promotional wording from this creative brief. Do not invent reviews, prices or release claims. No em or en dashes.',

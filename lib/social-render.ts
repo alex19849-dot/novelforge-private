@@ -6,9 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const run=promisify(execFile);
 /** Server-side equivalents of the existing feed/portrait export sizes. */
-export async function renderSocialMedia(source:Buffer,portrait:boolean,video:boolean):Promise<Buffer> {
+export async function renderSocialMedia(source:Buffer,portrait:boolean,video:boolean,fit:'cover'|'contain'='cover'):Promise<Buffer> {
   const width=1080,height=portrait?1920:1350;
-  const poster=await sharp(source).resize(width,height,{fit:'cover',position:'centre'}).jpeg({quality:92}).toBuffer();
+  const poster=await sharp(source).resize(width,height,{fit,position:'centre',background:'#07090d'}).jpeg({quality:92}).toBuffer();
   if(!video) return poster;
   const directory=await mkdtemp(join(tmpdir(),'novelforge-social-'));
   try {
