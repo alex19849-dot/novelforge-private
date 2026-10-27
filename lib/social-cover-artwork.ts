@@ -6,7 +6,7 @@ export function originalCoverLayout(portrait:boolean) {
   const left=Math.round((width-coverWidth)/2),top=Math.round(height*(portrait?0.5:0.52)-coverHeight/2);
   const scale=Math.max(width/1024,height/1536);
   const cropX=(1024*scale-width)/2,cropY=(1536*scale-height)/2;
-  return {left:Math.round((left+cropX)/scale),top:Math.round((top+cropY)/scale),width:Math.round(coverWidth/scale),height:Math.round(coverHeight/scale)};
+  return {left:Math.round((left+cropX)/scale),top:Math.round((top+cropY)/scale)+(portrait?60:0),width:Math.round(coverWidth/scale),height:Math.round(coverHeight/scale)};
 }
 export function originalCoverBackgroundPrompt(brief:string,portrait:boolean,bookTitle:string) {
   const box=originalCoverLayout(portrait);

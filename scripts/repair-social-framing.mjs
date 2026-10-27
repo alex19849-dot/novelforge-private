@@ -14,7 +14,7 @@ const {data:tasks,error}=await db.from('social_generation_tasks').select('*').eq
 if(error||tasks.length<1||tasks.length>2) throw new Error('Framing repair is limited to the two recovered images.');
 let repaired=0;
 for(const task of tasks){
-  if(task.request.asset_mode!=='original_cover_overlay'||task.result.framing_repaired) continue;
+  if(task.request.asset_mode!=='original_cover_overlay'||task.result.framing_version>=2) continue;
   const first=task.request.posts[0];
   if(first.planned_media_type!=='image') throw new Error('This repair accepts still posters only.');
   const book=job.config.books.find(b=>b.slug===first.book_slug);
@@ -23,12 +23,12 @@ for(const task of tasks){
   if(!image?.result) throw new Error('The original generated image is unavailable.');
   const source=await compositeOriginalCover(Buffer.from(image.result,'base64'),await originalCoverBytes(book.coverUrl),first.platform==='tiktok');
   const poster=await renderSocialMedia(source,first.platform==='tiktok',false,'contain');
-  const path=`${job.user_id}/calendar/${task.id}-full-frame.jpg`;
+  const path=`${job.user_id}/calendar/${task.id}-full-frame-v2.jpg`;
   const {error:uploadError}=await db.storage.from('social-media').upload(path,poster,{contentType:'image/jpeg',upsert:true});
   if(uploadError) throw new Error('The full-frame poster could not be uploaded.');
   const {data:saved,error:saveError}=await db.from('social_posts').update({media_path:path}).eq('user_id',job.user_id).eq('media_path',task.result.path).eq('status','draft').select('id');
   if(saveError) throw new Error('The full-frame poster could not be attached.');
-  const {error:recordError}=await db.from('social_generation_tasks').update({result:{...task.result,path,framing_repaired:true,framing_saved:saved.length}}).eq('id',task.id).eq('user_id',job.user_id);
+  const {error:recordError}=await db.from('social_generation_tasks').update({result:{...task.result,path,framing_repaired:true,framing_version:2,framing_saved:saved.length}}).eq('id',task.id).eq('user_id',job.user_id);
   if(recordError) throw new Error('The framing repair could not be recorded.');
   repaired++;
 }
