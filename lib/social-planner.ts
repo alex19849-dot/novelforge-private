@@ -1,3 +1,4 @@
+import { postingHours } from './social-posting-times';
 import { addDays, londonSchedule, POST_TYPES } from './social-calendar';
 import type { SocialPlatform } from './social-calendar';
 export const CONTENT_MIX = [
@@ -25,9 +26,11 @@ export function validateAiDays(value: unknown, platforms: SocialPlatform[], indi
   return days.sort((a,b) => a.dayIndex - b.dayIndex);
 }
 export function plannedTime(start: string, index: number, platform: SocialPlatform) {
-  return londonSchedule(addDays(start,index), platform === 'facebook' ? '18:00' : platform === 'instagram' ? '19:00' : '20:00');
+  const date=addDays(start,index);
+  const candidates=postingHours(date,platform).map(hour=>londonSchedule(date,`${String(hour).padStart(2,'0')}:00`));
+  return candidates.find(time=>Date.parse(time)>Date.now()+30*60_000) ?? candidates[0];
 }
 export function plannedFormat(type: string, platform: SocialPlatform): 'image' | 'video' | null {
   if (!POST_TYPES.includes(type as typeof POST_TYPES[number])) throw new Error('Invalid post type.');
-  return type === 'video' ? 'video' : platform === 'facebook' && ['reader_question','reader_engagement'].includes(type) ? null : 'image';
+  return type === 'video' || platform === 'tiktok' ? 'video' : platform === 'facebook' && ['reader_question','reader_engagement'].includes(type) ? null : 'image';
 }

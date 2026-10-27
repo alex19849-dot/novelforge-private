@@ -8,13 +8,15 @@ import { addDays, londonDate, londonSchedule } from '../lib/social-calendar';
 import type { CalendarPost, SocialPlatform } from '../lib/social-calendar';
 import type { PlanBook } from '../lib/social-planner';
 import { inspectPoster, posterPrompt } from '../lib/social-artwork';
+import { chooseSocialTrack, musicForPath, MUSIC_VERSION, MUSIC_LICENSE } from '../lib/social-music';
+import { socialTrackAudio, soundtrackSocialVideo } from '../lib/social-music-render';
 import { renderSocialMedia } from '../lib/social-render';
 import { completedImage, imageDiagnostic, noImageMessage } from '../lib/social-image-result';
 import { compositeOriginalCover, originalCoverBackgroundPrompt, originalCoverBytes } from '../lib/social-cover-artwork';
 
 type Assignment={dayIndex:number;date:string;postType:string;book:string};
 type Job={id:string;user_id:string;status:string;job_type:'plan'|'media';start_date:string;cancel_requested:boolean;config:{books:PlanBook[];platforms:SocialPlatform[];guidance:string}};
-type Task={id:string;run_id:string;user_id:string;status:string;response_id:string|null;request:{assignments?:Assignment[];posts?:CalendarPost[];asset_mode?:'original_cover_overlay'};result:Record<string,unknown>};
+type Task={id:string;run_id:string;user_id:string;status:string;response_id:string|null;request:{assignments?:Assignment[];posts?:CalendarPost[];asset_mode?:'original_cover_overlay';music?:boolean};result:Record<string,unknown>};
 const ai=()=>new OpenAI({apiKey:process.env.OPENAI_API_KEY,timeout:30000,maxRetries:0});
 async function context(runId:string,taskId?:string) {
   const db=jobAdmin();
@@ -43,14 +45,14 @@ export async function describeJob(runId:string) {
   if(error) throw new Error('The task queue could not be read.');
   return data.map(t=>t.id);
 }
-export async function prepareTask(runId:string,taskId:string):Promise<'stop'|'skip'|'run'> {
+export async function prepareTask(runId:string,taskId:string):Promise<'stop'|'skip'|'run'|'music'> {
   'use step';
   const {db,job,task}=await context(runId,taskId);
   if(job.status!=='generating'||job.cancel_requested) return 'stop';
   if(['completed','skipped'].includes(task.status)) return 'skip';
   const {error}=await db.from('social_generation_tasks').update({status:'running'}).eq('id',taskId).eq('user_id',job.user_id);
   if(error) throw new Error('The task could not be started.');
-  return 'run';
+  return task.request.music?'music':'run';
 }
 export async function submitTask(runId:string,taskId:string):Promise<string|null> {
   'use step';
@@ -76,8 +78,8 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
     // Reuse a completed feed/portrait asset when another platform still needs it.
     const {data:existing,error}=await db.from('social_posts').select('*').eq('user_id',job.user_id).eq('campaign_id',first.campaign_id).not('media_path','is',null);
     if(error) throw new FatalError('Existing artwork could not be checked.');
-    const match=(existing as CalendarPost[]).find(p=>p.media_type===first.planned_media_type&&p.creative_brief===first.creative_brief&&(p.platform==='tiktok')===(first.platform==='tiktok'));
-    if(match) { await attachMedia(job,task,match.media_path!,match.quality_notes??''); return null; }
+    const match=(existing as CalendarPost[]).find(p=>p.media_type===(first.platform==='tiktok'?'video':first.planned_media_type)&&p.creative_brief===first.creative_brief&&(p.platform==='tiktok')===(first.platform==='tiktok'));
+    if(match) { await attachMedia(job,task,match.media_path!,match.quality_notes??'',match.media_type!); return null; }
     const book=job.config.books.find(b=>b.slug===first.book_slug)!;
     request={model:'gpt-6-astra',background:true,store:true,reasoning:{effort:'low'},max_output_tokens:1000,
       input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,first.platform==='tiktok',book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)},{type:'input_image',image_url:book.coverUrl,detail:'high'}]}],
@@ -107,11 +109,11 @@ function campaignId(taskId:string,index:number) {
   const hex=createHash('sha256').update(`${taskId}:${index}`).digest('hex');
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-8${hex.slice(17,20)}-${hex.slice(20,32)}`;
 }
-async function attachMedia(job:Job,task:Task,path:string,notes:string) {
+async function attachMedia(job:Job,task:Task,path:string,notes:string,mediaType?:'image'|'video') {
   const db=jobAdmin();let saved=0;
   for(const post of task.request.posts!) {
     // Optimistic version checks protect edits, approvals and reschedules made while AI runs.
-    const {data,error}=await db.from('social_posts').update({media_path:path,media_type:post.planned_media_type,quality_notes:notes}).eq('id',post.id).eq('user_id',job.user_id).eq('version',post.version).eq('status','draft').is('media_path',null).select('id');
+    const {data,error}=await db.from('social_posts').update({media_path:path,media_type:mediaType??post.planned_media_type,planned_media_type:mediaType??post.planned_media_type,quality_notes:notes}).eq('id',post.id).eq('user_id',job.user_id).eq('version',post.version).eq('status','draft').is('media_path',null).select('id');
     if(error) throw new Error('Generated artwork could not be attached.');
     saved+=data.length;
   }
@@ -157,19 +159,22 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
     }
     let artworkSource=Buffer.from(image.result,'base64');
     if(task.request.asset_mode==='original_cover_overlay') artworkSource=Buffer.from(await compositeOriginalCover(artworkSource,await originalCoverBytes(book.coverUrl),first.platform==='tiktok'));
-    const extension=first.planned_media_type==='video'?'mp4':'jpg';
-    const path=`${job.user_id}/calendar/${taskId}.${extension}`;
-    const {data:files,error:listError}=await db.storage.from('social-media').list(`${job.user_id}/calendar`,{search:`${taskId}.${extension}`,limit:1});
+    const video=first.platform==='tiktok'||first.planned_media_type==='video';
+    const track=video?chooseSocialTrack(first.campaign_id,first.post_type):null;
+    const extension=video?'mp4':'jpg';
+    const file=`${taskId}${track?`-music-v${MUSIC_VERSION}-${track.id}`:''}.${extension}`;
+    const path=`${job.user_id}/calendar/${file}`;
+    const {data:files,error:listError}=await db.storage.from('social-media').list(`${job.user_id}/calendar`,{search:file,limit:1});
     if(listError) throw new Error('Media storage could not be checked.');
-    if(!files.some(f=>f.name===`${taskId}.${extension}`)) {
-      const media=await renderSocialMedia(artworkSource,first.platform==='tiktok',first.planned_media_type==='video',task.request.asset_mode==='original_cover_overlay'?'contain':'cover');
+    if(!files.some(f=>f.name===file)) {
+      const media=await renderSocialMedia(artworkSource,first.platform==='tiktok',video,task.request.asset_mode==='original_cover_overlay'?'contain':'cover',track?await socialTrackAudio(track):undefined);
       if(media.length>50*1024*1024) throw new FatalError('This media exceeds the 50 MB storage limit.');
       const {error}=await db.storage.from('social-media').upload(path,media,{contentType:extension==='mp4'?'video/mp4':'image/jpeg',upsert:false});
       if(error&&error.statusCode!=='409') throw new Error('The generated media could not be uploaded. Retrying the same saved image.');
     }
     const inspection=await inspectPoster(`data:image/jpeg;base64,${artworkSource.toString('base64')}`,{...book,author:'Marlow Quinn'},first.platform,first.creative_brief!,first.post_type);
     const notes=inspection.qualityCheck.decision==='review'?inspection.qualityCheck.summary:'';
-    await attachMedia(job,task,path,notes);
+    await attachMedia(job,task,path,notes,video?'video':'image');
   }
 }
 export async function failTask(runId:string,taskId:string,message:string) {
@@ -177,6 +182,49 @@ export async function failTask(runId:string,taskId:string,message:string) {
   const {db,job}=await context(runId,taskId);
   const {error}=await db.from('social_generation_tasks').update({status:'failed',error_message:message.slice(0,600)}).eq('id',taskId).eq('user_id',job.user_id);
   if(error) throw new Error('The task error could not be saved.');
+}
+export async function renderMusicTask(runId:string,taskId:string) {
+  'use step';
+  const {db,job,task}=await context(runId,taskId);
+  if(task.status==='completed'||task.status==='skipped') return;
+  const original=task.request.posts?.[0];
+  if(!task.request.music||!original?.media_path||!original.media_path.startsWith(`${job.user_id}/calendar/`)||original.platform!=='tiktok') throw new FatalError('Invalid soundtrack task.');
+  const track=chooseSocialTrack(original.campaign_id,original.post_type);
+  const hash=createHash('sha256').update(original.media_path).digest('hex').slice(0,16);
+  const file=`${original.id}-${hash}-music-v${MUSIC_VERSION}-${track.id}.mp4`;
+  const directory=`${job.user_id}/calendar/music`;
+  const path=`${directory}/${file}`;
+  async function complete(saved:number,message:string,status='completed') {
+    const {error}=await db.from('social_generation_tasks').update({status,result:{path,source_path:original.media_path,saved,message,music:{id:track.id,title:track.title,artist:track.artist,source:track.source,license:MUSIC_LICENSE,version:MUSIC_VERSION}}}).eq('id',taskId).eq('user_id',job.user_id);
+    if(error) throw new Error('The soundtrack progress could not be saved.');
+    await recordProgress(job);
+  }
+  const {data:current,error:readError}=await db.from('social_posts').select('*').eq('id',original.id).eq('user_id',job.user_id).maybeSingle();
+  if(readError) throw new Error('The current post could not be checked.');
+  if(current?.media_path===path) { await complete(1,'Music is already attached.'); return; }
+  if(job.cancel_requested||job.status!=='generating'||!current||!['draft','approved'].includes(current.status)||current.version!==original.version||current.media_path!==original.media_path||!current.scheduled_at||Date.parse(current.scheduled_at)<=Date.now()||musicForPath(current.media_path)) {
+    await complete(0,'This post changed or is no longer eligible. Its current content was kept.','skipped'); return;
+  }
+  console.log('Preparing social soundtrack',{runId,taskId,track:track.id});
+  const {data:files,error:listError}=await db.storage.from('social-media').list(directory,{search:file,limit:1});
+  if(listError) throw new Error('Saved music exports could not be checked.');
+  if(!files.some(item=>item.name===file)) {
+    const {data:asset,error:downloadError}=await db.storage.from('social-media').download(original.media_path);
+    if(downloadError||!asset) throw new Error('The saved original artwork could not be loaded.');
+    if(asset.size>50*1024*1024) throw new FatalError('The source exceeds the 50 MB media limit.');
+    const source=Buffer.from(await asset.arrayBuffer());
+    const audio=await socialTrackAudio(track);
+    let media:Buffer;
+    try { media=original.media_type==='video'?await soundtrackSocialVideo(source,audio):await renderSocialMedia(source,true,true,'contain',audio); }
+    catch(error) { throw new FatalError(error instanceof Error?error.message:'The soundtrack export failed. The original was kept.'); }
+    if(media.length>50*1024*1024) throw new FatalError('The music export exceeds the 50 MB media limit.');
+    const {error}=await db.storage.from('social-media').upload(path,media,{contentType:'video/mp4',upsert:false});
+    if(error&&String(error.statusCode)!=='409') throw new Error('The soundtrack could not be uploaded. Retrying the same export.');
+  }
+  // Keep captions, dates and approval status. A version check protects concurrent edits.
+  const {data:saved,error:saveError}=await db.from('social_posts').update({media_path:path,media_type:'video',planned_media_type:'video'}).eq('id',original.id).eq('user_id',job.user_id).eq('version',original.version).eq('media_path',original.media_path).in('status',['draft','approved']).gt('scheduled_at',new Date().toISOString()).select('id');
+  if(saveError) throw new Error('The soundtrack could not be attached. The original is still saved.');
+  await complete(saved.length,saved.length?'Licensed backing music added.':'The post changed during export. Its current content was kept.',saved.length?'completed':'skipped');
 }
 export async function finishJob(runId:string,paused:boolean) {
   'use step';

@@ -1,5 +1,5 @@
 import { sleep } from 'workflow';
-import { describeJob, prepareTask, submitTask, rememberResponse, pollResponse, persistTask, finishJob, failTask } from './social-generation-steps';
+import { describeJob, prepareTask, submitTask, rememberResponse, pollResponse, persistTask, finishJob, failTask, renderMusicTask } from './social-generation-steps';
 
 export async function generateSocialJob(runId:string) {
   'use workflow';
@@ -9,6 +9,7 @@ export async function generateSocialJob(runId:string) {
     if(next==='stop') { await finishJob(runId,true); return; }
     if(next==='skip') continue;
     try {
+      if(next==='music') { await renderMusicTask(runId,taskId); continue; }
       // Each submitted response is checkpointed before another step saves its ID.
       // Provider generation keeps running while this workflow sleeps.
       const responseId=await submitTask(runId,taskId);

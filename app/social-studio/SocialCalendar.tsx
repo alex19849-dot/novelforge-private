@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import { musicForPath } from '../../lib/social-music';
 import { readyForApproval } from '../../lib/social-approval';
 import { addDays, calendarDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
 import type { CalendarPost, CalendarSeed, SocialPlatform } from '../../lib/social-calendar';
 
-type BackgroundJob = { id:string; start_date:string; job_type:'plan'|'media'; status:'generating'|'completed'|'failed'|'paused'; completed_tasks:number; total_tasks:number; created_count:number; error_message:string; cancel_requested:boolean };
+type BackgroundJob = { id:string; start_date:string; job_type:'plan'|'media'; operation?:string; status:'generating'|'completed'|'failed'|'paused'; completed_tasks:number; total_tasks:number; created_count:number; error_message:string; cancel_requested:boolean };
 
 type Book = { slug: string; title: string };
 type Editor = {
@@ -60,6 +61,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   }, [visiblePosts]);
   const approvalDrafts = visiblePosts.filter(post => post.status === 'draft' && (!post.scheduled_at || Date.parse(post.scheduled_at) > Date.now()));
   const readyPosts = approvalDrafts.filter(post => readyForApproval(post));
+  const musicNeeded = posts.filter(post=>post.platform==='tiktok' && ['draft','approved'].includes(post.status) && post.media_path && post.scheduled_at && Date.parse(post.scheduled_at)>Date.now() && !musicForPath(post.media_path)).length;
   const blockedDrafts = approvalDrafts.length - readyPosts.length;
   const reviewArtworkCount = new Set(posts.filter(post => post.quality_notes?.trim()).map(post => post.media_path || post.id)).size;
   const reviewGroups = useMemo(() => {
@@ -244,7 +246,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Deletion failed.'); }
     finally { savingRef.current = false; setSaving(false); }
   }
-  async function startGeneration(kind:'plan'|'media', onlyPost?:CalendarPost) {
+  async function startGeneration(kind:'plan'|'media'|'music', onlyPost?:CalendarPost) {
     if (generatingRef.current || savingRef.current || editor) return;
     generatingRef.current = true; setError(''); setNotice('');
     if (kind === 'plan') setPlanning(true); else setMediaBusy(true);
@@ -256,7 +258,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       const storageKey = `novelforge-background:${data.session.user.id}:${kind}:${firstDay}:${onlyPost?.id ?? 'all'}`;
       const runId = localStorage.getItem(storageKey) || crypto.randomUUID();
       localStorage.setItem(storageKey, runId);
-      const response = await fetch(`/api/social-studio/${kind === 'plan' ? 'plan' : 'media'}`, {
+      const response = await fetch(`/api/social-studio/${kind}`, {
         method:'POST', headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},
         body:JSON.stringify({runId,start:firstDay,platforms:planPlatforms,books:planBook === 'all' ? [] : [planBook],guidance:planGuidance,postId:onlyPost?.id}),
         signal:AbortSignal.timeout(55000),
@@ -300,6 +302,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-300">{post.caption || 'Caption to write'}</p>
       <p className="mt-2 break-words text-sm text-pink-300">{post.hashtags.join(' ')}</p>
       {url && (post.media_type === 'video' ? <video src={url} controls preload="none" className="mt-3 max-h-64 rounded-lg" /> : <img src={url} loading="lazy" alt={post.title || 'Post artwork'} className="mt-3 max-h-64 rounded-lg" />)}
+      {musicForPath(post.media_path) && <p className="mt-2 text-xs text-emerald-300">Music included: {musicForPath(post.media_path)!.title} · Licensed backing track</p>}
       {post.quality_notes && <p className="mt-3 text-sm text-amber-200">Artwork review: {post.quality_notes}</p>}
       {reviewOnly && related.filter(item=>item.id!==post.id).map(item=><details key={item.id} className="mt-3 rounded-lg border border-white/10 p-3 text-sm">
         <summary className="cursor-pointer font-semibold capitalize">{item.platform} · {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'Europe/London'})+' · '+londonTime(item.scheduled_at) : 'No date'}</summary>
@@ -317,6 +320,12 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div><p className="text-xs font-semibold uppercase tracking-widest text-pink-400">Plan ahead</p><h2 id="calendar-title" className="mt-1 text-2xl font-bold">Your 30-day calendar</h2><p className="mt-2 text-sm text-neutral-400">Let your AI create the month, then review and approve its posts. Times are UK time. Automatic publishing is not enabled yet.</p></div>
       <div className="flex gap-2"><button type="button" disabled={Boolean(editor) || saving || loading || planning || mediaBusy} onClick={() => { setEditor(fresh()); setConfirmDelete(false); setNotice(''); }} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400 disabled:opacity-40">Manual draft</button><button type="button" disabled={loading || saving || Boolean(editor) || planning || mediaBusy} onClick={() => void load()} className={buttonClass}>Refresh</button></div>
+    </div>
+    <p className="mt-3 text-xs text-neutral-400">Posting times reviewed 27 October: Facebook and TikTok use the strongest available Metricool timing scores for each weekday. Instagram stays at 7 pm while useful audience data builds. These are starting points, not guaranteed results. You can edit individual times.</p>
+    <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-500/5 p-4">
+      <h3 className="font-bold">TikTok backing music</h3>
+      <p className="mt-2 text-sm text-neutral-300">New AI TikTok posts automatically become short videos with licensed music. Existing posters and silent clips can be prepared together in the background. Captions, dates and approvals are kept.</p>
+      <button type="button" disabled={loading || saving || planning || mediaBusy || Boolean(editor) || !musicNeeded} onClick={()=>void startGeneration('music')} className={`${buttonClass} mt-3 bg-violet-600`}>{job?.status==='generating' && job.operation==='music' ? 'Adding music in the background...' : `Add music to all TikTok posts (${musicNeeded})`}</button>
     </div>
     <div className="mt-4 flex flex-wrap gap-3" aria-label="Calendar views">
       <button type="button" aria-pressed={!reviewOnly} disabled={saving || Boolean(editor)} onClick={()=>setReviewOnly(false)} className={`${buttonClass} ${!reviewOnly?'border-pink-400 bg-pink-500/15':''}`}>Calendar</button>
@@ -338,8 +347,8 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       </div>
       <p className="mt-3 text-xs text-neutral-400">Uses your existing AI API credits. Copy is saved first; artwork/video generation is a separate paid AI step. The button shows how many media items it will create (up to 60 for a full month across all three networks). Generation runs in the background. You can leave this page or close the tab. Completed content is saved automatically; pause and resume missing items whenever you like. Existing dates are kept, and nothing is published automatically yet.</p>
       {job && <div role="status" className="mt-3 rounded-xl border border-white/15 p-3 text-sm">
-        <p className="font-semibold">{job.job_type === 'plan' ? '30-day content' : 'Artwork / videos'}: {job.status === 'generating' ? 'running in the background' : job.status}</p>
-        <p className="mt-1 text-neutral-300">{job.completed_tasks} of {job.total_tasks} {job.job_type === 'plan' ? 'batches' : 'media items'} saved{job.job_type === 'plan' ? ` · ${job.created_count} platform drafts` : ''}.</p>
+        <p className="font-semibold">{job.operation === 'music' ? 'Adding backing music' : job.job_type === 'plan' ? '30-day content' : 'Artwork / videos'}: {job.status === 'generating' ? 'running in the background' : job.status}</p>
+        <p className="mt-1 text-neutral-300">{job.completed_tasks} of {job.total_tasks} {job.operation === 'music' ? 'soundtracks' : job.job_type === 'plan' ? 'batches' : 'media items'} saved{job.job_type === 'plan' ? ` · ${job.created_count} platform drafts` : ''}.</p>
         {job.status === 'generating' && <p className="mt-1 text-emerald-300">You can close NovelForge. Come back later to review the results.</p>}
         {job.error_message && <p className="mt-2 text-amber-200">{job.error_message} {!job.error_message.includes('image service blocked') && 'Use Generate again to fill missing dates or media.'}</p>}
         {job.status === 'paused' && <p className="mt-2 text-neutral-300">Saved items are kept. Use Generate again to fill missing dates or media.</p>}

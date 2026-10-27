@@ -1,0 +1,43 @@
+{
+  "license": "Mixkit Stock Music Free License",
+  "license_url": "https://mixkit.co/license/#musicFree",
+  "license_text_url": "https://mixkit.co/license/modal/musicFree/",
+  "catalogue_url": "https://mixkit.co/free-stock-music/synthwave/",
+  "terms_url": "https://mixkit.co/terms/",
+  "verified_at": "2026-10-27",
+  "tracks": [
+    {
+      "id": "sun-in-your-eyes",
+      "title": "Sun in Your Eyes",
+      "artist": "Alejandro Maga\u00f1a (A. M.)",
+      "source": "https://assets.mixkit.co/music/131/131.mp3",
+      "source_sha256": "489db9cbe3ae805bc4d2789badbc351807669b1d23254dc0174c276c46c0a474",
+      "file": "sun-in-your-eyes.m4a",
+      "sha256": "9086dc9646443e50cccea6a0f7be9353fe9b5bac8ddd69e5b31623fdf6a317c4",
+      "excerpt_start_seconds": 16,
+      "excerpt_duration_seconds": 12
+    },
+    {
+      "id": "lonerism",
+      "title": "Lonerism",
+      "artist": "Alejandro Maga\u00f1a (A. M.)",
+      "source": "https://assets.mixkit.co/music/159/159.mp3",
+      "source_sha256": "e13488062e17701dfe7c366386e6bcf93a1f1eb50abf4e71b7a8d46794fec58f",
+      "file": "lonerism.m4a",
+      "sha256": "cf6761f9e08767ffa8087d81bfcc0a545bf1536a4cb40ca2e7ae1f60ea7daa9a",
+      "excerpt_start_seconds": 16,
+      "excerpt_duration_seconds": 12
+    },
+    {
+      "id": "better-times",
+      "title": "Better Times are Coming",
+      "artist": "Alejandro Maga\u00f1a (A. M.)",
+      "source": "https://assets.mixkit.co/music/173/173.mp3",
+      "source_sha256": "9606a32daac982a5cc42ab4f333ca427ee394f9242a433617007952f4b20ea10",
+      "file": "better-times.m4a",
+      "sha256": "289f5737a1c1be9cc691f4f09c4c8ea1be22018ab65114998d9ec474cbfad1ad",
+      "excerpt_start_seconds": 16,
+      "excerpt_duration_seconds": 12
+    }
+  ]
+}
