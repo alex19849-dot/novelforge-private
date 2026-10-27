@@ -9,10 +9,12 @@ import type { CalendarPost, SocialPlatform } from '../lib/social-calendar';
 import type { PlanBook } from '../lib/social-planner';
 import { inspectPoster, posterPrompt } from '../lib/social-artwork';
 import { renderSocialMedia } from '../lib/social-render';
+import { completedImage, imageDiagnostic, noImageMessage } from '../lib/social-image-result';
+import { compositeOriginalCover, originalCoverBackgroundPrompt, originalCoverBytes } from '../lib/social-cover-artwork';
 
 type Assignment={dayIndex:number;date:string;postType:string;book:string};
 type Job={id:string;user_id:string;status:string;job_type:'plan'|'media';start_date:string;cancel_requested:boolean;config:{books:PlanBook[];platforms:SocialPlatform[];guidance:string}};
-type Task={id:string;run_id:string;user_id:string;status:string;response_id:string|null;request:{assignments?:Assignment[];posts?:CalendarPost[]};result:Record<string,unknown>};
+type Task={id:string;run_id:string;user_id:string;status:string;response_id:string|null;request:{assignments?:Assignment[];posts?:CalendarPost[];asset_mode?:'original_cover_overlay'};result:Record<string,unknown>};
 const ai=()=>new OpenAI({apiKey:process.env.OPENAI_API_KEY,timeout:30000,maxRetries:0});
 async function context(runId:string,taskId?:string) {
   const db=jobAdmin();
@@ -78,7 +80,7 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
     if(match) { await attachMedia(job,task,match.media_path!,match.quality_notes??''); return null; }
     const book=job.config.books.find(b=>b.slug===first.book_slug)!;
     request={model:'gpt-6-astra',background:true,store:true,reasoning:{effort:'low'},max_output_tokens:1000,
-      input:[{role:'user',content:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief,'',first.post_type)},{type:'input_image',image_url:book.coverUrl,detail:'high'}]}],
+      input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,first.platform==='tiktok',book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)},{type:'input_image',image_url:book.coverUrl,detail:'high'}]}],
       tools:[{type:'image_generation',model:'gpt-image-2',size:'1024x1536',quality:'medium',output_format:'jpeg',output_compression:92,background:'opaque'}],tool_choice:{type:'image_generation'}};
   }
   try { return (await ai().responses.create(request)).id; }
@@ -147,19 +149,25 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
     await recordProgress(job);
   } else {
     const first=task.request.posts![0];const book=job.config.books.find(b=>b.slug===first.book_slug)!;
-    const image=response.output.find(item=>item.type==='image_generation_call');
-    if(!image||image.type!=='image_generation_call'||!image.result) throw new FatalError('The AI returned no artwork for this item.');
+    const image=completedImage(response);
+    if(!image?.result) {
+      const {error:diagnosticError}=await db.from('social_generation_tasks').update({result:{...task.result,provider_diagnostic:imageDiagnostic(response)}}).eq('id',taskId).eq('user_id',job.user_id);
+      if(diagnosticError) throw new Error('The image failure details could not be saved.');
+      throw new FatalError(noImageMessage(response));
+    }
+    let artworkSource=Buffer.from(image.result,'base64');
+    if(task.request.asset_mode==='original_cover_overlay') artworkSource=Buffer.from(await compositeOriginalCover(artworkSource,await originalCoverBytes(book.coverUrl),first.platform==='tiktok'));
     const extension=first.planned_media_type==='video'?'mp4':'jpg';
     const path=`${job.user_id}/calendar/${taskId}.${extension}`;
     const {data:files,error:listError}=await db.storage.from('social-media').list(`${job.user_id}/calendar`,{search:`${taskId}.${extension}`,limit:1});
     if(listError) throw new Error('Media storage could not be checked.');
     if(!files.some(f=>f.name===`${taskId}.${extension}`)) {
-      const media=await renderSocialMedia(Buffer.from(image.result,'base64'),first.platform==='tiktok',first.planned_media_type==='video');
+      const media=await renderSocialMedia(artworkSource,first.platform==='tiktok',first.planned_media_type==='video');
       if(media.length>50*1024*1024) throw new FatalError('This media exceeds the 50 MB storage limit.');
       const {error}=await db.storage.from('social-media').upload(path,media,{contentType:extension==='mp4'?'video/mp4':'image/jpeg',upsert:false});
       if(error&&error.statusCode!=='409') throw new Error('The generated media could not be uploaded. Retrying the same saved image.');
     }
-    const inspection=await inspectPoster(`data:image/jpeg;base64,${image.result}`,{...book,author:'Marlow Quinn'},first.platform,first.creative_brief!,first.post_type);
+    const inspection=await inspectPoster(`data:image/jpeg;base64,${artworkSource.toString('base64')}`,{...book,author:'Marlow Quinn'},first.platform,first.creative_brief!,first.post_type);
     const notes=inspection.qualityCheck.decision==='review'?inspection.qualityCheck.summary:'';
     await attachMedia(job,task,path,notes);
   }

@@ -75,6 +75,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         if (accountRef.current === data.user.id) {
           const current = result.job as BackgroundJob | null;
           setJob(current);
+          if(current && current.status !== 'generating') setNotice(previous => previous.startsWith('Generation started in the background.') ? '' : previous);
           const active = current?.status === 'generating';
           generatingRef.current = active;
           setPlanning(active && current?.job_type === 'plan');
@@ -271,7 +272,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         <p className="font-semibold">{job.job_type === 'plan' ? '30-day content' : 'Artwork / videos'}: {job.status === 'generating' ? 'running in the background' : job.status}</p>
         <p className="mt-1 text-neutral-300">{job.completed_tasks} of {job.total_tasks} {job.job_type === 'plan' ? 'batches' : 'media items'} saved{job.job_type === 'plan' ? ` · ${job.created_count} platform drafts` : ''}.</p>
         {job.status === 'generating' && <p className="mt-1 text-emerald-300">You can close NovelForge. Come back later to review the results.</p>}
-        {job.error_message && <p className="mt-2 text-amber-200">{job.error_message} Use Generate again to fill missing dates or media.</p>}
+        {job.error_message && <p className="mt-2 text-amber-200">{job.error_message} {!job.error_message.includes('image service blocked') && 'Use Generate again to fill missing dates or media.'}</p>}
         {job.status === 'paused' && <p className="mt-2 text-neutral-300">Saved items are kept. Use Generate again to fill missing dates or media.</p>}
       </div>}
     </div>

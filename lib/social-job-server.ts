@@ -6,6 +6,7 @@ import { generateSocialJob } from '../workflows/social-generation';
 import { addDays, londonDate, londonSchedule, SOCIAL_PLATFORMS } from './social-calendar';
 import type { CalendarPost, SocialPlatform } from './social-calendar';
 import { CONTENT_MIX, plannedTime } from './social-planner';
+import { isImageModerationFailure } from './social-image-result';
 import type { PlanBook } from './social-planner';
 
 export const jobJson = (body: unknown, status=200) => NextResponse.json(body,{status,headers:{'Cache-Control':'no-store'}});
@@ -64,7 +65,16 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media') {
         groups.set(key,[...(groups.get(key)??[]),post]);
       }
       config={books:allBooks};
-      tasks=[...groups.values()].map((group,ordinal)=>({ordinal,request:{posts:group}}));
+      const {data:previousFailures,error:failureError}=await admin.from('social_generation_tasks').select('request,result').eq('user_id',user.id).eq('status','failed').order('created_at',{ascending:false}).limit(120);
+      if(failureError) throw new Error('Previous artwork failures could not be checked.');
+      tasks=[...groups.values()].map((group,ordinal)=>{
+        const first=group[0];
+        const keepOriginal=previousFailures.some(task=>{
+          const previous=task.request?.posts?.[0];
+          return previous?.campaign_id===first.campaign_id&&previous.creative_brief===first.creative_brief&&(previous.platform==='tiktok')===(first.platform==='tiktok')&&isImageModerationFailure(task.result?.provider_diagnostic??{});
+        });
+        return {ordinal,request:{posts:group,...(keepOriginal?{asset_mode:'original_cover_overlay'}:{})}};
+      });
       if(!tasks.length) return jobJson({ok:true,message:'There is no missing AI media in these 30 days.',status:'completed'});
     }
     const {error:insertError}=await admin.from('social_generation_runs').insert({id:runId,user_id:user.id,start_date:date,status:'generating',job_type:kind,config,total_tasks:tasks.length});
