@@ -1,5 +1,9 @@
 "use client";
 
+import { PendingChapterGeneration, QualityResponse, SectionAction, WriterResponse, getStoryStateBeforeChapter, applyGeneratedChapter, getContractWordRange, isWriterResponse, isStringArray, isDiagnosticArray, isGenerationDiagnostic, isQualityResponse, isLedgerResponse, LedgerResponse, isStoryState, isChapterPlan, readApiJson, ApiRequestError, qualityReviewWarnings, EMPTY_STORY_STATE } from "./generation";
+
+import { chapterSourceFingerprint, type ChapterJobInput } from "../../lib/chapter-job";
+
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
@@ -26,94 +30,8 @@ const STORAGE_KEY = "novelforge-current-story";
 
 const PENDING_GENERATION_KEY = "novelforge-pending-chapter-generation";
 
-type PendingChapterGeneration = {
-  storyId: string;
-  savedAt?: string;
-  generatedChapter: NonNullable<StoryChatResponse["generatedChapter"]>;
-  chapterBrief: string;
-  latestUserMessage: string;
-  draft: string;
-  lastSection?: string;
-  repetitionWarnings?: string[];
-  minimumWordCount: number;
-  maximumWordCount: number;
-  qualityReview?: QualityResponse["quality"];
-  qualityCheckedDraft?: string;
-  qualityOverrideReady?: boolean;
-  qualityTechnicalError?: string;
-  diagnostics?: GenerationDiagnostic[];
-};
-
-type SectionAction = "start" | "continue" | "rewrite";
-
-type WriterResponse = {
-  section: string;
-  wordCount: number;
-  warnings: string[];
-  action: SectionAction;
-  specialistScenesPending?: boolean;
-  diagnostics: GenerationDiagnostic[];
-};
-
 type AionPassageResponse = {
   reply: string;
-  diagnostics: GenerationDiagnostic[];
-};
-
-type LedgerResponse = {
-  storyState: StoryWorkspace["storyState"];
-  diagnostics: GenerationDiagnostic[];
-};
-
-type QualityResponse = {
-  accepted: boolean;
-  chapterContent: string;
-  repaired: boolean;
-  quality: {
-    passed: boolean;
-    overallStatus: "pass" | "pass_with_warnings" | "needs_attention";
-    hardFailures: string[];
-    repairInstructions: string[];
-    summary: string;
-    findings: {
-      category: string;
-      severity: "minor" | "moderate" | "major" | "critical";
-      message: string;
-      beatOrder: number | null;
-    }[];
-    beatAssessments: {
-      order: number;
-      instruction: string;
-      status: "satisfied" | "partial" | "missing";
-      evidence: string;
-    }[];
-    guidanceAdherence: {
-      missingBeats: string[];
-      orderViolations: string[];
-      endpointViolations: string[];
-      inventedMajorEvents: string[];
-      exclusionViolations: string[];
-    };
-    wordCountCompliance: {
-      actual: number;
-      minimum: number;
-      maximum: number;
-      withinRange: boolean;
-    };
-    scores: {
-      continuity: number;
-      factualAuthenticity: number;
-      plotMovement: number;
-      relationshipProgression: number;
-      voiceDistinctiveness: number;
-      povAndTense: number;
-      repetitionControl: number;
-      hookStrength: number;
-      guidanceAdherence: number;
-      endpointCompliance: number;
-    };
-  };
-  qualityWarnings?: string[];
   diagnostics: GenerationDiagnostic[];
 };
 
@@ -172,51 +90,6 @@ const EMPTY_STORY_BIBLE: StoryBible = {
   notes: [],
 };
 
-const EMPTY_STORY_STATE = {
-  importantFacts: [],
-
-  characterStates: [],
-
-  relationshipStates: [],
-
-  unresolvedThreads: [],
-
-  timeline: [],
-
-  locations: [],
-
-  activePOV: "",
-
-  chapterLedger: [],
-
-  latestChapterEnding: "",
-
-  characterKnowledge: [],
-
-  repetitionWarnings: [],
-
-  voiceProfiles: [],
-
-  chapterPlans: [],
-
-  lastGenerationDiagnostics: [],
-
-  currentScene: undefined,
-
-  relationshipProgression: [],
-
-  repetitionMemory: {
-    completedInternalBeats: [],
-    settingTreatments: [],
-    actionPatterns: [],
-    dialoguePatterns: [],
-    repeatedLanguage: [],
-    sentenceOpeningWarnings: [],
-  },
-
-  continuityDirtyFromChapter: undefined,
-};
-
 function createEmptyStory(): StoryWorkspace {
   const now = new Date().toISOString();
 
@@ -263,92 +136,6 @@ function createEmptyStory(): StoryWorkspace {
   };
 }
 
-function isStringArray(value: unknown): value is string[] {
-  return (
-    Array.isArray(value) && value.every((item) => typeof item === "string")
-  );
-}
-
-function getStoryStateBeforeChapter(
-  state: StoryState,
-  replacementNumber: number | null,
-): StoryState {
-  if (replacementNumber === null) {
-    return state;
-  }
-
-  const earlierLedger = (state.chapterLedger ?? []).filter(
-    (entry) => entry.chapterNumber < replacementNumber,
-  );
-  const previousChapter = earlierLedger.at(-1);
-  const unique = (values: string[]) =>
-    Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
-
-  return {
-    ...EMPTY_STORY_STATE,
-    importantFacts: unique(earlierLedger.flatMap((entry) => entry.newFacts)),
-    relationshipStates: previousChapter?.relationshipShift
-      ? [previousChapter.relationshipShift]
-      : [],
-    unresolvedThreads: previousChapter?.unresolvedThreads ?? [],
-    timeline: [
-      ...earlierLedger.map(
-        (entry) => `Chapter ${entry.chapterNumber}: ${entry.summary}`,
-      ),
-      ...(previousChapter?.endingTime
-        ? [
-            `CURRENT CLOCK: ${previousChapter.endingTime}, immediately after Chapter ${previousChapter.chapterNumber}.`,
-          ]
-        : []),
-    ],
-    locations: unique(
-      earlierLedger.flatMap((entry) => [
-        entry.openingLocation,
-        entry.endingLocation,
-      ]),
-    ),
-    chapterLedger: earlierLedger,
-    latestChapterEnding: previousChapter?.endingExcerpt ?? "",
-    characterKnowledge: unique(
-      earlierLedger.flatMap((entry) => entry.characterKnowledgeChanges ?? []),
-    ),
-    repetitionWarnings: unique(
-      earlierLedger.flatMap((entry) => entry.repeatedBeats),
-    ).slice(-60),
-    repetitionMemory: {
-      completedInternalBeats: unique(
-        earlierLedger.flatMap((entry) => entry.completedInternalBeats ?? []),
-      ),
-      settingTreatments: unique(
-        earlierLedger.flatMap((entry) => entry.settingTreatments ?? []),
-      ),
-      actionPatterns: unique(
-        earlierLedger.flatMap((entry) => entry.actionPatterns ?? []),
-      ),
-      dialoguePatterns: [],
-      repeatedLanguage: unique(
-        earlierLedger.flatMap((entry) => entry.repeatedLanguage ?? []),
-      ),
-      sentenceOpeningWarnings: [],
-    },
-    currentScene: previousChapter
-      ? {
-          chapterNumber: previousChapter.chapterNumber,
-          storyClock: previousChapter.endingTime,
-          location: previousChapter.endingLocation,
-          presentCharacters: [],
-          physicalPositions: previousChapter.endingPositions ?? [],
-          activeObjects: previousChapter.activeObjects ?? [],
-          injuries: [],
-          clothing: [],
-        }
-      : undefined,
-    voiceProfiles: state.voiceProfiles ?? [],
-    activePOV: previousChapter?.povCharacter ?? "",
-    chapterPlans: state.chapterPlans ?? [],
-  };
-}
-
 function getRequestedWordCount(message: string): number | null {
   const match = message.match(/\b(\d{3,5})\s*words?\b/i);
 
@@ -359,61 +146,6 @@ function getRequestedWordCount(message: string): number | null {
   const wordCount = Number(match[1]);
 
   return Number.isFinite(wordCount) ? wordCount : null;
-}
-
-function getContractWordRange(chapterBrief: string): {
-  minimum: number;
-  maximum: number;
-} | null {
-  try {
-    const parsed = JSON.parse(chapterBrief) as Record<string, unknown>;
-    const range =
-      parsed.targetWordRange &&
-      typeof parsed.targetWordRange === "object" &&
-      !Array.isArray(parsed.targetWordRange)
-        ? (parsed.targetWordRange as Record<string, unknown>)
-        : null;
-    const minimum = Number(range?.minimum);
-    const maximum = Number(range?.maximum);
-
-    return Number.isInteger(minimum) &&
-      Number.isInteger(maximum) &&
-      minimum >= 500 &&
-      maximum <= 10000 &&
-      minimum <= maximum
-      ? { minimum, maximum }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function qualityReviewWarnings(quality: QualityResponse["quality"]): string[] {
-  const wordCount = quality.wordCountCompliance;
-  const warnings = [
-    `QA ${quality.overallStatus.replaceAll("_", " ").toUpperCase()}: ${quality.summary}`,
-    `Word count: ${wordCount.actual.toLocaleString()} (target ${wordCount.minimum.toLocaleString()} to ${wordCount.maximum.toLocaleString()}).`,
-    ...quality.beatAssessments
-      .filter((beat) => beat.status !== "satisfied")
-      .map(
-        (beat) =>
-          `Beat ${beat.order} ${beat.status}: ${beat.instruction}${
-            beat.evidence ? ` (${beat.evidence})` : ""
-          }`,
-      ),
-    ...quality.findings.map(
-      (finding) =>
-        `${finding.severity.toUpperCase()} ${finding.category.replaceAll("_", " ")}${
-          finding.beatOrder === null ? "" : `, beat ${finding.beatOrder}`
-        }: ${finding.message}`,
-    ),
-    ...quality.hardFailures.map((failure) => `MAJOR: ${failure}`),
-  ];
-
-  return [
-    ...Array.from(new Set(warnings)),
-    "Edit or use the recovery controls, or press Complete chapter again to accept this exact draft anyway.",
-  ];
 }
 
 type ChapterDeletionRequest =
@@ -507,39 +239,6 @@ function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
   return { kind: "none" };
 }
 
-function isGenerationDiagnostic(value: unknown): value is GenerationDiagnostic {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const diagnostic = value as Partial<GenerationDiagnostic>;
-
-  return (
-    typeof diagnostic.stage === "string" &&
-    (diagnostic.provider === "openai" ||
-      diagnostic.provider === "openrouter") &&
-    typeof diagnostic.model === "string" &&
-    (diagnostic.status === undefined ||
-      diagnostic.status === "succeeded" ||
-      diagnostic.status === "failed") &&
-    typeof diagnostic.inputTokens === "number" &&
-    typeof diagnostic.outputTokens === "number" &&
-    typeof diagnostic.totalTokens === "number" &&
-    (diagnostic.costUsd === null || typeof diagnostic.costUsd === "number") &&
-    (diagnostic.costType === undefined ||
-      diagnostic.costType === "reported" ||
-      diagnostic.costType === "estimated" ||
-      diagnostic.costType === "unavailable") &&
-    typeof diagnostic.durationMs === "number" &&
-    typeof diagnostic.attempt === "number" &&
-    (diagnostic.error === undefined || typeof diagnostic.error === "string")
-  );
-}
-
-function isDiagnosticArray(value: unknown): value is GenerationDiagnostic[] {
-  return Array.isArray(value) && value.every(isGenerationDiagnostic);
-}
-
 function getDiagnosticCostType(
   diagnostic: GenerationDiagnostic,
 ): "reported" | "estimated" | "unavailable" {
@@ -620,25 +319,6 @@ function stripGenerationDiagnostics(content: string): string {
   return content.replace(/\s*Generation diagnostics:[\s\S]*$/i, "").trim();
 }
 
-function isWriterResponse(value: unknown): value is WriterResponse {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const response = value as Partial<WriterResponse>;
-
-  return (
-    typeof response.section === "string" &&
-    Boolean(response.section.trim()) &&
-    typeof response.wordCount === "number" &&
-    isStringArray(response.warnings) &&
-    (response.action === "start" ||
-      response.action === "continue" ||
-      response.action === "rewrite") &&
-    isDiagnosticArray(response.diagnostics)
-  );
-}
-
 function isPendingGeneration(
   value: unknown,
 ): value is PendingChapterGeneration {
@@ -696,64 +376,6 @@ function parseRemotePendingGeneration(
   }
 }
 
-class ApiRequestError extends Error {
-  diagnostics: GenerationDiagnostic[];
-
-  constructor(
-    message: string,
-    diagnostics: GenerationDiagnostic[] = [],
-    readonly preservedDraft?: string,
-  ) {
-    super(message);
-    this.name = "ApiRequestError";
-    this.diagnostics = diagnostics;
-  }
-}
-
-async function readApiJson(response: Response): Promise<unknown> {
-  const responseText = await response.text();
-  let data: unknown = null;
-
-  if (responseText) {
-    try {
-      data = JSON.parse(responseText) as unknown;
-    } catch {
-      const preview = responseText.replace(/\s+/g, " ").trim().slice(0, 120);
-
-      throw new Error(
-        `The server returned HTTP ${response.status} with a non-JSON response${
-          preview ? `: ${preview}` : "."
-        }`,
-      );
-    }
-  }
-
-  if (!response.ok) {
-    const errorMessage =
-      data &&
-      typeof data === "object" &&
-      "error" in data &&
-      typeof data.error === "string"
-        ? data.error
-        : `The server returned HTTP ${response.status}.`;
-
-    const diagnostics =
-      data &&
-      typeof data === "object" &&
-      "diagnostics" in data &&
-      isDiagnosticArray(data.diagnostics)
-        ? data.diagnostics
-        : [];
-
-    const preservedDraft = data && typeof data === "object" &&
-      "preservedDraft" in data && typeof data.preservedDraft === "string"
-      ? data.preservedDraft : undefined;
-    throw new ApiRequestError(errorMessage, diagnostics, preservedDraft);
-  }
-
-  return data;
-}
-
 function isStoryBible(value: unknown): value is StoryBible {
   if (!value || typeof value !== "object") {
     return false;
@@ -775,39 +397,6 @@ function isStoryBible(value: unknown): value is StoryBible {
   );
 }
 
-function isChapterPlan(value: unknown): value is ChapterPlan {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const plan = value as Partial<ChapterPlan>;
-
-  return (
-    typeof plan.chapterNumber === "number" &&
-    typeof plan.title === "string" &&
-    typeof plan.povCharacter === "string" &&
-    typeof plan.chapterGoal === "string" &&
-    typeof plan.relationshipChange === "string" &&
-    Array.isArray(plan.scenes) &&
-    plan.scenes.length >= 1 &&
-    plan.scenes.length <= 5 &&
-    plan.scenes.every(
-      (scene) =>
-        Boolean(scene) &&
-        typeof scene === "object" &&
-        typeof scene.order === "number" &&
-        typeof scene.location === "string" &&
-        typeof scene.objective === "string" &&
-        typeof scene.conflict === "string" &&
-        typeof scene.newInformation === "string" &&
-        typeof scene.exitBeat === "string",
-    ) &&
-    isStringArray(plan.completedBeatsToAvoid) &&
-    (plan.status === "draft" || plan.status === "approved") &&
-    typeof plan.updatedAt === "string"
-  );
-}
-
 function getPlannedSceneCount(chapterBrief: string): number {
   try {
     const parsed = JSON.parse(chapterBrief) as Record<string, unknown>;
@@ -824,90 +413,6 @@ function getPlannedSceneCount(chapterBrief: string): number {
   }
 
   return 3;
-}
-
-function isStoryState(value: unknown): value is StoryWorkspace["storyState"] {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const state = value as Partial<StoryWorkspace["storyState"]>;
-
-  const chapterLedgerIsValid =
-    state.chapterLedger === undefined ||
-    (Array.isArray(state.chapterLedger) &&
-      state.chapterLedger.every(
-        (entry) =>
-          Boolean(entry) &&
-          typeof entry === "object" &&
-          typeof entry.chapterNumber === "number" &&
-          typeof entry.title === "string" &&
-          typeof entry.povCharacter === "string" &&
-          typeof entry.summary === "string" &&
-          typeof entry.openingLocation === "string" &&
-          typeof entry.endingLocation === "string" &&
-          typeof entry.endingTime === "string" &&
-          typeof entry.endingExcerpt === "string" &&
-          typeof entry.relationshipShift === "string" &&
-          typeof entry.intimacyMilestone === "string" &&
-          isStringArray(entry.newFacts) &&
-          isStringArray(entry.unresolvedThreads) &&
-          isStringArray(entry.repeatedBeats),
-      ));
-  const voiceProfilesAreValid =
-    state.voiceProfiles === undefined ||
-    (Array.isArray(state.voiceProfiles) &&
-      state.voiceProfiles.every(
-        (profile) =>
-          Boolean(profile) &&
-          typeof profile === "object" &&
-          typeof profile.characterName === "string" &&
-          typeof profile.narrativeRhythm === "string" &&
-          typeof profile.vocabulary === "string" &&
-          typeof profile.humourStyle === "string" &&
-          typeof profile.emotionalDeflection === "string" &&
-          typeof profile.sensoryFocus === "string" &&
-          typeof profile.dialoguePattern === "string" &&
-          typeof profile.internalThoughtPattern === "string" &&
-          isStringArray(profile.forbiddenHabits),
-      ));
-  const chapterPlansAreValid =
-    state.chapterPlans === undefined ||
-    (Array.isArray(state.chapterPlans) &&
-      state.chapterPlans.every(isChapterPlan));
-
-  return (
-    isStringArray(state.importantFacts) &&
-    isStringArray(state.characterStates) &&
-    isStringArray(state.relationshipStates) &&
-    isStringArray(state.unresolvedThreads) &&
-    isStringArray(state.timeline) &&
-    isStringArray(state.locations) &&
-    typeof state.activePOV === "string" &&
-    chapterLedgerIsValid &&
-    (state.latestChapterEnding === undefined ||
-      typeof state.latestChapterEnding === "string") &&
-    (state.characterKnowledge === undefined ||
-      isStringArray(state.characterKnowledge)) &&
-    (state.repetitionWarnings === undefined ||
-      isStringArray(state.repetitionWarnings)) &&
-    voiceProfilesAreValid &&
-    chapterPlansAreValid &&
-    (state.lastGenerationDiagnostics === undefined ||
-      isDiagnosticArray(state.lastGenerationDiagnostics))
-  );
-}
-
-function isLedgerResponse(value: unknown): value is LedgerResponse {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const response = value as Partial<LedgerResponse>;
-
-  return (
-    isStoryState(response.storyState) && isDiagnosticArray(response.diagnostics)
-  );
 }
 
 async function updateContinuityLedger(input: {
@@ -1011,65 +516,6 @@ async function updateContinuityLedger(input: {
     storyState: completedState,
     diagnostics,
   };
-}
-
-function isQualityResponse(value: unknown): value is QualityResponse {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const response = value as Partial<QualityResponse>;
-  const quality = response.quality;
-  const scores = quality?.scores;
-
-  return (
-    typeof response.accepted === "boolean" &&
-    typeof response.chapterContent === "string" &&
-    Boolean(response.chapterContent.trim()) &&
-    typeof response.repaired === "boolean" &&
-    Boolean(quality) &&
-    typeof quality?.passed === "boolean" &&
-    (quality?.overallStatus === "pass" ||
-      quality?.overallStatus === "pass_with_warnings" ||
-      quality?.overallStatus === "needs_attention") &&
-    isStringArray(quality?.hardFailures) &&
-    isStringArray(quality?.repairInstructions) &&
-    typeof quality?.summary === "string" &&
-    Array.isArray(quality?.findings) &&
-    quality.findings.every(
-      (finding) =>
-        Boolean(finding) &&
-        typeof finding.message === "string" &&
-        (finding.severity === "minor" ||
-          finding.severity === "moderate" ||
-          finding.severity === "major" ||
-          finding.severity === "critical"),
-    ) &&
-    Array.isArray(quality?.beatAssessments) &&
-    quality.beatAssessments.every(
-      (beat) =>
-        typeof beat.order === "number" &&
-        typeof beat.instruction === "string" &&
-        (beat.status === "satisfied" ||
-          beat.status === "partial" ||
-          beat.status === "missing") &&
-        typeof beat.evidence === "string",
-    ) &&
-    Boolean(quality?.wordCountCompliance) &&
-    typeof quality.wordCountCompliance.actual === "number" &&
-    typeof quality.wordCountCompliance.minimum === "number" &&
-    typeof quality.wordCountCompliance.maximum === "number" &&
-    typeof quality.wordCountCompliance.withinRange === "boolean" &&
-    Boolean(scores) &&
-    typeof scores?.continuity === "number" &&
-    typeof scores?.plotMovement === "number" &&
-    typeof scores?.relationshipProgression === "number" &&
-    typeof scores?.voiceDistinctiveness === "number" &&
-    typeof scores?.povAndTense === "number" &&
-    typeof scores?.repetitionControl === "number" &&
-    typeof scores?.hookStrength === "number" &&
-    isDiagnosticArray(response.diagnostics)
-  );
 }
 
 function isStoryChapter(
@@ -1193,70 +639,6 @@ function hasStoryBibleContent(storyBible: StoryBible): boolean {
   );
 }
 
-function applyGeneratedChapter(
-  story: StoryWorkspace,
-  pending: PendingChapterGeneration,
-  content: string,
-): StoryWorkspace {
-  const now = new Date().toISOString();
-  const chapterMetadata = pending.generatedChapter;
-  const replacementNumber = chapterMetadata.replaceChapterNumber;
-  const nextChapterNumber =
-    story.chapters.length > 0
-      ? Math.max(...story.chapters.map((chapter) => chapter.number)) + 1
-      : 1;
-
-  if (replacementNumber !== null) {
-    const chapterExists = story.chapters.some(
-      (chapter) => chapter.number === replacementNumber,
-    );
-
-    if (!chapterExists && replacementNumber !== nextChapterNumber) {
-      throw new Error(
-        `Chapter ${replacementNumber} could not be found for rewriting.`,
-      );
-    }
-
-    if (chapterExists) {
-      return {
-        ...story,
-        chapters: story.chapters.map((chapter) =>
-          chapter.number === replacementNumber
-            ? {
-                ...chapter,
-                kind: chapterMetadata.kind ?? chapter.kind ?? "chapter",
-                title: chapterMetadata.title.trim() || chapter.title,
-                povCharacter:
-                  chapterMetadata.povCharacter.trim() || chapter.povCharacter,
-                content: content.trim(),
-                updatedAt: now,
-              }
-            : chapter,
-        ),
-        updatedAt: now,
-      };
-    }
-  }
-
-  return {
-    ...story,
-    chapters: [
-      ...story.chapters,
-      {
-        id: crypto.randomUUID(),
-        number: nextChapterNumber,
-        kind: chapterMetadata.kind ?? "chapter",
-        title: chapterMetadata.title.trim() || `Chapter ${nextChapterNumber}`,
-        povCharacter: chapterMetadata.povCharacter.trim(),
-        content: content.trim(),
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
-    updatedAt: now,
-  };
-}
-
 export default function StoryChatPage() {
   const [story, setStory] = useState<StoryWorkspace | null>(null);
 
@@ -1272,7 +654,14 @@ export default function StoryChatPage() {
 
   const [input, setInput] = useState("");
 
-  const [isThinking, setIsThinking] = useState(false);
+  const [isThinkingLocal, setIsThinking] = useState(false);
+  const [backgroundBusy, setBackgroundBusy] = useState(false);
+  const [backgroundCheckedFor, setBackgroundCheckedFor] = useState("");
+  const [backgroundNotice, setBackgroundNotice] = useState("");
+  const [recoveredDraft, setRecoveredDraft] = useState<PendingChapterGeneration | null>(null);
+  const backgroundJobRef = useRef<string | null>(null);
+  const backgroundSubmitInFlight = useRef(false);
+  const isThinking = isThinkingLocal || backgroundBusy || Boolean(userId && story && backgroundCheckedFor !== story.id);
 
   const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -1679,6 +1068,84 @@ undone.`,
   }, [readerTheme, readerFontSize, readerLineHeight, readerWidth]);
 
   useEffect(() => {
+    const storyId = story?.id;
+    if (!userId || !storyId || !hasLoadedRemoteStory) return;
+    let stopped = false;
+    let checking = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let sawActive = false;
+    setBackgroundCheckedFor("");
+    setBackgroundBusy(false);
+    backgroundJobRef.current = null;
+    setBackgroundNotice("");
+    setRecoveredDraft(null);
+    async function check() {
+      if (stopped || checking) return;
+      checking = true;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const id = backgroundJobRef.current;
+        const response = await fetch(`/api/story-chat/jobs?storyId=${encodeURIComponent(storyId!)}${id ? `&id=${encodeURIComponent(id)}` : ""}`, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
+        const data = await readApiJson(response) as { job?: { id: string; status: string; stage: string; updated_at: string; error_message: string; result?: { story: StoryWorkspace; pending: PendingChapterGeneration | null; recoveryPending?: PendingChapterGeneration | null } } | null };
+        if (stopped || currentStoryRef.current?.id !== storyId) return;
+        if (backgroundJobRef.current && backgroundJobRef.current !== id) return;
+        const job = data.job;
+        if (!job && backgroundSubmitInFlight.current) return;
+        if (job?.status === "generating") {
+          sawActive = true;
+          backgroundJobRef.current = job.id;
+          setBackgroundBusy(true);
+          setBackgroundNotice(`Chapter generation is running in the background (${job.stage}). You can leave this tab or app.`);
+        } else {
+          // The worker saves into the existing story/draft storage. Reload it
+          // before re-enabling autosave, including after returning from mobile.
+          if (sawActive || backgroundJobRef.current || job && Date.parse(job.updated_at) > Date.parse(currentStoryRef.current?.updatedAt ?? "")) {
+            if (job?.status === "conflict") {
+              setBackgroundNotice(job.error_message);
+              setRecoveredDraft(job.result?.pending ?? job.result?.recoveryPending ?? null);
+            } else if (job) {
+              await openStory(storyId!);
+              setSectionInstruction("");
+              setBackgroundNotice(job.error_message || "Chapter generation finished. Your draft is ready.");
+            }
+          } else if (job?.status === "conflict") {
+            setBackgroundNotice(job.error_message);
+            setRecoveredDraft(job.result?.pending ?? job.result?.recoveryPending ?? null);
+          }
+          backgroundJobRef.current = null;
+          sawActive = false;
+          setBackgroundBusy(false);
+        }
+        setBackgroundCheckedFor(storyId!);
+      } catch (error) {
+        if (!stopped) setBackgroundNotice(error instanceof Error ? error.message : "Chapter progress could not be checked. Checking again shortly.");
+      } finally {
+        checking = false;
+        if (!stopped) {
+          clearTimeout(timer);
+          timer = setTimeout(() => void check(), backgroundJobRef.current ? 5000 : 30000);
+        }
+      }
+    }
+    const wake = () => { clearTimeout(timer); void check(); };
+    const visible = () => { if (document.visibilityState === "visible") wake(); };
+    void check();
+    window.addEventListener("focus", wake);
+    window.addEventListener("online", wake);
+    window.addEventListener("novelforge-chapter-job", wake);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("online", wake);
+      window.removeEventListener("novelforge-chapter-job", wake);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [userId, story?.id, hasLoadedRemoteStory]);
+
+  useEffect(() => {
     async function loadStory() {
       try {
         const currentStoryId = window.localStorage.getItem(
@@ -1809,7 +1276,7 @@ undone.`,
   }, [userId]);
 
   useEffect(() => {
-    if (!hasLoaded || !hasLoadedRemoteStory || !story || isThinking) {
+    if (!hasLoaded || !hasLoadedRemoteStory || !story || isThinking || backgroundCheckedFor !== story.id) {
       return;
     }
 
@@ -1878,11 +1345,13 @@ undone.`,
     }
 
     saveStoryToSupabase();
-  }, [story, hasLoaded, hasLoadedRemoteStory, userId, isThinking]);
+  }, [story, hasLoaded, hasLoadedRemoteStory, userId, isThinking, backgroundCheckedFor]);
 
   useEffect(() => {
     if (
       !hasLoadedRemoteStory ||
+      backgroundBusy ||
+      backgroundCheckedFor !== story?.id ||
       !userId ||
       !story ||
       !pendingGeneration ||
@@ -1908,7 +1377,7 @@ undone.`,
     }, 800);
 
     return () => window.clearTimeout(timeoutId);
-  }, [pendingGeneration, story, userId, hasLoadedRemoteStory]);
+  }, [pendingGeneration, story, userId, hasLoadedRemoteStory, backgroundBusy, backgroundCheckedFor]);
 
   function startNewStory() {
     const confirmed = window.confirm(
@@ -2304,378 +1773,42 @@ device.`,
     });
   }
 
-  async function writeChapterSection(
-    initialPending: PendingChapterGeneration,
-    baseStory: StoryWorkspace,
-    action: SectionAction,
-  ) {
-    setIsThinking(true);
-    let workingPending = initialPending;
-    savePendingGeneration(workingPending);
-
+  async function queueChapterBackground(input: ChapterJobInput) {
+    backgroundSubmitInFlight.current = true;
+    setBackgroundBusy(true);
+    setBackgroundNotice("Starting chapter generation. Once accepted, you can leave this tab or app.");
+    const id = crypto.randomUUID();
+    backgroundJobRef.current = id;
     try {
-      const resumingSpecialist = workingPending.draft.includes("[[AION_SCENE_");
-      if (action === "continue" && !workingPending.draft.trim()) {
-        throw new Error("There is no chapter draft to continue.");
-      }
-
-      if (!resumingSpecialist && action === "rewrite" && !workingPending.lastSection?.trim()) {
-        throw new Error("There is no previous generated section to rewrite.");
-      }
-
-      const replacementNumber =
-        workingPending.generatedChapter.replaceChapterNumber;
-      const writingStoryState = getStoryStateBeforeChapter(
-        baseStory.storyState,
-        replacementNumber,
-      );
-      const recentChapters =
-        replacementNumber === null
-          ? baseStory.chapters.slice(-2)
-          : baseStory.chapters
-              .filter((chapter) => chapter.number < replacementNumber)
-              .slice(-2);
-      let nextDraft = workingPending.draft.trim();
-      let warnings: string[] = workingPending.repetitionWarnings ?? [];
-      let lastGeneratedSection = "";
-
-      if (!resumingSpecialist) {
-        const response = await fetch("/api/story-chat/write", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action,
-            storyBible: baseStory.storyBible,
-            storyState: writingStoryState,
-            recentChapters,
-            chapterBrief: workingPending.chapterBrief,
-            chapterTitle: workingPending.generatedChapter.title,
-            povCharacter: workingPending.generatedChapter.povCharacter,
-            chapterDraft: workingPending.draft,
-            sectionToRewrite:
-              action === "rewrite" ? (workingPending.lastSection ?? "") : "",
-            sectionInstruction,
-            latestUserMessage: workingPending.latestUserMessage,
-          }),
-        });
-        const data = await readApiJson(response);
-
-        if (!isWriterResponse(data) || data.action !== action) {
-          throw new Error("The writer returned an invalid chapter section.");
-        }
-        lastGeneratedSection = data.section.trim();
-
-        if (action === "start") {
-          nextDraft = data.section.trim();
-        } else if (action === "continue") {
-          nextDraft = (nextDraft + "\n\n" + data.section.trim()).trim();
-        } else {
-          const oldSection = workingPending.lastSection ?? "";
-          const sectionStart = nextDraft.lastIndexOf(oldSection);
-
-          if (sectionStart < 0) {
-            throw new Error(
-              "The previous section changed and could not be replaced safely.",
-            );
-          }
-
-          nextDraft =
-            nextDraft.slice(0, sectionStart) +
-            data.section.trim() +
-            nextDraft.slice(sectionStart + oldSection.length);
-          nextDraft = nextDraft.trim();
-        }
-        warnings = data.warnings;
-        workingPending = {
-          ...workingPending,
-          draft: nextDraft,
-          diagnostics: [...(workingPending.diagnostics ?? []), ...data.diagnostics],
-        };
-        savePendingGeneration(workingPending);
-      }
-
-      while (nextDraft.includes("[[AION_SCENE_")) {
-        const response = await fetch("/api/story-chat/write", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phase: "fill_specialist",
-            action: "start",
-            storyBible: baseStory.storyBible,
-            storyState: writingStoryState,
-            chapterBrief: workingPending.chapterBrief,
-            chapterTitle: workingPending.generatedChapter.title,
-            povCharacter: workingPending.generatedChapter.povCharacter,
-            chapterDraft: nextDraft,
-            latestUserMessage: workingPending.latestUserMessage,
-          }),
-        });
-        const data = await readApiJson(response);
-        if (!isWriterResponse(data) || data.action !== "start" ||
-            data.section.trim() === nextDraft) {
-          throw new Error("Aion returned an invalid or unchanged chapter draft.");
-        }
-        nextDraft = data.section.trim();
-        warnings = data.warnings;
-        workingPending = {
-          ...workingPending,
-          draft: nextDraft,
-          diagnostics: [...(workingPending.diagnostics ?? []), ...data.diagnostics],
-        };
-        savePendingGeneration(workingPending);
-      }
-
-      workingPending = {
-        ...workingPending,
-        draft: nextDraft,
-        lastSection: action === "start" || resumingSpecialist
-          ? nextDraft
-          : lastGeneratedSection,
-        repetitionWarnings: warnings,
-        qualityReview: undefined,
-        qualityCheckedDraft: undefined,
-        qualityOverrideReady: undefined,
-        qualityTechnicalError: undefined,
-      };
-      savePendingGeneration(workingPending);
-      setSectionInstruction("");
-      setActiveTab("chapters");
-      setReaderOpen(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sign in before starting background generation.");
+      const response = await fetch("/api/story-chat/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ id, input, sourceFingerprint: chapterSourceFingerprint(currentStoryRef.current ?? input.story) }),
+      });
+      const data = await readApiJson(response) as { job?: { id: string }; error?: string };
+      if (!data.job?.id) throw new Error("The background job was not accepted.");
+      backgroundJobRef.current = data.job.id;
+      setBackgroundNotice("Chapter generation is running in the background. You can use another tab or app and return when ready.");
+      window.dispatchEvent(new Event("novelforge-chapter-job"));
     } catch (error) {
-      if (error instanceof ApiRequestError && error.preservedDraft !== undefined) {
-        workingPending = {
-          ...workingPending,
-          draft: error.preservedDraft,
-          lastSection: undefined,
-          qualityReview: undefined,
-          qualityCheckedDraft: undefined,
-          qualityOverrideReady: undefined,
-          qualityTechnicalError: undefined,
-        };
-        savePendingGeneration(workingPending);
-      }
-      if (error instanceof ApiRequestError && error.diagnostics.length > 0) {
-        workingPending = {
-          ...workingPending,
-          diagnostics: [
-            ...(workingPending.diagnostics ?? []),
-            ...error.diagnostics,
-          ],
-        };
-        savePendingGeneration(workingPending);
-      }
-
-      const message =
-        error instanceof Error ? error.message : "The section writer failed.";
-      const failedStory: StoryWorkspace = {
-        ...baseStory,
-        storyState: {
-          ...baseStory.storyState,
-          lastGenerationDiagnostics: workingPending.diagnostics ?? [],
-        },
-        messages: [
-          ...baseStory.messages,
-          {
-            id: Date.now(),
-            role: "assistant",
-            content:
-              "I couldn't write that section: " +
-              message +
-              (workingPending.draft.includes("[[AION_SCENE_")
-                ? " Astra's draft is saved. Press Complete chapter to retry only the Aion scene."
-                : " Your existing chapter draft has been preserved."),
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      };
-
-      setStory(failedStory);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(failedStory));
+      // A lost response does not prove that the server rejected the job.
+      // Poll its saved ID before allowing another paid submission.
+      setBackgroundNotice(error instanceof Error ? error.message : "Checking whether the chapter job started.");
+      window.dispatchEvent(new Event("novelforge-chapter-job"));
     } finally {
-      setIsThinking(false);
+      backgroundSubmitInFlight.current = false;
+      window.dispatchEvent(new Event("novelforge-chapter-job"));
     }
   }
 
-  async function completePendingChapter(
-    pending: PendingChapterGeneration,
-    baseStory: StoryWorkspace,
-  ) {
-    if (!pending.draft.trim()) {
-      await writeChapterSection(pending, baseStory, "start");
-      return;
-    }
+  async function writeChapterSection(pending: PendingChapterGeneration, baseStory: StoryWorkspace, action: SectionAction) {
+    await queueChapterBackground({ operation: "write", story: baseStory, pending, action, sectionInstruction });
+  }
 
-    if (pending.draft.includes("[[AION_SCENE_")) {
-      await writeChapterSection(pending, baseStory, "continue");
-      return;
-    }
-
-    setIsThinking(true);
-    let qualityAttempted = false;
-    let qualityCompleted = false;
-    let qualityDiagnostics: GenerationDiagnostic[] = [];
-
-    try {
-      const authorOverride =
-        pending.qualityOverrideReady === true &&
-        pending.qualityCheckedDraft === pending.draft;
-
-      if (!authorOverride) {
-        qualityAttempted = true;
-        const replacementNumber =
-          pending.generatedChapter.replaceChapterNumber;
-        const qualityResponse = await fetch("/api/story-chat/quality", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            storyBible: baseStory.storyBible,
-            storyState: getStoryStateBeforeChapter(
-              baseStory.storyState,
-              replacementNumber,
-            ),
-            chapterBrief: pending.chapterBrief,
-            chapterTitle: pending.generatedChapter.title,
-            povCharacter: pending.generatedChapter.povCharacter,
-            chapterContent: pending.draft,
-            minimumWordCount: pending.minimumWordCount,
-            maximumWordCount: pending.maximumWordCount,
-          }),
-        });
-        const qualityData = await readApiJson(qualityResponse);
-
-        if (!isQualityResponse(qualityData)) {
-          throw new Error("The quality assessor returned an invalid response.");
-        }
-
-        qualityCompleted = true;
-        qualityDiagnostics = qualityData.diagnostics;
-
-        if (!qualityData.accepted || qualityData.quality.findings.length > 0) {
-          const reviewedPending: PendingChapterGeneration = {
-            ...pending,
-            qualityReview: qualityData.quality,
-            qualityCheckedDraft: pending.draft,
-            qualityOverrideReady: true,
-            qualityTechnicalError: undefined,
-            repetitionWarnings: qualityReviewWarnings(qualityData.quality),
-            diagnostics: [
-              ...(pending.diagnostics ?? []),
-              ...qualityData.diagnostics,
-            ],
-          };
-          savePendingGeneration(reviewedPending);
-          setReaderOpen(true);
-          return;
-        }
-      }
-
-      const replacementNumber = pending.generatedChapter.replaceChapterNumber;
-      const chapterStory = applyGeneratedChapter(
-        baseStory,
-        pending,
-        pending.draft,
-      );
-      const completedChapterNumber =
-        replacementNumber ??
-        Math.max(0, ...baseStory.chapters.map((chapter) => chapter.number)) + 1;
-      const completedChapter = chapterStory.chapters.find(
-        (chapter) => chapter.number === completedChapterNumber,
-      );
-
-      if (!completedChapter) {
-        throw new Error("The chapter could not be prepared for continuity.");
-      }
-
-      const latestExistingChapterNumber = Math.max(
-        0,
-        ...baseStory.chapters.map((chapter) => chapter.number),
-      );
-      const needsLedgerRebuild =
-        !baseStory.storyState.chapterLedger?.length ||
-        (replacementNumber !== null &&
-          replacementNumber < latestExistingChapterNumber);
-      const ledgerData = await updateContinuityLedger({
-        storyBible: chapterStory.storyBible,
-        storyState: baseStory.storyState,
-        chapters: chapterStory.chapters,
-        chapter: completedChapter,
-        rebuild: needsLedgerRebuild,
-      });
-      const allDiagnostics = [
-        ...(pending.diagnostics ?? []),
-        ...qualityDiagnostics,
-        ...ledgerData.diagnostics,
-      ];
-      const completedStory: StoryWorkspace = {
-        ...chapterStory,
-        storyState: {
-          ...ledgerData.storyState,
-          chapterPlans:
-            chapterStory.storyState.chapterPlans ??
-            baseStory.storyState.chapterPlans ??
-            [],
-          lastGenerationDiagnostics: allDiagnostics,
-        },
-        messages: [
-          ...chapterStory.messages,
-          {
-            id: Date.now(),
-            role: "assistant",
-            content:
-              (completedChapter.kind === "epilogue"
-                ? "Epilogue"
-                : "Chapter " + completedChapterNumber) +
-              " completed and continuity updated.",
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      };
-
-      await persistStory(completedStory);
-      clearPendingGeneration();
-      setSectionInstruction("");
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "The chapter could not be completed.";
-      if (qualityAttempted && !qualityCompleted) {
-        savePendingGeneration({
-          ...pending,
-          qualityCheckedDraft: pending.draft,
-          qualityOverrideReady: true,
-          qualityTechnicalError: message,
-          repetitionWarnings: [
-            `QA could not run: ${message}`,
-            "The draft is preserved. Press Complete chapter to accept it anyway, or edit the draft and press Complete chapter to retry QA.",
-          ],
-          diagnostics: [
-            ...(pending.diagnostics ?? []),
-            ...(error instanceof ApiRequestError ? error.diagnostics : []),
-          ],
-        });
-      }
-      const failedStory: StoryWorkspace = {
-        ...baseStory,
-        messages: [
-          ...baseStory.messages,
-          {
-            id: Date.now(),
-            role: "assistant",
-            content:
-              "I couldn't complete the chapter: " +
-              message +
-              " The editable draft has been preserved.",
-          },
-        ],
-        updatedAt: new Date().toISOString(),
-      };
-
-      setStory(failedStory);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(failedStory));
-    } finally {
-      setIsThinking(false);
-    }
+  async function completePendingChapter(pending: PendingChapterGeneration, baseStory: StoryWorkspace) {
+    await queueChapterBackground({ operation: "complete", story: baseStory, pending, action: pending.draft.trim() ? "continue" : "start", sectionInstruction });
   }
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
@@ -2892,6 +2025,11 @@ device.`,
           clearPendingGeneration();
         }
 
+        return;
+      }
+
+      if (!hasPendingChapter && requestsChapterGeneration(trimmedMessage)) {
+        await queueChapterBackground({ operation: "generate", story: requestStory });
         return;
       }
 
@@ -3284,6 +2422,7 @@ text-pink-500"
               <input
                 type="text"
                 value={storyTitle}
+                disabled={backgroundBusy}
                 onChange={(event) => updateStoryTitle(event.target.value)}
                 onBlur={restoreDefaultTitle}
                 aria-label="Story title"
@@ -3293,6 +2432,20 @@ font-semibold text-white outline-none placeholder:text-neutral-600"
             </div>
           </div>
         </header>
+
+        {backgroundNotice && (
+          <div role="status" aria-live="polite" className="shrink-0 border-b border-white/10 px-5 py-3 text-sm text-neutral-300">
+            {backgroundNotice}
+            {recoveredDraft && (
+              <button type="button" className="ml-3 underline" onClick={() => {
+                savePendingGeneration(recoveredDraft);
+                setRecoveredDraft(null);
+                setActiveTab("chapters");
+                setReaderOpen(true);
+              }}>Open recovered draft</button>
+            )}
+          </div>
+        )}
 
         {isMenuOpen && (
           <>
@@ -3721,5 +2874,6 @@ disabled:opacity-40"
     </main>
   );
 }
+
 
 
