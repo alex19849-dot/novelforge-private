@@ -1,5 +1,5 @@
 {
   "framework": "nextjs",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm run build && SOCIAL_DIAGNOSTIC_RUN_ID=0098319e-1187-461c-9407-9852c95995a8 node scripts/diagnose-social-media.mjs",
   "installCommand": "npm install"
 }
