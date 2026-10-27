@@ -67,6 +67,9 @@ type OpenRouterUsage = {
   completion_tokens?: number;
   total_tokens?: number;
   cost?: number;
+  completion_tokens_details?: {
+    reasoning_tokens?: number;
+  };
 };
 
 class TechnicalWriterError extends Error {}
@@ -323,6 +326,9 @@ async function writeSpecialistScene(input: {
     "AFTER THE MARKER:\n" + context.after,
   ].join("\n\n");
 
+  const outputTokenLimit = Math.min(18000, Math.max(12000, input.scene.wordTarget * 9));
+  // OpenRouter's unified option is an extension to the OpenAI SDK types.
+  const reasoningOptions = { reasoning: { effort: "low" as const } };
   const startedAt = Date.now();
   let usage: OpenRouterUsage | undefined;
 
@@ -337,7 +343,10 @@ async function writeSpecialistScene(input: {
         },
         { role: "user", content: prompt },
       ],
-      max_tokens: Math.min(18000, Math.max(12000, input.scene.wordTarget * 9)),
+      max_tokens: outputTokenLimit,
+      // Aion 3.5 defaults to high reasoning. Use its supported low setting so
+      // this bounded scene leaves more of the existing budget for prose.
+      ...reasoningOptions,
       temperature: 0.65,
       top_p: 0.9,
       frequency_penalty: 0,
@@ -347,7 +356,18 @@ async function writeSpecialistScene(input: {
     const choice = response.choices[0];
 
     if (choice?.finish_reason === "length") {
-      throw new Error("Aion reached its output limit before finishing the intimacy scene.");
+      const inputTokens = usage?.prompt_tokens;
+      const outputTokens = usage?.completion_tokens;
+      const reasoningTokens = usage?.completion_tokens_details?.reasoning_tokens;
+      const visibleWords = countWords(choice?.message?.content ?? "");
+      const formatTokens = (value: number | undefined) =>
+        typeof value === "number" ? value.toLocaleString() : "not reported";
+      const visibleTokens = typeof outputTokens === "number" && typeof reasoningTokens === "number"
+        ? formatTokens(Math.max(0, outputTokens - reasoningTokens))
+        : "not reported";
+      throw new Error(
+        `Aion reached its output limit before finishing the intimacy scene. Input tokens: ${formatTokens(inputTokens)}; output tokens: ${formatTokens(outputTokens)}; reasoning tokens: ${formatTokens(reasoningTokens)}; estimated visible output tokens: ${visibleTokens}; returned prose: ${visibleWords.toLocaleString()} words. Requested output allowance: ${outputTokenLimit.toLocaleString()} tokens; reasoning effort: low. Your existing draft is preserved. No automatic retry was started.`,
+      );
     }
     if (choice?.finish_reason === "content_filter") {
       throw new Error("Aion's provider stopped the intimacy scene with a content filter.");
@@ -1397,6 +1417,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 

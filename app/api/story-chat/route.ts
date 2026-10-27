@@ -882,6 +882,45 @@ type StoryBibleEditOutput = {
   };
 };
 
+// Explicit author beat headings are structural boundaries, not suggestions for
+// the planner to subdivide into separately billed specialist calls.
+function readAuthorLabelledBeats(
+  guidance: string,
+): NonNullable<SectionWritingBrief["requiredBeats"]> | null {
+  const headings = Array.from(
+    guidance.matchAll(/^[ \t]*(?:#{1,6}[ \t]+)?BEAT[ \t]+(\d+)[ \t]*:[^\r\n]*$/gim),
+  );
+  if (!headings.length || headings.length > 30) return null;
+
+  const beats = headings.map((heading, index) => {
+    const start = heading.index!;
+    const end = headings[index + 1]?.index ?? guidance.length;
+    const section = guidance.slice(start, end);
+    const boundary = section.search(
+      /^[ \t]*(?:#{1,6}[ \t]+)?(?:ENDPOINT|TONE(?:[ \t]+AND[ \t]+EXCLUSIONS)?|EXCLUSIONS)[ \t]*:?[ \t]*\r?$/im,
+    );
+    const instruction = (boundary < 0 ? section : section.slice(0, boundary)).trim();
+    const target = getExplicitChapterWordRange(instruction)?.preferred;
+    return {
+      order: index + 1,
+      instruction,
+      specialistWriter: /\b(?:AION|EXPLICIT)\b/i.test(heading[0])
+        ? "aion" as const
+        : null,
+      ...(target ? { approximateWordTarget: target } : {}),
+    };
+  });
+
+  // Unlabelled requests and ordinary outlines keep the established planner.
+  // Only override when every labelled beat has a body and routing is explicit.
+  if (
+    !beats.some((beat) => beat.specialistWriter === "aion") ||
+    beats.some((beat) => !beat.instruction.slice(beat.instruction.indexOf("\n") + 1).trim() || !beat.instruction.includes("\n")) ||
+    headings.some((heading, index) => Number(heading[1]) !== index + 1)
+  ) return null;
+  return beats;
+}
+
 function cleanString(value: unknown): string {
   if (typeof value !== "string") {
     return "";
@@ -1655,8 +1694,9 @@ routing field, separate from the prose instruction. Preserve the author's
 explicit per-beat specialist labels in this field: a beat labelled EXPLICIT or
 AION is assigned "aion". All ordinary beats are null. Read the original author
 guidance when assigning the field, not just your paraphrased instruction. If
-one labelled beat needs several contract beats to preserve its requested
-sequence, retain its specialist assignment on those corresponding beats. Do
+one labelled beat contains several requested actions, keep all of those actions
+in ONE required beat, in their supplied order. Do not subdivide a continuous
+author-labelled specialist beat into multiple specialist calls. Do
 not assign unrelated earlier or later beats to the specialist merely because
 the chapter contains a labelled beat. Ordinary non-explicit kissing alone does
 not require a specialist assignment. Preserve the author's requested events,
@@ -3326,7 +3366,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
           )
             ? directOutput.sectionBrief.requiredBeats
             : [];
-          const requiredBeats = rawRequiredBeats
+          const requiredBeats = readAuthorLabelledBeats(latestMessage) ?? rawRequiredBeats
             .filter(
               (beat) =>
                 Boolean(beat) &&
@@ -3728,4 +3768,5 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     );
   }
 }
+
 
