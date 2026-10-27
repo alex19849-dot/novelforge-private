@@ -24,7 +24,7 @@ if(process.env.SOCIAL_OPTIMISE_TIMES==='1'&&!active) {
   if(londonTime(post.scheduled_at)!==oldDefault) continue;
   const date=londonDate(post.scheduled_at);
   const candidate=postingHours(date,post.platform).map(hour=>londonSchedule(date,`${String(hour).padStart(2,'0')}:00`)).find(time=>Date.parse(time)>Date.now()+30*60_000);
-  if(!candidate||candidate===post.scheduled_at) continue;
+  if(!candidate||Date.parse(candidate)===Date.parse(post.scheduled_at)) continue;
   const {data:saved,error}=await db.from('social_posts').update({scheduled_at:candidate}).eq('id',post.id).eq('user_id',owner).eq('version',post.version).in('status',['draft','approved']).select('id');
   if(error) throw new Error('A posting time could not be saved.');
   if(saved.length) timingChanges.push({id:post.id,platform:post.platform,from:post.scheduled_at,to:candidate});
