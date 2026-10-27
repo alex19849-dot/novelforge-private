@@ -23,7 +23,7 @@ export async function soundtrackSocialVideo(source:Buffer,audio:Buffer):Promise<
     const match=description.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
     const duration=match?Number(match[1])*3600+Number(match[2])*60+Number(match[3]):0;
     if(duration<=0||duration>60) throw new Error('Automatic backing music supports silent videos up to 60 seconds.');
-    await run(ffmpeg,['-y','-i',input,'-stream_loop','-1','-i',track,'-map','0:v:0','-map','1:a:0','-c:v','copy','-af',`afade=t=in:st=0:d=0.35,afade=t=out:st=${Math.max(0,duration-0.6)}:d=0.6`,'-c:a','aac','-b:a','128k','-t',String(duration),'-movflags','+faststart',output],{timeout:60000,maxBuffer:1024*1024});
+    await run(ffmpeg,['-y','-i',input,'-stream_loop','-1','-i',track,'-map','0:v:0','-map','1:a:0','-c:v','copy','-af',`afade=t=in:st=0:d=0.35,afade=t=out:st=${Math.max(0,duration-0.6)}:d=0.6`,'-c:a','aac','-ar','48000','-b:a','120k','-t',String(duration),'-movflags','+faststart',output],{timeout:60000,maxBuffer:1024*1024});
     return await readFile(output);
   } finally { await rm(directory,{recursive:true,force:true}); }
 }

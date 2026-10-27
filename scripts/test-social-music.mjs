@@ -55,7 +55,7 @@ let logs='';app.stdout.on('data',b=>{logs+=b;process.stdout.write(b);});app.stde
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const request=(path,body,auth=true)=>fetch('http://127.0.0.1:3402'+path,{method:body?'POST':'GET',headers:{...(auth?{Authorization:'Bearer fixture-user'}:{}),'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(30000)});
 const run=promisify(execFile),ffmpeg=root+'/node_modules/@ffmpeg-installer/linux-x64/ffmpeg';
-async function inspect(bytes,name){const file=join(dir,name);await writeFile(file,bytes);let info='';try{await run(ffmpeg,['-hide_banner','-i',file],{maxBuffer:128*1024});}catch(e){info=e.stderr;}assert.match(info,/Video: h264.*1080x1920/);assert.match(info,/Audio: aac/);assert.match(info,/Duration: 00:00:08/);const {stdout}=await run(ffmpeg,['-v','error','-i',file,'-frames:v','1','-f','image2pipe','-c:v','png','-'],{encoding:'buffer',maxBuffer:10*1024*1024});return stdout;}
+async function inspect(bytes,name){const file=join(dir,name);await writeFile(file,bytes);let info='';try{await run(ffmpeg,['-hide_banner','-i',file],{maxBuffer:128*1024});}catch(e){info=e.stderr;}assert.match(info,/Video: h264.*1080x1920/);assert.match(info,/Audio: aac.*48000 Hz/);assert.match(info,/Duration: 00:00:08/);const {stdout}=await run(ffmpeg,['-v','error','-i',file,'-frames:v','1','-f','image2pipe','-c:v','png','-'],{encoding:'buffer',maxBuffer:10*1024*1024});return stdout;}
 try{
  for(let i=0;i<40;i++){try{await fetch('http://127.0.0.1:3402/social-studio',{signal:AbortSignal.timeout(1000)});break;}catch{await wait(250);}}
  assert.equal((await request('/api/social-studio/music',{runId:randomUUID()},false)).status,401);
