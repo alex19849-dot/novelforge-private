@@ -22,6 +22,7 @@ export async function POST(request: Request) {
     });
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data.user) return json({ error: "Your NovelForge session has expired. Sign in again." }, 401);
+    if(data.user.id!==process.env.SOCIAL_STUDIO_OWNER_ID) return json({error:'Use the Social Studio owner account to check this Buffer connection.'},403);
     return json(await checkBufferConnection());
   } catch (error) {
     if (error instanceof BufferConnectionError) return json({ error: error.message }, error.status);

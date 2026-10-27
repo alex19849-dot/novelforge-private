@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import PublishingPanel from './PublishingPanel';
 import { musicForPath } from '../../lib/social-music';
 import { readyForApproval } from '../../lib/social-approval';
 import { addDays, calendarDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
@@ -22,6 +23,7 @@ const buttonClass = 'rounded-xl border border-white/15 px-3 py-2 text-sm font-se
 const editable = (post: CalendarPost) => ['draft', 'approved'].includes(post.status);
 
 export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Book[]; seed: CalendarSeed | null; onSeedUsed: () => void }) {
+  const [publishingEnabled,setPublishingEnabled] = useState(false);
   const [posts, setPosts] = useState<CalendarPost[]>([]);
   const [start, setStart] = useState(() => londonDate());
   const [selected, setSelected] = useState(() => londonDate());
@@ -127,6 +129,10 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     return () => { data.subscription.unsubscribe(); window.clearInterval(interval); window.removeEventListener('focus', onFocus); };
   }, []);
 
+  async function notifyPublisher() {
+    try {const {data}=await supabase.auth.getSession();if(data.session) await fetch('/api/social-studio/publishing',{method:'POST',headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'wake'}),signal:AbortSignal.timeout(8000)});}catch{/* The background publisher also checks for missed notifications. */}
+  }
+
   function fresh(date = selected, initial?: CalendarSeed): Editor {
     return {
       id: crypto.randomUUID(), existing: null, campaignId: crypto.randomUUID(), bookSlug: initial?.book_slug ?? '', bookTitle: initial?.book_title ?? '',
@@ -200,7 +206,8 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       const post = result.data as CalendarPost;
       setPosts(current => [...current.filter(item => item.id !== post.id), post]);
       if (editor.date) { setSelected(editor.date); if (!days.includes(editor.date)) setStart(editor.date); }
-      setEditor(null); setNotice(approve ? 'Approved and saved. Automatic publishing is not enabled yet.' : 'Draft saved to your calendar.');
+      setEditor(null); setNotice(approve ? `Approved and saved.${publishingEnabled?' It will publish automatically at the saved time.':' Enable automatic publishing when ready.'}` : 'Draft saved to your calendar.');
+      void notifyPublisher();
     } catch (failure) {
       // A database timeout may have committed successfully. Keep its media rather than risk breaking that post.
       if (uploadedPath && !databaseAttempted) await supabase.storage.from('social-media').remove([uploadedPath]);
@@ -229,8 +236,9 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       setUndoBatch(approve ? changed : []);
       const skipped = batch.length - changed.length;
       setNotice(approve
-        ? `${changed.length} posts approved in one go.${skipped ? ` ${skipped} changed or were not ready and were left untouched.` : ''} You can still edit them. Automatic publishing is not enabled yet.`
+        ? `${changed.length} posts approved in one go.${skipped ? ` ${skipped} changed or were not ready and were left untouched.` : ''} You can still edit them.${publishingEnabled?' They will publish automatically at their saved times.':' Enable automatic publishing when ready.'}`
         : `${changed.length} posts returned to drafts.${skipped ? ` ${skipped} changed since approval and were left untouched.` : ''}`);
+      void notifyPublisher();
       if(skipped) await load(true);
     } catch(failure) { setError(failure instanceof Error ? failure.message : 'The posts could not be updated.'); }
     finally { savingRef.current = false; setSaving(false); setBulkAction(null); }
@@ -242,7 +250,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     try {
       const { data, error: deleteError } = await supabase.from('social_posts').delete().eq('id', editor.id).eq('version', editor.existing.version).in('status', ['draft', 'approved']).select('id').single();
       if (deleteError || !data) throw new Error('This post could not be deleted. It may have changed in another tab. Refresh the calendar.');
-      setPosts(current => current.filter(post => post.id !== editor.id)); setEditor(null); setNotice('Draft deleted.'); setConfirmDelete(false);
+      setPosts(current => current.filter(post => post.id !== editor.id)); setEditor(null); setNotice('Draft deleted.'); setConfirmDelete(false); void notifyPublisher();
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Deletion failed.'); }
     finally { savingRef.current = false; setSaving(false); }
   }
@@ -295,7 +303,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     const related = reviewOnly ? (reviewGroups.get(post.media_path || post.id) ?? [post]) : [post];
     return <article key={post.id} className="rounded-xl border border-white/10 bg-neutral-950 p-4">
       {reviewOnly && <p className="mb-2 text-sm font-semibold text-amber-200">{post.scheduled_at ? new Date(post.scheduled_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/London'}) : 'Undated draft'}</p>}
-      <div className="flex flex-wrap justify-between gap-2"><span className="font-semibold capitalize">{post.platform} · {post.scheduled_at ? londonTime(post.scheduled_at) : 'No date'}</span><span className="rounded-full bg-white/10 px-2 py-1 text-xs capitalize">{post.status}</span></div>
+      <div className="flex flex-wrap justify-between gap-2"><span className="font-semibold capitalize">{post.platform} · {post.scheduled_at ? londonTime(post.scheduled_at) : 'No date'}</span><span className="rounded-full bg-white/10 px-2 py-1 text-xs capitalize">{post.status==='approved'&&publishingEnabled?'Scheduled':post.status}</span></div>
       <p className="mt-2 text-sm text-pink-300">{post.book_title || 'General reader post'} · {POST_LABELS[post.post_type]}</p>
       {reviewOnly && related.length > 1 && <p className="mt-2 text-sm text-neutral-400">Shared artwork: {related.map(item=>item.platform).join(', ')}. Each platform caption is listed below.</p>}
       {post.title && <h4 className="mt-2 font-semibold">{post.title}</h4>}
@@ -318,9 +326,10 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
 
   return <section id="social-calendar" aria-labelledby="calendar-title" className="mb-7 scroll-mt-28 rounded-2xl border border-pink-500/30 bg-neutral-900 p-4 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-pink-400">Plan ahead</p><h2 id="calendar-title" className="mt-1 text-2xl font-bold">Your 30-day calendar</h2><p className="mt-2 text-sm text-neutral-400">Let your AI create the month, then review and approve its posts. Times are UK time. Automatic publishing is not enabled yet.</p></div>
+      <div><p className="text-xs font-semibold uppercase tracking-widest text-pink-400">Plan ahead</p><h2 id="calendar-title" className="mt-1 text-2xl font-bold">Your 30-day calendar</h2><p className="mt-2 text-sm text-neutral-400">Let your AI create the month, then review and approve its posts. Times are UK time. Approved posts publish automatically when automatic publishing is on.</p></div>
       <div className="flex gap-2"><button type="button" disabled={Boolean(editor) || saving || loading || planning || mediaBusy} onClick={() => { setEditor(fresh()); setConfirmDelete(false); setNotice(''); }} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400 disabled:opacity-40">Manual draft</button><button type="button" disabled={loading || saving || Boolean(editor) || planning || mediaBusy} onClick={() => void load()} className={buttonClass}>Refresh</button></div>
     </div>
+    <PublishingPanel posts={posts} onEnabledChange={setPublishingEnabled} onReload={()=>void load(true)} />
     <p className="mt-3 text-xs text-neutral-400">Posting times reviewed 27 October: Facebook and TikTok use the strongest available Metricool timing scores for each weekday. Instagram stays at 7 pm while useful audience data builds. These are starting points, not guaranteed results. You can edit individual times.</p>
     <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-500/5 p-4">
       <h3 className="font-bold">TikTok backing music</h3>
@@ -404,7 +413,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       </fieldset>
       <div className="flex flex-wrap gap-3"><button type="submit" disabled={saving} className={buttonClass}>{saving ? 'Saving...' : 'Save draft'}</button><button type="button" disabled={saving} onClick={() => void save(true)} className="rounded-xl bg-pink-500 px-4 py-2 font-semibold disabled:opacity-40">Save and approve</button><button type="button" disabled={saving} onClick={() => { setEditor(null); setConfirmDelete(false); }} className={buttonClass}>Cancel</button>{editor.existing && <button type="button" disabled={saving} onClick={() => setConfirmDelete(true)} className={`${buttonClass} text-red-300`}>Delete draft</button>}</div>
       {confirmDelete && <div className="rounded-xl border border-red-400/30 p-3"><p className="text-sm">Delete this saved post?</p><div className="mt-2 flex gap-3"><button type="button" disabled={saving} onClick={() => void remove()} className={`${buttonClass} text-red-300`}>Delete post</button><button type="button" disabled={saving} onClick={() => setConfirmDelete(false)} className={buttonClass}>Keep post</button></div></div>}
-      <p className="text-xs text-neutral-500">Approval saves your chosen content and date. It does not publish or send it to Buffer yet.</p>
+      <p className="text-xs text-neutral-500">Approval makes this post eligible for automatic publishing at its saved time when automatic publishing is on.</p>
     </form>}
   </section>;
 }

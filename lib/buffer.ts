@@ -1,7 +1,9 @@
 // Server-side only. Never import this module into a client component.
 export class BufferConnectionError extends Error {
-  constructor(message: string, public status = 502) {
+  status:number;
+  constructor(message: string, status = 502) {
     super(message);
+    this.status=status;
   }
 }
 
