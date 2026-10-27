@@ -25,6 +25,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const [start, setStart] = useState(() => londonDate());
   const [selected, setSelected] = useState(() => londonDate());
   const [platform, setPlatform] = useState('all');
+  const [reviewOnly, setReviewOnly] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,7 +34,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [bulkAction, setBulkAction] = useState<'approve'|'undo'|null>(null);
   const [undoBatch, setUndoBatch] = useState<CalendarPost[]>([]);
-  const [planStart, setPlanStart] = useState(() => addDays(londonDate(), 1));
+  const [planStart, setPlanStart] = useState(() => londonDate());
   const [planBook, setPlanBook] = useState('all');
   const [planPlatforms, setPlanPlatforms] = useState<SocialPlatform[]>([...SOCIAL_PLATFORMS]);
   const [planGuidance, setPlanGuidance] = useState('');
@@ -57,9 +58,20 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     }
     return groups;
   }, [visiblePosts]);
-  const calendarDrafts = visiblePosts.filter(post => post.status === 'draft' && post.scheduled_at && days.includes(londonDate(post.scheduled_at)));
-  const readyPosts = calendarDrafts.filter(post => readyForApproval(post));
-  const blockedDrafts = calendarDrafts.length - readyPosts.length;
+  const approvalDrafts = visiblePosts.filter(post => post.status === 'draft' && (!post.scheduled_at || Date.parse(post.scheduled_at) > Date.now()));
+  const readyPosts = approvalDrafts.filter(post => readyForApproval(post));
+  const blockedDrafts = approvalDrafts.length - readyPosts.length;
+  const reviewArtworkCount = new Set(posts.filter(post => post.quality_notes?.trim()).map(post => post.media_path || post.id)).size;
+  const reviewGroups = useMemo(() => {
+    const flaggedAssets = new Set(posts.filter(post => post.quality_notes?.trim()).map(post => post.media_path || post.id));
+    const groups = new Map<string, CalendarPost[]>();
+    for(const post of visiblePosts) {
+      const key = post.media_path || post.id;
+      if(flaggedAssets.has(key)) groups.set(key,[...(groups.get(key) ?? []),post]);
+    }
+    return groups;
+  },[posts,visiblePosts]);
+  const reviewPosts = [...reviewGroups.values()].map(group => group.find(post => post.quality_notes?.trim()) ?? group[0]);
   const selectedPosts = postsByDate.get(selected) ?? [];
   const drafts = useMemo(() => visiblePosts.filter(post => !post.scheduled_at), [visiblePosts]);
   const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
@@ -104,7 +116,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     void load();
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session || (accountRef.current && accountRef.current !== session.user.id)) {
-        setPosts([]); setEditor(null); setJob(null); setUndoBatch([]); initialRangeRef.current = false; setPlanning(false); setMediaBusy(false); generatingRef.current = false; accountRef.current = null;
+        setPosts([]); setEditor(null); setJob(null); setUndoBatch([]); setReviewOnly(false); initialRangeRef.current = false; setPlanning(false); setMediaBusy(false); generatingRef.current = false; accountRef.current = null;
       }
     });
     const interval = window.setInterval(() => { void load(true); }, 10000);
@@ -278,14 +290,23 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
 
   function card(post: CalendarPost) {
     const url = post.media_path ? supabase.storage.from('social-media').getPublicUrl(post.media_path).data.publicUrl : null;
+    const related = reviewOnly ? (reviewGroups.get(post.media_path || post.id) ?? [post]) : [post];
     return <article key={post.id} className="rounded-xl border border-white/10 bg-neutral-950 p-4">
+      {reviewOnly && <p className="mb-2 text-sm font-semibold text-amber-200">{post.scheduled_at ? new Date(post.scheduled_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/London'}) : 'Undated draft'}</p>}
       <div className="flex flex-wrap justify-between gap-2"><span className="font-semibold capitalize">{post.platform} · {post.scheduled_at ? londonTime(post.scheduled_at) : 'No date'}</span><span className="rounded-full bg-white/10 px-2 py-1 text-xs capitalize">{post.status}</span></div>
       <p className="mt-2 text-sm text-pink-300">{post.book_title || 'General reader post'} · {POST_LABELS[post.post_type]}</p>
+      {reviewOnly && related.length > 1 && <p className="mt-2 text-sm text-neutral-400">Shared artwork: {related.map(item=>item.platform).join(', ')}. Each platform caption is listed below.</p>}
       {post.title && <h4 className="mt-2 font-semibold">{post.title}</h4>}
       <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-300">{post.caption || 'Caption to write'}</p>
       <p className="mt-2 break-words text-sm text-pink-300">{post.hashtags.join(' ')}</p>
       {url && (post.media_type === 'video' ? <video src={url} controls preload="none" className="mt-3 max-h-64 rounded-lg" /> : <img src={url} loading="lazy" alt={post.title || 'Post artwork'} className="mt-3 max-h-64 rounded-lg" />)}
       {post.quality_notes && <p className="mt-3 text-sm text-amber-200">Artwork review: {post.quality_notes}</p>}
+      {reviewOnly && related.filter(item=>item.id!==post.id).map(item=><details key={item.id} className="mt-3 rounded-lg border border-white/10 p-3 text-sm">
+        <summary className="cursor-pointer font-semibold capitalize">{item.platform} · {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'Europe/London'})+' · '+londonTime(item.scheduled_at) : 'No date'}</summary>
+        <p className="mt-2 font-semibold">{item.title}</p><p className="mt-2 whitespace-pre-wrap text-neutral-300">{item.caption}</p><p className="mt-2 text-pink-300">{item.hashtags.join(' ')}</p>
+        {item.quality_notes && item.quality_notes!==post.quality_notes && <p className="mt-2 text-amber-200">Artwork review: {item.quality_notes}</p>}
+        {editable(item) && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={()=>edit(item)} className={`${buttonClass} mt-3`}>Edit {item.platform} post</button>}
+      </details>)}
       {post.creative_brief && <details className="mt-3 text-sm text-neutral-400"><summary className="cursor-pointer">AI creative brief</summary><p className="mt-2 whitespace-pre-wrap">{post.creative_brief}</p></details>}
       {post.status === 'draft' && post.planned_media_type && !post.media_path && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={() => void generateMedia(post)} className={`${buttonClass} mt-3 mr-3 bg-violet-600`}>AI: create {post.planned_media_type === 'video' ? 'video' : 'artwork'}</button>}
       {editable(post) && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={() => edit(post)} className={`${buttonClass} mt-3`}>Edit / reschedule</button>}
@@ -297,7 +318,11 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       <div><p className="text-xs font-semibold uppercase tracking-widest text-pink-400">Plan ahead</p><h2 id="calendar-title" className="mt-1 text-2xl font-bold">Your 30-day calendar</h2><p className="mt-2 text-sm text-neutral-400">Let your AI create the month, then review and approve its posts. Times are UK time. Automatic publishing is not enabled yet.</p></div>
       <div className="flex gap-2"><button type="button" disabled={Boolean(editor) || saving || loading || planning || mediaBusy} onClick={() => { setEditor(fresh()); setConfirmDelete(false); setNotice(''); }} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400 disabled:opacity-40">Manual draft</button><button type="button" disabled={loading || saving || Boolean(editor) || planning || mediaBusy} onClick={() => void load()} className={buttonClass}>Refresh</button></div>
     </div>
-    <div className="mt-5 rounded-2xl border border-pink-500/25 bg-pink-500/5 p-4">
+    <div className="mt-4 flex flex-wrap gap-3" aria-label="Calendar views">
+      <button type="button" aria-pressed={!reviewOnly} disabled={saving || Boolean(editor)} onClick={()=>setReviewOnly(false)} className={`${buttonClass} ${!reviewOnly?'border-pink-400 bg-pink-500/15':''}`}>Calendar</button>
+      <button type="button" aria-pressed={reviewOnly} disabled={saving || Boolean(editor)} onClick={()=>{setReviewOnly(true);setPlatform('all');}} className={`${buttonClass} border-amber-400/40 ${reviewOnly?'bg-amber-500/15':''}`}>Needs review ({reviewArtworkCount} {reviewArtworkCount===1?'poster':'posters'})</button>
+    </div>
+    {!reviewOnly && <div className="mt-5 rounded-2xl border border-pink-500/25 bg-pink-500/5 p-4">
       <h3 className="text-lg font-bold">Let your AI create the month</h3>
       <p className="mt-2 text-sm text-neutral-300">30 book-specific daily ideas, with separate captions and five hashtags for each selected platform. Hooks, tropes, character conflict, humour, reader questions and promotion are mixed automatically.</p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -319,8 +344,9 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         {job.error_message && <p className="mt-2 text-amber-200">{job.error_message} {!job.error_message.includes('image service blocked') && 'Use Generate again to fill missing dates or media.'}</p>}
         {job.status === 'paused' && <p className="mt-2 text-neutral-300">Saved items are kept. Use Generate again to fill missing dates or media.</p>}
       </div>}
-    </div>
+    </div>}
     <div aria-live="polite">{error && <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}{notice && <p className="mt-4 text-sm text-emerald-300">{notice}</p>}{seed && editor && <p className="mt-3 text-sm text-amber-200">A generated post is waiting. Save or close your current editor to open it.</p>}</div>
+    {!reviewOnly && <>
     <div className="mt-5 flex flex-wrap items-end gap-3">
       <label className="text-sm">Calendar starts<input aria-label="Calendar start date" type="date" value={start} onChange={event => { if (event.target.value) { setStart(event.target.value); setSelected(event.target.value); } }} className={inputClass} /></label>
       <button type="button" className={buttonClass} onClick={() => { const date = addDays(start, -30); setStart(date); setSelected(date); }}>Previous 30 days</button>
@@ -333,10 +359,17 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         <button type="button" disabled={loading || saving || planning || mediaBusy || Boolean(editor) || !readyPosts.length} onClick={() => void setBatchApproval(true)} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold hover:bg-emerald-500 disabled:opacity-40">{bulkAction==='approve' ? 'Approving your posts...' : `Approve all ready posts (${readyPosts.length})`}</button>
         {undoBatch.length > 0 && <button type="button" disabled={saving || planning || mediaBusy || Boolean(editor)} onClick={() => void setBatchApproval(false)} className={buttonClass}>{bulkAction==='undo' ? 'Undoing approval...' : 'Undo last bulk approval'}</button>}
       </div>
-      <p className="mt-2 text-sm text-neutral-300">Approves ready drafts in these 30 days{platform==='all'?' across all platforms':` for ${platform}`}. Individual posts can still be edited.</p>
+      <p className="mt-2 text-sm text-neutral-300">Approves all ready future drafts{platform==='all'?' across all platforms':` for ${platform}`}. Individual posts can still be edited.</p>
       {blockedDrafts > 0 && <p className="mt-2 text-sm text-amber-200">{blockedDrafts} draft{blockedDrafts===1?' needs':'s need'} a future time, a valid caption or missing media before approval.</p>}
     </div>
-    {loading ? <p className="mt-5 text-neutral-400">Loading your saved posts...</p> : <>
+    </>}
+    {loading ? <p className="mt-5 text-neutral-400">Loading your saved posts...</p> : reviewOnly ? <div id="social-review-list" className="mt-5" aria-labelledby="review-title">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><h3 id="review-title" className="text-xl font-bold">Posts needing artwork review</h3><p className="mt-2 text-sm text-neutral-400">All dates together. Shared Facebook/Instagram artwork appears once, with both captions available.</p></div>
+        <label className="text-sm">Platform<select value={platform} onChange={event=>setPlatform(event.target.value)} className={inputClass}><option value="all">All platforms</option>{SOCIAL_PLATFORMS.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">{reviewPosts.map(card)}{!reviewPosts.length && <p className="text-sm text-neutral-300">No artwork review notes for these platforms.</p>}</div>
+    </div> : <>
       <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7">
         {days.map(date => { const count = postsByDate.get(date)?.length ?? 0; return <button type="button" key={date} aria-pressed={selected === date} onClick={() => setSelected(date)} className={`min-h-24 rounded-xl border p-3 text-left ${selected === date ? 'border-pink-400 bg-pink-500/15' : 'border-white/10 bg-neutral-950 hover:border-white/30'}`}><span className="block text-xs text-neutral-400">{new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', month: 'short', timeZone: 'UTC' })}</span><span className="mt-1 block text-lg font-bold">{Number(date.slice(-2))}</span><span className="mt-1 block text-xs text-pink-300">{count ? `${count} post${count === 1 ? '' : 's'}` : 'Empty'}</span></button>; })}
       </div>
