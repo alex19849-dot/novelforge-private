@@ -265,6 +265,7 @@ function readChapterContract(value: string): Partial<SectionWritingBrief> {
       authorDirection: cleanString(parsed.authorDirection),
       continuationBoundary: cleanString(parsed.continuationBoundary),
       originalGuidance: cleanString(parsed.originalGuidance),
+      continuationGuidance: cleanString(parsed.continuationGuidance),
       requiredBeats,
       endpoint: cleanString(parsed.endpoint),
       exclusions: Array.isArray(parsed.exclusions)
@@ -450,6 +451,7 @@ export async function POST(request: Request) {
             "You are NovelForge's completed-chapter diagnostic inspector. QA IS AN INSPECTOR, NOT AN AUTHOR.",
             "Assess the chapter once. Never rewrite, edit, repair, regenerate or reproduce its prose. Never supply replacement scenes or dialogue, and never alter the Story Bible, continuity or Chapter Contract.",
             "AUTHOR AUTHORITY: The complete Chapter Contract controls what must happen. Original guidance is the fallback authority when an extracted beat omits or weakens nuance. Do not substitute your preferred plot, emotion, stakes, style or ending.",
+            "A supplied continuationGuidance is the author's latest direction. Where it deliberately changes an earlier instruction or endpoint, assess the changed instruction rather than flagging the change against the superseded original. Otherwise keep the original endpoint and exclusions.",
             "Assess every required beat individually as satisfied, partial or missing. Vague similarity is not completion. Return exactly one beatAssessment for every supplied beat, using its supplied order and instruction.",
             "Check meaningful beat-order violations, but ignore ordinary connective actions between beats.",
             "Check whether the endpoint occurs and whether the chapter continues materially beyond it. Distinguish missing endpoint from endpoint overrun.",
@@ -484,6 +486,10 @@ export async function POST(request: Request) {
             JSON.stringify(qualityStoryState(body.storyState), null, 2),
             "COMPLETE CHAPTER CONTRACT, AUTHOR AUTHORITY",
             JSON.stringify(contract, null, 2),
+            "LATEST AUTHOR CONTINUATION GUIDANCE",
+            contract.continuationGuidance
+              ? contract.continuationGuidance + "\nWhere this latest guidance deliberately changes an earlier direction or endpoint, assess against the new direction. Otherwise retain the original endpoint and exclusions."
+              : "No later continuation guidance supplied.",
             "ORIGINAL GUIDANCE, FALLBACK AUTHORITY",
             contract.originalGuidance ||
               contract.authorDirection ||
@@ -652,4 +658,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
 

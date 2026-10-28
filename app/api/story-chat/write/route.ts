@@ -145,6 +145,7 @@ function readSectionBrief(value: string): Partial<SectionWritingBrief> {
         : undefined;
 
     return {
+      continuationGuidance: cleanString(parsed.continuationGuidance),
       chapterNumber:
         typeof parsed.chapterNumber === "number"
           ? parsed.chapterNumber
@@ -266,13 +267,56 @@ function markerContext(draft: string, marker: string): {
   };
 }
 
-function validateSpecialistScene(scene: string): void {
-  if (!scene || countWords(scene) < 350) {
+function validateHandoffMarkers(draft: string, scenes: SpecialistScene[], terminalMarker?: string): void {
+  const actual = draft.match(/\[\[AION_SCENE_\d+\]\]/g) ?? [];
+  if (actual.length !== scenes.length || scenes.some((scene, index) => actual[index] !== scene.marker)) {
+    throw new Error("The chapter framework must contain each assigned scene marker exactly once, in order. Aion was not called; the existing draft is preserved.");
+  }
+  if (terminalMarker && !draft.trimEnd().endsWith(terminalMarker)) {
+    throw new Error("The final assigned scene marker must end the chapter framework. The main writer must not write that scene or its aftermath. Aion was not called; the existing draft is preserved.");
+  }
+}
+
+function validateProseResponse(prose: string, writer: string): void {
+  if (!prose.trim()) throw new Error(`${writer} returned an empty response, not chapter prose. The existing draft is preserved.`);
+  if (/^(?:(?:I['’]m sorry|Sorry)[,.!\s]+)?I\s+(?:can(?:not|['’]t)|won['’]t|am unable to)\s+(?:write|generate|continue|provide|assist|help)[\s\S]{0,300}\b(?:explicit|sexual content|pornograph\w*|this scene|that scene|this request|that request)\b/i.test(prose.trim())) {
+    throw new Error(`${writer} returned a refusal rather than chapter prose. The existing draft is preserved.`);
+  }
+}
+
+function validateContinuationBoundary(before: string, addition: string): void {
+  const previous = normalise(before);
+  const next = normalise(addition);
+  const opening = next.split(" ").slice(0, 16).join(" ");
+  if (opening.split(" ").length >= 12 && previous.includes(opening)) {
+    throw new Error("The writer restarted prose already present in the edited draft. The existing draft is preserved; no automatic rewrite was started.");
+  }
+}
+
+function chapterLengthWarnings(draft: string, target: NonNullable<SectionWritingBrief["targetWordRange"]>): string[] {
+  const words = countWords(draft);
+  return words < target.minimum || words > target.maximum
+    ? [`The complete draft is ${words.toLocaleString()} words; the chapter target is ${target.minimum.toLocaleString()} to ${target.maximum.toLocaleString()}. This continuation has been saved for review.`]
+    : [];
+}
+
+function specialistContinuation(sectionBrief: Partial<SectionWritingBrief>, latestUserMessage: string, instruction: string): SpecialistScene | undefined {
+  const scenes = explicitSpecialistScenes(sectionBrief, latestUserMessage);
+  if (/^\s*ASTRA\s*:/i.test(instruction)) return undefined;
+  const finalBeat = sectionBrief.requiredBeats?.at(-1);
+  return (finalBeat?.specialistWriter !== null ? scenes.find((scene) => scene.instruction === finalBeat?.instruction) : undefined) ??
+    (/^\s*AION\s*:/i.test(instruction) ? scenes.at(-1) : undefined);
+}
+
+function validateSpecialistScene(scene: string, continuation = false): void {
+  validateProseResponse(scene, "Aion");
+  if (!continuation && countWords(scene) < 350) {
     throw new Error("Aion returned an incomplete intimacy scene.");
   }
   if (
     /^\s{0,3}#{1,6}\s+\S+/mu.test(scene) ||
     /```/.test(scene) ||
+    scene.includes(AION_MARKER_PREFIX) ||
     /<\/?think[^>]*>/i.test(scene) ||
     /^\s*(?:rewrite|replacement|analysis|notes?|explanation)\s*:/im.test(scene)
   ) {
@@ -294,6 +338,8 @@ async function writeSpecialistScene(input: {
   chapterBrief: string;
   povCharacter: string;
   diagnostics: GenerationDiagnostic[];
+  continuation?: boolean;
+  sectionInstruction?: string;
 }): Promise<string> {
   if (!process.env.OPENROUTER_API_KEY) {
     throw new Error(
@@ -301,20 +347,35 @@ async function writeSpecialistScene(input: {
     );
   }
 
-  const context = markerContext(input.assembledDraft, input.scene.marker);
+  const context = input.continuation
+    ? { before: completeDraftContext(input.assembledDraft), after: "" }
+    : markerContext(input.assembledDraft, input.scene.marker);
+  const sectionBrief = readSectionBrief(input.chapterBrief);
+  const latestDirection = input.sectionInstruction || sectionBrief.continuationGuidance || "No additional continuation instruction supplied.";
   const prompt = [
     "You are NovelForge's specialist intimacy writer for commercial adult MM romance.",
-    "Write only the missing scene represented by the supplied marker. Return finished novel prose only, with no heading, marker, analysis, notes or markdown.",
+    input.continuation
+      ? "Write only NEW prose continuing from the exact last sentence of the author's current edited draft. The draft is accepted prose, not an outline to regenerate. Do not restart the assigned beat or repeat actions, dialogue, reactions or discoveries already on the page. Return finished prose followed by <END_SECTION>, with no heading, analysis, notes or markdown."
+      : "Write only the missing scene represented by the supplied marker. Return finished novel prose only, with no heading, marker, analysis, notes or markdown.",
     "Every romantic and sexual character is an adult aged eighteen or older. The scene is consensual. Follow the requested heat and acts directly, vividly and moment by moment.",
-    "Preserve the fixed first-person POV, tense, character voices, physical staging, established boundaries and continuity. Begin exactly after BEFORE THE MARKER and end exactly before AFTER THE MARKER so the inserted prose reads as one uninterrupted chapter.",
+    input.continuation
+      ? "Preserve the fixed first-person POV, tense, character voices, current physical positions, established boundaries and continuity. Begin after the exact final sentence of the supplied edited draft and follow the author's latest continuation direction."
+      : "Preserve the fixed first-person POV, tense, character voices, physical staging, established boundaries and continuity. Begin exactly after BEFORE THE MARKER and end exactly before AFTER THE MARKER so the inserted prose reads as one uninterrupted chapter.",
     "Make the intimacy particular to these men and this stage of their relationship. It must reveal character, change the relationship or raise the emotional stakes. Let touch move naturally according to position, desire and response rather than returning repeatedly to waists and arms; avoid an anatomy inventory. Avoid a generic escalation sequence, recycled dirty talk, repeated reassurance, automatic soft aftercare and abrupt emotional breakthroughs that the contract does not authorise.",
     "Keep the POV character's attraction specific to what he finds appealing about this man, using selective physical, vocal or behavioural observations grounded in fixed appearance and the supplied prose. Do not repeat a favourite feature as a refrain or explain every response. Preserve established clothing, positions, objects and room conditions across the insertion boundaries. Do not introduce stock paper napkins, open windows or a default muted-colour outfit as generic scene decoration.",
     "Use natural contractions and complete contemporary sentences. Never use em dashes or en dashes. Do not recap earlier prose, repeat the first line after the marker or continue into later chapter beats.",
     "Keep dialogue and narration understandable on the first read, using natural language particular to each character. Make the connection between a reply and its prompt clear even during teasing, evasion or conflict. Let sarcasm work through the words and immediate context rather than missing premises or imagined delivery. Mix ordinary responses with selective wit; do not chain clever retorts, give everyone the same verbal style or explain a joke after it fails to land. Keep imagery selective and grounded, with plain phrasing where an elaborate comparison would obscure the moment. Preserve the established heat, emotional intensity and individual voices.",
     "Keep the reader inside the fixed POV character's immediate experience. Weave his private reactions, interpretations, withheld words and decisions through the live scene, rather than mainly reporting outward movements and surroundings. Prefer a revealing thought in his own voice over incidental set dressing. Retain enough physical orientation to follow the action, and let environmental details matter to what he notices or does. Do not add a thought after every line, pause for an internal essay, explain every feeling or repeat an established conclusion. Each response should develop with the unfolding interaction.",
     "When relevant supporting characters are present in this bounded scene, let them act and speak according to the supplied context instead of being described only through the POV character. If this scene also ends the chapter, land on its final live moment without an explanatory recap or generic thought about what comes next. Preserve the author's exact endpoint and do not invent additional beats.",
-    `TARGET LENGTH: approximately ${input.scene.wordTarget} words. Finish the scene cleanly even if exact length varies.`,
-    "SCENE REQUIREMENT:\n" + input.scene.instruction,
+    input.continuation
+      ? "Write only the continuation requested by the author. There is no minimum section length. Do not pad the section to satisfy the whole-chapter word target."
+      : `TARGET LENGTH: approximately ${input.scene.wordTarget} words. Finish the scene cleanly even if exact length varies.`,
+    input.continuation
+      ? "LATEST AUTHOR CONTINUATION GUIDANCE, TAKES PRIORITY OVER EARLIER DIRECTIONS WHERE IT DELIBERATELY CHANGES THEM:\n" + latestDirection + "\nIf this guidance explicitly changes the old endpoint, follow the new endpoint. Otherwise retain the original endpoint and exclusions. Do not infer a new endpoint merely from the word continue."
+      : "SCENE REQUIREMENT:\n" + input.scene.instruction,
+    !input.continuation && (input.sectionInstruction || sectionBrief.continuationGuidance)
+      ? "LATEST AUTHOR SCENE GUIDANCE:\n" + latestDirection + "\nThis takes priority where it deliberately changes an earlier instruction or endpoint; otherwise keep the original boundaries."
+      : "",
     "POV CHARACTER:\n" + input.povCharacter,
     "CHAPTER CONTRACT:\n" + input.chapterBrief,
     "STORY BIBLE:\n" + JSON.stringify(input.storyBible ?? {}, null, 2),
@@ -339,7 +400,9 @@ async function writeSpecialistScene(input: {
         {
           role: "system",
           content:
-            "Return only the complete missing intimacy scene. Reason internally but never expose reasoning. Preserve the supplied boundaries exactly.",
+            input.continuation
+              ? "Continue the author's current edited draft only. Follow the latest continuation guidance, including an explicitly changed endpoint, without replaying the original scene. Return new prose followed by <END_SECTION>. Reason internally but never expose reasoning."
+              : "Return only the complete missing intimacy scene. Reason internally but never expose reasoning. Preserve the supplied boundaries exactly.",
         },
         { role: "user", content: prompt },
       ],
@@ -372,9 +435,21 @@ async function writeSpecialistScene(input: {
     if (choice?.finish_reason === "content_filter") {
       throw new Error("Aion's provider stopped the intimacy scene with a content filter.");
     }
+    if (choice?.message?.refusal) {
+      throw new Error("Aion returned a refusal rather than chapter prose. The existing draft is preserved.");
+    }
 
-    const prose = choice?.message?.content?.trim() ?? "";
-    validateSpecialistScene(prose);
+    const raw = choice?.message?.content?.trim() ?? "";
+    validateProseResponse(raw, "Aion");
+    const prose = input.continuation ? extractCompletedSection(raw, "", input.povCharacter) : raw;
+    validateSpecialistScene(prose, input.continuation);
+    if (input.continuation) {
+      validateSection(prose, 0);
+      validateContinuationBoundary(input.assembledDraft, prose);
+    } else {
+      validateContinuationBoundary(context.before, prose);
+      if (context.after) validateContinuationBoundary(prose, context.after);
+    }
     input.diagnostics.push(
       aionDiagnostic({
         status: "succeeded",
@@ -627,6 +702,20 @@ function getAction(value: unknown): SectionAction {
   return value === "start" || value === "rewrite" ? value : "continue";
 }
 
+function mainWriterSystemPrompt(handoff: boolean, action: SectionAction): string {
+  return [
+    "You are NovelForge, writing polished adult MM romance as a skilled human novelist. The complete Chapter Contract and its original author guidance govern the requested events, order, endpoint, exclusions and length.",
+    handoff
+      ? "On a start action, write only the chapter framework and unassigned beats. Each Aion-assigned beat belongs exclusively to Aion: insert its marker exactly once at its start and write none of its actions, dialogue, reactions or endpoint. If that beat is last, stop at the marker. Do not complete the assigned scene before leaving its marker."
+      : "On a start action, write the complete requested chapter in one response.",
+    "On continuation, the author's current edited draft is authoritative. Continue only after its exact final sentence; do not restore deleted text or replay completed material. The latest continuation guidance takes priority where it deliberately changes an earlier instruction or endpoint. Otherwise retain the original endpoint and exclusions. On rewrite, replace only the selected passage.",
+    "Follow accepted continuity, stay in the fixed POV and tense, and return only complete novel prose followed by <END_SECTION>. Write fluid contemporary prose with natural contractions. Make each character's voice distinct and each conversation logically connected, imperfect and alive. Let important moments breathe without filler, circular thought or repeated explanation. Treat repetition data as guidance rather than a rigid blacklist. Never foreground a stable minor injury or routine caretaking unless it materially affects the present action.",
+    handoff ? "Do not write any part of an Aion-assigned scene." : "When explicit intimacy is requested, make it vivid, physically clear, character-specific and consequential.",
+    action === "continue" ? "A valid requested continuation can be short. Do not pad it to reach a chapter word target." : "",
+    "Never use em dashes or en dashes, repeat completed material or add an unrequested escalation.",
+  ].filter(Boolean).join(" ");
+}
+
 function getPrompt(input: {
   action: SectionAction;
   storyBible: unknown;
@@ -661,6 +750,7 @@ function getPrompt(input: {
     requiredBeats[requiredBeats.length - 1]?.instruction ||
     "Stop at the final development explicitly requested by the author.";
   const chapterContract = {
+    continuationGuidance: sectionBrief.continuationGuidance,
     chapterNumber: sectionBrief.chapterNumber,
     chapterKind: sectionBrief.chapterKind,
     chapterTitle: input.chapterTitle || sectionBrief.chapterTitle,
@@ -681,16 +771,18 @@ function getPrompt(input: {
     input.povCharacter,
   );
   const manualRecoveryInstruction =
-    input.sectionInstruction || "No additional recovery instruction supplied.";
+    input.sectionInstruction || sectionBrief.continuationGuidance || "No additional recovery instruction supplied.";
   const actionInstruction =
     input.action === "start"
-      ? `Write the complete requested chapter in one response. Begin from the continuity boundary: ${
+      ? input.specialistScenes.length
+        ? "Write the chapter framework only: write unassigned beats and place each assigned Aion marker exactly once at the START of its assigned beat. Write no action, dialogue, internal reaction or endpoint belonging to an assigned beat. If an assigned beat ends the chapter, stop immediately after its marker. The complete chapter word target applies after the specialist fills the markers, not to this framework."
+        : `Write the complete requested chapter in one response. Begin from the continuity boundary: ${
           sectionBrief.continuationBoundary ||
           "the exact accepted ending supplied in continuity"
         }. Include every REQUIRED BEAT in order, reach the precise ENDPOINT, and do not continue beyond it. The complete chapter must be ${targetWordRange.minimum.toLocaleString()} to ${targetWordRange.maximum.toLocaleString()} words; aim near ${targetWordRange.preferred.toLocaleString()} words.`
       : input.action === "rewrite"
         ? "Replace SECTION TO REWRITE only. Preserve what happens immediately before and after it. The full Chapter Contract governs continuity and prohibitions, but do not add later required beats, rewrite the whole chapter or advance beyond the selected passage."
-        : `Continue from the exact final moment of EXACT CONTINUATION BOUNDARY. Compare the COMPLETE CURRENT CHAPTER DRAFT against every REQUIRED BEAT. Treat a beat as complete only when its specific required event is actually present on the page. Write only the remaining beats, in order, without repeating completed material. Bring the complete draft toward ${targetWordRange.minimum.toLocaleString()} to ${targetWordRange.maximum.toLocaleString()} total words, aiming near ${targetWordRange.preferred.toLocaleString()}, and stop at the ENDPOINT without advancing beyond it.`;
+        : "Continue only from the exact last sentence of the author's current edited draft. It is accepted prose, not an outline to regenerate. Follow the latest continuation guidance; when it deliberately changes an earlier direction or endpoint, the new direction takes priority. Otherwise keep the original endpoint and exclusions. Do not infer permission to change the endpoint merely from the word continue. Do not replay completed actions or restore text the author removed. Write only the requested new section, with no minimum section length and no padding to reach the whole-chapter target.";
   const specialistBudget = input.specialistScenes.reduce(
     (total, scene) => total + scene.wordTarget,
     0,
@@ -699,7 +791,7 @@ function getPrompt(input: {
     ? [
         "AUTOMATIC SPECIALIST HANDOFF",
         "The explicit intimacy beats listed below will be written by NovelForge's specialist model after this response.",
-        "At the exact chronological position of each listed beat, output its marker on a line by itself. Do not write, summarise or fade through the missing sexual action. Continue with later prose only when the chapter contract requires later beats.",
+        "At the START of each listed assigned beat, output its marker exactly once on a line by itself. That beat belongs exclusively to the specialist. Do not write any part of it, its endpoint or a substitute summary. Continue with later unassigned prose only when the chapter contract requires later beats; if the assigned beat is last, stop at its marker.",
         "Make the prose immediately before and after every marker join naturally once the marker is replaced. Do not refer to a missing scene, a handoff or a marker in the narration.",
         `Reserve approximately ${specialistBudget.toLocaleString()} words of the complete chapter target for specialist scenes. Keep the non-specialist prose compact enough that the final assembled chapter remains within the contract range.`,
         JSON.stringify(input.specialistScenes, null, 2),
@@ -854,7 +946,8 @@ function extractCompletedSection(
   return section;
 }
 
-function validateSection(section: string): void {
+function validateSection(section: string, minimumWords = 120): void {
+  validateProseResponse(section, "The writer");
   if (
     /^\s*chapter\s+\d+\b/im.test(section) ||
     /^\s{0,3}#{1,6}\s+\S+/mu.test(section) ||
@@ -881,7 +974,7 @@ function validateSection(section: string): void {
     );
   }
 
-  if (countWords(section) < 120) {
+  if (countWords(section) < minimumWords) {
     throw new Error(
       "The writing model returned too little prose to preserve safely.",
     );
@@ -1122,6 +1215,12 @@ export async function POST(request: Request) {
     const sectionBrief = readSectionBrief(chapterBrief);
     const latestUserMessage = cleanString(body.latestUserMessage);
     const phase = cleanString(body.phase);
+    const sectionInstruction = cleanString(body.sectionInstruction) || sectionBrief.continuationGuidance || "";
+    const assignedScenes = explicitSpecialistScenes(sectionBrief, latestUserMessage);
+    const finalBeat = sectionBrief.requiredBeats?.at(-1);
+    const terminalScene = finalBeat?.specialistWriter !== null
+      ? assignedScenes.find((scene) => scene.instruction === finalBeat?.instruction)
+      : undefined;
     const specialistScenes =
       action === "start"
         ? explicitSpecialistScenes(sectionBrief, latestUserMessage)
@@ -1155,6 +1254,7 @@ export async function POST(request: Request) {
       }
 
       try {
+        validateHandoffMarkers(chapterDraft, specialistScenes.filter((scene) => chapterDraft.includes(scene.marker)), terminalScene?.marker);
         const replacement = await writeSpecialistScene({
           scene: nextScene,
           assembledDraft: chapterDraft,
@@ -1163,6 +1263,7 @@ export async function POST(request: Request) {
           chapterBrief,
           povCharacter,
           diagnostics,
+          sectionInstruction,
         });
         const section = chapterDraft.replace(nextScene.marker, replacement);
         const specialistScenesPending = specialistScenes.some((scene) =>
@@ -1243,6 +1344,41 @@ export async function POST(request: Request) {
       );
     }
 
+    const continuationScene = action === "continue"
+      ? specialistContinuation(sectionBrief, latestUserMessage, sectionInstruction)
+      : undefined;
+    if (continuationScene) {
+      try {
+        const section = await writeSpecialistScene({
+          scene: continuationScene,
+          assembledDraft: chapterDraft,
+          storyBible: body.storyBible ?? {},
+          storyState: body.storyState ?? {},
+          chapterBrief,
+          povCharacter,
+          diagnostics,
+          continuation: true,
+          sectionInstruction,
+        });
+        return NextResponse.json({
+          section,
+          wordCount: countWords(section),
+          warnings: [
+            ...repetitionWarnings(chapterDraft, section, ""),
+            ...chapterLengthWarnings(`${chapterDraft}\n\n${section}`, targetWordRange),
+          ],
+          action: "continue",
+          diagnostics,
+        });
+      } catch (error) {
+        return NextResponse.json({
+          error: error instanceof Error ? error.message : "The scene continuation failed.",
+          preservedDraft: chapterDraft,
+          diagnostics,
+        }, { status: 422 });
+      }
+    }
+
     const writingPrompt = getPrompt({
       action,
       storyBible: body.storyBible ?? {},
@@ -1253,7 +1389,7 @@ export async function POST(request: Request) {
       povCharacter,
       chapterDraft,
       sectionToRewrite,
-      sectionInstruction: cleanString(body.sectionInstruction),
+      sectionInstruction,
       latestUserMessage: cleanString(body.latestUserMessage),
       specialistScenes,
     });
@@ -1272,7 +1408,7 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "You are NovelForge, writing polished adult MM romance as a skilled human novelist. The complete Chapter Contract and its original author guidance govern the requested events, order, endpoint, exclusions and length. On a start action, write the complete requested chapter in one response. On continuation, infer completed and remaining beats from the complete draft and write only what remains. On rewrite, replace only the selected passage. Follow accepted continuity, stay in the fixed POV and tense, and return only complete novel prose followed by <END_SECTION>. Write fluid contemporary prose with natural contractions. Make each character's voice distinct and each conversation logically connected, imperfect and alive. Let important moments breathe without filler, circular thought or repeated explanation. Treat repetition data as guidance rather than a rigid blacklist. Never foreground a stable minor injury or routine caretaking unless it materially affects the present action. When explicit intimacy is requested, make it vivid, physically clear, character-specific and consequential. Never use em dashes or en dashes, repeat completed material or add an unrequested escalation.",
+                mainWriterSystemPrompt(specialistScenes.length > 0, action),
             },
             { role: "user", content: writingPrompt },
           ],
@@ -1300,12 +1436,16 @@ export async function POST(request: Request) {
         }
 
         const raw = response.output_text;
+        if (response.output?.some((item) => item.type === "message" && item.content.some((part) => part.type === "refusal"))) {
+          throw new Error("Astra returned a refusal rather than chapter prose. The existing draft is preserved.");
+        }
 
         if (!raw?.trim()) {
           throw new TechnicalWriterError(
             "The writing model returned an empty response.",
           );
         }
+        validateProseResponse(raw, "Astra");
 
         const section = extractCompletedSection(
           raw,
@@ -1313,13 +1453,9 @@ export async function POST(request: Request) {
           povCharacter,
         );
         if (!specialistScenes.length) {
-          validateSection(section);
-          if (action === "start" || action === "continue") {
-            const completeDraft = action === "continue"
-              ? `${chapterDraft}\n\n${section}`.trim()
-              : section;
-            validateChapterLength(completeDraft, targetWordRange);
-          }
+          validateSection(section, action === "continue" ? 0 : 120);
+          if (action === "continue") validateContinuationBoundary(chapterDraft, section);
+          if (action === "start") validateChapterLength(section, targetWordRange);
         }
 
         diagnostics.push(
@@ -1333,6 +1469,7 @@ export async function POST(request: Request) {
 
         let assembledSection = section;
         if (specialistScenes.length) {
+          validateHandoffMarkers(assembledSection, specialistScenes, terminalScene?.marker);
           for (const scene of specialistScenes) {
             markerContext(assembledSection, scene.marker);
           }
@@ -1358,12 +1495,13 @@ export async function POST(request: Request) {
           );
         }
 
-        validateSection(assembledSection);
+        validateSection(assembledSection, action === "continue" ? 0 : 120);
         const warnings = repetitionWarnings(
           chapterDraft,
           assembledSection,
           sectionToRewrite,
         );
+        if (action === "continue") warnings.push(...chapterLengthWarnings(`${chapterDraft}\n\n${assembledSection}`, targetWordRange));
 
         return NextResponse.json({
           section: assembledSection,
@@ -1417,6 +1555,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 

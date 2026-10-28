@@ -103,9 +103,16 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
         state.phase = 'write';
       }
     } else if (state.phase === 'write' || state.phase === 'specialist') {
-      const pending = state.pending!;
+      let pending = state.pending!;
       const specialist = state.phase === 'specialist';
       const action = specialist ? 'start' : input.operation === 'generate' || !pending.draft.trim() ? 'start' : input.action ?? 'continue';
+      if ((action === 'continue' || specialist) && input.sectionInstruction?.trim()) {
+        // Keep the original guidance lossless while carrying the author's new
+        // direction into this call and the later chapter review.
+        const brief = JSON.parse(pending.chapterBrief);
+        pending = { ...pending, chapterBrief: JSON.stringify({ ...brief, continuationGuidance: input.sectionInstruction.trim() }) };
+        state.pending = pending;
+      }
       const replacement = pending.generatedChapter.replaceChapterNumber;
       const data = await readApiJson(await writeChapter(request({
         ...(specialist ? { phase: 'fill_specialist' } : {}), action,
@@ -198,3 +205,4 @@ export async function failChapterJob(id: string, message: string) {
   const { error: persistError } = await jobAdmin().rpc('finish_story_generation_job', { p_job_id: id });
   if (persistError) await jobAdmin().from('story_generation_jobs').update({ status: 'failed' }).eq('id', id).eq('status', 'generating');
 }
+

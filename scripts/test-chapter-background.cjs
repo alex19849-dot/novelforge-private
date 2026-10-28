@@ -16,6 +16,7 @@ const diagnostic = stage => ({ stage,provider:'openai',model:'mock',status:'succ
 function harness(input, options={}) {
   const row = { id:'job',status:'generating',input:clone(input),checkpoint:null,result:null,model_call_in_flight:false };
   const calls=[];
+  const writerRequests=[];
   const db={ from:() => {
     let updates, filters=[];
     const q={ select:()=>q,eq:(key,value)=>{filters.push([key,value]);return q;},update:value=>{updates=value;return q;},
@@ -31,7 +32,7 @@ function harness(input, options={}) {
   const routes={
     '../app/api/story-chat/route':{POST:async req=>{calls.push('plan');return response({story:input.story,generatedChapter:pending.generatedChapter,chapterBrief:pending.chapterBrief,diagnostics:[diagnostic('plan')]});}},
     '../app/api/story-chat/write/route':{POST:async req=>{
-      const body=await req.json();calls.push(body.phase==='fill_specialist'?'specialist':'write');
+      const body=await req.json();writerRequests.push(body);calls.push(body.phase==='fill_specialist'?'specialist':'write');
       if(options.failWrite) return new Response(JSON.stringify({error:'Truncated.',preservedDraft:'Preserved new draft.',diagnostics:[{...diagnostic('write'),status:'failed'}]}),{status:502});
       let section='New prose.';
       if(body.phase==='fill_specialist')section=++fills===1?'Opening. First saved scene. [[AION_SCENE_2]]':'Opening. First saved scene. Second saved scene.';
@@ -46,7 +47,7 @@ function harness(input, options={}) {
   };
   const steps=load('workflows/chapter-generation-steps.ts',{'../lib/social-job-db':{jobAdmin:()=>db},'../app/story-chat/generation':shared,...routes});
   const workflow=load('workflows/chapter-generation.ts',{'./chapter-generation-steps':steps});
-  return {row,calls,steps,workflow};
+  return {row,calls,steps,workflow,writerRequests};
 }
 (async()=>{
   let h=harness({operation:'generate',story},{markers:true});
@@ -81,8 +82,19 @@ function harness(input, options={}) {
   h.row.model_call_in_flight=true;
   await assert.rejects(h.steps.advanceChapterJob('job'),/not automatically submitted again/);
   assert.deepEqual(h.calls,[],'An interrupted model call must not be billed again on replay');
+  const editedDraft='The author kept this sentence and removed the repeated scene.';
+  const latestGuidance='Continue only after the edited sentence. End when the gate closes.';
+  h=harness({operation:'write',action:'continue',story,pending:{...pending,draft:editedDraft,chapterBrief:JSON.stringify({originalGuidance:'Original direction, kept verbatim.',targetWordRange:{minimum:500,preferred:600,maximum:800}})},sectionInstruction:latestGuidance});
+  await h.workflow.generateChapterJob('job');
+  assert.equal(h.writerRequests[0].chapterDraft,editedDraft);
+  assert.equal(h.writerRequests[0].sectionInstruction,latestGuidance);
+  assert.equal(JSON.parse(h.writerRequests[0].chapterBrief).continuationGuidance,latestGuidance);
+  assert.equal(JSON.parse(h.row.result.pending.chapterBrief).continuationGuidance,latestGuidance);
+  assert.equal(JSON.parse(h.row.result.pending.chapterBrief).originalGuidance,'Original direction, kept verbatim.');
+  assert.equal(h.row.result.pending.draft,editedDraft+'\n\nNew prose.');
   const fp=load('lib/chapter-job.ts').chapterSourceFingerprint;
   assert.equal(fp(story),fp({...story,storyState:{...story.storyState,lastGenerationDiagnostics:[diagnostic('test')],workspaceMetadata:{seriesType:'standalone'}}}));
   assert.notEqual(fp(story),fp({...story,chapters:[{content:'Manual edit.'}]}));
   console.log('PASS: browser-independent plan/write/specialist chain, checkpointed progress, failed-call draft recovery, resumed handoff, accepted-draft completion, no automatic paid replay and concurrent-edit fingerprints.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+

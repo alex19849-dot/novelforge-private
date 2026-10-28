@@ -208,6 +208,8 @@ export type ChapterTargetWordRange = {
  * drafts created before this staged upgrade remain loadable.
  */
 export type SectionWritingBrief = {
+  /** Latest explicit direction for continuing the author's edited draft. */
+  continuationGuidance?: string;
   chapterNumber: number;
   chapterKind: StoryChapterKind;
   chapterTitle: string;
@@ -355,4 +357,5 @@ export type StoryChatResponse = {
   /** A separately saved book seeded from the current story. */
   createdStory?: StoryWorkspace | null;
 };
+
 
