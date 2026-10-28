@@ -117,3 +117,8 @@ export async function advancePublisher(owner:string,lease:string,generation:numb
   if(readError) throw new Error('The publisher continuation could not be checked.');
   return current.enabled&&current.lease===lease&&current.generation===generation+1?generation+1:null;
 }
+export async function reportPublisherHandoffFailure(owner:string,lease:string,generation:number) {
+  'use step';
+  const {error}=await jobAdmin().from('social_publishing_settings').update({last_error:'The next publishing worker could not start. Automatic recovery is retrying in five minutes.'}).eq('user_id',owner).eq('lease',lease).eq('generation',generation).eq('enabled',true).is('workflow_run_id',null);
+  if(error) throw new Error('The publishing handover error could not be saved.');
+}

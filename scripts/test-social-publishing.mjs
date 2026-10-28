@@ -6,7 +6,7 @@ import {bufferPayload,createBufferPost,BufferPublishError,matchingBufferPosts} f
 const db=new PGlite();
 await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;`);
 const root=new URL('../supabase/migrations/',import.meta.url);
-for(const file of (await readdir(root)).filter(f=>f.endsWith('.sql')).sort()) await db.exec(await readFile(new URL(file,root),'utf8'));
+for(const file of (await readdir(root)).filter(f=>f.endsWith('.sql')&&f.includes('_social_')).sort()) await db.exec(await readFile(new URL(file,root),'utf8'));
 const owner=randomUUID(),other=randomUUID(),lease=randomUUID(),worker='worker-test';
 await db.query('insert into auth.users values($1),($2)',[owner,other]);
 await db.query('insert into social_publishing_settings(user_id,enabled,lease,channels) values($1,true,$2,$3)',[owner,lease,JSON.stringify({facebook:{id:'fb'}})]);
