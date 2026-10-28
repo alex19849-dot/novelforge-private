@@ -71,6 +71,20 @@ async function run(body, output, options = {}) {
   assert(prompt.includes('There is no minimum section length'));
   assert(!prompt.includes('TARGET LENGTH: approximately 900'));
   assert(prompt.includes('takes priority') || prompt.includes('TAKES PRIORITY'));
+  for (const ending of ['"I will be there."', '“I will be there.”', "'I will be there.'", 'I will be there.']) {
+    for (const specialist of [true, false]) {
+      r = await run({ ...base, ...(specialist ? {} : { chapterBrief: brief([ordinary]) }), action: 'continue', chapterDraft: edited }, ending + (specialist ? '\n<END_SECTION>' : ''));
+      assert.equal(r.result.status, 200, `Complete dialogue must be saved: ${ending}, specialist=${specialist}`);
+      assert.equal(r.result.data.section, ending);
+      assert.equal(r.calls.length, 1);
+    }
+  }
+  for (const specialist of [true, false]) {
+    r = await run({ ...base, ...(specialist ? {} : { chapterBrief: brief([ordinary]) }), action: 'continue', chapterDraft: edited }, 'I reach for the' + (specialist ? '\n<END_SECTION>' : ''));
+    assert.equal(r.result.status, 422);
+    assert.match(r.result.data.error, /obviously truncated/);
+    assert.equal(r.result.data.preservedDraft, edited);
+  }
   const ordinaryBrief = brief([ordinary]);
   r = await run({ ...base, chapterBrief: ordinaryBrief, action: 'continue', chapterDraft: edited, sectionInstruction: instruction }, 'I close the gate.');
   assert.equal(r.result.status, 200);

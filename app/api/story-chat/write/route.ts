@@ -962,7 +962,7 @@ function validateSection(section: string, minimumWords = 120): void {
     );
   }
 
-  if (!/[.!?…”’']$/u.test(section)) {
+  if (!/[.!?…”’'"]$/u.test(section)) {
     throw new Error(
       "The writing model returned an obviously truncated section.",
     );
