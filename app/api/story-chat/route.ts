@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { assertChapterPlanSchema, createAionChapterPlan } from "../../../lib/aion-chapter-planner";
 
 import { NextResponse } from "next/server";
 
@@ -3225,6 +3226,9 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
             },
             ...planningConversation,
           ];
+      if (usesCompactChapterPlan) {
+        return createAionChapterPlan({ messages: planningInput, schema: directSectionBriefSchema, diagnostics: planningDiagnostics, attempt });
+      }
       try {
         const planningResponse = await openai.responses.create({
           model: "gpt-5.6-terra",
@@ -3308,7 +3312,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     let parsedOutput: Partial<StoryModelOutput> | null = null;
     let planningFailureReason = "";
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    for (let attempt = 0; attempt < (usesCompactChapterPlan ? 1 : 2); attempt += 1) {
       if (attempt > 0) {
         response = await createPlanningResponse(conversation.slice(-20));
       }
@@ -3343,6 +3347,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
         const rawOutput = JSON.parse(outputText) as unknown;
 
         if (usesCompactChapterPlan) {
+          assertChapterPlanSchema(rawOutput, directSectionBriefSchema);
           const directOutput = rawOutput as DirectSectionBriefOutput;
           const expectedChapterNumber =
             rewriteTarget?.number ??
@@ -3472,7 +3477,9 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
 
     if (!parsedOutput) {
       throw new Error(
-        `The planning model failed twice because ${planningFailureReason}. No chapter was generated or saved.`,
+        usesCompactChapterPlan
+          ? `Aion chapter planning failed because ${planningFailureReason}. No chapter was generated or saved. No automatic retry was started.`
+          : `The planning model failed twice because ${planningFailureReason}. No chapter was generated or saved.`,
       );
     }
 
@@ -3768,5 +3775,6 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     );
   }
 }
+
 
 
