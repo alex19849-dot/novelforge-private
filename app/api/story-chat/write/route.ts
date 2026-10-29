@@ -1303,6 +1303,11 @@ export async function POST(request: Request) {
     if (
       action === "start" &&
       !specialistScenes.length &&
+      // Explicit routing (including null = main writer) is authoritative.
+      // Only legacy contracts without complete routing need this keyword guard.
+      !(sectionBrief.requiredBeats?.length && sectionBrief.requiredBeats.every(
+        (beat) => beat.specialistWriter === null || beat.specialistWriter === "aion",
+      )) &&
       /\b(?:explicit|graphic|open[ -]door|on[ -]page sex|sex scene|hand[ -]?job|masturbat\w*|wank\w*|jerk(?:ing|s|ed)?\s+(?:each other\s+)?off|perking\s+off|hands?\s+(?:inside|down)\s+(?:his|their|the|each other's)?\s*boxers)\b/i.test(
         sectionBrief.originalGuidance || latestUserMessage,
       )

@@ -42,6 +42,29 @@ async function run(body, output, options = {}) {
   assert(!r.calls[0].request.input[0].content.includes('write the complete requested chapter'));
   assert(!r.calls[0].request.input[0].content.includes('When explicit intimacy is requested'));
   assert.match(r.calls[0].request.input[1].content, /at the START/);
+  // A complete routing contract is authoritative. Exclusions are not Aion requests.
+  for (const guidance of [
+    'A deliberate kiss. Exclusions: No graphic sexual escalation. Lauren remains his girlfriend.',
+    'A deliberate kiss. No explicit content is needed.',
+    'A tense conversation without explicit sexual detail.',
+  ]) {
+    const contract = brief([{ ...ordinary, instruction: 'They talk, share a deliberate kiss and leave.' }], { originalGuidance: guidance });
+    r = await run({ ...base, chapterBrief: contract, latestUserMessage: guidance }, words(600, 'ordinaryChapter'));
+    assert.equal(r.result.status, 200, `Main-writer routing must not be overridden by exclusion keywords: ${guidance}`);
+    assert.equal(r.calls.length, 1);
+    assert.equal(r.calls[0].provider, 'openai');
+    assert.notEqual(r.result.data.specialistScenesPending, true);
+    assert(r.calls[0].request.input[1].content.includes(guidance), 'Original guidance must remain unchanged');
+  }
+  // Keep the legacy incomplete-contract guard and explicit specialist assignment.
+  r = await run({ ...base, chapterBrief: brief([{ order: 1, instruction: 'They talk.' }], { originalGuidance: 'Include an explicit scene.' }) }, words(600));
+  assert.equal(r.result.status, 422);
+  assert.match(r.result.data.error, /no Aion assignment/);
+  assert.equal(r.calls.length, 0);
+  r = await run({ ...base, chapterBrief: brief([ordinary, assigned], { originalGuidance: 'Include an explicit scene.' }) }, words(50, 'assignedOpening') + '\n[[AION_SCENE_1]]');
+  assert.equal(r.result.status, 200);
+  assert.equal(r.result.data.specialistScenesPending, true);
+
   for (const skeleton of ['[[AION_SCENE_1]]\n[[AION_SCENE_1]]', '[[AION_SCENE_2]]', '[[AION_SCENE_1]]\nLater scene repeated.']) {
     r = await run(base, skeleton);
     assert.equal(r.result.status, 422);
@@ -139,3 +162,4 @@ async function run(body, output, options = {}) {
   assert.equal(qa.readChapterContract(brief(undefined, { continuationGuidance: instruction })).continuationGuidance, instruction);
   console.log('PASS: exclusive handoff, marker cardinality/order/end boundary, no duplicate paid handoff, edited-draft Aion continuation, latest direction/endpoint, short prose saved with warnings, ordinary routing retained, clear empty/refusal/truncation errors, no replay and initial chapter length enforcement retained.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
