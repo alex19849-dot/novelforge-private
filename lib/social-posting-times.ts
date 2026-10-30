@@ -378,3 +378,20 @@ export function postingHours(date: string, platform: string): number[] {
   return rankedHours[platform]?.[day] ?? [19];
 }
 
+
+// These are test candidates, not claims about this account's best times.
+// Keep a morning baseline and test alternatives rather than always taking rank 1.
+export const TIMING_POLICY = 'balanced_time_trials_v1';
+export const TESTING_HOURS:Record<string,number[]>={facebook:[10,12,18],tiktok:[10,18,20],instagram:[12,19,21]};
+export function testingPostingHours(date:string,platform:string,learned:number[]=[]):number[]{
+  const ordinal=Math.floor(Date.parse(date+'T12:00:00Z')/86400000);
+  if(!Number.isFinite(ordinal))throw new Error('Choose a valid posting date.');
+  const slots=TESTING_HOURS[platform];if(!slots)throw new Error('Choose a supported platform.');
+  const week=Math.floor((ordinal+3)/7),weekday=(ordinal+3)%7;
+  const offset=platform==='facebook'?0:platform==='tiktok'?1:2;
+  const index=((weekday+2*week+offset)%slots.length+slots.length)%slots.length;
+  const trial=[...slots.slice(index),...slots.slice(0,index)];
+  // Qualified winners receive most slots; keep one day in three for testing.
+  const winners=ordinal%3===0?[]:learned.filter(hour=>Number.isInteger(hour)&&hour>=0&&hour<=23);
+  return [...new Set([...winners,...trial,...postingHours(date,platform)])];
+}

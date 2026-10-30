@@ -338,7 +338,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     </div>
     <PublishingPanel posts={posts} onEnabledChange={setPublishingEnabled} onReload={()=>void load(true)} />
     <StrategyPanel books={books}/>
-    <p className="mt-3 text-xs text-neutral-400">Posting times reviewed 27 October: Facebook and TikTok use the strongest available Metricool timing scores for each weekday. Instagram stays at 7 pm while useful audience data builds. These are starting points, not guaranteed results. You can edit individual times.</p>
+    <p className="mt-3 text-xs text-neutral-400">Timing tests, in UK time: Facebook 10 am / noon / 6 pm; TikTok 10 am / 6 pm / 8 pm; Instagram noon / 7 pm / 9 pm. These are balanced test slots, not proven audience peaks. New batches favour qualified winners while continuing to test alternatives. You can edit individual times.</p>
     <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-500/5 p-4">
       <h3 className="font-bold">TikTok backing music</h3>
       <p className="mt-2 text-sm text-neutral-300">New AI TikTok posts automatically become short videos with licensed music. Existing posters and silent clips can be prepared together in the background. Captions, dates and approvals are kept.</p>

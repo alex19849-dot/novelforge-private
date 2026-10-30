@@ -1,4 +1,4 @@
-import { postingHours } from './social-posting-times';
+import { testingPostingHours } from './social-posting-times';
 import { addDays, londonSchedule, POST_TYPES } from './social-calendar';
 import type { SocialPlatform } from './social-calendar';
 export const CONTENT_MIX = [
@@ -27,7 +27,7 @@ export function validateAiDays(value: unknown, platforms: SocialPlatform[], indi
 }
 export function plannedTime(start: string, index: number, platform: SocialPlatform,preferredHours:number[]=[]) {
   const date=addDays(start,index);
-  const candidates=[...new Set([...preferredHours,...postingHours(date,platform)])].map(hour=>londonSchedule(date,`${String(hour).padStart(2,'0')}:00`));
+  const candidates=testingPostingHours(date,platform,preferredHours).map(hour=>londonSchedule(date,`${String(hour).padStart(2,'0')}:00`));
   return candidates.find(time=>Date.parse(time)>Date.now()+30*60_000) ?? candidates[0];
 }
 export function plannedFormat(type: string, platform: SocialPlatform): 'image' | 'video' | null {

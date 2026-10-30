@@ -157,7 +157,7 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
         const strategyCopy=strategyCopies?.get(day.dayIndex+':'+platform);
         const book=strategyCopy?strategyCopy.book:legacyBook;
         const postType=strategyCopy?.postType??assignment.postType;
-        const {error}=await db.from('social_posts').insert({campaign_id:campaignId(taskId,day.dayIndex),generation_run_id:runId,user_id:job.user_id,book_slug:book?.slug??'',book_title:book?.title??'',platform,post_type:postType,title:copy.title,caption:copy.caption,hashtags:copy.hashtags,creative_brief:strategyCopy?.brief??day.creativeBrief,content_metadata:strategyCopy?.metadata??{},planned_media_type:strategyCopy?(platform==='tiktok'?'video':'image'):plannedFormat(postType,platform),scheduled_at:scheduled,status:'draft'});
+        const {error}=await db.from('social_posts').insert({campaign_id:campaignId(taskId,day.dayIndex),generation_run_id:runId,user_id:job.user_id,book_slug:book?.slug??'',book_title:book?.title??'',platform,post_type:postType,title:copy.title,caption:copy.caption,hashtags:copy.hashtags,creative_brief:strategyCopy?.brief??day.creativeBrief,content_metadata:strategyCopy?{...strategyCopy.metadata,timing_policy:'balanced_time_trials_v1'}:{},planned_media_type:strategyCopy?(platform==='tiktok'?'video':'image'):plannedFormat(postType,platform),scheduled_at:scheduled,status:'draft'});
         if(error&&error.code!=='23505') throw new Error('Generated drafts could not be saved. Retrying the saved response.');
       }
     }
