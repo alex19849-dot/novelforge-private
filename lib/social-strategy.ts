@@ -70,6 +70,9 @@ export function createStrategyAssignments(start:string,platforms:SocialPlatform[
    const score=evidence?.conversion??evidence?.discovery??0;
    return {book,weight:Math.exp(Math.max(-.2,Math.min(.2,score)))};
   });
+  // Carry a bounded exposure credit across batches so quieter books do not
+  // repeatedly lose the same rounding slots at the end of every month.
+  for(const book of books)bookUsed[book.slug]=Math.min(2,recent.filter(p=>p.platform===platform&&p.book_slug===book.slug).length);
   const out:StrategyVariant[]=[];
   for(let dayIndex=0;dayIndex<30;dayIndex++){
    const ordered=FAMILIES.filter(f=>weights[f]>0).sort((a,b)=>{
