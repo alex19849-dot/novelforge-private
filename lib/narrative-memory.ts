@@ -23,9 +23,13 @@ const words = (value: string) => new Set(normalise(value).split(" ").filter(w =>
 
 // Content identity, not a security hash. Runs identically in browser and server.
 export function memorySourceHash(content: string): string {
-  let hash = 14695981039346656037n;
-  for (let i = 0; i < content.length; i++) hash = BigInt.asUintN(64, (hash ^ BigInt(content.charCodeAt(i))) * 1099511628211n);
-  return hash.toString(16).padStart(16, "0");
+  let first = 0x811c9dc5, second = 0x9e3779b9;
+  for (let i = 0; i < content.length; i++) {
+    const code = content.charCodeAt(i);
+    first = Math.imul(first ^ code, 0x01000193) >>> 0;
+    second = Math.imul(second ^ code, 0x85ebca6b) >>> 0;
+  }
+  return first.toString(16).padStart(8, "0") + second.toString(16).padStart(8, "0");
 }
 
 export const narrativeRecordsSchema = {
