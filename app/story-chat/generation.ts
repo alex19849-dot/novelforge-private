@@ -146,7 +146,7 @@ export function getStoryStateBeforeChapter(
   }
 
   const earlierLedger = (state.chapterLedger ?? []).filter(
-    (entry) => entry.chapterNumber < replacementNumber,
+    (entry) => entry.chapterNumber < Math.min(replacementNumber, state.continuityDirtyFromChapter ?? Infinity),
   );
   const previousChapter = earlierLedger.at(-1);
   const unique = (values: string[]) =>
@@ -154,6 +154,7 @@ export function getStoryStateBeforeChapter(
 
   return {
     ...EMPTY_STORY_STATE,
+    memoryCorrections: (state.memoryCorrections ?? []).filter(correction => correction.chapterNumber < replacementNumber),
     importantFacts: unique(earlierLedger.flatMap((entry) => entry.newFacts)),
     relationshipStates: previousChapter?.relationshipShift
       ? [previousChapter.relationshipShift]
@@ -621,4 +622,5 @@ export function applyGeneratedChapter(
     updatedAt: now,
   };
 }
+
 

@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { narrativeRecordsSchema, groundNarrativeRecords, projectNarrativeMemory, retrieveNarrativeMemory, NARRATIVE_EXTRACTION_INSTRUCTION } from "../../../../lib/narrative-memory";
 
 import { NextResponse } from "next/server";
 
@@ -10,6 +11,7 @@ export const maxDuration = 300;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
+  maxRetries: 0,
 });
 
 type ChapterInput = {
@@ -49,6 +51,7 @@ type LedgerModelOutput = {
     forbiddenHabits: string[];
   }>;
   chapterEntries: Array<{
+    narrativeRecords: unknown;
     chapterNumber: number;
     summary: string;
     openingLocation: string;
@@ -163,6 +166,7 @@ const ledgerSchema = {
         type: "object",
         additionalProperties: false,
         required: [
+          "narrativeRecords",
           "chapterNumber",
           "summary",
           "openingLocation",
@@ -175,6 +179,7 @@ const ledgerSchema = {
           "repeatedBeats",
         ],
         properties: {
+          narrativeRecords: narrativeRecordsSchema,
           chapterNumber: { type: "number" },
           summary: { type: "string" },
           openingLocation: { type: "string" },
@@ -242,6 +247,7 @@ function cleanStateForAnalysis(value: unknown): Record<string, unknown> {
   delete state.generationDiagnostics;
   delete state.chapterPlans;
   delete state.latestChapterEnding;
+  delete state.memoryCorrections;
 
   if (Array.isArray(state.chapterLedger)) {
     state.chapterLedger = state.chapterLedger
@@ -255,6 +261,7 @@ function cleanStateForAnalysis(value: unknown): Record<string, unknown> {
         };
 
         delete compactEntry.endingExcerpt;
+        delete compactEntry.narrativeMemory;
 
         return compactEntry;
       });
@@ -282,7 +289,7 @@ function cleanChapters(value: unknown): Array<{
       number: typeof chapter.number === "number" ? chapter.number : Number.NaN,
       title: cleanString(chapter.title),
       povCharacter: cleanString(chapter.povCharacter),
-      content: cleanString(chapter.content),
+      content: typeof chapter.content === "string" ? chapter.content : "",
     }))
     .filter(
       (chapter) =>
@@ -310,7 +317,7 @@ export async function POST(request: Request) {
     const chapterNumber = body.chapter?.number;
     const chapterTitle = cleanString(body.chapter?.title);
     const povCharacter = cleanString(body.chapter?.povCharacter);
-    const chapterContent = cleanString(body.chapter?.content);
+    const chapterContent = typeof body.chapter?.content === "string" ? body.chapter.content : "";
     const allChapters = cleanChapters(body.chapters);
     const isBatchRebuild = body.rebuildMode === "batch";
     diagnosticStage = isBatchRebuild
@@ -497,6 +504,8 @@ explicit adult intimacy accurately when it changes character, relationship,
 knowledge or plot. Every romantic or sexual character is an adult aged eighteen
 or older.
 
+${NARRATIVE_EXTRACTION_INSTRUCTION}
+
 Do not invent events, rewrite prose, include plans or discuss your reasoning.
           `.trim(),
         },
@@ -506,6 +515,14 @@ Do not invent events, rewrite prose, include plans or discuss your reasoning.
 STORY BIBLE:
 
 ${JSON.stringify(body.storyBible ?? {}, null, 2)}
+
+EXISTING MEMORY KEYS AND LATEST VERIFIED CHANGES (reuse IDs when updating):
+
+${JSON.stringify(retrieveNarrativeMemory((body.storyState ?? {}) as Parameters<typeof projectNarrativeMemory>[0], { guidance: chaptersToAnalyse.map(c => c.content).join("\n"), maxCharacters: 18000, beforeChapter: latestChapterNumber + 1 }).records.map(r => ({ key: r.key, kind: r.kind, subject: r.subject, claim: r.claim, status: r.status, chapter: r.lastReferencedChapter })), null, 0)}
+
+AUTHOR MEMORY CORRECTIONS (authoritative, not new prose evidence):
+
+${JSON.stringify(((body.storyState as { memoryCorrections?: import("../../../../lib/narrative-memory").MemoryCorrection[] })?.memoryCorrections ?? []).filter(c => c.chapterNumber <= latestChapterNumber))}
 
 CURRENT STORY STATE:
 
@@ -576,7 +593,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
     const sourceChapter =
       chaptersToAnalyse.find(
         (chapter) => chapter.number === entry.chapterNumber,
-      ) ?? chaptersToAnalyse[index];
+      );
 
     if (!sourceChapter) {
       console.warn(
@@ -585,7 +602,11 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
       return null;
     }
 
+    if (!Array.isArray(entry.narrativeRecords)) throw new Error(`The continuity model omitted structured memory for chapter ${sourceChapter.number}.`);
+    const narrativeMemory = groundNarrativeRecords(entry.narrativeRecords, sourceChapter);
+    if (entry.narrativeRecords.length && !narrativeMemory.records.length) throw new Error(`None of chapter ${sourceChapter.number}'s proposed memory records could be grounded in its prose. No unsupported memory was saved.`);
     return {
+      narrativeMemory,
       chapterNumber: sourceChapter.number,
       title: sourceChapter.title,
       povCharacter: sourceChapter.povCharacter,
@@ -612,6 +633,7 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
     );
 
     if (
+      analysedEntries.length !== expectedNumbers.size ||
       analysedNumbers.size !== expectedNumbers.size ||
       [...expectedNumbers].some((number) => !analysedNumbers.has(number))
     ) {
@@ -655,6 +677,8 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
     ];
     return NextResponse.json({
       storyState: {
+        memoryCorrections: (body.storyState as { memoryCorrections?: unknown })?.memoryCorrections ?? [],
+        chapterPlans: (body.storyState as { chapterPlans?: unknown })?.chapterPlans ?? [],
         importantFacts: output.importantFacts,
         characterStates: output.characterStates,
         relationshipStates: output.relationshipStates,
@@ -716,5 +740,6 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
   );
   }
 }
+
 
 

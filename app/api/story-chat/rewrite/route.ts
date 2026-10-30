@@ -1,3 +1,5 @@
+import { selectedProseWriter, proseCostEstimate } from "../../../../lib/prose-writer";
+import { narrativeContext } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import type { GenerationDiagnostic } from "../../../story-chat/types";
@@ -40,7 +42,7 @@ function validateProse(value: string): void {
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
   let called = false;
-  let model = "gpt-6-astra";
+  let model: string = "gpt-6.1-terra";
   let provider: "openai" | "openrouter" = "openai";
   let startedAt = Date.now();
   let inputTokens = 0;
@@ -69,7 +71,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: (error as Error).message, diagnostics }, { status: 409 });
     }
     const isAion = selectedWriter.model === "aion";
-    model = isAion ? "aion-labs/aion-3.5" : "gpt-6-astra";
+    const proseWriter = selectedProseWriter(body.storyState, text(body.instruction));
+    model = isAion ? "aion-labs/aion-3.5" : proseWriter.model;
     provider = isAion ? "openrouter" : "openai";
     if (!(isAion ? process.env.OPENROUTER_API_KEY : process.env.OPENAI_API_KEY)) {
       return NextResponse.json({ error: `${isAion ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY"} is not configured.`, diagnostics }, { status: 500 });
@@ -82,7 +85,7 @@ export async function POST(request: Request) {
       "Keep the reader inside the fixed POV character's immediate experience. Weave his private reactions, interpretations, withheld words and decisions through the live scene, rather than mainly reporting outward movements and surroundings. Prefer a revealing thought in his own voice over incidental set dressing. Retain enough physical orientation to follow the action, and let environmental details matter to what he notices or does. Do not add a thought after every line, pause for an internal essay, explain every feeling or repeat an established conclusion. Each response should develop with the unfolding interaction.",
       "POV CHARACTER:\n" + text(body.povCharacter),
       "STORY BIBLE:\n" + JSON.stringify(body.storyBible ?? {}),
-      "CONTINUITY AND CHARACTER VOICE PROFILES:\n" + JSON.stringify(body.storyState ?? {}),
+      "CONTINUITY AND CHARACTER VOICE PROFILES:\n" + JSON.stringify(narrativeContext(body.storyState, { pov: text(body.povCharacter), guidance: selectedWriter.instruction + "\n" + text(body.passage) })),
       "CHAPTER CONTRACT, CONTEXT ONLY:\n" + text(body.chapterBrief),
       "CURRENT CHAPTER, CONTEXT ONLY:\n" + chapterContent,
       "IMMEDIATELY BEFORE, DO NOT REPEAT:\n" + chapterContent.slice(Math.max(0, range.start - 5000), range.start),
@@ -126,18 +129,19 @@ export async function POST(request: Request) {
       outputTokens = response.usage?.output_tokens ?? 0;
       totalTokens = response.usage?.total_tokens ?? inputTokens + outputTokens;
       const cached = response.usage?.input_tokens_details?.cached_tokens ?? 0;
-      costUsd = (Math.max(0, inputTokens - cached) * 10 + cached + outputTokens * 50) / 1000000;
+      costUsd = proseCostEstimate(proseWriter.model, inputTokens, outputTokens, cached);
       costType = "estimated";
       if (response.status !== "completed") throw new Error("The writer did not finish the replacement. Your chapter is unchanged.");
       replacement = response.output_text?.trim() ?? "";
     }
     validateProse(replacement);
     diagnostics.push(diagnostic("succeeded"));
-    return NextResponse.json({ replacement, diagnostics, model: selectedWriter.model });
+    return NextResponse.json({ replacement, diagnostics, model, writerRole: isAion ? "aion" : "main" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "The passage could not be rewritten.";
     if (called) diagnostics.push(diagnostic("failed", message));
     return NextResponse.json({ error: message, diagnostics }, { status: called ? 502 : 400 });
   }
 }
+
 

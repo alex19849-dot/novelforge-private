@@ -1,5 +1,7 @@
 // NovelForge original-voice restoration with targeted realism safeguards.
 import OpenAI from "openai";
+import { selectedProseWriter, proseCostEstimate } from "../../../../lib/prose-writer";
+import { narrativeContext } from "../../../../lib/narrative-memory";
 
 import { NextResponse } from "next/server";
 
@@ -11,10 +13,6 @@ import type {
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const WRITING_MODEL = "gpt-6-astra";
-const INPUT_COST_PER_MILLION_TOKENS = 10;
-const CACHED_INPUT_COST_PER_MILLION_TOKENS = 1;
-const OUTPUT_COST_PER_MILLION_TOKENS = 50;
 const AION_MODEL = "aion-labs/aion-3.5";
 const AION_MARKER_PREFIX = "[[AION_SCENE_";
 const openai = new OpenAI({
@@ -256,7 +254,7 @@ function markerContext(draft: string, marker: string): {
 } {
   const markerIndex = draft.indexOf(marker);
   if (markerIndex < 0) {
-    throw new Error(`Astra did not place the required specialist marker ${marker}.`);
+    throw new Error(`The main writer did not place the required specialist marker ${marker}.`);
   }
 
   return {
@@ -382,7 +380,7 @@ async function writeSpecialistScene(input: {
     "CHARACTER VOICE PROFILES, ACTIVE POV FIRST:\n" +
       JSON.stringify(cleanVoiceProfiles(input.storyState, input.povCharacter), null, 2),
     "CONTINUITY STATE:\n" +
-      JSON.stringify(cleanStoryState(input.storyState), null, 2),
+      JSON.stringify(cleanStoryState(input.storyState, input.povCharacter, input.chapterBrief + "\n" + (input.sectionInstruction ?? "")), null, 2),
     "BEFORE THE MARKER:\n" + context.before,
     "AFTER THE MARKER:\n" + context.after,
   ].join("\n\n");
@@ -488,38 +486,8 @@ function endingExcerpt(text: string, maximumWords: number): string {
     .join(" ");
 }
 
-function cleanStoryState(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  const state = value as Record<string, unknown>;
-
-  return {
-    importantFacts: state.importantFacts ?? [],
-    characterStates: state.characterStates ?? [],
-    relationshipStates: state.relationshipStates ?? [],
-    unresolvedThreads: state.unresolvedThreads ?? [],
-    timeline: state.timeline ?? [],
-    locations: state.locations ?? [],
-    activePOV: state.activePOV ?? "",
-    latestChapterEnding: state.latestChapterEnding ?? "",
-    characterKnowledge: state.characterKnowledge ?? [],
-    repetitionWarnings: state.repetitionWarnings ?? [],
-    currentScene: state.currentScene ?? null,
-    relationshipProgression: state.relationshipProgression ?? [],
-    repetitionMemory: state.repetitionMemory ?? null,
-    settledChapterExchanges: Array.isArray(state.chapterLedger)
-      ? state.chapterLedger.slice(-8).map((entry: unknown) => {
-          const chapter = entry as Record<string, unknown>;
-          return {
-            chapterNumber: chapter.chapterNumber,
-            relationshipShift: chapter.relationshipShift,
-            completedBeats: chapter.repeatedBeats ?? [],
-          };
-        })
-      : [],
-  };
+function cleanStoryState(value: unknown, pov = "", guidance = ""): unknown {
+  return narrativeContext(value, { pov, guidance });
 }
 
 function cleanVoiceProfiles(
@@ -855,7 +823,7 @@ function getPrompt(input: {
         ? JSON.stringify(voiceProfiles, null, 2)
         : "No persistent profile exists yet. Establish distinct voices from the Story Bible and current prose."),
     "CONTINUITY CHECKPOINT\n" +
-      JSON.stringify(cleanStoryState(input.storyState), null, 2),
+      JSON.stringify(cleanStoryState(input.storyState, input.povCharacter, input.chapterBrief + "\n" + (input.sectionInstruction ?? "")), null, 2),
     "RECENT CHAPTER ENDINGS\n" + JSON.stringify(input.recentChapters, null, 2),
     "COMPLETE CHAPTER CONTRACT, AUTHOR AUTHORITY\n" +
       JSON.stringify(chapterContract, null, 2),
@@ -1162,6 +1130,7 @@ function isTechnicalFailure(error: unknown): boolean {
 }
 
 function diagnostic(input: {
+  writer: ReturnType<typeof selectedProseWriter>;
   status: "succeeded" | "failed";
   usage?: Usage;
   durationMs: number;
@@ -1171,17 +1140,12 @@ function diagnostic(input: {
   const inputTokens = input.usage?.input_tokens ?? 0;
   const outputTokens = input.usage?.output_tokens ?? 0;
   const cachedTokens = input.usage?.input_tokens_details?.cached_tokens ?? 0;
-  const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
-  const costUsd =
-    (uncachedTokens * INPUT_COST_PER_MILLION_TOKENS +
-      cachedTokens * CACHED_INPUT_COST_PER_MILLION_TOKENS +
-      outputTokens * OUTPUT_COST_PER_MILLION_TOKENS) /
-    1_000_000;
+  const costUsd = proseCostEstimate(input.writer.model, inputTokens, outputTokens, cachedTokens);
 
   return {
     stage: "chapter_section_writing",
     provider: "openai",
-    model: WRITING_MODEL,
+    model: input.writer.model,
     status: input.status,
     inputTokens,
     outputTokens,
@@ -1216,6 +1180,7 @@ export async function POST(request: Request) {
     const latestUserMessage = cleanString(body.latestUserMessage);
     const phase = cleanString(body.phase);
     const sectionInstruction = cleanString(body.sectionInstruction) || sectionBrief.continuationGuidance || "";
+    const writer = selectedProseWriter(body.storyState, sectionInstruction);
     const assignedScenes = explicitSpecialistScenes(sectionBrief, latestUserMessage);
     const finalBeat = sectionBrief.requiredBeats?.at(-1);
     const terminalScene = finalBeat?.specialistWriter !== null
@@ -1405,7 +1370,7 @@ export async function POST(request: Request) {
 
       try {
         const response = await openai.responses.create({
-          model: WRITING_MODEL,
+          model: writer.model,
           reasoning: {
             effort: "low",
           },
@@ -1442,7 +1407,7 @@ export async function POST(request: Request) {
 
         const raw = response.output_text;
         if (response.output?.some((item) => item.type === "message" && item.content.some((part) => part.type === "refusal"))) {
-          throw new Error("Astra returned a refusal rather than chapter prose. The existing draft is preserved.");
+          throw new Error(`${writer.label} returned a refusal rather than chapter prose. The existing draft is preserved.`);
         }
 
         if (!raw?.trim()) {
@@ -1450,7 +1415,7 @@ export async function POST(request: Request) {
             "The writing model returned an empty response.",
           );
         }
-        validateProseResponse(raw, "Astra");
+        validateProseResponse(raw, writer.label);
 
         const section = extractCompletedSection(
           raw,
@@ -1465,6 +1430,7 @@ export async function POST(request: Request) {
 
         diagnostics.push(
           diagnostic({
+            writer,
             status: "succeeded",
             usage,
             durationMs: Date.now() - startedAt,
@@ -1525,6 +1491,7 @@ export async function POST(request: Request) {
 
         diagnostics.push(
           diagnostic({
+            writer,
             status: "failed",
             usage,
             durationMs: Date.now() - startedAt,
@@ -1560,6 +1527,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 

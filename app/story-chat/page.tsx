@@ -1,5 +1,6 @@
 "use client";
 
+
 import { PendingChapterGeneration, QualityResponse, SectionAction, WriterResponse, getStoryStateBeforeChapter, applyGeneratedChapter, getContractWordRange, isWriterResponse, isStringArray, isDiagnosticArray, isGenerationDiagnostic, isQualityResponse, isLedgerResponse, LedgerResponse, isStoryState, isChapterPlan, readApiJson, ApiRequestError, qualityReviewWarnings, EMPTY_STORY_STATE } from "./generation";
 
 import { chapterSourceFingerprint, type ChapterJobInput } from "../../lib/chapter-job";
@@ -13,6 +14,7 @@ import ChatPanel from "./components/ChatPanel";
 import ChapterPanel from "./components/ChapterPanel";
 
 import BiblePanel from "./components/BiblePanel";
+import MemoryPanel from "./components/MemoryPanel";
 import { findPassageRange, replacePassage, type PassageRewriteRequest } from "./passageRewrite";
 
 import type {
@@ -444,7 +446,7 @@ async function updateContinuityLedger(input: {
       )
     : [chaptersToAnalyse];
   let workingState: StoryState = input.rebuild
-    ? { ...EMPTY_STORY_STATE }
+    ? { ...EMPTY_STORY_STATE, memoryCorrections: input.storyState.memoryCorrections ?? [] }
     : partialRebuildStart !== undefined
       ? getStoryStateBeforeChapter(input.storyState, partialRebuildStart)
       : input.storyState;
@@ -508,6 +510,7 @@ async function updateContinuityLedger(input: {
 
   const completedState: StoryState = {
     ...workingState,
+    memoryCorrections: input.storyState.memoryCorrections ?? [],
     chapterPlans: input.storyState.chapterPlans ?? [],
   };
   delete completedState.continuityDirtyFromChapter;
@@ -1776,7 +1779,7 @@ device.`,
   async function queueChapterBackground(input: ChapterJobInput) {
     backgroundSubmitInFlight.current = true;
     setBackgroundBusy(true);
-    setBackgroundNotice("Starting chapter generation. Once accepted, you can leave this tab or app.");
+    setBackgroundNotice(input.operation === "memory" ? "Starting memory analysis. Once accepted, you can leave this tab or app." : "Starting chapter generation. Once accepted, you can leave this tab or app.");
     const id = crypto.randomUUID();
     backgroundJobRef.current = id;
     try {
@@ -1790,7 +1793,7 @@ device.`,
       const data = await readApiJson(response) as { job?: { id: string }; error?: string };
       if (!data.job?.id) throw new Error("The background job was not accepted.");
       backgroundJobRef.current = data.job.id;
-      setBackgroundNotice("Chapter generation is running in the background. You can use another tab or app and return when ready.");
+      setBackgroundNotice(input.operation === "memory" ? "Memory analysis is running in the background. You can return when ready." : "Chapter generation is running in the background. You can use another tab or app and return when ready.");
       window.dispatchEvent(new Event("novelforge-chapter-job"));
     } catch (error) {
       // A lost response does not prove that the server rejected the job.
@@ -2564,7 +2567,9 @@ transition ${
                     Story Bible
                   </button>
                 )}
+                {story && <button type="button" onClick={() => { setActiveTab("memory"); setIsMenuOpen(false); }} className={`w-full rounded-xl px-4 py-3 text-left font-semibold ${activeTab === "memory" ? "bg-white/10 text-white" : "text-neutral-400 hover:bg-white/5 hover:text-white"}`}>Memory</button>}
               </div>
+
 
               <div className="mt-6">
                 <p
@@ -2776,6 +2781,14 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
           </div>
         )}
 
+        {activeTab === "memory" && <MemoryPanel key={story.id} story={story} busy={isThinking} onCorrections={corrections => {
+          if (isThinking) return;
+          const current = currentStoryRef.current;
+          if (!current) return;
+          setIsThinking(true);
+          void persistStory({ ...current, storyState: { ...current.storyState, memoryCorrections: corrections }, updatedAt: new Date().toISOString() }).catch(error => setBackgroundNotice(error instanceof Error ? error.message : "The correction could not be saved.")).finally(() => setIsThinking(false));
+        }} onBuild={() => { if (!isThinking) void queueChapterBackground({ operation: "memory", memoryBuildApproved: true, story, ...(pendingForCurrentStory ? { pending: pendingForCurrentStory } : {}) }); }} />}
+
         {activeTab === "bible" && (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <BiblePanel
@@ -2874,6 +2887,7 @@ disabled:opacity-40"
     </main>
   );
 }
+
 
 
 

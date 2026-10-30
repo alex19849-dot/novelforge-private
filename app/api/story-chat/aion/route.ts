@@ -1,3 +1,4 @@
+import { narrativeContext } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
@@ -180,7 +181,7 @@ export async function POST(request: Request) {
       "COMPLETE CHAPTER CONTRACT:\n" +
         (chapterBrief || "No separate Chapter Contract was supplied."),
       "STORY BIBLE:\n" + compactContext(body.storyBible, 9000),
-      "CONTINUITY STATE:\n" + compactContext(body.storyState, 7000),
+      "CONTINUITY STATE:\n" + compactContext(narrativeContext(body.storyState, { pov: cleanString(body.povCharacter), guidance: cleanString(body.message), maxCharacters: 6500 }), 7000),
       "CURRENT CHAPTER DRAFT, CONTEXT ONLY:\n" +
         cleanString(body.chapterDraft).slice(-12000),
       "AUTHOR INSTRUCTION AND EXACT PASSAGE:\n" + instructionAndPassage,
@@ -271,4 +272,5 @@ export async function POST(request: Request) {
     );
   }
 }
+
 

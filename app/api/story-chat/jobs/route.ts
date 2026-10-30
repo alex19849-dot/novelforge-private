@@ -25,8 +25,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const input = body.input as ChapterJobInput;
-    if (!uuid(body.id) || !input || !uuid(input.story?.id) || !['generate', 'write', 'complete'].includes(input.operation) || !Array.isArray(input.story.messages) || !Array.isArray(input.story.chapters) || !input.story.storyBible || !input.story.storyState || typeof body.sourceFingerprint !== 'string') return json({ error: 'The chapter background request is incomplete.' }, 400);
-    if (input.operation !== 'generate' && (!input.pending || input.pending.storyId !== input.story.id || typeof input.pending.chapterBrief !== 'string' || typeof input.pending.draft !== 'string')) return json({ error: 'A valid saved chapter draft is required.' }, 400);
+    if (!uuid(body.id) || !input || !uuid(input.story?.id) || !['generate', 'write', 'complete', 'memory'].includes(input.operation) || !Array.isArray(input.story.messages) || !Array.isArray(input.story.chapters) || !input.story.storyBible || !input.story.storyState || typeof body.sourceFingerprint !== 'string') return json({ error: 'The chapter background request is incomplete.' }, 400);
+    if (!['generate', 'memory'].includes(input.operation) && (!input.pending || input.pending.storyId !== input.story.id || typeof input.pending.chapterBrief !== 'string' || typeof input.pending.draft !== 'string')) return json({ error: 'A valid saved chapter draft is required.' }, 400);
+    if (input.operation === 'memory' && (!input.memoryBuildApproved || !input.story.chapters.length)) return json({ error: 'Review the memory build cost estimate and confirm before starting.' }, 400);
     if (input.action && !['start', 'continue', 'rewrite'].includes(input.action)) return json({ error: 'Invalid chapter action.' }, 400);
     const db = jobAdmin();
     const { data: duplicate, error: duplicateError } = await db.from('story_generation_jobs').select('id,status').eq('id', body.id).eq('user_id', user.id).maybeSingle();
@@ -85,3 +86,4 @@ export async function GET(request: Request) {
     return json({ job: job ? summary : null });
   } catch (error) { return json({ error: error instanceof Error ? error.message : 'Chapter progress could not be loaded.' }, 503); }
 }
+

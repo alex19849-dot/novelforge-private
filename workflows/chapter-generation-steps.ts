@@ -1,3 +1,4 @@
+import { memoryCoverage } from "../lib/narrative-memory";
 import { jobAdmin } from '../lib/social-job-db';
 import type { ChapterJobInput } from '../lib/chapter-job';
 import type { StoryWorkspace, GenerationDiagnostic, StoryChapter, StoryChatResponse } from '../app/story-chat/types';
@@ -54,13 +55,22 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
   }
   try {
     if (state.phase === 'prepare') {
-      if (input.operation === 'generate') {
+      if (input.operation === 'memory') {
+        if (!input.memoryBuildApproved) throw new Error('Memory build approval is required.');
+        const coverage = memoryCoverage(state.story.storyState, state.story.chapters);
+        if (!coverage.needsBuild) { state.phase = 'ready'; return true; }
+        state.ledgerBatches = ledgerBatches(state.story.chapters, coverage.fromChapter);
+        state.ledgerIndex = 0;
+        state.diagnostics = [];
+        state.story = { ...state.story, storyState: { ...getStoryStateBeforeChapter(state.story.storyState, coverage.fromChapter!), memoryCorrections: input.story.storyState.memoryCorrections ?? [], chapterPlans: input.story.storyState.chapterPlans ?? [], voiceProfiles: input.story.storyState.voiceProfiles ?? [] } };
+        state.phase = 'ledger';
+      } else if (input.operation === 'generate') {
         const dirty = state.story.storyState.continuityDirtyFromChapter;
         const missing = !state.story.storyState.chapterLedger?.length;
         if (state.story.chapters.length && (missing || dirty !== undefined)) {
           state.ledgerBatches = ledgerBatches(state.story.chapters, missing ? undefined : dirty);
           state.ledgerIndex = 0;
-          state.story = { ...state.story, storyState: missing ? { ...EMPTY_STORY_STATE } : getStoryStateBeforeChapter(state.story.storyState, dirty!) };
+          state.story = { ...state.story, storyState: missing ? { ...EMPTY_STORY_STATE, memoryCorrections: input.story.storyState.memoryCorrections ?? [] } : getStoryStateBeforeChapter(state.story.storyState, dirty!) };
           state.phase = 'preledger';
         } else state.phase = 'plan';
       } else {
@@ -75,15 +85,16 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       if (batch?.length) {
         const data = await readApiJson(await ledgerChapter(request({ storyBible: state.story.storyBible, storyState: state.story.storyState, chapters: batch, chapter: batch.at(-1), rebuildMode: 'batch' })));
         if (!isLedgerResponse(data)) throw new Error('The continuity worker returned an invalid ledger.');
-        state.story = { ...state.story, storyState: { ...data.storyState, chapterPlans: state.story.storyState.chapterPlans ?? [] } };
+        state.story = { ...state.story, storyState: { ...data.storyState, memoryCorrections: input.story.storyState.memoryCorrections ?? [], chapterPlans: state.story.storyState.chapterPlans ?? [] } };
         state.diagnostics.push(...data.diagnostics);
         state.ledgerIndex = index + 1;
       }
       if (!state.ledgerBatches?.[state.ledgerIndex ?? 0]) {
+        delete state.story.storyState.continuityDirtyFromChapter;
         if (state.phase === 'preledger') state.phase = 'plan';
         else {
-          state.story = { ...state.story, storyState: { ...state.story.storyState, lastGenerationDiagnostics: state.diagnostics }, messages: [...state.story.messages, { id: Date.now(), role: 'assistant', content: 'Chapter completed and continuity updated.' }], updatedAt: new Date().toISOString() };
-          state.pending = undefined;
+          state.story = { ...state.story, storyState: { ...state.story.storyState, lastGenerationDiagnostics: state.diagnostics }, messages: [...state.story.messages, { id: Date.now(), role: 'assistant', content: input.operation === 'memory' ? 'Narrative memory built from the accepted chapters. Your manuscript and Story Bible are unchanged.' : 'Chapter completed and continuity updated.' }], updatedAt: new Date().toISOString() };
+          if (input.operation !== 'memory') state.pending = undefined;
           state.phase = 'ready';
         }
       }
@@ -158,7 +169,7 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       state.story = completed;
       state.ledgerBatches = rebuild ? ledgerBatches(completed.chapters) : [[completed.chapters.find(chapter => chapter.number === number)!]];
       state.ledgerIndex = 0;
-      if (rebuild) state.story = { ...completed, storyState: { ...EMPTY_STORY_STATE, chapterPlans: before.storyState.chapterPlans ?? [], voiceProfiles: before.storyState.voiceProfiles ?? [] } };
+      if (rebuild) state.story = { ...completed, storyState: { ...EMPTY_STORY_STATE, memoryCorrections: before.storyState.memoryCorrections ?? [], chapterPlans: before.storyState.chapterPlans ?? [], voiceProfiles: before.storyState.voiceProfiles ?? [] } };
       state.phase = 'ledger';
     }
     await saveCheckpoint(id, state);
@@ -171,7 +182,8 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
     if (state.pending) state.pending = { ...state.pending, diagnostics: state.diagnostics, savedAt: new Date().toISOString() };
     state.error = error instanceof Error ? error.message : 'Chapter generation failed.';
     if (state.phase === 'quality' && state.pending) state.pending = { ...state.pending, qualityCheckedDraft: state.pending.draft, qualityOverrideReady: true, qualityTechnicalError: state.error, repetitionWarnings: [`QA could not run: ${state.error}`, 'The draft is preserved. Press Complete chapter to accept it anyway, or edit the draft and press Complete chapter to retry QA.'] };
-    state.story = { ...input.story, messages: [...state.story.messages, { id: Date.now(), role: 'assistant', content: `I couldn't complete that: ${state.error} Your saved draft is preserved.` }], storyState: { ...input.story.storyState, lastGenerationDiagnostics: state.diagnostics }, updatedAt: new Date().toISOString() };
+    const recoveryStory = input.operation === 'memory' ? state.story : input.story;
+    state.story = { ...recoveryStory, messages: [...state.story.messages, { id: Date.now(), role: 'assistant', content: `I couldn't complete that: ${state.error} Your saved draft is preserved.` }], storyState: { ...recoveryStory.storyState, lastGenerationDiagnostics: state.diagnostics }, updatedAt: new Date().toISOString() };
     state.phase = 'ready';
     await saveCheckpoint(id, state);
     return true;
@@ -205,4 +217,5 @@ export async function failChapterJob(id: string, message: string) {
   const { error: persistError } = await jobAdmin().rpc('finish_story_generation_job', { p_job_id: id });
   if (persistError) await jobAdmin().from('story_generation_jobs').update({ status: 'failed' }).eq('id', id).eq('status', 'generating');
 }
+
 

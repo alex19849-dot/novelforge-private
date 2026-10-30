@@ -24,5 +24,15 @@ const body={id:jobId,input:{operation:'generate',story},sourceFingerprint:fp(sto
  assert.equal(starts,1);assert.equal(jobs[0].user_id,owner);
  assert.equal((await api.POST(req('owner',body))).status,202);assert.equal(starts,1);
  assert.equal((await api.POST(req('owner',{...body,id:'44444444-4444-4444-8444-444444444444'}))).status,202);assert.equal(starts,1);
+ jobs=[];starts=0;
+ const memoryStory={...story,chapters:[{id:'one',number:1,title:'Test',povCharacter:'Sam',content:'Accepted prose.'}]};
+ saved.chapters=memoryStory.chapters;
+ const memoryBody={id:jobId,input:{operation:'memory',story:memoryStory},sourceFingerprint:fp(memoryStory)};
+ assert.equal((await api.POST(req('owner',memoryBody))).status,400,'Memory analysis requires a separate cost approval');
+ assert.equal(starts,0);
+ assert.equal((await api.POST(req('owner',{...memoryBody,input:{...memoryBody.input,memoryBuildApproved:true}}))).status,202);
+ assert.equal(starts,1);
+ assert.equal(jobs[0].input.operation,'memory');
  console.log('PASS: authenticated owner-only submission, stale-source rejection, durable request storage, request-ID idempotency and active-story deduplication.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+

@@ -9,6 +9,7 @@ function load(file, mocks = {}) {
   return m.exports;
 }
 const shared = load('app/story-chat/generation.ts');
+const memory = load('lib/narrative-memory.ts');
 const story = { id:'story', title:'Test', storyBible:{},storyState:{...shared.EMPTY_STORY_STATE},chapters:[],messages:[{ id:1,role:'user',content:'Write Chapter 1.' }],createdAt:'2026-10-27',updatedAt:'2026-10-27' };
 const pending = { storyId:'story',generatedChapter:{title:'Test',povCharacter:'Sam',replaceChapterNumber:null},chapterBrief:JSON.stringify({targetWordRange:{minimum:500,preferred:600,maximum:800}}),latestUserMessage:'Write chapter.',draft:'',minimumWordCount:500,maximumWordCount:800,diagnostics:[] };
 const clone = x => JSON.parse(JSON.stringify(x));
@@ -43,7 +44,11 @@ function harness(input, options={}) {
       calls.push('quality');const quality={passed:false,overallStatus:'needs_attention',hardFailures:[],repairInstructions:[],summary:'Review.',findings:[{category:'test',severity:'minor',message:'Review this.',beatOrder:null}],beatAssessments:[],guidanceAdherence:{missingBeats:[],orderViolations:[],endpointViolations:[],inventedMajorEvents:[],exclusionViolations:[]},wordCountCompliance:{actual:600,minimum:500,maximum:800,withinRange:true},scores:{continuity:5,plotMovement:5,relationshipProgression:5,voiceDistinctiveness:5,povAndTense:5,repetitionControl:5,hookStrength:5}};
       return response({accepted:false,chapterContent:'Draft.',repaired:false,quality,diagnostics:[diagnostic('quality')]});
     }},
-    '../app/api/story-chat/ledger/route':{POST:async()=>{calls.push('ledger');return response({storyState:{...shared.EMPTY_STORY_STATE},diagnostics:[diagnostic('ledger')]});}},
+    '../app/api/story-chat/ledger/route':{POST:async req=>{
+      calls.push('ledger'); const body = await req.json();
+      if (options.failLedgerAt && calls.filter(c => c === 'ledger').length === options.failLedgerAt) return new Response(JSON.stringify({error:'Extraction stopped.', diagnostics:[]}), {status:502});
+      return response({storyState:{...shared.EMPTY_STORY_STATE, chapterLedger:[...(body.storyState.chapterLedger ?? []), ...(body.chapters ?? [body.chapter]).map(c => ({ chapterNumber:c.number,title:c.title,povCharacter:c.povCharacter,summary:'Accepted chapter.',openingLocation:'Room',endingLocation:'Room',endingTime:'Friday',endingExcerpt:'Accepted ending.',relationshipShift:'',intimacyMilestone:'',newFacts:[],unresolvedThreads:[],repeatedBeats:[],narrativeMemory:memory.groundNarrativeRecords([],c) }))]},diagnostics:[diagnostic('ledger')]});
+    }},
   };
   const steps=load('workflows/chapter-generation-steps.ts',{'../lib/social-job-db':{jobAdmin:()=>db},'../app/story-chat/generation':shared,...routes});
   const workflow=load('workflows/chapter-generation.ts',{'./chapter-generation-steps':steps});
@@ -92,9 +97,32 @@ function harness(input, options={}) {
   assert.equal(JSON.parse(h.row.result.pending.chapterBrief).continuationGuidance,latestGuidance);
   assert.equal(JSON.parse(h.row.result.pending.chapterBrief).originalGuidance,'Original direction, kept verbatim.');
   assert.equal(h.row.result.pending.draft,editedDraft+'\n\nNew prose.');
+  const book = {...clone(story), chapters:Array.from({length:5},(_,i)=>({id:String(i+1),number:i+1,title:`Chapter ${i+1}`,povCharacter:'Sam',content:`Accepted source chapter ${i+1}.`})), storyState:{...shared.EMPTY_STORY_STATE,memoryCorrections:[{targetId:'author:test',replacement:'Author fact.',kind:'fact',characters:['Sam'],chapterNumber:1,suppressed:false}]}};
+  h=harness({operation:'memory',memoryBuildApproved:true,story:book,pending:{...pending,draft:'Unfinished draft, retain it.'}});
+  await h.workflow.generateChapterJob('job');
+  assert.deepEqual(h.calls,['ledger','ledger']);
+  assert.equal(h.row.status,'completed');
+  assert.deepEqual(h.row.result.story.chapters,book.chapters);
+  assert.deepEqual(h.row.result.story.storyBible,book.storyBible);
+  assert.equal(h.row.result.pending.draft,'Unfinished draft, retain it.');
+  assert.equal(h.row.result.story.storyState.memoryCorrections[0].replacement,'Author fact.');
+  assert.equal(memory.memoryCoverage(h.row.result.story.storyState,book.chapters).complete,5);
+  h=harness({operation:'memory',memoryBuildApproved:true,story:book},{failLedgerAt:2});
+  await h.workflow.generateChapterJob('job');
+  assert.equal(h.row.status,'failed');
+  assert.equal(memory.memoryCoverage(h.row.result.story.storyState,book.chapters).complete,3,'Completed memory batches survive a later failure');
+  const partial=h.row.result.story;
+  h=harness({operation:'memory',memoryBuildApproved:true,story:partial});
+  await h.workflow.generateChapterJob('job');
+  assert.deepEqual(h.calls,['ledger'],'A resumed build must not bill completed batches again');
+  assert.equal(memory.memoryCoverage(h.row.result.story.storyState,book.chapters).complete,5);
+  h=harness({operation:'memory',memoryBuildApproved:false,story:book});
+  await h.workflow.generateChapterJob('job');
+  assert.deepEqual(h.calls,[],'A build needs explicit in-app cost approval');
   const fp=load('lib/chapter-job.ts').chapterSourceFingerprint;
   assert.equal(fp(story),fp({...story,storyState:{...story.storyState,lastGenerationDiagnostics:[diagnostic('test')],workspaceMetadata:{seriesType:'standalone'}}}));
   assert.notEqual(fp(story),fp({...story,chapters:[{content:'Manual edit.'}]}));
   console.log('PASS: browser-independent plan/write/specialist chain, checkpointed progress, failed-call draft recovery, resumed handoff, accepted-draft completion, no automatic paid replay and concurrent-edit fingerprints.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+
 

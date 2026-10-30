@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { getStoryStateBeforeChapter as historicalStoryState } from "../../story-chat/generation";
+import { narrativeContext, type MemoryQuery } from "../../../lib/narrative-memory";
 import { assertChapterPlanSchema, createAionChapterPlan } from "../../../lib/aion-chapter-planner";
 
 import { NextResponse } from "next/server";
@@ -206,62 +208,12 @@ const EMPTY_STORY_STATE = {
   activePOV: "",
 };
 
-function getStoryStateBeforeChapter(
-  state: StoryWorkspace["storyState"],
-  chapterNumber: number,
-): StoryWorkspace["storyState"] {
-  const earlierLedger = (state.chapterLedger ?? []).filter(
-    (entry) => entry.chapterNumber < chapterNumber,
-  );
-  const previousEntry = earlierLedger.at(-1);
-  const unique = (values: string[]) =>
-    Array.from(new Set(values.filter(Boolean)));
-
-  return {
-    ...EMPTY_STORY_STATE,
-    importantFacts: unique(
-      earlierLedger.flatMap((entry) => entry.newFacts ?? []),
-    ),
-    relationshipStates: previousEntry?.relationshipShift
-      ? [previousEntry.relationshipShift]
-      : [],
-    unresolvedThreads: previousEntry?.unresolvedThreads ?? [],
-    timeline: earlierLedger.map(
-      (entry) => `Chapter ${entry.chapterNumber}: ${entry.summary}`,
-    ),
-    locations: unique(
-      earlierLedger.flatMap((entry) => [
-        entry.openingLocation,
-        entry.endingLocation,
-      ]),
-    ),
-    activePOV: previousEntry?.povCharacter ?? "",
-    chapterLedger: earlierLedger,
-    latestChapterEnding: previousEntry?.endingExcerpt ?? "",
-    characterKnowledge: [],
-    repetitionWarnings: unique(
-      earlierLedger.flatMap((entry) => entry.repeatedBeats ?? []),
-    ).slice(-30),
-    voiceProfiles: state.voiceProfiles ?? [],
-    lastGenerationDiagnostics: [],
-  };
+function getStoryStateBeforeChapter(state: StoryWorkspace["storyState"], chapterNumber: number): StoryWorkspace["storyState"] {
+  return historicalStoryState(state, chapterNumber);
 }
 
-function getCompactPlanningStoryState(
-  state: StoryWorkspace["storyState"],
-): StoryWorkspace["storyState"] {
-  const compactLedger = (state.chapterLedger ?? []).map((entry) => ({
-    ...entry,
-    endingExcerpt: "",
-  }));
-
-  return {
-    ...state,
-    chapterLedger: compactLedger,
-    latestChapterEnding: "",
-    chapterPlans: [],
-    lastGenerationDiagnostics: [],
-  };
+function getCompactPlanningStoryState(state: StoryWorkspace["storyState"], query: MemoryQuery = {}): StoryWorkspace["storyState"] {
+  return narrativeContext(state, query) as unknown as StoryWorkspace["storyState"];
 }
 
 const storyChatSchema = {
@@ -2522,7 +2474,12 @@ workspace.`,
           rewriteTarget.number,
         )
       : currentStory.storyState;
-    const planningChapterLedger = planningStoryState.chapterLedger ?? [];
+    const planningPromptState = getCompactPlanningStoryState(planningStoryState, {
+      pov: latestMessage.match(/\bPOV\s*:\s*([^\r\n]+)/i)?.[1] ?? rewriteTarget?.povCharacter ?? "",
+      guidance: latestMessage,
+      beforeChapter: rewriteTarget?.number,
+    });
+    const planningChapterLedger = planningPromptState.chapterLedger ?? [];
     const planningLatestLedgerEntry = planningChapterLedger.at(-1) ?? null;
     const planningLatestChapter = rewriteTarget
       ? rewritePrecedingChapter
@@ -2542,14 +2499,14 @@ workspace.`,
           ? getEndingExcerpt(planningLatestChapter.content, 500)
           : ""),
       latestRelationshipState:
-        planningStoryState.relationshipStates.at(-1) ?? "",
+        planningPromptState.relationshipStates.at(-1) ?? "",
       latestIntimacyMilestone:
         planningLatestLedgerEntry?.intimacyMilestone ?? "",
-      currentCharacterStates: planningStoryState.characterStates,
-      characterKnowledge: planningStoryState.characterKnowledge ?? [],
-      unresolvedThreads: planningStoryState.unresolvedThreads,
-      repetitionWarnings: planningStoryState.repetitionWarnings ?? [],
-      voiceProfiles: planningStoryState.voiceProfiles ?? [],
+      currentCharacterStates: planningPromptState.characterStates,
+      characterKnowledge: planningPromptState.characterKnowledge ?? [],
+      unresolvedThreads: planningPromptState.unresolvedThreads,
+      repetitionWarnings: planningPromptState.repetitionWarnings ?? [],
+      voiceProfiles: planningPromptState.voiceProfiles ?? [],
       recentChapterLedger: planningChapterLedger.slice(-4).map((entry) => ({
         ...entry,
         endingExcerpt: "",
@@ -2596,7 +2553,7 @@ workspace.`,
           povCharacter: chapter.povCharacter,
         })),
       storyBible: currentStory.storyBible,
-      storyState: getCompactPlanningStoryState(planningStoryState),
+      storyState: planningPromptState,
       continuityHandoff,
       createdAt: currentStory.createdAt,
       updatedAt: currentStory.updatedAt,
@@ -3775,6 +3732,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     );
   }
 }
+
 
 
 

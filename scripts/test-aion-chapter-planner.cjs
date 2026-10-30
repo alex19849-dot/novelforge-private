@@ -4,7 +4,7 @@ const ts = require('typescript');
 function load(file, mocks = {}, extra = '') {
   const js = ts.transpileModule(fs.readFileSync(file, 'utf8') + '\n' + extra, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', js)(id => id in mocks ? mocks[id] : require(id), module, module.exports);
+  new Function('require', 'module', 'exports', js)(id => id in mocks ? mocks[id] : id.endsWith('/narrative-memory') ? load('lib/narrative-memory.ts') : id.endsWith('/prose-writer') ? load('lib/prose-writer.ts') : id.endsWith('/generation') ? {} : require(id), module, module.exports);
   return module.exports;
 }
 process.env.OPENAI_API_KEY = 'mock';
@@ -52,3 +52,4 @@ const copy = () => JSON.parse(JSON.stringify(plan));
   }
   console.log('PASS: Aion planner request, full contract schema, ordinary/specialist routing fields, reported cost and single-call failure handling.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+

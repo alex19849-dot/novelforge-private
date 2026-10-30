@@ -1,6 +1,8 @@
+import type { ChapterNarrativeMemory, MemoryCorrection } from "../../lib/narrative-memory";
+
 import type { StoryIntent } from "../../src/lib/detect-story-intent";
 
-export type ActiveTab = "chat" | "chapters" | "bible";
+export type ActiveTab = "chat" | "chapters" | "bible" | "memory";
 export type ChatRole = "user" | "assistant";
 
 export type ChatMessage = {
@@ -56,6 +58,7 @@ export type StoryChapter = {
 };
 
 export type ChapterLedgerEntry = {
+  narrativeMemory?: ChapterNarrativeMemory;
   chapterNumber: number;
   title: string;
   povCharacter: string;
@@ -283,6 +286,7 @@ export type GenerationDiagnostic = {
 };
 
 export type StoryState = {
+  memoryCorrections?: MemoryCorrection[];
   importantFacts: string[];
   characterStates: string[];
   relationshipStates: string[];
@@ -357,5 +361,6 @@ export type StoryChatResponse = {
   /** A separately saved book seeded from the current story. */
   createdStory?: StoryWorkspace | null;
 };
+
 
 

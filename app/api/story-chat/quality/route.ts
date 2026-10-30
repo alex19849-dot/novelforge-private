@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { narrativeContext } from "../../../../lib/narrative-memory";
 
 import { NextResponse } from "next/server";
 
@@ -278,21 +279,8 @@ function readChapterContract(value: string): Partial<SectionWritingBrief> {
   }
 }
 
-function qualityStoryState(value: unknown): unknown {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  const state = { ...(value as Record<string, unknown>) };
-
-  delete state.lastGenerationDiagnostics;
-  delete state.chapterPlans;
-
-  if (Array.isArray(state.chapterLedger)) {
-    state.chapterLedger = state.chapterLedger.slice(-8);
-  }
-
-  return state;
+function qualityStoryState(value: unknown, pov = "", guidance = ""): unknown {
+  return narrativeContext(value, { pov, guidance });
 }
 
 function duplicateParagraphFailures(content: string): string[] {
@@ -457,6 +445,7 @@ export async function POST(request: Request) {
             "Check whether the endpoint occurs and whether the chapter continues materially beyond it. Distinguish missing endpoint from endpoint overrun.",
             "Check every explicit exclusion. Do not invent exclusions.",
             "Flag only consequential invented events unsupported by the contract, original guidance, Story Bible or continuity. Dialogue, gestures, thoughts, humour, environmental interaction, attraction, minor reactions, micro-conflict and connective actions are normal creative freedom.",
+            "For source-backed memory contradictions, cite the prior source chapter and the competing passage in this chapter in the finding message. Treat beliefs as beliefs, @reader information as unavailable to a POV unless learned, and missing knowledge records as unknown. Do not infer a contradiction from a missing record or an omitted mundane action. Manual memory corrections take precedence. A divergence from the Bible is a diagnostic issue, never permission to rewrite either source.",
             "Check meaningful continuity contradictions involving facts, character and relationship states, time, location, previous events, unresolved threads and especially character knowledge. Do not flag harmless wording differences.",
             "Check the specified POV character, person and tense. Distinguish real drift or head-hopping from dialogue, memories and grammatically necessary tense changes.",
             "Use available voice profiles and established information to flag only clear narration or dialogue drift, inappropriate vocabulary, or characters becoming indistinguishable. Allow emotional range.",
@@ -483,7 +472,7 @@ export async function POST(request: Request) {
             "STORY BIBLE, FIXED CANON",
             JSON.stringify(body.storyBible ?? {}, null, 2),
             "CONTINUITY BEFORE CHAPTER, INCLUDING KNOWLEDGE AND VOICE DATA",
-            JSON.stringify(qualityStoryState(body.storyState), null, 2),
+            JSON.stringify(qualityStoryState(body.storyState, povCharacter, chapterBrief + "\n" + chapterContent.slice(0, 9000)), null, 2),
             "COMPLETE CHAPTER CONTRACT, AUTHOR AUTHORITY",
             JSON.stringify(contract, null, 2),
             "LATEST AUTHOR CONTINUATION GUIDANCE",
@@ -658,5 +647,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
