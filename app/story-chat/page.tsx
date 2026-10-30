@@ -1,5 +1,7 @@
 "use client";
 
+import { isStoryBibleRequest } from "../../lib/story-bible-request";
+
 
 import { PendingChapterGeneration, QualityResponse, SectionAction, WriterResponse, getStoryStateBeforeChapter, applyGeneratedChapter, getContractWordRange, isWriterResponse, isStringArray, isDiagnosticArray, isGenerationDiagnostic, isQualityResponse, isLedgerResponse, LedgerResponse, isStoryState, isChapterPlan, readApiJson, ApiRequestError, qualityReviewWarnings, EMPTY_STORY_STATE } from "./generation";
 
@@ -1820,7 +1822,8 @@ device.`,
     const trimmedMessage = input.trim();
     const deletionRequest = getChapterDeletionRequest(trimmedMessage);
     const hasPendingChapter = pendingGeneration?.storyId === story?.id;
-    const isAionRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage);
+    const bibleRequest = isStoryBibleRequest(trimmedMessage);
+    const isAionRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage) && !bibleRequest;
 
     if (!story || !trimmedMessage || isThinking) {
       return;
@@ -2031,16 +2034,16 @@ device.`,
         return;
       }
 
-      if (!hasPendingChapter && requestsChapterGeneration(trimmedMessage)) {
+      if (!bibleRequest && !hasPendingChapter && requestsChapterGeneration(trimmedMessage)) {
         await queueChapterBackground({ operation: "generate", story: requestStory });
         return;
       }
 
-      const requestsChapterPlanning =
+      const requestsChapterPlanning = !bibleRequest && (
         requestsChapterGeneration(trimmedMessage) ||
         /\b(?:plan|outline|map)\b[\s\S]{0,100}\bchapter\b/i.test(
           trimmedMessage,
-        );
+        ));
       const dirtyFromChapter =
         planningStory.storyState.continuityDirtyFromChapter;
       const hasContinuityLedger = Boolean(

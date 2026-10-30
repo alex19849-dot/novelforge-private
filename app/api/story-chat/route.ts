@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import { isStoryBibleRequest, parseStoryBibleImport, requestsNewBibleWorkspace, bibleOutputAllowance } from "../../../lib/story-bible-request";
+import { createAionBibleEdit } from "../../../lib/aion-story-bible";
 import { getStoryStateBeforeChapter as historicalStoryState } from "../../story-chat/generation";
 import { narrativeContext, type MemoryQuery } from "../../../lib/narrative-memory";
 import { assertChapterPlanSchema, createAionChapterPlan } from "../../../lib/aion-chapter-planner";
@@ -2256,11 +2258,33 @@ export async function POST(request: Request) {
       }));
 
     const latestMessage = conversation[conversation.length - 1]?.content ?? "";
+    const bibleRequest = isStoryBibleRequest(latestMessage);
+    const aionBibleRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(latestMessage) && bibleRequest;
+    const newBibleWorkspace = bibleRequest && requestsNewBibleWorkspace(latestMessage);
+    const importedBible = parseStoryBibleImport(latestMessage);
+    const hasExistingStory = currentStory.chapters.length > 0 || Object.values(currentStory.storyBible).some(value => Array.isArray(value) ? value.length > 0 : Boolean(value));
+    const bibleBase: StoryWorkspace = newBibleWorkspace ? {
+      ...currentStory, title: "Untitled story", seriesType: "standalone", seriesTitle: "", bookNumber: 1, lineage: undefined,
+      chapters: [], storyBible: sanitiseStoryBible({}), storyState: { ...EMPTY_STORY_STATE, chapterPlans: [] },
+    } : currentStory;
+    const bibleResult = (updated: StoryWorkspace, reply: string, patch?: StoryBiblePatch) => {
+      const createsSeparateStory = newBibleWorkspace && hasExistingStory;
+      const saved = createsSeparateStory ? { ...updated, id: crypto.randomUUID(), messages: [{ id: Date.now(), role: "assistant" as const, content: reply }], createdAt: new Date().toISOString() } : updated;
+      return NextResponse.json({ reply, intent: newBibleWorkspace ? "create_story" : "update_story",
+        story: createsSeparateStory ? currentStory : saved,
+        ...(createsSeparateStory ? { createdStory: saved } : {}),
+        generatedChapter: null, chapterBrief: "", ...(patch ? { storyBiblePatch: patch } : {}), diagnostics: planningDiagnostics });
+    };
+    if (importedBible) {
+      const reply = `Saved ${importedBible.title} and its complete Story Bible. No chapter was generated.`;
+      return bibleResult({ ...bibleBase, title: importedBible.title, storyBible: importedBible.storyBible,
+        messages: [...currentStory.messages, { id: Date.now(), role: "assistant", content: reply }], updatedAt: new Date().toISOString() }, reply);
+    }
     const explicitTitleChange = getExplicitTitleChange(latestMessage);
     const derivedBookRequested = requestsDerivedBook(latestMessage);
 
     const detectedIntent = detectStoryIntent(latestMessage);
-    const startsNewStory = detectedIntent === "create_story";
+    const startsNewStory = newBibleWorkspace || detectedIntent === "create_story";
     const epilogueRequested =
       !startsNewStory && requestsEpilogue(latestMessage);
     let intent = detectedIntent;
@@ -2309,7 +2333,7 @@ export async function POST(request: Request) {
       intent = "update_story";
     }
 
-    const chapterRequestText = removeNegatedChapterProseRequests(latestMessage);
+    const chapterRequestText = bibleRequest ? "" : removeNegatedChapterProseRequests(latestMessage);
     const explicitlyRequestsChapterProse =
       /\b(?:write|generate|continue|create)\b[\s\S]{0,100}\bchapter(?:\s+\d+|\s+(?:one|two|three|four|five|six|seven|eight|nine|ten))?\b/i.test(
         chapterRequestText,
@@ -2334,6 +2358,8 @@ export async function POST(request: Request) {
     if (startsNewStory) {
       intent = "create_story";
     }
+
+    if (bibleRequest && !startsNewStory) intent = "update_story";
 
     if (!startsNewStory && chatOnly && intent !== "update_story") {
       intent = "general_chat";
@@ -2404,7 +2430,7 @@ workspace.`,
     };
 
     const isWriterMode =
-      !startsNewStory &&
+      !bibleRequest && !startsNewStory &&
       (intent === "continue_story" ||
         intent === "rewrite_chapter" ||
         explicitlyRequestsChapterProse ||
@@ -2691,10 +2717,10 @@ an adult aged eighteen or older. Keep the reply brief.`,
       });
     }
 
-    if (intent === "update_story" && !isWriterMode) {
+    if ((intent === "update_story" || (aionBibleRequest && intent === "create_story")) && !isWriterMode) {
       const startedAt = Date.now();
       planningAttempt += 1;
-      const bibleResponse = await openai.responses.create({
+      const bibleInput = {
         model: "gpt-5.6-terra",
         reasoning: { effort: "low" },
         input: [
@@ -2735,19 +2761,19 @@ response.
             content: `
 CURRENT TITLE
 
-${currentStory.title}
+${bibleBase.title}
 
 CURRENT STORY BIBLE
 
-${JSON.stringify(currentStory.storyBible, null, 2)}
+${JSON.stringify(bibleBase.storyBible, null, 2)}
 
 RECENT CONVERSATION
 
-${JSON.stringify(conversation.slice(-12), null, 2)}
+${JSON.stringify(newBibleWorkspace ? conversation.slice(-1) : conversation.slice(-12), null, 2)}
 
 UNFINISHED DRAFT CONTEXT, READ ONLY
 
-${chatOnly && draftContext ? draftContext.slice(-6000) : "No active draft context supplied."}
+${!newBibleWorkspace && chatOnly && draftContext ? draftContext.slice(-6000) : "No active draft context supplied."}
 
 LATEST USER INSTRUCTION
 
@@ -2764,47 +2790,53 @@ ${latestMessage}
             schema: storyBibleEditSchema,
           },
         },
-        max_output_tokens: 3000,
-      });
-      const usage = bibleResponse.usage;
-      const inputTokens = usage?.input_tokens ?? 0;
-      const outputTokens = usage?.output_tokens ?? 0;
-      const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
-      const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
+        max_output_tokens: bibleOutputAllowance(latestMessage),
+      } as const;
+      let output: StoryBibleEditOutput;
+      if (aionBibleRequest) {
+        output = await createAionBibleEdit({ messages: [...bibleInput.input], schema: storyBibleEditSchema, diagnostics: planningDiagnostics, instruction: latestMessage }) as StoryBibleEditOutput;
+      } else {
+        const bibleResponse = await openai.responses.create({ ...bibleInput, input: [...bibleInput.input] });
+        const usage = bibleResponse.usage;
+        const inputTokens = usage?.input_tokens ?? 0;
+        const outputTokens = usage?.output_tokens ?? 0;
+        const cachedTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
+        const uncachedTokens = Math.max(0, inputTokens - cachedTokens);
 
-      planningDiagnostics.push({
-        stage: "story_bible_update",
-        provider: "openai",
-        model: "gpt-5.6-terra",
-        status: "succeeded",
-        inputTokens,
-        outputTokens,
-        totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
-        costUsd:
-          (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
-          1_000_000,
-        costType: "estimated",
-        durationMs: Date.now() - startedAt,
-        attempt: planningAttempt,
-      });
+        planningDiagnostics.push({
+          stage: "story_bible_update",
+          provider: "openai",
+          model: "gpt-5.6-terra",
+          status: "succeeded",
+          inputTokens,
+          outputTokens,
+          totalTokens: usage?.total_tokens ?? inputTokens + outputTokens,
+          costUsd:
+            (uncachedTokens * 1.25 + cachedTokens * 0.125 + outputTokens * 7.5) /
+            1_000_000,
+          costType: "estimated",
+          durationMs: Date.now() - startedAt,
+          attempt: planningAttempt,
+        });
 
-      if (bibleResponse.status === "incomplete") {
-        throw new Error(
-          `The Story Bible update was incomplete because ${
-            bibleResponse.incomplete_details?.reason ??
-            "the response was truncated"
-          }.`,
-        );
+        if (bibleResponse.status === "incomplete") {
+          throw new Error(
+            `The Story Bible update was incomplete because ${
+              bibleResponse.incomplete_details?.reason ??
+              "the response was truncated"
+            }.`,
+          );
+        }
+
+        const outputText = bibleResponse.output_text?.trim();
+        if (!outputText) {
+          throw new Error("The Story Bible editor returned no update.");
+        }
+
+        output = JSON.parse(outputText) as StoryBibleEditOutput;
       }
-
-      const outputText = bibleResponse.output_text?.trim();
-      if (!outputText) {
-        throw new Error("The Story Bible editor returned no update.");
-      }
-
-      const output = JSON.parse(outputText) as StoryBibleEditOutput;
       const applied = applyStoryBiblePatch(
-        sanitiseStoryBible(currentStory.storyBible),
+        sanitiseStoryBible(bibleBase.storyBible),
         output.patch,
       );
       const reply = cleanString(output.reply);
@@ -2813,10 +2845,10 @@ ${latestMessage}
       }
 
       const updatedStory: StoryWorkspace = {
-        ...currentStory,
+        ...bibleBase,
         title:
           cleanString(output.storyTitle) ||
-          cleanString(currentStory.title) ||
+          cleanString(bibleBase.title) ||
           "Untitled story",
         storyBible: applied.storyBible,
         messages: [
@@ -2826,15 +2858,7 @@ ${latestMessage}
         updatedAt: new Date().toISOString(),
       };
 
-      return NextResponse.json({
-        reply,
-        intent: "update_story",
-        story: updatedStory,
-        generatedChapter: null,
-        chapterBrief: "",
-        storyBiblePatch: applied.patch,
-        diagnostics: planningDiagnostics,
-      });
+      return bibleResult(updatedStory, reply, applied.patch);
     }
 
     if (isChapterPlanConversation && !isWriterMode) {
