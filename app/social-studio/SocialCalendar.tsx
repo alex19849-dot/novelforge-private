@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import PublishingPanel from './PublishingPanel';
+import StrategyPanel from './StrategyPanel';
+import {editedMetadata} from '../../lib/social-strategy';
 import { musicForPath } from '../../lib/social-music';
 import { readyForApproval } from '../../lib/social-approval';
 import { addDays, calendarDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
@@ -16,7 +18,7 @@ type Editor = {
   platform: SocialPlatform; postType: string; title: string; caption: string; hashtags: string;
   date: string; time: string; source?: string; mediaType: 'image' | 'video' | null; mimeType?: string;
   file?: File; mediaBlob?: Blob; removeMedia: boolean;
-  creativeBrief: string; plannedMediaType: 'image' | 'video' | '';
+  includesCover:boolean; creativeBrief: string; plannedMediaType: 'image' | 'video' | '';
 };
 const inputClass = 'mt-1 w-full rounded-xl border border-white/15 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-pink-500';
 const buttonClass = 'rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40';
@@ -78,7 +80,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const reviewPosts = [...reviewGroups.values()].map(group => group.find(post => post.quality_notes?.trim()) ?? group[0]);
   const selectedPosts = postsByDate.get(selected) ?? [];
   const drafts = useMemo(() => visiblePosts.filter(post => !post.scheduled_at), [visiblePosts]);
-  const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
+  const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.book_slug}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
 
   async function load(silent = false) {
     if (loadingRef.current) return;
@@ -139,7 +141,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       platform: initial?.platform ?? 'facebook', postType: initial?.media_type === 'video' ? 'video' : 'premise_hook',
       title: initial?.title ?? '', caption: initial?.caption ?? '', hashtags: initial?.hashtags.join(' ') ?? '', date, time: '19:00',
       source: initial?.mediaSource, mediaBlob: initial?.mediaBlob, mediaType: initial?.media_type ?? null, mimeType: initial?.mimeType, removeMedia: false,
-      creativeBrief: '', plannedMediaType: initial?.media_type ?? '',
+      includesCover:false, creativeBrief: '', plannedMediaType: initial?.media_type ?? '',
     };
   }
   useEffect(() => {
@@ -157,7 +159,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       platform: post.platform, postType: post.post_type, title: post.title, caption: post.caption, hashtags: post.hashtags.join(' '),
       date: post.scheduled_at ? londonDate(post.scheduled_at) : '', time: post.scheduled_at ? londonTime(post.scheduled_at) : '19:00',
       mediaType: post.media_type, removeMedia: false,
-      creativeBrief: post.creative_brief ?? '', plannedMediaType: post.planned_media_type ?? '',
+      includesCover:post.content_metadata?.includes_cover===true, creativeBrief: post.creative_brief ?? '', plannedMediaType: post.planned_media_type ?? '',
     });
     setError(''); setNotice(''); setConfirmDelete(false);
   }
@@ -197,6 +199,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         title: editor.title.trim(), caption: editor.caption.trim(), hashtags, media_path: mediaPath, media_type: mediaType,
         scheduled_at: scheduledAt, status: approve ? 'approved' : 'draft',
         creative_brief: editor.creativeBrief.trim(), planned_media_type: editor.plannedMediaType || null,
+        content_metadata:editor.existing?{...editedMetadata(editor.existing,{post_type:editor.postType,caption:editor.caption.trim(),title:editor.title.trim(),creative_brief:editor.creativeBrief.trim(),book_slug:editor.bookSlug}),includes_cover:editor.includesCover,...(editor.file||editor.mediaBlob||editor.source||editor.removeMedia?{visual_type:undefined,hook_type:undefined}:{})}:{},
       };
       databaseAttempted = true;
       const result = editor.existing
@@ -298,6 +301,9 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     } catch(failure) { setError(failure instanceof Error ? failure.message : 'The job could not be paused.'); }
   }
 
+  async function blockTopic(topic:string){
+    try{const {data}=await supabase.auth.getSession();if(!data.session)throw Error('Sign in first.');const response=await fetch('/api/social-studio/strategy',{method:'POST',headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'block',topic})});const result=await response.json();if(!response.ok)throw Error(result.error);setNotice('This topic is excluded from future generation.');window.dispatchEvent(new Event('social-strategy-updated'));}catch(error){setError(error instanceof Error?error.message:'The topic could not be blocked.');}
+  }
   function card(post: CalendarPost) {
     const url = post.media_path ? supabase.storage.from('social-media').getPublicUrl(post.media_path).data.publicUrl : null;
     const related = reviewOnly ? (reviewGroups.get(post.media_path || post.id) ?? [post]) : [post];
@@ -320,6 +326,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       </details>)}
       {post.creative_brief && <details className="mt-3 text-sm text-neutral-400"><summary className="cursor-pointer">AI creative brief</summary><p className="mt-2 whitespace-pre-wrap">{post.creative_brief}</p></details>}
       {post.status === 'draft' && post.planned_media_type && !post.media_path && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={() => void generateMedia(post)} className={`${buttonClass} mt-3 mr-3 bg-violet-600`}>AI: create {post.planned_media_type === 'video' ? 'video' : 'artwork'}</button>}
+      {typeof post.content_metadata?.topic==='string'&&<button type="button" onClick={()=>void blockTopic(post.content_metadata!.topic as string)} className={`${buttonClass} mt-3 mr-2`}>Don’t reuse this topic</button>}
       {editable(post) && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={() => edit(post)} className={`${buttonClass} mt-3`}>Edit / reschedule</button>}
     </article>;
   }
@@ -330,6 +337,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       <div className="flex gap-2"><button type="button" disabled={Boolean(editor) || saving || loading || planning || mediaBusy} onClick={() => { setEditor(fresh()); setConfirmDelete(false); setNotice(''); }} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400 disabled:opacity-40">Manual draft</button><button type="button" disabled={loading || saving || Boolean(editor) || planning || mediaBusy} onClick={() => void load()} className={buttonClass}>Refresh</button></div>
     </div>
     <PublishingPanel posts={posts} onEnabledChange={setPublishingEnabled} onReload={()=>void load(true)} />
+    <StrategyPanel books={books}/>
     <p className="mt-3 text-xs text-neutral-400">Posting times reviewed 27 October: Facebook and TikTok use the strongest available Metricool timing scores for each weekday. Instagram stays at 7 pm while useful audience data builds. These are starting points, not guaranteed results. You can edit individual times.</p>
     <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-500/5 p-4">
       <h3 className="font-bold">TikTok backing music</h3>
@@ -408,6 +416,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         <label className="text-sm sm:col-span-2">Hashtags<input value={editor.hashtags} onChange={event => field('hashtags', event.target.value)} className={inputClass} /></label>
         <label className="text-sm">AI media format<select value={editor.plannedMediaType} onChange={event => field('plannedMediaType', event.target.value as Editor['plannedMediaType'])} className={inputClass}><option value="">Text only</option><option value="image">Image</option><option value="video">Animated video</option></select></label>
         <label className="text-sm sm:col-span-2">AI creative brief<textarea rows={4} maxLength={5000} value={editor.creativeBrief} onChange={event => field('creativeBrief', event.target.value)} className={inputClass} /></label>
+        <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={editor.includesCover} onChange={event=>field('includesCover',event.target.checked)}/>This artwork includes a book cover</label>
         <label className="text-sm sm:col-span-2">Image or MP4 video<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4" onChange={event => { const file = event.target.files?.[0]; if (file) setEditor(current => current ? { ...current, file, mediaBlob: undefined, source: undefined, removeMedia: false, mediaType: file.type.startsWith('video/') ? 'video' : 'image' } : null); }} className={inputClass} /></label>
         <div className="text-sm text-neutral-400 sm:col-span-2">{editor.file ? editor.file.name : editor.source ? 'Generated media will be saved with this draft.' : editor.existing?.media_path && !editor.removeMedia ? 'Existing media is attached.' : 'No media attached.'}{(editor.source || editor.file || editor.existing?.media_path) && !editor.removeMedia && <button type="button" className="ml-3 underline" onClick={() => setEditor(current => current ? { ...current, file: undefined, mediaBlob: undefined, source: undefined, mediaType: null, removeMedia: true } : null)}>Remove attachment</button>}</div>
       </fieldset>

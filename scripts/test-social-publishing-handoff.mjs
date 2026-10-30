@@ -6,7 +6,7 @@ const source=await readFile(new URL('../workflows/social-publishing.ts',import.m
 const executable=stripTypeScriptTypes(source.replace(/^import .*;\n/gm,'').replace('export async function','async function'));
 async function scenario(generation,{rejectStarts=0,registered=true,advanced=true}={}) {
  const calls={ticks:0,starts:[],sleeps:[],reports:0,advance:0};
- const context=vm.createContext({registerPublisher:async()=>registered,publishingTick:async()=>{calls.ticks++;return{stop:false,delay:300};},advancePublisher:async()=>{calls.advance++;return advanced?generation+1:null;},reportPublisherHandoffFailure:async()=>{calls.reports++;},sleep:async delay=>calls.sleeps.push(delay),start:async(...args)=>{calls.starts.push(args);if(calls.starts.length<=rejectStarts)throw Error('Transient start failure');}});
+ const context=vm.createContext({queueAnalyticsRefresh:async()=>{},registerPublisher:async()=>registered,publishingTick:async()=>{calls.ticks++;return{stop:false,delay:300};},advancePublisher:async()=>{calls.advance++;return advanced?generation+1:null;},reportPublisherHandoffFailure:async()=>{calls.reports++;},sleep:async delay=>calls.sleeps.push(delay),start:async(...args)=>{calls.starts.push(args);if(calls.starts.length<=rejectStarts)throw Error('Transient start failure');}});
  vm.runInContext(executable,context);await context.publishSocialCalendar('owner','lease',generation);return calls;
 }
 let calls=await scenario(0,{rejectStarts:4});

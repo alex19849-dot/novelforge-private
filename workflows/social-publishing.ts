@@ -1,4 +1,5 @@
 import { sleep } from 'workflow';
+import {queueAnalyticsRefresh} from './social-analytics-steps';
 import { start } from 'workflow/api';
 import { registerPublisher, publishingTick, advancePublisher, reportPublisherHandoffFailure } from './social-publishing-steps';
 export async function publishSocialCalendar(owner:string,lease:string,generation=0) {
@@ -15,6 +16,7 @@ export async function publishSocialCalendar(owner:string,lease:string,generation
     try {next=await publishingTick(owner,lease,generation);}
     catch {await sleep('5m');continue;}
     if(next.stop) return;
+    try{if(iteration%12===0)await queueAnalyticsRefresh(owner);}catch{/* Analytics cannot stop publishing. */}
     await sleep(`${generation===0?Math.min(next.delay,5):next.delay}s`);
   }
   let next;

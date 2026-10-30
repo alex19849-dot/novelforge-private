@@ -25,12 +25,14 @@ export function validateAiDays(value: unknown, platforms: SocialPlatform[], indi
   }
   return days.sort((a,b) => a.dayIndex - b.dayIndex);
 }
-export function plannedTime(start: string, index: number, platform: SocialPlatform) {
+export function plannedTime(start: string, index: number, platform: SocialPlatform,preferredHours:number[]=[]) {
   const date=addDays(start,index);
-  const candidates=postingHours(date,platform).map(hour=>londonSchedule(date,`${String(hour).padStart(2,'0')}:00`));
+  const candidates=[...new Set([...preferredHours,...postingHours(date,platform)])].map(hour=>londonSchedule(date,`${String(hour).padStart(2,'0')}:00`));
   return candidates.find(time=>Date.parse(time)>Date.now()+30*60_000) ?? candidates[0];
 }
 export function plannedFormat(type: string, platform: SocialPlatform): 'image' | 'video' | null {
   if (!POST_TYPES.includes(type as typeof POST_TYPES[number])) throw new Error('Invalid post type.');
   return type === 'video' || platform === 'tiktok' ? 'video' : platform === 'facebook' && ['reader_question','reader_engagement'].includes(type) ? null : 'image';
 }
+
+export function generalReaderBook():PlanBook {return {slug:'',title:'',blurb:'General MM romance-reader entertainment. No book or character claims.',tropes:[],subgenre:'MM romance',kindleUnlimited:false,amazonUrl:'',coverUrl:''};}

@@ -285,7 +285,7 @@ export function posterPrompt(
     "The author may request any combination of people, environments, rooms, landscapes, objects, props, devices, typography, icons, illustration, photography, collage, paint, texture, lighting or abstract graphics. Create what the guidance requests and make cohesive supporting decisions from its theme.",
     "Do not impose a gothic, sports, office, floral, dark, Kindle, trope-list or any other default style. Do not add a permanent footer, fixed icon row, standard heading position or repeated composition.",
     "Do not introduce irrelevant imagery. Every visible element must support the author's brief, the supplied cover or the verified book facts.",
-    "COVER FIDELITY",
+    book.coverUrl?"COVER FIDELITY":"GENERAL READER CONTENT: no book cover, device, book title, sales footer or invented character/book attribution. The short social line is original, not a book extract.",
     ["book_promotion", "new_release"].includes(contentType)
       ? "The supplied image is the genuine book cover. Use that exact cover as the hero. Preserve its artwork, title, author name, spelling, colours and proportions. Never redesign, rewrite, crop away or replace its contents."
       : "The supplied genuine cover is a factual reference, not a mandatory layout element. Create the requested hook, humour, question or character-conflict artwork. Include the exact cover only when the creative brief asks for it. Do not force a book advert, device or sales footer onto reader-engagement artwork. If the cover is used, preserve it exactly.",
@@ -419,7 +419,7 @@ export async function inspectPoster(
                 kindleUnlimited: book.kindleUnlimited,
                 amazonUrl: book.amazonUrl,
               })}`,
-              "The first image is the finished poster. The second image is the genuine cover reference.",
+              book.coverUrl?"The first image is the finished poster. The second image is the genuine cover reference.":"This is general reader entertainment. There is no book or cover. Judge the supplied brief, legibility and originality; do not request a cover, book attribution, website or sales CTA.",
               "Check prompt adherence, wording legibility and cover fidelity. Use scores from 0 to 100.",
               !["book_promotion", "new_release"].includes(contentType)
                 ? "This is hook or reader-engagement artwork. A cover is optional unless the guidance requires it. When no cover is required or shown, score coverFidelity as 100 (not applicable) and do not mark review merely because there is no cover."
@@ -439,7 +439,7 @@ export async function inspectPoster(
             ].join(" "),
           },
           { type: "input_image", image_url: imageDataUrl, detail: "high" },
-          { type: "input_image", image_url: book.coverUrl, detail: "high" },
+          ...(book.coverUrl?[{ type: "input_image" as const, image_url: book.coverUrl, detail: "high" as const }]:[]),
         ],
       }],
       max_output_tokens: 1200,
@@ -518,7 +518,7 @@ async function generatePoster(
       role: "user",
       content: [
         { type: "input_text", text: posterPrompt(book, platform, outputType, guidance, revision, contentType) },
-        { type: "input_image", image_url: book.coverUrl, detail: "high" },
+        ...(book.coverUrl?[{ type: "input_image" as const, image_url: book.coverUrl, detail: "high" as const }]:[]),
       ],
     }],
     tools: [{

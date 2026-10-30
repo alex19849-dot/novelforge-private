@@ -5,7 +5,9 @@ import { start } from 'workflow/api';
 import { generateSocialJob } from '../workflows/social-generation';
 import { addDays, londonDate, londonSchedule, SOCIAL_PLATFORMS } from './social-calendar';
 import type { CalendarPost, SocialPlatform } from './social-calendar';
-import { CONTENT_MIX, plannedTime } from './social-planner';
+import { plannedTime } from './social-planner';
+import {cleanStrategy,createStrategyAssignments} from './social-strategy';
+import type {LearningReport} from './social-strategy';
 import { musicForPath } from './social-music';
 import { isImageModerationFailure } from './social-image-result';
 import type { PlanBook } from './social-planner';
@@ -60,8 +62,18 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
         plannedTime(date,29,platforms[0]);
         const books=allBooks.filter(b=>!slugs.length||slugs.includes(b.slug));
         if(!books.length) return jobJson({error:'No matching published books were found.'},400);
-        config={platforms,books,guidance:typeof body.guidance==='string'?body.guidance.slice(0,3000):''};
-        for(let i=0;i<30;i+=5) tasks.push({ordinal:i/5,request:{assignments:CONTENT_MIX.slice(i,i+5).map((postType,j)=>({dayIndex:i+j,date:addDays(date,i+j),postType,book:books[(i+j)%books.length].slug}))}});
+        const [preferences,learning,recentRows]=await Promise.all([
+          admin.from('social_strategy_settings').select('settings').eq('user_id',user.id).maybeSingle(),
+          admin.from('social_learning_state').select('report').eq('user_id',user.id).maybeSingle(),
+          admin.from('social_posts').select('platform,book_slug,title,caption,content_metadata').eq('user_id',user.id).neq('status','cancelled').order('created_at',{ascending:false}).limit(120),
+        ]);
+        if(preferences.error||learning.error||recentRows.error)throw new Error('Your saved strategy could not be loaded.');
+        const settings=cleanStrategy(preferences.data?.settings);
+        const report=learning.data?.report?.version===1&&Date.parse(learning.data.report.updated_at)>Date.now()-7*86400000?learning.data.report as LearningReport:null;
+        const recent=recentRows.data??[];
+        const assignments=createStrategyAssignments(date,platforms,books,settings,report,recent as CalendarPost[]);
+        config={platforms,books,guidance:typeof body.guidance==='string'?body.guidance.slice(0,3000):'',strategy:{settings,report,recent:recent.map(p=>({platform:p.platform,caption:p.caption.slice(0,240)}))}};
+        for(let i=0;i<30;i+=5)tasks.push({ordinal:i/5,request:{assignments:assignments.slice(i,i+5)}});
       } else {
         const {data:rows,error}=await admin.from('social_posts').select('*').eq('user_id',user.id).eq('status','draft').is('media_path',null).not('planned_media_type','is',null).gte('scheduled_at',londonSchedule(date,'00:00')).lt('scheduled_at',londonSchedule(addDays(date,30),'00:00')).order('scheduled_at');
         if(error) throw new Error('Your saved posts could not be loaded.');
@@ -69,8 +81,8 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
         const groups=new Map<string,CalendarPost[]>();
         for(const post of selected){
           if(!post.creative_brief?.trim()) return jobJson({error:'Add an AI creative brief to each selected draft first.'},400);
-          if(!allBooks.some(b=>b.slug===post.book_slug&&b.coverUrl)) return jobJson({error:`The genuine cover for ${post.book_title} could not be found.`},400);
-          const key=`${post.campaign_id}:${post.platform==='tiktok'?'portrait':'feed'}:${post.planned_media_type}:${post.creative_brief}`;
+          if(post.book_slug&&!allBooks.some(b=>b.slug===post.book_slug&&b.coverUrl)) return jobJson({error:`The genuine cover for ${post.book_title} could not be found.`},400);
+          const key=`${post.campaign_id}:${post.book_slug}:${post.platform==='tiktok'?'portrait':'feed'}:${post.planned_media_type}:${post.creative_brief}`;
           groups.set(key,[...(groups.get(key)??[]),post]);
         }
         config={books:allBooks};
@@ -78,7 +90,7 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
         if(failureError) throw new Error('Previous artwork failures could not be checked.');
         tasks=[...groups.values()].map((group,ordinal)=>{
           const first=group[0];
-          const keepOriginal=previousFailures.some(task=>{
+          const keepOriginal=Boolean(first.book_slug)&&previousFailures.some(task=>{
             const previous=task.request?.posts?.[0];
             return previous?.campaign_id===first.campaign_id&&previous.creative_brief===first.creative_brief&&(previous.platform==='tiktok')===(first.platform==='tiktok')&&isImageModerationFailure(task.result?.provider_diagnostic??{});
           });

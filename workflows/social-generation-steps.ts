@@ -14,8 +14,12 @@ import { renderSocialMedia } from '../lib/social-render';
 import { completedImage, imageDiagnostic, noImageMessage } from '../lib/social-image-result';
 import { compositeOriginalCover, originalCoverBackgroundPrompt, originalCoverBytes } from '../lib/social-cover-artwork';
 
-type Assignment={dayIndex:number;date:string;postType:string;book:string};
-type Job={id:string;user_id:string;status:string;job_type:'plan'|'media';start_date:string;cancel_requested:boolean;config:{books:PlanBook[];platforms:SocialPlatform[];guidance:string}};
+import type {StrategyAssignment,StrategySettings,LearningReport} from '../lib/social-strategy';
+import {learnedPostingHours} from '../lib/social-strategy';
+import {validateStrategyCopy} from '../lib/social-strategy-validation';
+import {generalReaderBook} from '../lib/social-planner';
+type Assignment=StrategyAssignment;
+type Job={id:string;user_id:string;status:string;job_type:'plan'|'media';start_date:string;cancel_requested:boolean;config:{books:PlanBook[];platforms:SocialPlatform[];guidance:string;strategy?:{settings:StrategySettings;recent:{platform:string;caption:string}[];report:LearningReport|null}}};
 type Task={id:string;run_id:string;user_id:string;status:string;response_id:string|null;request:{assignments?:Assignment[];posts?:CalendarPost[];asset_mode?:'original_cover_overlay';music?:boolean};result:Record<string,unknown>};
 const ai=()=>new OpenAI({apiKey:process.env.OPENAI_API_KEY,timeout:30000,maxRetries:0});
 async function context(runId:string,taskId?:string) {
@@ -64,13 +68,15 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
     const {data:existing,error}=await db.from('social_posts').select('scheduled_at,platform').eq('user_id',job.user_id).gte('scheduled_at',londonSchedule(assignments[0].date,'00:00')).lt('scheduled_at',londonSchedule(addDays(assignments.at(-1)!.date,1),'00:00')).neq('status','cancelled');
     if(error) throw new FatalError('The calendar could not be checked. No new AI request was started.');
     const occupied=new Set(existing.map(p=>`${londonDate(p.scheduled_at)}:${p.platform}`));
-    const open=assignments.filter(day=>job.config.platforms.some(platform=>!occupied.has(`${day.date}:${platform}`)&&Date.parse(plannedTime(job.start_date,day.dayIndex,platform))>Date.now()));
+    const open=assignments.filter(day=>job.config.platforms.some(platform=>!occupied.has(`${day.date}:${platform}`)&&Date.parse(plannedTime(job.start_date,day.dayIndex,platform,learnedPostingHours(job.config.strategy?.report,platform,job.config.strategy?.settings.adaptive)))>Date.now()));
     if(!open.length) {
       const {error:skipError}=await db.from('social_generation_tasks').update({status:'skipped'}).eq('id',taskId).eq('user_id',job.user_id);
       if(skipError) throw new FatalError('The completed date range could not be recorded.');
       await recordProgress(job); return null;
     }
-    request=planRequest(job.config.platforms,open,job.config.books,job.config.guidance);
+    let strategy=job.config.strategy;
+    if(strategy){const {data,error}=await db.from('social_posts').select('platform,caption').eq('user_id',job.user_id).neq('status','cancelled').order('created_at',{ascending:false}).limit(120);if(error)throw new Error('Recent content could not be checked.');strategy={...strategy,recent:data.map(p=>({platform:p.platform,caption:p.caption.slice(0,240)}))};}
+    request=planRequest(job.config.platforms,open,job.config.books,job.config.guidance,strategy);
     const {error:saveError}=await db.from('social_generation_tasks').update({request:{assignments:open}}).eq('id',taskId).eq('user_id',job.user_id);
     if(saveError) throw new FatalError('The batch could not be saved before generation.');
   } else {
@@ -78,11 +84,11 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
     // Reuse a completed feed/portrait asset when another platform still needs it.
     const {data:existing,error}=await db.from('social_posts').select('*').eq('user_id',job.user_id).eq('campaign_id',first.campaign_id).not('media_path','is',null);
     if(error) throw new FatalError('Existing artwork could not be checked.');
-    const match=(existing as CalendarPost[]).find(p=>p.media_type===(first.platform==='tiktok'?'video':first.planned_media_type)&&p.creative_brief===first.creative_brief&&(p.platform==='tiktok')===(first.platform==='tiktok'));
+    const match=(existing as CalendarPost[]).find(p=>p.book_slug===first.book_slug&&p.media_type===(first.platform==='tiktok'?'video':first.planned_media_type)&&p.creative_brief===first.creative_brief&&(p.platform==='tiktok')===(first.platform==='tiktok'));
     if(match) { await attachMedia(job,task,match.media_path!,match.quality_notes??'',match.media_type!); return null; }
-    const book=job.config.books.find(b=>b.slug===first.book_slug)!;
+    const book=first.book_slug?job.config.books.find(b=>b.slug===first.book_slug)!:generalReaderBook();
     request={model:'gpt-6-astra',background:true,store:true,reasoning:{effort:'low'},max_output_tokens:1000,
-      input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,first.platform==='tiktok',book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)},{type:'input_image',image_url:book.coverUrl,detail:'high'}]}],
+      input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,first.platform==='tiktok',book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)},...(book.coverUrl?[{type:'input_image' as const,image_url:book.coverUrl,detail:'high' as const}]:[])]}],
       tools:[{type:'image_generation',model:'gpt-image-2',size:'1024x1536',quality:'medium',output_format:'jpeg',output_compression:92,background:'opaque'}],tool_choice:{type:'image_generation'}};
   }
   try { return (await ai().responses.create(request)).id; }
@@ -132,17 +138,26 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
     let days;
     try { days=validateAiDays(JSON.parse(response.output_text),job.config.platforms,task.request.assignments!.map(d=>d.dayIndex)); }
     catch { throw new FatalError('The AI returned incomplete content for this batch. Other saved batches are kept.'); }
+    let strategyCopies:ReturnType<typeof validateStrategyCopy>|null=null;
+    if(job.config.strategy){
+      const {data:history,error}=await db.from('social_posts').select('platform,title,caption,campaign_id').eq('user_id',job.user_id).neq('status','cancelled').order('created_at',{ascending:false}).limit(180);
+      if(error)throw new Error('Recent content could not be checked.');
+      try{strategyCopies=validateStrategyCopy(days,task.request.assignments!,job.config.books,job.config.strategy.settings,history.filter(p=>!days.some(day=>p.campaign_id===campaignId(taskId,day.dayIndex))) as CalendarPost[]);}catch(error){throw new FatalError(error instanceof Error?error.message:'Content labels could not be validated.');}
+    }
     for(const day of days) {
       const assignment=task.request.assignments!.find(d=>d.dayIndex===day.dayIndex)!;
-      const book=job.config.books.find(b=>b.slug===assignment.book)!;
+      const legacyBook=assignment.book?job.config.books.find(b=>b.slug===assignment.book)!:null;
       for(const platform of job.config.platforms) {
-        const scheduled=plannedTime(job.start_date,day.dayIndex,platform);
+        const scheduled=plannedTime(job.start_date,day.dayIndex,platform,learnedPostingHours(job.config.strategy?.report,platform,job.config.strategy?.settings.adaptive));
         if(Date.parse(scheduled)<=Date.now()) continue;
         const {count,error:checkError}=await db.from('social_posts').select('id',{head:true,count:'exact'}).eq('user_id',job.user_id).eq('platform',platform).gte('scheduled_at',londonSchedule(assignment.date,'00:00')).lt('scheduled_at',londonSchedule(addDays(assignment.date,1),'00:00')).neq('status','cancelled');
         if(checkError) throw new Error('The calendar could not be checked before saving.');
         if(count) continue;
         const copy=day.posts.find(p=>p.platform===platform)!;
-        const {error}=await db.from('social_posts').insert({campaign_id:campaignId(taskId,day.dayIndex),generation_run_id:runId,user_id:job.user_id,book_slug:book.slug,book_title:book.title,platform,post_type:assignment.postType,title:copy.title,caption:copy.caption,hashtags:copy.hashtags,creative_brief:day.creativeBrief,planned_media_type:plannedFormat(assignment.postType,platform),scheduled_at:scheduled,status:'draft'});
+        const strategyCopy=strategyCopies?.get(day.dayIndex+':'+platform);
+        const book=strategyCopy?strategyCopy.book:legacyBook;
+        const postType=strategyCopy?.postType??assignment.postType;
+        const {error}=await db.from('social_posts').insert({campaign_id:campaignId(taskId,day.dayIndex),generation_run_id:runId,user_id:job.user_id,book_slug:book?.slug??'',book_title:book?.title??'',platform,post_type:postType,title:copy.title,caption:copy.caption,hashtags:copy.hashtags,creative_brief:strategyCopy?.brief??day.creativeBrief,content_metadata:strategyCopy?.metadata??{},planned_media_type:strategyCopy?(platform==='tiktok'?'video':'image'):plannedFormat(postType,platform),scheduled_at:scheduled,status:'draft'});
         if(error&&error.code!=='23505') throw new Error('Generated drafts could not be saved. Retrying the saved response.');
       }
     }
@@ -150,7 +165,7 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
     if(error) throw new Error('Batch progress could not be saved.');
     await recordProgress(job);
   } else {
-    const first=task.request.posts![0];const book=job.config.books.find(b=>b.slug===first.book_slug)!;
+    const first=task.request.posts![0];const book=first.book_slug?job.config.books.find(b=>b.slug===first.book_slug)!:generalReaderBook();
     const image=completedImage(response);
     if(!image?.result) {
       const {error:diagnosticError}=await db.from('social_generation_tasks').update({result:{...task.result,provider_diagnostic:imageDiagnostic(response)}}).eq('id',taskId).eq('user_id',job.user_id);

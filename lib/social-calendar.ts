@@ -1,9 +1,10 @@
 export const SOCIAL_PLATFORMS = ['facebook', 'instagram', 'tiktok'] as const;
 export type SocialPlatform = typeof SOCIAL_PLATFORMS[number];
-export const POST_TYPES = ['premise_hook', 'trope_hook', 'character_conflict', 'reader_question', 'humour', 'book_promotion', 'new_release', 'video', 'reader_engagement'] as const;
+export const POST_TYPES = ['premise_hook', 'trope_hook', 'character_conflict', 'reader_question', 'humour', 'book_promotion', 'new_release', 'video', 'reader_engagement','romance_hot_take','this_or_that','original_quote'] as const;
 export const POST_LABELS: Record<string, string> = {
   premise_hook: 'Premise hook', trope_hook: 'Trope hook', character_conflict: 'Character / conflict',
   reader_question: 'Reader question', humour: 'Funny / spicy', book_promotion: 'Book promotion',
+  romance_hot_take:'Romance debate',this_or_that:'This or that',original_quote:'Original social line',
   new_release: 'New release', video: 'Video / reel', reader_engagement: 'Reader engagement',
 };
 export type CalendarSeed = {
@@ -15,7 +16,7 @@ export type CalendarPost = {
   id: string; campaign_id: string; user_id: string; book_slug: string; book_title: string;
   platform: SocialPlatform; post_type: string; title: string; caption: string; hashtags: string[];
   media_path: string | null; media_type: 'image' | 'video' | null; scheduled_at: string | null;
-  status: string; creative_brief?: string; planned_media_type?: 'image' | 'video' | null; quality_notes?: string; generation_run_id?: string | null; version: number; created_at: string; updated_at: string;
+  status: string; content_metadata?: Record<string,unknown>; creative_brief?: string; planned_media_type?: 'image' | 'video' | null; quality_notes?: string; generation_run_id?: string | null; version: number; created_at: string; updated_at: string;
 };
 export function londonDate(value: Date | string = new Date()) {
   const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value));
