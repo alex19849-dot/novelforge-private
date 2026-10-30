@@ -24,7 +24,7 @@ async function run(body, output, options = {}) {
     constructor(config) {
       this.responses = { create: async request => {
         calls.push({ provider: 'openai', request });
-        return { status: options.truncated ? 'incomplete' : 'completed', incomplete_details: { reason: 'max_output_tokens' }, output_text: output + (options.noSentinel ? '' : '\n<END_SECTION>'), output: options.refusal ? [{ type: 'message', content: [{ type: 'refusal', refusal: 'Refused.' }] }] : [], usage: { input_tokens: 100, output_tokens: 100, total_tokens: 200 } };
+        return { status: options.truncated ? 'incomplete' : options.status ?? 'completed', incomplete_details: { reason: 'max_output_tokens' }, output_text: output + (options.noSentinel ? '' : '\n<END_SECTION>'), output: options.refusal ? [{ type: 'message', content: [{ type: 'refusal', refusal: 'Refused.' }] }] : [], usage: { input_tokens: 100, output_tokens: 100, total_tokens: 200 } };
       } };
       this.chat = { completions: { create: async request => {
         calls.push({ provider: 'openrouter', request });
@@ -133,6 +133,26 @@ async function run(body, output, options = {}) {
     assert.equal(r.result.status, 422);
     assert.match(r.result.data.error, error);
     assert.equal(r.result.data.preservedDraft, edited);
+    assert.equal(r.calls.length, 1);
+  }
+  // A completed main-provider response need not echo the advisory sentinel.
+  r = await run({ ...base, chapterBrief: ordinaryBrief }, words(600, 'complete'), { noSentinel: true });
+  assert.equal(r.result.status, 200);
+  assert.equal(r.result.data.section, words(600, 'complete'));
+  assert.equal(r.calls.length, 1);
+  r = await run({ ...base, chapterBrief: ordinaryBrief, action: 'continue', chapterDraft: edited }, 'I close the gate.', { noSentinel: true });
+  assert.equal(r.result.status, 200);
+  assert.equal(r.result.data.section, 'I close the gate.');
+  for (const [output, options, expected] of [
+    [words(600), { noSentinel: true, truncated: true }, /did not complete/],
+    [words(600), { noSentinel: true, status: 'in_progress' }, /deliberately complete/],
+    ['I reach for the', { noSentinel: true }, /obviously truncated/],
+    [words(300), { noSentinel: true }, /short|words|length/i],
+    [words(850), { noSentinel: true }, /long|words|length/i],
+  ]) {
+    r = await run({ ...base, chapterBrief: ordinaryBrief }, output, options);
+    assert.equal(r.result.status, 422);
+    assert.match(r.result.data.error, expected);
     assert.equal(r.calls.length, 1);
   }
   r = await run({ ...base, chapterBrief: ordinaryBrief, action: 'continue', chapterDraft: edited }, 'I cannot continue this scene because it contains explicit content.', { noSentinel: true });

@@ -862,10 +862,13 @@ function extractCompletedSection(
   raw: string,
   chapterTitle: string,
   povCharacter: string,
+  providerCompleted = false,
 ): string {
   const trimmed = raw.trim();
 
-  if (!/<END_SECTION>\s*$/i.test(trimmed)) {
+  // A provider-confirmed completed response can omit our advisory marker.
+  // Callers still validate prose, sentence endings, length and scene handoffs.
+  if (!/<END_SECTION>\s*$/i.test(trimmed) && !providerCompleted) {
     throw new Error(
       "The writing model did not deliberately complete the section.",
     );
@@ -1421,6 +1424,7 @@ export async function POST(request: Request) {
           raw,
           chapterTitle,
           povCharacter,
+          response.status === "completed",
         );
         if (!specialistScenes.length) {
           validateSection(section, action === "continue" ? 0 : 120);
