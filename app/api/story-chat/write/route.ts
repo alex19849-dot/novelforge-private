@@ -1,6 +1,6 @@
 // NovelForge original-voice restoration with targeted realism safeguards.
 import OpenAI from "openai";
-import { selectedProseWriter, proseCostEstimate } from "../../../../lib/prose-writer";
+import { selectedProseWriter, proseCostEstimate, requestProse } from "../../../../lib/prose-writer";
 import { narrativeContext } from "../../../../lib/narrative-memory";
 
 import { NextResponse } from "next/server";
@@ -15,9 +15,6 @@ export const maxDuration = 300;
 
 const AION_MODEL = "aion-labs/aion-3.5";
 const AION_MARKER_PREFIX = "[[AION_SCENE_";
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
@@ -43,6 +40,7 @@ type WriterRequest = {
 };
 
 type Usage = {
+  cost?: number;
   input_tokens?: number;
   output_tokens?: number;
   total_tokens?: number;
@@ -1143,18 +1141,18 @@ function diagnostic(input: {
   const inputTokens = input.usage?.input_tokens ?? 0;
   const outputTokens = input.usage?.output_tokens ?? 0;
   const cachedTokens = input.usage?.input_tokens_details?.cached_tokens ?? 0;
-  const costUsd = proseCostEstimate(input.writer.model, inputTokens, outputTokens, cachedTokens);
+  const costUsd = input.usage?.cost ?? proseCostEstimate(input.writer.model, inputTokens, outputTokens, cachedTokens);
 
   return {
     stage: "chapter_section_writing",
-    provider: "openai",
+    provider: input.writer.provider,
     model: input.writer.model,
     status: input.status,
     inputTokens,
     outputTokens,
     totalTokens: input.usage?.total_tokens ?? inputTokens + outputTokens,
     costUsd,
-    costType: "estimated",
+    costType: input.usage?.cost !== undefined ? "reported" : "estimated",
     durationMs: input.durationMs,
     attempt: input.attempt,
     ...(input.error ? { error: input.error } : {}),
@@ -1165,9 +1163,9 @@ export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
 
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENROUTER_API_KEY) {
       return NextResponse.json(
-        { error: "OPENAI_API_KEY is not configured." },
+        { error: "OPENROUTER_API_KEY is not configured." },
         { status: 500 },
       );
     }
@@ -1372,23 +1370,10 @@ export async function POST(request: Request) {
       let usage: Usage | undefined;
 
       try {
-        const response = await openai.responses.create({
-          model: writer.model,
-          reasoning: {
-            effort: "low",
-          },
-          input: [
-            {
-              role: "system",
-              content:
-                mainWriterSystemPrompt(specialistScenes.length > 0, action),
-            },
-            { role: "user", content: writingPrompt },
-          ],
-          text: {
-            verbosity: "medium",
-          },
-          max_output_tokens: maxOutputTokens,
+        const response = await requestProse(openrouter, {
+          system: mainWriterSystemPrompt(specialistScenes.length > 0, action),
+          prompt: writingPrompt,
+          maxOutputTokens,
         });
         usage = response.usage as Usage | undefined;
 

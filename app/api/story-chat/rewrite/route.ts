@@ -1,4 +1,4 @@
-import { selectedProseWriter, proseCostEstimate } from "../../../../lib/prose-writer";
+import { selectedProseWriter, proseCostEstimate, requestProse } from "../../../../lib/prose-writer";
 import { narrativeContext } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
@@ -42,8 +42,8 @@ function validateProse(value: string): void {
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
   let called = false;
-  let model: string = "gpt-6.1-terra";
-  let provider: "openai" | "openrouter" = "openai";
+  let model: string = selectedProseWriter().model;
+  let provider: "openai" | "openrouter" = "openrouter";
   let startedAt = Date.now();
   let inputTokens = 0;
   let outputTokens = 0;
@@ -73,9 +73,9 @@ export async function POST(request: Request) {
     const isAion = selectedWriter.model === "aion";
     const proseWriter = selectedProseWriter(body.storyState, text(body.instruction));
     model = isAion ? "aion-labs/aion-3.5" : proseWriter.model;
-    provider = isAion ? "openrouter" : "openai";
-    if (!(isAion ? process.env.OPENROUTER_API_KEY : process.env.OPENAI_API_KEY)) {
-      return NextResponse.json({ error: `${isAion ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY"} is not configured.`, diagnostics }, { status: 500 });
+    provider = "openrouter";
+    if (!process.env.OPENROUTER_API_KEY) {
+      return NextResponse.json({ error: "OPENROUTER_API_KEY is not configured.", diagnostics }, { status: 500 });
     }
     const prompt = [
       "You are NovelForge's bounded-passage editor. Return only the complete replacement for PASSAGE TO REPLACE, without labels, notes, markdown, reasoning or alternatives.",
@@ -120,18 +120,20 @@ export async function POST(request: Request) {
       if (choice?.finish_reason !== "stop") throw new Error("Aion did not finish the replacement. Your chapter is unchanged.");
       replacement = choice.message.content?.trim() ?? "";
     } else {
-      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, maxRetries: 0, timeout: 240_000 });
-      const response = await openai.responses.create({
-        model, input: [{ role: "system", content: system }, { role: "user", content: prompt }],
-        reasoning: { effort: "low" }, text: { verbosity: "medium" }, max_output_tokens: tokenLimit,
+      const openrouter = new OpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1",
+        maxRetries: 0, timeout: 240_000,
       });
+      const response = await requestProse(openrouter, { system, prompt, maxOutputTokens: tokenLimit });
       inputTokens = response.usage?.input_tokens ?? 0;
       outputTokens = response.usage?.output_tokens ?? 0;
       totalTokens = response.usage?.total_tokens ?? inputTokens + outputTokens;
       const cached = response.usage?.input_tokens_details?.cached_tokens ?? 0;
-      costUsd = proseCostEstimate(proseWriter.model, inputTokens, outputTokens, cached);
-      costType = "estimated";
+      costUsd = response.usage.cost ?? proseCostEstimate(proseWriter.model, inputTokens, outputTokens, cached);
+      costType = response.usage.cost !== undefined ? "reported" : "estimated";
       if (response.status !== "completed") throw new Error("The writer did not finish the replacement. Your chapter is unchanged.");
+      if (response.output.length) throw new Error("Fable returned a refusal. Your chapter is unchanged.");
       replacement = response.output_text?.trim() ?? "";
     }
     validateProse(replacement);

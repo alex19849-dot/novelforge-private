@@ -23,12 +23,12 @@ async function run(body, output, options = {}) {
     static APIConnectionError = class extends Error {};
     constructor(config) {
       this.responses = { create: async request => {
-        calls.push({ provider: 'openai', request });
+        calls.push({ provider: 'openrouter', request });
         return { status: options.truncated ? 'incomplete' : options.status ?? 'completed', incomplete_details: { reason: 'max_output_tokens' }, output_text: output + (options.noSentinel ? '' : '\n<END_SECTION>'), output: options.refusal ? [{ type: 'message', content: [{ type: 'refusal', refusal: 'Refused.' }] }] : [], usage: { input_tokens: 100, output_tokens: 100, total_tokens: 200 } };
       } };
       this.chat = { completions: { create: async request => {
-        calls.push({ provider: 'openrouter', request });
-        return { choices: [{ finish_reason: options.truncated ? 'length' : options.filter ? 'content_filter' : 'stop', message: { content: output, ...(options.refusal ? { refusal: 'Refused.' } : {}) } }], usage: { prompt_tokens: 100, completion_tokens: 100, total_tokens: 200, cost: .001 } };
+        calls.push({ provider: 'openrouter', request: { ...request, input: request.messages } });
+        return { choices: [{ finish_reason: options.truncated ? 'length' : options.filter ? 'content_filter' : options.status === 'in_progress' ? null : 'stop', message: { content: output, ...(options.refusal ? { refusal: 'Refused.' } : {}) } }], usage: { prompt_tokens: 100, completion_tokens: 100, total_tokens: 200, cost: .001 } };
       } } };
     }
   }
@@ -52,7 +52,7 @@ async function run(body, output, options = {}) {
     r = await run({ ...base, chapterBrief: contract, latestUserMessage: guidance }, words(600, 'ordinaryChapter'));
     assert.equal(r.result.status, 200, `Main-writer routing must not be overridden by exclusion keywords: ${guidance}`);
     assert.equal(r.calls.length, 1);
-    assert.equal(r.calls[0].provider, 'openai');
+    assert.equal(r.calls[0].provider, 'openrouter');
     assert.notEqual(r.result.data.specialistScenesPending, true);
     assert(r.calls[0].request.input[1].content.includes(guidance), 'Original guidance must remain unchanged');
   }
@@ -69,7 +69,7 @@ async function run(body, output, options = {}) {
     r = await run(base, skeleton);
     assert.equal(r.result.status, 422);
     assert.equal(r.calls.length, 1);
-    assert.equal(r.calls[0].provider, 'openai');
+    assert.equal(r.calls[0].provider, 'openrouter');
   }
   r = await run({ ...base, phase: 'fill_specialist', chapterDraft: 'Opening. [[AION_SCENE_1]] [[AION_SCENE_1]]' }, words(550));
   assert.equal(r.result.status, 502);
@@ -111,13 +111,13 @@ async function run(body, output, options = {}) {
   const ordinaryBrief = brief([ordinary]);
   r = await run({ ...base, chapterBrief: ordinaryBrief, action: 'continue', chapterDraft: edited, sectionInstruction: instruction }, 'I close the gate.');
   assert.equal(r.result.status, 200);
-  assert.equal(r.calls[0].provider, 'openai');
+  assert.equal(r.calls[0].provider, 'openrouter');
   r = await run({ ...base, action: 'continue', chapterDraft: edited, sectionInstruction: 'ASTRA: Continue with the ordinary discussion.' }, 'He answers me.');
   assert.equal(r.result.status, 200);
-  assert.equal(r.calls[0].provider, 'openai');
-  assert.equal(r.calls[0].request.model, 'gpt-6.1-terra');
+  assert.equal(r.calls[0].provider, 'openrouter');
+  assert.equal(r.calls[0].request.model, 'anthropic/claude-fable-5.1');
   r = await run({ ...base, action: 'continue', chapterDraft: edited, chapterBrief: brief([assigned, { ...ordinary, order: 2 }]) }, 'He answers me.');
-  assert.equal(r.calls[0].provider, 'openai', 'An earlier Aion scene must not capture later ordinary continuation');
+  assert.equal(r.calls[0].provider, 'openrouter', 'An earlier Aion scene must not capture later ordinary continuation');
   r = await run({ ...base, action: 'continue', chapterDraft: edited, chapterBrief: brief(undefined, { continuationGuidance: instruction }) }, addition);
   assert.equal(r.result.status, 200);
   assert(r.calls[0].request.messages[1].content.includes(instruction));
@@ -145,7 +145,7 @@ async function run(body, output, options = {}) {
   assert.equal(r.result.data.section, 'I close the gate.');
   for (const [output, options, expected] of [
     [words(600), { noSentinel: true, truncated: true }, /did not complete/],
-    [words(600), { noSentinel: true, status: 'in_progress' }, /deliberately complete/],
+    [words(600), { noSentinel: true, status: 'in_progress' }, /did not complete/],
     ['I reach for the', { noSentinel: true }, /obviously truncated/],
     [words(300), { noSentinel: true }, /short|words|length/i],
     [words(850), { noSentinel: true }, /long|words|length/i],
