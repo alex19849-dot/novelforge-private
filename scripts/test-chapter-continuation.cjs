@@ -115,7 +115,7 @@ async function run(body, output, options = {}) {
   r = await run({ ...base, action: 'continue', chapterDraft: edited, sectionInstruction: 'ASTRA: Continue with the ordinary discussion.' }, 'He answers me.');
   assert.equal(r.result.status, 200);
   assert.equal(r.calls[0].provider, 'openai');
-  assert.equal(r.calls[0].request.model, 'gpt-6.1-terra');
+  assert.equal(r.calls[0].request.model, 'gpt-6-astra');
   r = await run({ ...base, action: 'continue', chapterDraft: edited, chapterBrief: brief([assigned, { ...ordinary, order: 2 }]) }, 'He answers me.');
   assert.equal(r.calls[0].provider, 'openai', 'An earlier Aion scene must not capture later ordinary continuation');
   r = await run({ ...base, action: 'continue', chapterDraft: edited, chapterBrief: brief(undefined, { continuationGuidance: instruction }) }, addition);
@@ -183,5 +183,6 @@ async function run(body, output, options = {}) {
   assert.equal(qa.readChapterContract(brief(undefined, { continuationGuidance: instruction })).continuationGuidance, instruction);
   console.log('PASS: exclusive handoff, marker cardinality/order/end boundary, no duplicate paid handoff, edited-draft Aion continuation, latest direction/endpoint, short prose saved with warnings, ordinary routing retained, clear empty/refusal/truncation errors, no replay and initial chapter length enforcement retained.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+
 
 

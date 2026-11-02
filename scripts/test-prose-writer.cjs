@@ -21,18 +21,19 @@ async function run(file, body, output) {
   return { result: await route.POST({ json: async () => body }), calls };
 }
 (async () => {
-  assert.equal(writers.selectedProseWriter().model, 'gpt-6.1-terra');
-  assert.equal(writers.selectedProseWriter({ proseWriter: 'gpt-6-astra' }, 'ASTRA: Continue.').model, 'gpt-6.1-terra', 'Astra is removed from active prose routing during this trial');
-  assert.equal(writers.proseCostEstimate('gpt-6.1-terra', 1000000, 0), 2, 'Long input uses documented higher rates');
-  assert.equal(writers.proseCostEstimate('gpt-6.1-terra', 100, 100), 0.0006);
+  assert.equal(writers.selectedProseWriter().model, 'gpt-6-astra');
+  assert.equal(writers.selectedProseWriter({ proseWriter: 'gpt-6-astra' }, 'ASTRA: Continue.').model, 'gpt-6-astra', 'Astra is restored for all ordinary prose');
+  assert.equal(writers.proseCostEstimate('gpt-6-astra', 1000000, 0), 10, 'Restored Astra standard input rate');
+  assert.equal(writers.proseCostEstimate('gpt-6-astra', 100, 100), 0.006);
   const prose = Array.from({ length: 600 }, (_, i) => `synthetic${i}`).join(' ') + '.';
   let r = await run('app/api/story-chat/write/route.ts', { action: 'start', povCharacter: 'Sam', chapterBrief: JSON.stringify({ chapterNumber: 1, povCharacter: 'Sam', requiredBeats: [{ order: 1, instruction: 'An ordinary conversation.', specialistWriter: null }], originalGuidance: 'Have the conversation.', endpoint: 'Sam leaves.', targetWordRange: { minimum: 500, preferred: 600, maximum: 800 } }) }, prose + '\n<END_SECTION>');
-  assert.equal(r.result.status, 200); assert.equal(r.calls.length, 1); assert.equal(r.calls[0].model, 'gpt-6.1-terra');
-  assert.equal(r.calls[0].reasoning.effort, 'low'); assert.equal(r.result.data.diagnostics[0].model, 'gpt-6.1-terra'); assert.equal(r.result.data.diagnostics[0].costUsd, 0.0006);
+  assert.equal(r.result.status, 200); assert.equal(r.calls.length, 1); assert.equal(r.calls[0].model, 'gpt-6-astra');
+  assert.equal(r.calls[0].reasoning.effort, 'low'); assert.equal(r.result.data.diagnostics[0].model, 'gpt-6-astra'); assert.equal(r.result.data.diagnostics[0].costUsd, 0.006);
   const body = { chapterContent: 'Before. The selected passage is here. After.', passage: 'The selected passage is here.', instruction: 'Rewrite this.' };
   r = await run('app/api/story-chat/rewrite/route.ts', body, 'A new complete replacement.');
-  assert.equal(r.result.status, 200); assert.equal(r.calls[0].model, 'gpt-6.1-terra'); assert.equal(r.result.data.model, 'gpt-6.1-terra'); assert.equal(r.result.data.diagnostics[0].costUsd, 0.0006);
+  assert.equal(r.result.status, 200); assert.equal(r.calls[0].model, 'gpt-6-astra'); assert.equal(r.result.data.model, 'gpt-6-astra'); assert.equal(r.result.data.diagnostics[0].costUsd, 0.006);
   r = await run('app/api/story-chat/rewrite/route.ts', { ...body, instruction: 'AION: Rewrite this.' }, 'A new complete replacement.');
   assert.equal(r.result.status, 200); assert.equal(r.calls[0].model, 'aion-labs/aion-3.5'); assert.equal(r.result.data.diagnostics[0].costUsd, 0.001);
-  console.log('PASS: Terra 6.1 is restored for prose and normal passage rewrites, diagnostics/rates match, and explicit Aion selection is preserved.');
+  console.log('PASS: Astra is restored for prose and normal passage rewrites, diagnostics/rates match, and explicit Aion selection is preserved.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
+

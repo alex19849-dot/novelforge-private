@@ -42,7 +42,7 @@ function validateProse(value: string): void {
 export async function POST(request: Request) {
   const diagnostics: GenerationDiagnostic[] = [];
   let called = false;
-  let model: string = "gpt-6.1-terra";
+  let model: string = selectedProseWriter().model;
   let provider: "openai" | "openrouter" = "openai";
   let startedAt = Date.now();
   let inputTokens = 0;
@@ -145,5 +145,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message, diagnostics }, { status: called ? 502 : 400 });
   }
 }
+
 
 
