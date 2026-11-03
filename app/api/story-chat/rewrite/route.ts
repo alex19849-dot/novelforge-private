@@ -11,6 +11,7 @@ export const maxDuration = 300;
 type RewriteBody = {
   chapterContent?: unknown;
   passage?: unknown;
+  passageRange?: unknown;
   instruction?: unknown;
   povCharacter?: unknown;
   storyBible?: unknown;
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Supply a chapter and a bounded passage to rewrite.", diagnostics }, { status: 400 });
     }
     let range: { start: number; end: number };
-    try { range = findPassageRange(chapterContent, passage); }
+    try { range = findPassageRange(chapterContent, passage, body.passageRange); }
     catch (error) {
       return NextResponse.json({ error: (error as Error).message, diagnostics }, { status: 409 });
     }

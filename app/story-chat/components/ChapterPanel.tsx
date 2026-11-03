@@ -11,7 +11,9 @@ import {
   type SetStateAction,
 } from "react";
 import type { StoryChapter } from "../types";
-import type { PassageRewriteRequest } from "../passageRewrite";
+import type { PassageRewriteRequest, PassageRewriteResult, PassageRewriteUndo } from "../passageRewrite";
+import { readerParagraphs, selectedReaderPassage, type ReaderPassage } from "../readerSelection";
+import PassageGuideDialog from "./PassageGuideDialog";
 
 type ReaderTheme = "light" | "sepia" | "dark";
 type ReaderWidth = "narrow" | "medium" | "wide";
@@ -32,7 +34,8 @@ type ChapterPanelProps = {
   chapters: StoryChapter[];
   readerOpen: boolean;
   onCloseReader: () => void;
-  onRewritePassage?: (request: PassageRewriteRequest) => Promise<void>;
+  onRewritePassage?: (request: PassageRewriteRequest) => Promise<PassageRewriteResult>;
+  onUndoPassageRewrite?: (undo: PassageRewriteUndo) => void;
   isWriting?: boolean;
   onSaveChapter: (
     chapterId: string,
@@ -91,6 +94,7 @@ export default function ChapterPanel({
   onCloseReader,
   onSaveChapter,
   onRewritePassage,
+  onUndoPassageRewrite,
   isWriting = false,
   readerTheme,
   setReaderTheme,
@@ -123,6 +127,13 @@ export default function ChapterPanel({
   const [rewriteMessage, setRewriteMessage] = useState("");
   const [rewriteError, setRewriteError] = useState("");
   const rewriteRunningRef = useRef(false);
+  const [selectedPassage, setSelectedPassage] = useState<ReaderPassage | null>(null);
+  const [guidedPassage, setGuidedPassage] = useState<ReaderPassage | null>(null);
+  const [selectionInstruction, setSelectionInstruction] = useState("");
+  const [rewriteUndo, setRewriteUndo] = useState<PassageRewriteUndo | null>(null);
+  const suppressDraftAutoScroll = useRef(false);
+  const currentStoryId = useRef(storyId);
+  currentStoryId.current = storyId;
   const [isEditing, setIsEditing] = useState(false);
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
@@ -251,6 +262,10 @@ export default function ChapterPanel({
     setRewriteChapterId(null);
     setRewriteError("");
     setRewriteMessage("");
+    setSelectedPassage(null);
+    setGuidedPassage(null);
+    setRewriteUndo(null);
+    setSelectionInstruction("");
   }, [storyId]);
 
   useEffect(() => {
@@ -272,6 +287,44 @@ export default function ChapterPanel({
     });
   }, [readerOpen, storyId, hasReadableContent]);
 
+  const readerContents = useMemo(() => {
+    const contents = new Map(orderedChapters.map(chapter => [chapter.id, chapter.content]));
+    if (draftWorkspace) contents.set("__draft__", draftWorkspace.content);
+    return contents;
+  }, [orderedChapters, draftWorkspace?.content]);
+
+  useEffect(() => {
+    if (!readerOpen || isEditing || guidedPassage || !onRewritePassage) {
+      setSelectedPassage(null);
+      return;
+    }
+    const reader = readerRef.current;
+    if (!reader) return;
+    let frame = 0;
+    const capture = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        setSelectedPassage(isWriting || rewriteRunningRef.current ? null :
+          selectedReaderPassage(reader, id => readerContents.get(id)));
+      });
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedPassage(null);
+    };
+    const keyUp = (event: KeyboardEvent) => { if (event.key !== "Escape") capture(); };
+    document.addEventListener("selectionchange", capture);
+    document.addEventListener("keyup", keyUp);
+    document.addEventListener("keydown", escape);
+    window.addEventListener("resize", capture);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("selectionchange", capture);
+      document.removeEventListener("keyup", keyUp);
+      document.removeEventListener("keydown", escape);
+      window.removeEventListener("resize", capture);
+    };
+  }, [readerOpen, isEditing, guidedPassage, onRewritePassage, isWriting, readerContents]);
+
   useEffect(() => {
     const previousContent = previousDraftContentRef.current.trim();
     const nextContent = draftWorkspace?.content.trim() ?? "";
@@ -280,7 +333,9 @@ export default function ChapterPanel({
       nextContent.length > previousContent.length &&
       (!previousContent || nextContent.startsWith(previousContent));
 
-    if (readerOpen && draftWorkspace && appendedSection && readerRef.current) {
+    const preservePosition = suppressDraftAutoScroll.current;
+    if (previousDraftContentRef.current !== (draftWorkspace?.content ?? "")) suppressDraftAutoScroll.current = false;
+    if (!preservePosition && readerOpen && draftWorkspace && appendedSection && readerRef.current) {
       const firstNewParagraphIndex = getParagraphs(previousContent).length;
       requestAnimationFrame(() => {
         const firstNewParagraph = document.querySelector<HTMLElement>(
@@ -300,6 +355,7 @@ export default function ChapterPanel({
   }, [draftWorkspace, readerOpen]);
 
   function handleScroll() {
+    setSelectedPassage(null);
     const reader = readerRef.current;
     if (!reader) return;
     if (rewriteRunningRef.current) pendingScrollRestoreRef.current = reader.scrollTop;
@@ -340,7 +396,7 @@ export default function ChapterPanel({
   }
 
   function toggleControls() {
-    if (isEditing) return;
+    if (isEditing || document.getSelection()?.toString().trim()) return;
     setControlsVisible((visible) => {
       if (visible) {
         setSettingsVisible(false);
@@ -360,30 +416,54 @@ export default function ChapterPanel({
     setSettingsVisible(false);
   }
 
-  async function applyPassageRewrite() {
+  async function applyPassageRewrite(target?: ReaderPassage, instruction = rewriteInstruction) {
     if (!onRewritePassage || rewriteRunningRef.current || isWriting) return;
-    const chapterId = rewriteChapterId ?? activeChapterId ?? activeChapter?.id;
+    const chapterId = target?.chapterId ?? rewriteChapterId ?? activeChapterId ?? activeChapter?.id;
     const content = chapterId === "__draft__" ? draftWorkspace?.content
       : orderedChapters.find((chapter) => chapter.id === chapterId)?.content;
-    if (!chapterId || content === undefined) {
+    if (!chapterId || content === undefined || (target && target.sourceContent !== content)) {
       setRewriteError("Choose the chapter containing this passage first.");
       return;
     }
+    const requestStoryId = storyId;
+    setSelectedPassage(null);
+    document.getSelection()?.removeAllRanges();
+    suppressDraftAutoScroll.current = chapterId === "__draft__";
     rewriteRunningRef.current = true;
     setRewriteRunning(true);
     setRewriteError("");
     setRewriteMessage("");
     pendingScrollRestoreRef.current = readerRef.current?.scrollTop ?? null;
     try {
-      await onRewritePassage({ chapterId, sourceContent: content,
-        passage: rewritePassageText, instruction: rewriteInstruction });
+      const result = await onRewritePassage({ chapterId, sourceContent: content,
+        passage: target?.passage ?? rewritePassageText, range: target?.range, instruction });
+      if (result.content === content) suppressDraftAutoScroll.current = false;
+      if (currentStoryId.current !== requestStoryId) return;
+      setRewriteUndo({ chapterId, sourceContent: content, rewrittenContent: result.content });
+      setGuidedPassage(null);
       setRewritePassageText("");
       setRewriteMessage("Passage updated in the chapter.");
     } catch (error) {
-      setRewriteError(error instanceof Error ? error.message : "The passage could not be rewritten.");
+      suppressDraftAutoScroll.current = false;
+      if (currentStoryId.current === requestStoryId) setRewriteError(error instanceof Error ? error.message : "The passage could not be rewritten.");
     } finally {
       rewriteRunningRef.current = false;
       setRewriteRunning(false);
+    }
+  }
+
+  function undoLastRewrite() {
+    if (!rewriteUndo || !onUndoPassageRewrite || isWriting || rewriteRunningRef.current) return;
+    pendingScrollRestoreRef.current = readerRef.current?.scrollTop ?? null;
+    suppressDraftAutoScroll.current = rewriteUndo.chapterId === "__draft__" && rewriteUndo.sourceContent !== rewriteUndo.rewrittenContent;
+    try {
+      onUndoPassageRewrite(rewriteUndo);
+      setRewriteUndo(null);
+      setRewriteError("");
+      setRewriteMessage("Previous passage restored.");
+    } catch (error) {
+      suppressDraftAutoScroll.current = false;
+      setRewriteError(error instanceof Error ? error.message : "The rewrite could not be undone.");
     }
   }
 
@@ -474,17 +554,21 @@ export default function ChapterPanel({
     paragraph: string,
     key: string,
     draftParagraphIndex?: number,
+    sourceStart?: number,
+    sourceEnd?: number,
   ) {
     const message = paragraph.match(MESSAGE_PATTERN);
     return (
       <p
         key={key}
         data-draft-paragraph-index={draftParagraphIndex}
+        data-source-start={sourceStart}
+        data-source-end={sourceEnd}
         className="mb-[1em] whitespace-pre-wrap [overflow-wrap:anywhere]"
       >
         {message ? (
           <>
-            <strong>{message[1]}:</strong> <em>{message[2]}</em>
+            <strong>{message[1]}:</strong>{paragraph.slice(message[1].length + 1, paragraph.length - message[2].length)}<em>{message[2]}</em>
           </>
         ) : (
           paragraph
@@ -597,9 +681,11 @@ export default function ChapterPanel({
                         chapter.povCharacter,
                         chapter.kind === "epilogue",
                       )}
-                      {getParagraphs(chapter.content).map((paragraph, index) =>
-                        renderParagraph(paragraph, `${chapter.id}-${index}`),
-                      )}
+                      <div data-reader-content={chapter.id}>
+                        {readerParagraphs(chapter.content).map((paragraph, index) =>
+                          renderParagraph(paragraph.text, `${chapter.id}-${index}`, undefined, paragraph.start, paragraph.end),
+                        )}
+                      </div>
                     </>
                   )}
                 </article>
@@ -650,10 +736,11 @@ export default function ChapterPanel({
                       draftWorkspace.povCharacter,
                       draftIsEpilogue,
                     )}
-                    {getParagraphs(draftWorkspace.content).map(
-                      (paragraph, index) =>
-                        renderParagraph(paragraph, `draft-${index}`, index),
-                    )}
+                    <div data-reader-content="__draft__">
+                      {readerParagraphs(draftWorkspace.content).map((paragraph, index) =>
+                        renderParagraph(paragraph.text, `draft-${index}`, index, paragraph.start, paragraph.end),
+                      )}
+                    </div>
                     {!draftWorkspace.content.trim() && (
                       <p className={mutedClasses}>
                         The chapter draft will appear here.
@@ -665,6 +752,33 @@ export default function ChapterPanel({
             )}
           </main>
         </div>
+
+        {selectedPassage && !isEditing && !isWriting && !rewriteRunning && (
+          <div role="toolbar" aria-label="Selected passage actions"
+            onPointerDown={event => event.preventDefault()}
+            className="fixed z-[60] flex w-[264px] max-w-[calc(100vw-16px)] gap-1 rounded-xl border border-white/20 bg-neutral-950 p-1 text-sm font-semibold text-white shadow-xl"
+            style={{ left: selectedPassage.left, top: selectedPassage.top }}>
+            <button type="button" className="min-h-11 flex-1 rounded-lg px-3 hover:bg-white/10 focus:bg-white/10"
+              onClick={() => void applyPassageRewrite(selectedPassage, "Rewrite this passage with fresh, natural wording. Preserve its meaning, events, POV, tense, approximate length and connection to the surrounding prose.")}>Change this</button>
+            <button type="button" className="min-h-11 flex-1 rounded-lg bg-pink-500 px-3"
+              onClick={() => { setGuidedPassage(selectedPassage); setSelectedPassage(null); setSelectionInstruction(""); setRewriteError(""); document.getSelection()?.removeAllRanges(); }}>Guide this</button>
+          </div>
+        )}
+        {guidedPassage && (
+          <PassageGuideDialog passage={guidedPassage.passage} instruction={selectionInstruction}
+            onInstruction={setSelectionInstruction} busy={rewriteRunning} error={rewriteError}
+            onClose={() => { setGuidedPassage(null); setRewriteError(""); }}
+            onApply={() => void applyPassageRewrite(guidedPassage, selectionInstruction)} />
+        )}
+        {!isEditing && (rewriteRunning || rewriteMessage || (rewriteError && !guidedPassage) || rewriteUndo) && (
+          <div className={`absolute inset-x-3 top-16 z-50 mx-auto flex max-w-xl items-center gap-3 rounded-xl border p-3 font-sans text-sm shadow-lg ${chromeClasses}`}>
+            <p className="min-w-0 flex-1" role={rewriteError ? "alert" : "status"}>{rewriteRunning ? "Rewriting passage..." : rewriteError || rewriteMessage}</p>
+            {rewriteUndo && onUndoPassageRewrite && <button type="button" onClick={undoLastRewrite} disabled={isWriting || rewriteRunning}
+              className="min-h-11 rounded-lg border border-current/20 px-3 font-semibold disabled:opacity-40">Undo</button>}
+            {!rewriteRunning && <button type="button" aria-label="Dismiss rewrite message" className="min-h-11 px-2"
+              onClick={() => { setRewriteMessage(""); setRewriteError(""); setRewriteUndo(null); }}>×</button>}
+          </div>
+        )}
 
         {(controlsVisible || isEditing) && (
           <header

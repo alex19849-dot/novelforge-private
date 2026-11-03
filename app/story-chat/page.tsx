@@ -17,7 +17,7 @@ import ChapterPanel from "./components/ChapterPanel";
 
 import BiblePanel from "./components/BiblePanel";
 import MemoryPanel from "./components/MemoryPanel";
-import { findPassageRange, replacePassage, type PassageRewriteRequest } from "./passageRewrite";
+import { findPassageRange, replacePassage, undoPassageRewrite, type PassageRewriteRequest, type PassageRewriteResult, type PassageRewriteUndo } from "./passageRewrite";
 
 import type {
   ActiveTab,
@@ -1427,7 +1427,7 @@ device.`,
     setIsThinking(false);
   }
 
-  async function rewritePassage(request: PassageRewriteRequest): Promise<void> {
+  async function rewritePassage(request: PassageRewriteRequest): Promise<PassageRewriteResult> {
     const sourceStory = currentStoryRef.current;
     if (!sourceStory || isThinking || passageRewriteBusy.current) {
       throw new Error("Wait for the current writing request to finish.");
@@ -1440,7 +1440,7 @@ device.`,
     if (sourceContent !== request.sourceContent) {
       throw new Error("This chapter has changed. Copy the passage again before rewriting.");
     }
-    findPassageRange(request.sourceContent, request.passage);
+    findPassageRange(request.sourceContent, request.passage, request.range);
     const chapterNumber = isDraft ? sourcePending?.generatedChapter.replaceChapterNumber : chapter?.number;
     const plan = sourceStory.storyState.chapterPlans?.find((item) => item.chapterNumber === chapterNumber);
     passageRewriteBusy.current = true;
@@ -1450,7 +1450,7 @@ device.`,
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chapterContent: request.sourceContent,
-          passage: request.passage, instruction: request.instruction,
+          passage: request.passage, passageRange: request.range, instruction: request.instruction,
           povCharacter: isDraft ? sourcePending?.generatedChapter.povCharacter : chapter?.povCharacter,
           storyBible: sourceStory.storyBible,
           storyState: getStoryStateBeforeChapter(sourceStory.storyState, chapterNumber ?? null),
@@ -1471,7 +1471,7 @@ device.`,
             : latestChapter?.content !== request.sourceContent)) {
         throw new Error("The chapter changed while the rewrite was running. The rewrite was not applied; your latest edits are kept.");
       }
-      const content = replacePassage(request.sourceContent, request.passage, data.replacement);
+      const content = replacePassage(request.sourceContent, request.passage, data.replacement, request.range);
       const diagnostics = data.diagnostics as GenerationDiagnostic[];
       if (isDraft && latestPending) {
         const nextPending: PendingChapterGeneration = {
@@ -1501,10 +1501,38 @@ device.`,
       localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStory));
       setStory(nextStory);
       // Existing story and draft effects sync these edits to the signed-in account.
+      return { content };
     } finally {
       passageRewriteBusy.current = false;
       setIsThinking(false);
     }
+  }
+
+  function undoReaderRewrite(undo: PassageRewriteUndo) {
+    const source = currentStoryRef.current;
+    if (!source || isThinking || passageRewriteBusy.current) throw new Error("Wait for the current writing request to finish.");
+    const draft = undo.chapterId === "__draft__";
+    const pending = currentPendingRef.current;
+    const chapter = source.chapters.find(item => item.id === undo.chapterId);
+    const current = draft && pending?.storyId === source.id ? pending.draft : chapter?.content;
+    if (current === undefined) throw new Error("This chapter is no longer available.");
+    const content = undoPassageRewrite(current, undo);
+    if (draft && pending) {
+      const nextPending = { ...pending, draft: content, lastSection: undefined,
+        repetitionWarnings: [], qualityReview: undefined, qualityCheckedDraft: undefined,
+        qualityOverrideReady: undefined, qualityTechnicalError: undefined };
+      currentPendingRef.current = nextPending;
+      savePendingGeneration(nextPending);
+    }
+    const now = new Date().toISOString();
+    const next: StoryWorkspace = { ...source,
+      chapters: draft ? source.chapters : source.chapters.map(item => item.id === undo.chapterId ? { ...item, content, updatedAt: now } : item),
+      storyState: { ...source.storyState, ...(!draft && chapter ? {
+        continuityDirtyFromChapter: Math.min(source.storyState.continuityDirtyFromChapter ?? chapter.number, chapter.number),
+      } : {}) }, updatedAt: now };
+    currentStoryRef.current = next;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    setStory(next);
   }
 
   function updateChapter(
@@ -2725,6 +2753,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
               }}
               onSaveChapter={updateChapter}
               onRewritePassage={rewritePassage}
+              onUndoPassageRewrite={undoReaderRewrite}
               isWriting={isThinking}
               readerTheme={readerTheme}
               setReaderTheme={setReaderTheme}

@@ -3,12 +3,37 @@ export type PassageRewriteRequest = {
   sourceContent: string;
   passage: string;
   instruction: string;
+  range?: PassageRange;
 };
 
-export function findPassageRange(content: string, passage: string): {
+export type PassageRange = { start: number; end: number };
+export type PassageRewriteResult = { content: string };
+export type PassageRewriteUndo = {
+  chapterId: string;
+  sourceContent: string;
+  rewrittenContent: string;
+};
+
+export function undoPassageRewrite(content: string, undo: PassageRewriteUndo): string {
+  if (content !== undo.rewrittenContent) {
+    throw new Error("This chapter has changed since the rewrite. Undo would overwrite newer edits.");
+  }
+  return undo.sourceContent;
+}
+
+export function findPassageRange(content: string, passage: string, exactRange?: unknown): {
   start: number;
   end: number;
 } {
+  if (exactRange !== undefined) {
+    const range = exactRange as PassageRange | null;
+    if (!range || !Number.isInteger(range.start) || !Number.isInteger(range.end) ||
+        range.start < 0 || range.end <= range.start || range.end > content.length ||
+        !passage.trim() || content.slice(range.start, range.end) !== passage) {
+      throw new Error("The selected passage has changed. Select it again before rewriting.");
+    }
+    return { start: range.start, end: range.end };
+  }
   const words = passage.trim().split(/\s+/).filter(Boolean);
   if (!words.length) throw new Error("Paste the passage you want rewritten first.");
   const pattern = words
@@ -27,8 +52,8 @@ export function findPassageRange(content: string, passage: string): {
   return { start, end: start + matches[0][1].length };
 }
 
-export function replacePassage(content: string, passage: string, replacement: string): string {
-  const range = findPassageRange(content, passage);
+export function replacePassage(content: string, passage: string, replacement: string, exactRange?: PassageRange): string {
+  const range = findPassageRange(content, passage, exactRange);
   if (!replacement.trim()) throw new Error("The writer returned an empty replacement.");
   return content.slice(0, range.start) + replacement.trim() + content.slice(range.end);
 }
