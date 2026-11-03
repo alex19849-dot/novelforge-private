@@ -1,7 +1,7 @@
 // NovelForge original-voice restoration with targeted realism safeguards.
 import OpenAI from "openai";
 import { selectedProseWriter, proseCostEstimate } from "../../../../lib/prose-writer";
-import { narrativeContext } from "../../../../lib/narrative-memory";
+import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 
 import { NextResponse } from "next/server";
 
@@ -384,6 +384,7 @@ async function writeSpecialistScene(input: {
       JSON.stringify(cleanVoiceProfiles(input.storyState, input.povCharacter), null, 2),
     "CONTINUITY STATE:\n" +
       JSON.stringify(cleanStoryState(input.storyState, input.povCharacter, input.chapterBrief + "\n" + (input.sectionInstruction ?? "")), null, 2),
+    CONTINUITY_CONSISTENCY_INSTRUCTION,
     "BEFORE THE MARKER:\n" + context.before,
     "AFTER THE MARKER:\n" + context.after,
   ].join("\n\n");
@@ -805,6 +806,7 @@ function getPrompt(input: {
     "Avoid reusing a stock evasion-challenge-concession exchange across scenes or characters, especially \"That's not what I asked\" followed by \"No, it isn't\", or paraphrases that perform the same automatic sequence. Do not default tension to one person calling out a non-answer and the other neatly admitting it. Let replies arise from what each speaker wants, knows and is willing to say in this moment; sometimes answer directly, press a concrete issue, push back, act or leave something unanswered when that fits. These are possibilities, not a replacement template. Preserve conflict, subtext, personality and author-specified lines. An occasional natural use is fine; avoid making the exchange a recurring house style rather than banning ordinary words.",
     "Avoid exposition both speakers know, interview-style question chains, random topic changes, confirmation ladders, constant banter, interchangeable sarcasm, therapy language, mediator language, workplace-training language and speeches that explain what the scene already shows.",
     "PACE, FRESHNESS AND CONTINUITY",
+    CONTINUITY_CONSISTENCY_INSTRUCTION,
     "Every scene must advance character, relationship, conflict or plot, but it may also contain brief distinctive texture that makes the people and world feel lived in. Maintain clear causal flow between beats and let transitions arise from character choices and consequences. Cut filler, transition waffle, repeated conclusions and generic reactions. Do not turn this into clipped, staccato or breathless prose merely to make it efficient.",
     "At scene and chapter boundaries, land on the strongest live action, exchange, decision, discovery or consequence, then stop at the specified endpoint. Do not append a recap, a paragraph explaining the meaning or feeling of what just happened, or a generic thought wondering what comes next. Allow implications and unresolved tension to remain. Vary the shape of endings; do not routinely finish with ominous reflection or a rhetorical question. Preserve any explicitly requested final beat or line.",
     "Treat the repetition report as guidance, not a rigid blacklist. Avoid a tracked pattern naturally. Do not contort sentences, drain the character's voice or replace one repeated phrase with a different cliché merely to satisfy a count.",
@@ -1537,6 +1539,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 

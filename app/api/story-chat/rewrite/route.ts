@@ -1,5 +1,5 @@
 import { selectedProseWriter, proseCostEstimate } from "../../../../lib/prose-writer";
-import { narrativeContext } from "../../../../lib/narrative-memory";
+import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import type { GenerationDiagnostic } from "../../../story-chat/types";
@@ -86,6 +86,7 @@ export async function POST(request: Request) {
       "Keep the reader inside the fixed POV character's immediate experience. Weave his private reactions, interpretations, withheld words and decisions through the live scene, rather than mainly reporting outward movements and surroundings. Prefer a revealing thought in his own voice over incidental set dressing. Retain enough physical orientation to follow the action, and let environmental details matter to what he notices or does. Do not add a thought after every line, pause for an internal essay, explain every feeling or repeat an established conclusion. Each response should develop with the unfolding interaction.",
       "Avoid habitual comma-and chains that string several independent actions, observations and thoughts into one sentence. Give a distinct action or change of thought its own sentence when that makes the sequence clearer. Use subordination or combine closely related actions where they belong together, and vary sentence length and construction. Keep occasional longer flowing sentences when they serve the character or moment, but do not use repeated and clauses as the default rhythm, even in action or internal monologue. Do not replace this habit with uniformly clipped sentences, fragments, semicolons or another repeated connector. Preserve natural contractions, voice, pace and all requested events.",
       "Use the Story Bible, continuity ledger and prior prose as background knowledge, not a checklist to narrate. Do not routinely list what is in the room, where everyone is, what the character has done, or what he already knows, wants or feels to re-establish the scene. Carry known facts silently; bring a detail or earlier event into the prose when it changes his present perception, choice, dialogue or action, or when the reader needs brief orientation. Let thoughts follow the unfolding moment rather than repeatedly taking stock. Keep purposeful atmosphere, necessary reminders and character-specific observations, but avoid inventory paragraphs, recap lists and repeated summaries in internal monologue. Do not compensate by stripping out interiority or making the prose sparse.",
+      CONTINUITY_CONSISTENCY_INSTRUCTION,
       "POV CHARACTER:\n" + text(body.povCharacter),
       "STORY BIBLE:\n" + JSON.stringify(body.storyBible ?? {}),
       "CONTINUITY AND CHARACTER VOICE PROFILES:\n" + JSON.stringify(narrativeContext(body.storyState, { pov: text(body.povCharacter), guidance: selectedWriter.instruction + "\n" + text(body.passage) })),
@@ -146,6 +147,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message, diagnostics }, { status: called ? 502 : 400 });
   }
 }
+
 
 
 

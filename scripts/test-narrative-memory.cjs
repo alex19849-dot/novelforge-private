@@ -50,3 +50,28 @@ assert.equal(context.importantFacts.length, 0, 'Verified full coverage must not 
 const historical = load('app/story-chat/generation.ts').getStoryStateBeforeChapter(corrected, 2);
 assert.equal(historical.chapterLedger.length, 1); assert.equal(historical.memoryCorrections.length, 1);
 console.log('PASS: source grounding, evidence ambiguity, knowledge learning time, history isolation, thread closure, invalidation, correction precedence and bounded retrieval.');
+
+
+// Broad chapter requests must retain old venue constraints even when recent
+// relationship records and POV names dominate lexical relevance.
+const venueChapter = chapter(1, 'The bar has no kitchen. Food comes from the takeout place next door.');
+const venueRule = record('bar-food-service', 'The bar has no kitchen; food comes from next door.', 'The bar has no kitchen.', { kind: 'world_rule', subject: 'The bar', characters: [], location: 'The bar' });
+const venueHistory = [entry(venueChapter, [venueRule]), ...Array.from({ length: 10 }, (_, i) => {
+  const c = chapter(i + 2, `Sam discusses the ordinary delivery number ${i} with Lee.`);
+  return entry(c, [record(`delivery-${i}`, `Sam checks delivery ${i}.`, c.content)]);
+})];
+const venueState = { ...state, chapterLedger: venueHistory };
+const broad = m.retrieveNarrativeMemory(venueState, { pov: 'Sam', guidance: 'Write the next chapter.', maxCharacters: 4000 });
+assert(broad.records.some(r => r.kind === 'world_rule' && r.key === 'bar:food:service'), 'An established negative venue capability must survive a broad generation request');
+assert(broad.text.length <= 4000);
+const reduced = m.narrativeContext(venueState, { pov: 'Sam', guidance: 'Write the next chapter.', maxCharacters: 7000 });
+assert(String(reduced.relevantStoryMemory).includes('bar:food:service'), 'Verified full coverage must not discard the venue constraint together with legacy notes');
+assert.equal(reduced.importantFacts.length, 0);
+const futureRule = entry(chapter(20, 'The bar kitchen has now opened.'), [record('bar-food-service', 'The bar now has a kitchen.', 'The bar kitchen has now opened.', { kind: 'world_rule', subject: 'The bar', characters: [], location: 'The bar' })]);
+const historicalVenue = m.retrieveNarrativeMemory({ ...venueState, chapterLedger: [...venueHistory, futureRule] }, { pov: 'Sam', guidance: 'Write the next chapter.', beforeChapter: 12 });
+assert(historicalVenue.records.some(r => r.claim === venueRule.claim), 'A rewrite must use the venue rule established before that chapter');
+assert(!historicalVenue.records.some(r => r.claim === 'The bar now has a kitchen.'));
+const changedVenue = m.retrieveNarrativeMemory({ ...venueState, chapterLedger: [...venueHistory, futureRule] }, { pov: 'Sam', guidance: 'Write the next chapter.' });
+assert(changedVenue.records.some(r => r.claim === 'The bar now has a kitchen.'), 'A supported update must supersede the old venue capability');
+assert(!changedVenue.records.some(r => r.claim === venueRule.claim));
+console.log('PASS: old world constraints survive broad requests, bounded full-coverage projection, historical rewrites and supported world-rule updates.');

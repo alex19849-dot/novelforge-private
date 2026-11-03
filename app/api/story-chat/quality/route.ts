@@ -447,6 +447,7 @@ export async function POST(request: Request) {
             "Flag only consequential invented events unsupported by the contract, original guidance, Story Bible or continuity. Dialogue, gestures, thoughts, humour, environmental interaction, attraction, minor reactions, micro-conflict and connective actions are normal creative freedom.",
             "For source-backed memory contradictions, cite the prior source chapter and the competing passage in this chapter in the finding message. Treat beliefs as beliefs, @reader information as unavailable to a POV unless learned, and missing knowledge records as unknown. Do not infer a contradiction from a missing record or an omitted mundane action. Manual memory corrections take precedence. A divergence from the Bible is a diagnostic issue, never permission to rewrite either source.",
             "Check meaningful continuity contradictions involving facts, character and relationship states, time, location, previous events, unresolved threads and especially character knowledge. Do not flag harmless wording differences.",
+            "Check within this chapter as well as against prior evidence: venue capabilities and food provenance, actor/recipient reversals in callbacks, garments changing within continuous action, physical access contradicting an explicitly locked exit, and elapsed-time claims exceeding the supported chronology. Cite the conflicting passages, not a hypothetical rule. Takeout does not establish an on-site kitchen; silence about a key does not prove nobody has one. Flag an access gap only where the stated sequence is materially impossible or unclear, and allow harmless compression or figurative exaggeration. Do not prescribe extra logistical scenes, wardrobe inventories, automatic rewrites or additional model calls.",
             "Check the specified POV character, person and tense. Distinguish real drift or head-hopping from dialogue, memories and grammatically necessary tense changes.",
             "Use available voice profiles and established information to flag only clear narration or dialogue drift, inappropriate vocabulary, or characters becoming indistinguishable. Allow emotional range.",
             "Inspect prose for patterns, not isolated examples: action-list narration, redundant emotional explanation, excessive staccato or one-line paragraphs, generic AI phrasing, repeated reactions or sentence structures, circular thought, exposition, purple prose, unnatural dialogue or lack of contractions, excessive comparisons, repeated mannerisms and inappropriate therapy-speak.",
@@ -647,6 +648,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 
