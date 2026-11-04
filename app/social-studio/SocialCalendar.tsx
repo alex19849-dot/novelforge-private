@@ -7,7 +7,7 @@ import StrategyPanel from './StrategyPanel';
 import {editedMetadata} from '../../lib/social-strategy';
 import { musicForPath } from '../../lib/social-music';
 import { readyForApproval } from '../../lib/social-approval';
-import { addDays, calendarDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
+import { addDays, calendarDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, AUTOMATED_PLATFORMS, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
 import type { CalendarPost, CalendarSeed, SocialPlatform } from '../../lib/social-calendar';
 
 type BackgroundJob = { id:string; start_date:string; job_type:'plan'|'media'; operation?:string; status:'generating'|'completed'|'failed'|'paused'; completed_tasks:number; total_tasks:number; created_count:number; error_message:string; cancel_requested:boolean };
@@ -41,7 +41,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const [undoBatch, setUndoBatch] = useState<CalendarPost[]>([]);
   const [planStart, setPlanStart] = useState(() => londonDate());
   const [planBook, setPlanBook] = useState('all');
-  const [planPlatforms, setPlanPlatforms] = useState<SocialPlatform[]>([...SOCIAL_PLATFORMS]);
+  const [planPlatforms, setPlanPlatforms] = useState<SocialPlatform[]>([...AUTOMATED_PLATFORMS]);
   const [planGuidance, setPlanGuidance] = useState('');
   const [planning, setPlanning] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
@@ -65,7 +65,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   }, [visiblePosts]);
   const approvalDrafts = visiblePosts.filter(post => post.status === 'draft' && (!post.scheduled_at || Date.parse(post.scheduled_at) > Date.now()));
   const readyPosts = approvalDrafts.filter(post => readyForApproval(post));
-  const musicNeeded = posts.filter(post=>post.platform==='tiktok' && ['draft','approved'].includes(post.status) && post.media_path && post.scheduled_at && Date.parse(post.scheduled_at)>Date.now() && !musicForPath(post.media_path)).length;
+  const musicNeeded = posts.filter(post=>(post.platform==='tiktok'||post.platform==='youtube') && ['draft','approved'].includes(post.status) && post.media_path && post.scheduled_at && Date.parse(post.scheduled_at)>Date.now() && !musicForPath(post.media_path)).length;
   const blockedDrafts = approvalDrafts.length - readyPosts.length;
   const reviewArtworkCount = new Set(posts.filter(post => post.quality_notes?.trim()).map(post => post.media_path || post.id)).size;
   const reviewGroups = useMemo(() => {
@@ -80,7 +80,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const reviewPosts = [...reviewGroups.values()].map(group => group.find(post => post.quality_notes?.trim()) ?? group[0]);
   const selectedPosts = postsByDate.get(selected) ?? [];
   const drafts = useMemo(() => visiblePosts.filter(post => !post.scheduled_at), [visiblePosts]);
-  const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.book_slug}:${post.platform === 'tiktok' ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
+  const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.book_slug}:${(post.platform==='tiktok'||post.platform==='youtube') ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
 
   async function load(silent = false) {
     if (loadingRef.current) return;
@@ -193,7 +193,8 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         if (uploadError) throw new Error(uploadError.message);
         mediaPath = uploadedPath; mediaType = mime.startsWith('video/') ? 'video' : 'image';
       }
-      if (approve && editor.platform !== 'facebook' && !mediaPath) throw new Error('Instagram and TikTok need an image or video before approval.');
+      if(approve&&editor.platform==='youtube'&&(mediaType!=='video'||!editor.title.trim()||editor.title.length>100))throw new Error('YouTube needs an MP4 video and a title of at most 100 characters.');
+      if (approve && editor.platform !== 'facebook' && !mediaPath) throw new Error('This platform needs media before approval.');
       const values = {
         book_slug: editor.bookSlug, book_title: editor.bookTitle, platform: editor.platform, post_type: editor.postType,
         title: editor.title.trim(), caption: editor.caption.trim(), hashtags, media_path: mediaPath, media_type: mediaType,
@@ -315,6 +316,9 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       {post.title && <h4 className="mt-2 font-semibold">{post.title}</h4>}
       <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-300">{post.caption || 'Caption to write'}</p>
       <p className="mt-2 break-words text-sm text-pink-300">{post.hashtags.join(' ')}</p>
+      {post.platform==='instagram'&&<p className="mt-2 text-sm text-amber-200">Instagram: prepared for manual posting.</p>}
+      {url&&<a href={url} target="_blank" rel="noreferrer" download className={`${buttonClass} mt-3 mr-2 inline-block`}>Download media</a>}
+      <button type="button" className={`${buttonClass} mt-3`} onClick={()=>void navigator.clipboard.writeText([post.caption.replace(/\\n/g,'\n'),post.hashtags.join(' ')].join('\n\n'))}>Copy caption</button>
       {url && (post.media_type === 'video' ? <video src={url} controls preload="none" className="mt-3 max-h-64 rounded-lg" /> : <img src={url} loading="lazy" alt={post.title || 'Post artwork'} className="mt-3 max-h-64 rounded-lg" />)}
       {musicForPath(post.media_path) && <p className="mt-2 text-xs text-emerald-300">Music included: {musicForPath(post.media_path)!.title} · Licensed backing track</p>}
       {post.quality_notes && <p className="mt-3 text-sm text-amber-200">Artwork review: {post.quality_notes}</p>}
@@ -341,7 +345,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     <p className="mt-3 text-xs text-neutral-400">Timing tests, in UK time: Facebook 10 am / noon / 6 pm; TikTok 10 am / 6 pm / 8 pm; Instagram noon / 7 pm / 9 pm. These are balanced test slots, not proven audience peaks. New batches favour qualified winners while continuing to test alternatives. You can edit individual times.</p>
     <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-500/5 p-4">
       <h3 className="font-bold">TikTok backing music</h3>
-      <p className="mt-2 text-sm text-neutral-300">New AI TikTok posts automatically become short videos with licensed music. Existing posters and silent clips can be prepared together in the background. Captions, dates and approvals are kept.</p>
+      <p className="mt-2 text-sm text-neutral-300">New AI TikTok and YouTube posts automatically become portrait videos with licensed music. Existing posters and silent clips can be prepared together in the background. Captions, dates and approvals are kept. Instagram content remains available for manual posting.</p>
       <button type="button" disabled={loading || saving || planning || mediaBusy || Boolean(editor) || !musicNeeded} onClick={()=>void startGeneration('music')} className={`${buttonClass} mt-3 bg-violet-600`}>{job?.status==='generating' && job.operation==='music' ? 'Adding music in the background...' : `Add music to all TikTok posts (${musicNeeded})`}</button>
     </div>
     <div className="mt-4 flex flex-wrap gap-3" aria-label="Calendar views">
@@ -426,3 +430,4 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     </form>}
   </section>;
 }
+

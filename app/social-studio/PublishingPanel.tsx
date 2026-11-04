@@ -31,13 +31,14 @@ export default function PublishingPanel({posts,onEnabledChange,onReload}:{posts:
     }catch(error){setError(error instanceof Error?error.message:'Publishing could not be updated.');}
     finally{setBusy(false);}
   }
-  const next=posts.filter(post=>post.status==='approved'&&post.scheduled_at&&Date.parse(post.scheduled_at)>Date.now()).sort((a,b)=>a.scheduled_at!.localeCompare(b.scheduled_at!))[0];
+  const next=posts.filter(post=>post.status==='approved'&&Boolean(settings?.channels?.[post.platform])&&post.scheduled_at&&Date.parse(post.scheduled_at)>Date.now()).sort((a,b)=>a.scheduled_at!.localeCompare(b.scheduled_at!))[0];
   const attention=entries.filter(entry=>['failed','attention','uncertain'].includes(entry.state));
   const history=[...attention,...entries.filter(entry=>!attention.includes(entry))].slice(0,showAll?300:30);
   return <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-4" aria-labelledby="publishing-title">
     <div className="flex flex-wrap items-center justify-between gap-3"><h3 id="publishing-title" className="font-bold">Automatic publishing: {settings?.enabled?'ON':'OFF'}</h3>
       <div className="flex flex-wrap gap-2"><button type="button" disabled={busy||!settings?.preflight_at} onClick={()=>void action(settings?.enabled?'pause':'enable')} className={`${button} ${settings?.enabled?'':'bg-emerald-600'}`}>{busy?'Updating...':settings?.enabled?'Pause publishing':'Enable automatic publishing'}</button><button type="button" disabled={busy} onClick={()=>void action('check')} className={button}>Check publishing status</button></div>
     </div>
+    <button type="button" disabled={busy} onClick={()=>void action('youtube')} className={`${button} mt-3`}>Use Facebook, TikTok and YouTube (Instagram manual)</button>
     <p className="mt-2 text-sm text-neutral-300">Approved posts stay editable here until their posting time, then NovelForge sends them to Buffer automatically. You can close this page. Pausing prevents new posts from starting; a post already being sent may finish.</p>
     {settings?.channels&&<p className="mt-2 text-xs text-emerald-300">{Object.entries(settings.channels).map(([platform,channel])=>`${platform}: ${channel.name}`).join(' · ')}</p>}
     {settings?.enabled&&next&&<p className="mt-2 text-sm">Next: {next.platform} · {new Date(next.scheduled_at!).toLocaleString('en-GB',{timeZone:'Europe/London',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} UK · {next.book_title}</p>}
@@ -55,3 +56,4 @@ export default function PublishingPanel({posts,onEnabledChange,onReload}:{posts:
     </details>}
   </div>;
 }
+

@@ -19,7 +19,7 @@ export function validateAiDays(value: unknown, platforms: SocialPlatform[], indi
     if (!day.hook?.trim() || !day.creativeBrief?.trim() || day.creativeBrief.length > 5000 || !Array.isArray(day.posts) || day.posts.length !== platforms.length) throw new Error('The AI returned an incomplete campaign. No drafts were saved.');
     const found = new Set<string>();
     for (const post of day.posts) {
-      if (!platforms.includes(post.platform) || found.has(post.platform) || !post.caption?.trim() || !post.title?.trim() || post.title.length > 240 || post.caption.length > 1800 || !Array.isArray(post.hashtags) || post.hashtags.length !== 5 || post.hashtags.some(tag => typeof tag !== 'string' || tag.length > 40 || !/^#[\p{L}\p{N}_]+$/u.test(tag))) throw new Error('The AI returned invalid platform copy. No drafts were saved.');
+      if (!platforms.includes(post.platform) || found.has(post.platform) || !post.caption?.trim() || !post.title?.trim() || post.title.length > (post.platform==='youtube'?100:240) || post.caption.length > 1800 || !Array.isArray(post.hashtags) || post.hashtags.length !== 5 || post.hashtags.some(tag => typeof tag !== 'string' || tag.length > 40 || !/^#[\p{L}\p{N}_]+$/u.test(tag))) throw new Error('The AI returned invalid platform copy. No drafts were saved.');
       found.add(post.platform);
     }
   }
@@ -32,7 +32,8 @@ export function plannedTime(start: string, index: number, platform: SocialPlatfo
 }
 export function plannedFormat(type: string, platform: SocialPlatform): 'image' | 'video' | null {
   if (!POST_TYPES.includes(type as typeof POST_TYPES[number])) throw new Error('Invalid post type.');
-  return type === 'video' || platform === 'tiktok' ? 'video' : platform === 'facebook' && ['reader_question','reader_engagement'].includes(type) ? null : 'image';
+  return type === 'video' || (platform === 'tiktok' || platform === 'youtube') ? 'video' : platform === 'facebook' && ['reader_question','reader_engagement'].includes(type) ? null : 'image';
 }
 
 export function generalReaderBook():PlanBook {return {slug:'',title:'',blurb:'General MM romance-reader entertainment. No book or character claims.',tropes:[],subgenre:'MM romance',kindleUnlimited:false,amazonUrl:'',coverUrl:''};}
+

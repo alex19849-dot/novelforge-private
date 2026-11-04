@@ -43,7 +43,7 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
     let config:Record<string,unknown>;
     let tasks:{ordinal:number;request:unknown}[]=[];
     if(kind==='music') {
-      const {data:rows,error}=await admin.from('social_posts').select('*').eq('user_id',user.id).eq('platform','tiktok').in('status',['draft','approved']).not('media_path','is',null).gt('scheduled_at',new Date().toISOString()).order('scheduled_at').limit(180);
+      const {data:rows,error}=await admin.from('social_posts').select('*').eq('user_id',user.id).in('platform',['tiktok','youtube']).in('status',['draft','approved']).not('media_path','is',null).gt('scheduled_at',new Date().toISOString()).order('scheduled_at').limit(180);
       if(error) throw new Error('Your TikTok media could not be loaded.');
       const selected=(rows as CalendarPost[]).filter(post=>!musicForPath(post.media_path));
       if(!selected.length) return jobJson({ok:true,message:'All future TikTok posts already have backing music.',status:'completed'});
@@ -82,7 +82,7 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
         for(const post of selected){
           if(!post.creative_brief?.trim()) return jobJson({error:'Add an AI creative brief to each selected draft first.'},400);
           if(post.book_slug&&!allBooks.some(b=>b.slug===post.book_slug&&b.coverUrl)) return jobJson({error:`The genuine cover for ${post.book_title} could not be found.`},400);
-          const key=`${post.campaign_id}:${post.book_slug}:${post.platform==='tiktok'?'portrait':'feed'}:${post.planned_media_type}:${post.creative_brief}`;
+          const key=`${post.campaign_id}:${post.book_slug}:${(post.platform==='tiktok'||post.platform==='youtube')?'portrait':'feed'}:${post.planned_media_type}:${post.creative_brief}`;
           groups.set(key,[...(groups.get(key)??[]),post]);
         }
         config={books:allBooks};
@@ -92,7 +92,7 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
           const first=group[0];
           const keepOriginal=Boolean(first.book_slug)&&previousFailures.some(task=>{
             const previous=task.request?.posts?.[0];
-            return previous?.campaign_id===first.campaign_id&&previous.creative_brief===first.creative_brief&&(previous.platform==='tiktok')===(first.platform==='tiktok')&&isImageModerationFailure(task.result?.provider_diagnostic??{});
+            return previous?.campaign_id===first.campaign_id&&previous.creative_brief===first.creative_brief&&((previous.platform==='tiktok'||previous.platform==='youtube'))===((first.platform==='tiktok'||first.platform==='youtube'))&&isImageModerationFailure(task.result?.provider_diagnostic??{});
           });
           return {ordinal,request:{posts:group,...(keepOriginal?{asset_mode:'original_cover_overlay'}:{})}};
         });
@@ -112,3 +112,4 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
     return jobJson({error:error instanceof Error?error.message:'Background generation could not be started.'},503);
   }
 }
+

@@ -1,3 +1,4 @@
+import type {SocialPlatform} from './social-calendar';
 import 'server-only';
 import {randomUUID} from 'node:crypto';
 import {start,getRun} from 'workflow/api';
@@ -13,11 +14,12 @@ export async function wakePublisher(owner:string) {
   if(error) throw new Error('The automatic publisher could not be checked.');
   if(data?.enabled&&data.workflow_run_id) await getRun(data.workflow_run_id).wakeUp();
 }
-export async function enablePublisher(owner:string) {
+export async function enablePublisher(owner:string,platforms?:SocialPlatform[]) {
   const db=jobAdmin();
   const {data:previous,error}=await db.from('social_publishing_settings').select('*').eq('user_id',owner).maybeSingle();
   if(error||!previous?.preflight_at||previous.test_drafts?.length) throw new Error('Buffer draft checks must finish before automatic publishing can be enabled.');
-  const channels=chooseMarlowChannels((await checkBufferConnection()).channels);
+  const selected=platforms??(Object.keys(previous.channels??{}).length?Object.keys(previous.channels) as SocialPlatform[]:undefined);
+  const channels=chooseMarlowChannels((await checkBufferConnection()).channels,false,selected);
   const lease=randomUUID();
   const {error:saveError}=await db.from('social_publishing_settings').update({enabled:true,channels,connection_checked_at:new Date().toISOString(),lease,generation:0,workflow_run_id:null,heartbeat_at:null,last_error:'',updated_at:new Date().toISOString()}).eq('user_id',owner);
   if(saveError) throw new Error('Automatic publishing could not be enabled.');
@@ -31,3 +33,4 @@ export async function enablePublisher(owner:string) {
     throw error;
   }
 }
+

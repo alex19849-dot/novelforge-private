@@ -19,7 +19,7 @@ type Connection = {
 };
 const platforms = [
   { service: "tiktok", label: "TikTok" },
-  { service: "instagram", label: "Instagram" },
+  { service: "youtube", label: "YouTube Shorts" },
   { service: "facebook", label: "Facebook" },
 ];
 
@@ -89,3 +89,4 @@ export default function BufferConnection() {
     </section>
   );
 }
+

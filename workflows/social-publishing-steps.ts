@@ -2,7 +2,7 @@ import {getWorkflowMetadata} from 'workflow';
 import {jobAdmin} from '../lib/social-job-db';
 import {bufferPayload,BufferPublishError,createBufferPost,readBufferPost,recentBufferPosts,matchingBufferPosts} from '../lib/buffer-publishing';
 import type {ProviderPost} from '../lib/buffer-publishing';
-import type {CalendarPost} from '../lib/social-calendar';
+import type {SocialPlatform,CalendarPost} from '../lib/social-calendar';
 import {checkBufferConnection} from '../lib/buffer';
 import {chooseMarlowChannels} from '../lib/buffer-publishing';
 type Publication={post_id:string;user_id:string;attempt:number;state:string;provider_post_id:string|null;payload:any;submitted_at:string;next_check_at:string|null;poll_count:number};
@@ -60,12 +60,12 @@ export async function publishingTick(owner:string,lease:string,generation:number
     const {data:pending,error:pendingError}=await db.from('social_publications').select('*').eq('user_id',owner).in('state',['submitting','accepted','uncertain']).lte('next_check_at',now).order('next_check_at').limit(6);
     if(pendingError) throw new Error('The publishing history could not be loaded.');
     for(const item of pending) await reconcile(item,settings.channels);
-    const {data:due,error:dueError}=await db.from('social_posts').select('*').eq('user_id',owner).eq('status','approved').lte('scheduled_at',now).order('scheduled_at').limit(6);
+    const {data:due,error:dueError}=await db.from('social_posts').select('*').eq('user_id',owner).eq('status','approved').in('platform',Object.keys(settings.channels)).lte('scheduled_at',now).order('scheduled_at').limit(6);
     if(dueError) throw new Error('Approved posts could not be loaded.');
     // Refresh connection health only when work is due, not during every idle tick.
     if(due.length&&Date.now()-Date.parse(settings.connection_checked_at??'2000-01-01')>6*60*60_000) {
-      const fresh=chooseMarlowChannels((await checkBufferConnection()).channels,true);
-      for(const platform of ['facebook','instagram','tiktok']) if(settings.channels[platform]?.id!==fresh[platform].id) throw new Error('A Buffer channel changed. Pause and reconnect before publishing to a different account.');
+      const fresh=chooseMarlowChannels((await checkBufferConnection()).channels,true,Object.keys(settings.channels) as SocialPlatform[]);
+      for(const platform of Object.keys(settings.channels)) if(settings.channels[platform]?.id!==fresh[platform].id) throw new Error('A Buffer channel changed. Pause and reconnect before publishing to a different account.');
       const {error}=await db.from('social_publishing_settings').update({connection_checked_at:now,channels:fresh}).eq('user_id',owner).eq('lease',lease);
       if(error) throw new Error('Connection health could not be saved.');
       settings.channels=fresh;
@@ -95,7 +95,7 @@ export async function publishingTick(owner:string,lease:string,generation:number
         await result(item,type==='retry'?'retry':type==='rejected'?'failed':'uncertain',{error:error instanceof Error?error.message:'The Buffer response could not be confirmed.',delay:error instanceof BufferPublishError?error.retryAfter:120});
       }
     }
-    const {data:future,error:futureError}=await db.from('social_posts').select('scheduled_at').eq('user_id',owner).eq('status','approved').gt('scheduled_at',now).order('scheduled_at').limit(1);
+    const {data:future,error:futureError}=await db.from('social_posts').select('scheduled_at').eq('user_id',owner).eq('status','approved').in('platform',Object.keys(settings.channels)).gt('scheduled_at',now).order('scheduled_at').limit(1);
     const {data:checks,error:checksError}=await db.from('social_publications').select('next_check_at').eq('user_id',owner).in('state',['submitting','accepted','uncertain']).not('next_check_at','is',null).order('next_check_at').limit(1);
     if(futureError||checksError) throw new Error('The next publishing time could not be checked.');
     const times=[...retryTimes,...[future[0]?.scheduled_at,checks[0]?.next_check_at].filter(Boolean).map(time=>Date.parse(time))];
@@ -122,3 +122,4 @@ export async function reportPublisherHandoffFailure(owner:string,lease:string,ge
   const {error}=await jobAdmin().from('social_publishing_settings').update({last_error:'The next publishing worker could not start. Automatic recovery is retrying in five minutes.'}).eq('user_id',owner).eq('lease',lease).eq('generation',generation).eq('enabled',true).is('workflow_run_id',null);
   if(error) throw new Error('The publishing handover error could not be saved.');
 }
+

@@ -1,5 +1,5 @@
 // Server-only provider operations. No credentials or provider requests enter the browser.
-import type { CalendarPost } from './social-calendar';
+import type { CalendarPost,SocialPlatform } from './social-calendar';
 import type { BufferChannel } from './buffer';
 export class BufferPublishError extends Error {
   kind:'retry'|'rejected'|'unknown';
@@ -22,11 +22,11 @@ export async function bufferRequest<T>(document:string,variables:unknown={},muta
   if(result.errors?.length||!result.data) throw new BufferPublishError('Buffer could not confirm the operation. Check API permissions and the saved publishing error.',mutating?'unknown':'retry');
   return result.data;
 }
-export function chooseMarlowChannels(channels:BufferChannel[],allowUnhealthy=false) {
+export function chooseMarlowChannels(channels:BufferChannel[],allowUnhealthy=false,platforms:SocialPlatform[]=['facebook','tiktok','youtube']) {
   const selected:Record<string,BufferChannel>={};
-  for(const platform of ['facebook','instagram','tiktok']) {
-    const expected=platform==='instagram'?'marlowquinnauthor':'marlowquinn';
-    const candidates=channels.filter(channel=>channel.service===platform&&channel.name.toLowerCase().replace(/[^a-z0-9]/g,'')===expected);
+  for(const platform of platforms) {
+    const expected=['instagram','youtube'].includes(platform)?'marlowquinnauthor':'marlowquinn';
+    const candidates=channels.filter(channel=>channel.service===platform&&(channel.name.toLowerCase().replace(/[^a-z0-9]/g,'')===expected||(platform==='youtube'&&channel.name.toLowerCase().replace(/[^a-z0-9]/g,'')==='marlowquinn')));
     if(candidates.length!==1) throw new Error(`Choose one unambiguous Marlow Quinn ${platform} connection in Buffer.`);
     const channel=candidates[0];
     if(!allowUnhealthy&&(channel.isDisconnected||channel.isLocked||channel.isQueuePaused)) throw new Error(`The ${platform} connection needs attention in Buffer (disconnected, locked or paused).`);
@@ -36,12 +36,13 @@ export function chooseMarlowChannels(channels:BufferChannel[],allowUnhealthy=fal
 }
 export function bufferPayload(post:CalendarPost,channel:BufferChannel,storageUrl:string) {
   const text=[post.caption.trim(),post.hashtags.join(' ').trim()].filter(Boolean).join('\n\n');
-  if(!text||text.length>(post.platform==='facebook'?10000:2200)) throw new Error(`${post.platform} caption and hashtags exceed its publishing limit.`);
+  if(!text||text.length>(post.platform==='facebook'?10000:post.platform==='youtube'?5000:2200)) throw new Error(`${post.platform} caption and hashtags exceed its publishing limit.`);
   if(post.platform!=='facebook'&&!post.media_path) throw new Error(`${post.platform} needs media before publishing.`);
   if(post.media_path&&!post.media_path.startsWith(`${post.user_id}/calendar/`)) throw new Error('The attached media does not belong to this calendar.');
+  if(post.platform==='youtube'&&(!post.title.trim()||post.title.length>100||post.media_type!=='video')) throw new Error('YouTube needs an MP4 video and a title of at most 100 characters.');
   const assets=post.media_path?[post.media_type==='video'?{video:{url:storageUrl,metadata:{thumbnailOffset:1000}}}:{image:{url:storageUrl}}]:[];
   const generated=Boolean(post.generation_run_id);
-  const metadata=post.platform==='instagram'?{instagram:{type:post.media_type==='video'?'reel':'post',shouldShareToFeed:true,isAiGenerated:generated}}:post.platform==='tiktok'?{tiktok:post.media_type==='video'?{isAiGenerated:generated}:{title:post.title}}:{facebook:{type:'post'}};
+  const metadata=post.platform==='youtube'?{youtube:{title:post.title.trim(),categoryId:'24',madeForKids:false,privacy:'public',isAiGenerated:generated}}:post.platform==='instagram'?{instagram:{type:post.media_type==='video'?'reel':'post',shouldShareToFeed:true,isAiGenerated:generated}}:post.platform==='tiktok'?{tiktok:post.media_type==='video'?{isAiGenerated:generated}:{title:post.title}}:{facebook:{type:'post'}};
   return {channelId:channel.id,text,assets,metadata,mode:'shareNow',schedulingType:'automatic',needsApproval:false,saveToDraft:false,aiAssisted:generated,source:`novelforge:${post.id}`};
 }
 export async function createBufferPost(input:Record<string,unknown>):Promise<ProviderPost> {
@@ -66,3 +67,4 @@ export function matchingBufferPosts(posts:ProviderPost[],payload:any,since:strin
   const sources=(payload.assets??[]).map(asset=>(asset.video??asset.image)?.url).sort();
   return posts.filter(post=>post.channelId===payload.channelId&&post.text===payload.text&&post.via==='api'&&post.status!=='draft'&&Date.parse(post.createdAt)>=Date.parse(since)&&JSON.stringify((post.assets??[]).map(asset=>asset.source).sort())===JSON.stringify(sources));
 }
+

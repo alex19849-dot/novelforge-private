@@ -1,4 +1,4 @@
-export const SOCIAL_PLATFORMS = ['facebook', 'instagram', 'tiktok'] as const;
+export const SOCIAL_PLATFORMS = ['facebook', 'instagram', 'tiktok', 'youtube'] as const;
 export type SocialPlatform = typeof SOCIAL_PLATFORMS[number];
 export const POST_TYPES = ['premise_hook', 'trope_hook', 'character_conflict', 'reader_question', 'humour', 'book_promotion', 'new_release', 'video', 'reader_engagement','romance_hot_take','this_or_that','original_quote'] as const;
 export const POST_LABELS: Record<string, string> = {
@@ -46,3 +46,7 @@ export function calendarError(error: { message?: string; code?: string } | null)
   if (error?.code === '23505') return 'This post is already saved. Refresh the calendar before adding it again.';
   return error?.message || 'The calendar could not be saved. Your editor is still open.';
 }
+
+
+export const AUTOMATED_PLATFORMS: SocialPlatform[] = ['facebook','tiktok','youtube'];
+export function portraitPlatform(platform:string){return platform==='tiktok'||platform==='youtube';}

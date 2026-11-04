@@ -8,7 +8,7 @@ const IMAGE_MODEL = "gpt-image-2";
 const CHECK_MODEL = "gpt-5.6-terra";
 const openai = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-type SocialPlatform = "facebook" | "instagram" | "tiktok";
+type SocialPlatform = "facebook" | "instagram" | "tiktok" | "youtube";
 type CreativeOutput = "image" | "video";
 
 type CampaignRequest = {
@@ -277,8 +277,8 @@ export function posterPrompt(
   return [
     "You are creating finished commercial artwork for NovelForge, not a wireframe, dashboard, presentation slide or coded template.",
     outputLabel(outputType),
-    platform === "tiktok"
-      ? "The tool output will be centre-cropped from 2:3 to a final 9:16 TikTok poster. Keep every important word, face, cover and call to action inside the central 84 percent of the width. Keep important content away from interface areas near the right and bottom edges. Compose specifically for that final crop."
+    (platform === "tiktok" || platform === "youtube")
+      ? "The tool output will be centre-cropped from 2:3 to a final 9:16 short-video poster. Keep every important word, face, cover and call to action inside the central 84 percent of the width. Keep important content away from interface areas near the right and bottom edges. Compose specifically for that final crop."
       : "The tool output will be centre-cropped from 2:3 to a final 4:5 Facebook or Instagram feed poster. Keep every important word, face, cover and call to action inside the central 83 percent of the height. Compose specifically for that final crop.",
     "AUTHOR CONTROL",
     "The author's guidance below is the creative brief. Each generation must be art-directed specifically for that brief and must not reuse a fixed layout.",
@@ -626,4 +626,5 @@ export async function handleArtwork(request: Request) {
     );
   }
 }
+
 

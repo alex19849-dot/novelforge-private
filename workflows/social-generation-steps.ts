@@ -84,11 +84,11 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
     // Reuse a completed feed/portrait asset when another platform still needs it.
     const {data:existing,error}=await db.from('social_posts').select('*').eq('user_id',job.user_id).eq('campaign_id',first.campaign_id).not('media_path','is',null);
     if(error) throw new FatalError('Existing artwork could not be checked.');
-    const match=(existing as CalendarPost[]).find(p=>p.book_slug===first.book_slug&&p.media_type===(first.platform==='tiktok'?'video':first.planned_media_type)&&p.creative_brief===first.creative_brief&&(p.platform==='tiktok')===(first.platform==='tiktok'));
+    const match=(existing as CalendarPost[]).find(p=>p.book_slug===first.book_slug&&p.media_type===((first.platform==='tiktok'||first.platform==='youtube')?'video':first.planned_media_type)&&p.creative_brief===first.creative_brief&&((p.platform==='tiktok'||p.platform==='youtube'))===((first.platform==='tiktok'||first.platform==='youtube')));
     if(match) { await attachMedia(job,task,match.media_path!,match.quality_notes??'',match.media_type!); return null; }
     const book=first.book_slug?job.config.books.find(b=>b.slug===first.book_slug)!:generalReaderBook();
     request={model:'gpt-6-astra',background:true,store:true,reasoning:{effort:'low'},max_output_tokens:1000,
-      input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,first.platform==='tiktok',book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)},...(book.coverUrl?[{type:'input_image' as const,image_url:book.coverUrl,detail:'high' as const}]:[])]}],
+      input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,(first.platform==='tiktok'||first.platform==='youtube'),book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)},...(book.coverUrl?[{type:'input_image' as const,image_url:book.coverUrl,detail:'high' as const}]:[])]}],
       tools:[{type:'image_generation',model:'gpt-image-2',size:'1024x1536',quality:'medium',output_format:'jpeg',output_compression:92,background:'opaque'}],tool_choice:{type:'image_generation'}};
   }
   try { return (await ai().responses.create(request)).id; }
@@ -173,8 +173,8 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
       throw new FatalError(noImageMessage(response));
     }
     let artworkSource=Buffer.from(image.result,'base64');
-    if(task.request.asset_mode==='original_cover_overlay') artworkSource=Buffer.from(await compositeOriginalCover(artworkSource,await originalCoverBytes(book.coverUrl),first.platform==='tiktok'));
-    const video=first.platform==='tiktok'||first.planned_media_type==='video';
+    if(task.request.asset_mode==='original_cover_overlay') artworkSource=Buffer.from(await compositeOriginalCover(artworkSource,await originalCoverBytes(book.coverUrl),(first.platform==='tiktok'||first.platform==='youtube')));
+    const video=(first.platform==='tiktok'||first.platform==='youtube')||first.planned_media_type==='video';
     const track=video?chooseSocialTrack(first.campaign_id,first.post_type):null;
     const extension=video?'mp4':'jpg';
     const file=`${taskId}${track?`-music-v${MUSIC_VERSION}-${track.id}`:''}.${extension}`;
@@ -182,7 +182,7 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
     const {data:files,error:listError}=await db.storage.from('social-media').list(`${job.user_id}/calendar`,{search:file,limit:1});
     if(listError) throw new Error('Media storage could not be checked.');
     if(!files.some(f=>f.name===file)) {
-      const media=await renderSocialMedia(artworkSource,first.platform==='tiktok',video,task.request.asset_mode==='original_cover_overlay'?'contain':'cover',track?await socialTrackAudio(track):undefined);
+      const media=await renderSocialMedia(artworkSource,(first.platform==='tiktok'||first.platform==='youtube'),video,task.request.asset_mode==='original_cover_overlay'?'contain':'cover',track?await socialTrackAudio(track):undefined);
       if(media.length>50*1024*1024) throw new FatalError('This media exceeds the 50 MB storage limit.');
       const {error}=await db.storage.from('social-media').upload(path,media,{contentType:extension==='mp4'?'video/mp4':'image/jpeg',upsert:false});
       if(error&&error.statusCode!=='409') throw new Error('The generated media could not be uploaded. Retrying the same saved image.');
@@ -203,7 +203,7 @@ export async function renderMusicTask(runId:string,taskId:string) {
   const {db,job,task}=await context(runId,taskId);
   if(task.status==='completed'||task.status==='skipped') return;
   const original=task.request.posts?.[0];
-  if(!task.request.music||!original?.media_path||!original.media_path.startsWith(`${job.user_id}/calendar/`)||original.platform!=='tiktok') throw new FatalError('Invalid soundtrack task.');
+  if(!task.request.music||!original?.media_path||!original.media_path.startsWith(`${job.user_id}/calendar/`)||!['tiktok','youtube'].includes(original.platform)) throw new FatalError('Invalid soundtrack task.');
   const track=chooseSocialTrack(original.campaign_id,original.post_type);
   const hash=createHash('sha256').update(original.media_path).digest('hex').slice(0,16);
   const file=`${original.id}-${hash}-music-v${MUSIC_VERSION}-${track.id}.mp4`;
@@ -250,3 +250,4 @@ export async function finishJob(runId:string,paused:boolean) {
   const {error:updateError}=await db.from('social_generation_runs').update({status:paused?'paused':failed.length?'failed':'completed',error_message:failed.length?`${failed.length} item(s) need attention. ${failed[0].error_message}`:'',updated_at:new Date().toISOString()}).eq('id',runId).eq('user_id',job.user_id);
   if(updateError) throw new Error('The final job status could not be saved.');
 }
+

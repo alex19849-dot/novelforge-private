@@ -43,7 +43,7 @@ export function buildLearningReport(posts:PerformancePost[],snapshots:MetricSnap
  }
  const observations=[...latest.values()];
  const platforms:PlatformLearning[]=[];
- for(const platform of ['facebook','instagram','tiktok'] as SocialPlatform[]){
+ for(const platform of ['facebook','instagram','tiktok','youtube'] as SocialPlatform[]){
   const measured=new Map<string,Measured>();
   const current=observations.filter(p=>p.post.platform===platform).sort((a,b)=>Date.parse(a.snapshot.provider_updated_at)-Date.parse(b.snapshot.provider_updated_at));
   for(const item of current){
@@ -88,3 +88,4 @@ export function buildLearningReport(posts:PerformancePost[],snapshots:MetricSnap
  }
  return {version:1,updated_at:now.toISOString(),source_updated_at:newest?new Date(newest).toISOString():null,snapshot_posts:available.size,platforms};
 }
+

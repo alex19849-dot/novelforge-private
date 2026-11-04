@@ -93,7 +93,7 @@ export function createStrategyAssignments(start:string,platforms:SocialPlatform[
     const score=(v:string)=>{const e=learning?.attributes.find(s=>s.attribute==='visual'&&s.value===v&&s.ready);return (visualUsed[v]??0)+(out.at(-1)?.visual===v?1:0)-(settings.adaptive&&e?.discovery!=null?Math.max(-.25,Math.min(.25,e.discovery)):0);};
     return score(a)-score(b)||checksum(start+a)-checksum(start+b);
    })[0];visualUsed[visual]=(visualUsed[visual]??0)+1;
-   const styles=platform==='facebook'?['conversational_question','short_story_hook','playful_one_liner']:platform==='tiktok'?['immediate_booktok_hook','pov_opening','reader_confession']:['concise_visual_caption','reader_confession','short_question'];
+   const styles=platform==='facebook'?['conversational_question','short_story_hook','playful_one_liner']:(platform==='tiktok'||platform==='youtube')?['immediate_booktok_hook','pov_opening','reader_confession']:['concise_visual_caption','reader_confession','short_question'];
    const captionStyle=styles.sort((a,b)=>{const cost=(v:string)=>{const e=learning?.attributes.find(s=>s.attribute==='caption'&&s.value===v&&s.ready);return (styleUsed[v]??0)-(settings.adaptive&&e?.discovery!=null?Math.max(-.35,Math.min(.35,e.discovery)):0);};return cost(a)-cost(b);})[0];styleUsed[captionStyle]=(styleUsed[captionStyle]??0)+1;
    out.push({platform,family,book,postType:FAMILY_POST_TYPES[family],visual,captionStyle});
   }
@@ -118,3 +118,4 @@ export function editedMetadata(post:CalendarPost,changes:{post_type:string;capti
 }
 
 export function learnedPostingHours(report:LearningReport|null|undefined,platform:SocialPlatform,adaptive=true){return adaptive?(report?.platforms.find(p=>p.platform===platform)?.attributes??[]).filter(a=>a.attribute==='uk_hour'&&a.ready&&(a.discovery??0)>.1).sort((a,b)=>(b.discovery??0)-(a.discovery??0)).slice(0,2).map(a=>Number(a.value)).filter(n=>Number.isInteger(n)&&n>=0&&n<=23):[];}
+

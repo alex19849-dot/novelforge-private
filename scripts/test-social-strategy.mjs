@@ -20,7 +20,7 @@ for(let mask=0;mask<255;mask++){const settings={...DEFAULT_STRATEGY,disabled_fam
 assert.throws(()=>cleanStrategy({...DEFAULT_STRATEGY,disabled_families:FAMILIES}));assert.ok(tooSimilar('What is your favourite romance trope to read?', 'What is your favourite romance trope to read tonight?'));
 assert.deepEqual(normaliseMetrics([{type:'views',value:0,unit:'count'},{type:'reach',value:-1,unit:'count'},{type:'engagementRate',value:1000,unit:'percentage'}]),{views:0});
 const now=new Date('2026-11-30T12:00:00Z'),posts=[],snapshots=[];
-for(const platform of ['instagram','tiktok'])for(let i=0;i<16;i++){
+for(const platform of ['instagram','tiktok','youtube'])for(let i=0;i<16;i++){
  const date=new Date(now.getTime()-(25-i)*86400000).toISOString(),id=platform+i,question=i%2===0;
  posts.push({id,platform,media_type:'image',book_slug:question?'':'alpha',published_at:date,scheduled_at:date,content_metadata:{origin:'planned_v2',family:question?'reader_question':'book_promotion',visual_type:question?'question_card':'cover_hero'}});
  snapshots.push({post_id:id,provider_updated_at:new Date(Date.parse(date)+48*3600000).toISOString(),metrics:{views:(platform==='tiktok'?1000:100)*(question?2:1),comments:question?12:2,clicks:question?1:12}});
@@ -49,3 +49,4 @@ const post=(await db.query("insert into social_posts(campaign_id,user_id,platfor
 await db.query("insert into social_publications(post_id,user_id,state,payload,scheduled_at) values($1,$2,'submitting','{}',now())",[post.id,owner]);await db.query("update social_posts set caption='Later changed' where id=$1",[post.id]);assert.equal((await db.query('select content_snapshot from social_publications where post_id=$1',[post.id])).rows[0].content_snapshot.caption,'Approved original');
 await assert.rejects(()=>db.query("insert into social_metric_snapshots(post_id,user_id,provider_updated_at,metrics) values($1,$2,now(),'{}')",[post.id,other]),/foreign key/);await db.close();
 console.log('PASS: real SQL owner RLS, client write denial, fenced/hourly collection claims, cross-owner snapshot rejection, and frozen publication metadata.');
+
