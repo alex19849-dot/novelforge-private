@@ -1,6 +1,4 @@
 {
   "framework": "nextjs",
-  "installCommand": "npm install",
-  "crons": [{"path":"/api/social-studio/repair-worker","schedule":"15 16 * * *"}]
+  "installCommand": "npm install"
 }
-

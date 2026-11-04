@@ -1,10 +1,11 @@
 """Upload checked immutable exports through the expiring maintenance endpoint.
 The local auth file is never committed. Verify every uploaded public object.
 """
-import concurrent.futures,json,hashlib,urllib.request,urllib.error
+import concurrent.futures,json,hashlib,urllib.request,urllib.error,argparse
 from pathlib import Path
 root=Path(__file__).resolve().parents[1];scratch=root.parent;out=scratch/'outputs/romance-rebuild'
-auth=json.loads((scratch/'content-upload-auth.local.json').read_text());anon=json.loads((scratch/'content-public-key.local.json').read_text())['key'];assets=json.loads((out/'upload-manifest.json').read_text())
+parser=argparse.ArgumentParser();parser.add_argument('--manifest',default='upload-manifest.json');parser.add_argument('--verification',default='remote-verification.json');args=parser.parse_args()
+auth=json.loads((scratch/'content-upload-auth.local.json').read_text());anon=json.loads((scratch/'content-public-key.local.json').read_text())['key'];assets=json.loads((out/args.manifest).read_text())
 origin='https://rchktrrkwqsazlxmjmog.supabase.co';endpoint=origin+'/functions/v1/social-content-revision-upload'
 def upload(a):
  data=Path(a['local_path']).read_bytes();assert hashlib.sha256(data).hexdigest()==a['sha256']
@@ -24,4 +25,4 @@ try:
  raise AssertionError('Unauthenticated handler accepted a request')
 except urllib.error.HTTPError as e:assert e.code==401
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:results=list(pool.map(upload,assets))
-(out/'remote-verification.json').write_text(json.dumps(results,indent=2));print(json.dumps({'all_uploads_verified':len(results)}),flush=True)
+(out/args.verification).write_text(json.dumps(results,indent=2));print(json.dumps({'all_uploads_verified':len(results)}),flush=True)

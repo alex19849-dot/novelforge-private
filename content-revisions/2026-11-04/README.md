@@ -1,3 +1,5 @@
+> Superseded: the flat card visuals were rejected. Use the book-specific object-only romance pipeline in ../2026-11-04-romance/ and scripts/rebuild-romance-media.py. The improved copy remains in use.
+
 # November queued-content revision
 
 Scope: the 68 unpublished approved Facebook, TikTok and YouTube posts read on 4 November 2026. Instagram and already published content are excluded.

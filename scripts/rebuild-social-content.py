@@ -105,4 +105,4 @@ def main():
   updates.append({'id':p['id'],'user_id':p['user_id'],'expected_version':p['version'],'expected_media_path':p['media_path'],'title':title,'caption':caption,'hashtags':tags,'media_path':media_path,'metadata':{**p.get('content_metadata',{}),'content_revision':'2026-11-04-v2','revision_original_media':p['media_path'],'revision_original_version':p['version'],'revision_hook':idea['hook']}})
  (out/'upload-manifest.json').write_text(json.dumps(media,indent=2));(out/'post-updates.json').write_text(json.dumps(updates,indent=2));(out/'source-backup.json').write_text(json.dumps(source,indent=2))
  print(json.dumps({'prepared_updates':len(updates),'media_exports':len(media)}),flush=True)
-if __name__=='__main__':main()
+if __name__=='__main__':raise SystemExit('Retired corporate-card exporter. Use scripts/rebuild-romance-media.py; retain the revised copy.')
