@@ -1,0 +1,23 @@
+// Temporary maintenance uploader. Inject an expiring token digest and exact
+// immutable path/checksum allowlist, then redeploy a 410 handler after use.
+const tokenDigest = '__TOKEN_DIGEST__';
+const expires = __EXPIRES__;
+const allowed:Record<string,{sha256:string;size:number}> = __ALLOWLIST__;
+const hex=(bytes:ArrayBuffer)=>Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');
+Deno.serve(async(req:Request)=>{
+ if(req.method!=='POST'||Date.now()>expires)return new Response('Unavailable',{status:410});
+ const token=req.headers.get('x-content-token')??'';
+ if(token.length!==64||hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token)))!==tokenDigest)return new Response('Unauthorized',{status:401});
+ const path=req.headers.get('x-content-path')??'',asset=allowed[path];
+ if(!asset||Number(req.headers.get('content-length'))!==asset.size||asset.size>10000000)return new Response('Invalid asset',{status:400});
+ const data=await req.arrayBuffer();
+ if(data.byteLength!==asset.size||hex(await crypto.subtle.digest('SHA-256',data))!==asset.sha256)return new Response('Checksum mismatch',{status:400});
+ const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+ const origin=Deno.env.get('SUPABASE_URL');
+ if(!key||!origin)return new Response('Storage unavailable',{status:503});
+ const response=await fetch(origin+'/storage/v1/object/social-media/'+path,{method:'POST',headers:{Authorization:'Bearer '+key,apikey:key,'Content-Type':'video/mp4','x-upsert':'false'},body:data});
+ if(response.ok)return Response.json({ok:true,path,sha256:asset.sha256});
+ // No upstream response body or key is exposed. An existing path is verified
+ // separately against its public bytes, never overwritten.
+ return Response.json({ok:false,status:response.status},{status:409});
+});
