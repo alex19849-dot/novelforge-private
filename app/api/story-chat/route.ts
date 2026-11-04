@@ -1,3 +1,4 @@
+import { requestsChapterGeneration } from "../../../lib/chapter-request";
 import OpenAI from "openai";
 import { isStoryBibleRequest, parseStoryBibleImport, requestsNewBibleWorkspace, bibleOutputAllowance } from "../../../lib/story-bible-request";
 import { createAionBibleEdit } from "../../../lib/aion-story-bible";
@@ -2335,6 +2336,7 @@ export async function POST(request: Request) {
 
     const chapterRequestText = bibleRequest ? "" : removeNegatedChapterProseRequests(latestMessage);
     const explicitlyRequestsChapterProse =
+      requestsChapterGeneration(chapterRequestText) ||
       /\b(?:write|generate|continue|create)\b[\s\S]{0,100}\bchapter(?:\s+\d+|\s+(?:one|two|three|four|five|six|seven|eight|nine|ten))?\b/i.test(
         chapterRequestText,
       ) ||

@@ -4,7 +4,7 @@ const ts = require('typescript');
 function load(file, mocks = {}, extra = '') {
   const js = ts.transpileModule(fs.readFileSync(file, 'utf8') + '\n' + extra, { compilerOptions: { target: ts.ScriptTarget.ES2017, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', js)(id => id in mocks ? mocks[id] : /\/(story-bible-request|aion-story-bible|aion-chapter-planner|narrative-memory|prose-writer)$/.test(id) ? load('lib/' + id.split('/').at(-1) + '.ts') : id.endsWith('/generation') ? {} : require(id), module, module.exports);
+  new Function('require', 'module', 'exports', js)(id => id in mocks ? mocks[id] : /\/(chapter-request|story-bible-request|aion-story-bible|aion-chapter-planner|narrative-memory|prose-writer)$/.test(id) ? load('lib/' + id.split('/').at(-1) + '.ts') : id.endsWith('/generation') ? {} : require(id), module, module.exports);
   return module.exports;
 }
 process.env.OPENAI_API_KEY = 'mock';
@@ -85,6 +85,6 @@ const request = message => new Request('https://example.test/api/story-chat', { 
   }
   const page = fs.readFileSync('app/story-chat/page.tsx', 'utf8');
   assert(page.includes('&& !bibleRequest'));
-  assert(page.includes('if (!bibleRequest && !hasPendingChapter'));
+  assert(page.includes('if (!bibleRequest && requestsChapterGeneration(trimmedMessage))'));
   console.log('PASS: exact no-cost Bible import, separate workspace, Aion/Terra routing and budgets, patch preservation, malformed/truncated output rejected without retry.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

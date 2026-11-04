@@ -68,7 +68,7 @@ export async function createAionChapterPlan(input: {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST", headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "aion-labs/aion-3.5", messages, response_format: { type: "json_object" }, reasoning: { effort: "low" }, temperature: 0.2, max_tokens: 4000, provider: { allow_fallbacks: false } }),
-      signal: AbortSignal.timeout(110000),
+      signal: AbortSignal.timeout(240000),
     });
     const data = await response.json();
     usage = data.usage;
@@ -82,7 +82,10 @@ export async function createAionChapterPlan(input: {
     return { status: "completed" as const, incomplete_details: null, output_text: outputText,
       usage: { input_tokens: usage?.prompt_tokens ?? 0, output_tokens: usage?.completion_tokens ?? 0, total_tokens: usage?.total_tokens ?? 0, input_tokens_details: { cached_tokens: usage?.prompt_tokens_details?.cached_tokens ?? 0 } } };
   } catch (error) {
-    input.diagnostics.push(diagnostic("failed", error instanceof Error ? error.message : "Aion chapter planning failed."));
-    throw error;
+    const failure = error instanceof Error && error.name === "TimeoutError"
+      ? new Error("Aion chapter planning timed out after four minutes. Saved chapters and drafts are preserved. No automatic retry was started.")
+      : error;
+    input.diagnostics.push(diagnostic("failed", failure instanceof Error ? failure.message : "Aion chapter planning failed."));
+    throw failure;
   }
 }

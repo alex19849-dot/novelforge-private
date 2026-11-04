@@ -4,7 +4,7 @@ const ts = require('typescript');
 function load(file, mocks = {}, extra = '') {
   const js = ts.transpileModule(fs.readFileSync(file, 'utf8') + '\n' + extra, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
   const module = { exports: {} };
-  new Function('require', 'module', 'exports', js)(id => id in mocks ? mocks[id] : id.endsWith('/story-bible-request') ? load('lib/story-bible-request.ts') : id.endsWith('/aion-story-bible') ? load('lib/aion-story-bible.ts') : id.endsWith('/aion-chapter-planner') ? load('lib/aion-chapter-planner.ts') : id.endsWith('/narrative-memory') ? load('lib/narrative-memory.ts') : id.endsWith('/prose-writer') ? load('lib/prose-writer.ts') : id.endsWith('/generation') ? {} : require(id), module, module.exports);
+  new Function('require', 'module', 'exports', js)(id => id in mocks ? mocks[id] : id.endsWith('/chapter-request') ? load('lib/chapter-request.ts') : id.endsWith('/story-bible-request') ? load('lib/story-bible-request.ts') : id.endsWith('/aion-story-bible') ? load('lib/aion-story-bible.ts') : id.endsWith('/aion-chapter-planner') ? load('lib/aion-chapter-planner.ts') : id.endsWith('/narrative-memory') ? load('lib/narrative-memory.ts') : id.endsWith('/prose-writer') ? load('lib/prose-writer.ts') : id.endsWith('/generation') ? {} : require(id), module, module.exports);
   return module.exports;
 }
 process.env.OPENAI_API_KEY = 'mock';
@@ -25,8 +25,13 @@ const copy = () => JSON.parse(JSON.stringify(plan));
   let calls = [];
   const usage = { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120, cost: 0.00042 };
   global.fetch = async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return { ok: true, status: 200, json: async () => ({ usage, choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(plan) } }] }) }; };
+  const originalTimeout = AbortSignal.timeout;
+  let timeoutMs;
+  AbortSignal.timeout = ms => { timeoutMs = ms; return new AbortController().signal; };
   const diagnostics = [];
   const response = await helper.createAionChapterPlan({ messages: [{ role: 'system', content: 'Existing planner instructions.' }, { role: 'user', content: 'No graphic sexual escalation.' }], schema, diagnostics, attempt: 1 });
+  assert.equal(timeoutMs, 240000);
+  AbortSignal.timeout = originalTimeout;
   assert.equal(calls.length, 1);
   assert.equal(calls[0].body.model, 'aion-labs/aion-3.5');
   assert.equal(calls[0].body.max_tokens, 4000);
@@ -50,6 +55,13 @@ const copy = () => JSON.parse(JSON.stringify(plan));
     await assert.rejects(helper.createAionChapterPlan({ messages: [], schema, diagnostics: failed, attempt: 1 }), error);
     assert.equal(attempts, 1); assert.equal(failed.length, 1); assert.equal(failed[0].status, 'failed');
   }
+  let timeoutCalls = 0;
+  global.fetch = async () => { timeoutCalls++; throw new DOMException('Timed out', 'TimeoutError'); };
+  const timeoutDiagnostics = [];
+  await assert.rejects(helper.createAionChapterPlan({ messages: [], schema, diagnostics: timeoutDiagnostics, attempt: 1 }), /timed out after four minutes/);
+  assert.equal(timeoutCalls, 1);
+  assert.equal(timeoutDiagnostics[0].status, 'failed');
+  assert.match(timeoutDiagnostics[0].error, /No automatic retry/);
   console.log('PASS: Aion planner request, full contract schema, ordinary/specialist routing fields, reported cost and single-call failure handling.');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 

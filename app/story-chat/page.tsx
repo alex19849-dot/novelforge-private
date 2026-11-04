@@ -1,5 +1,7 @@
 "use client";
 
+import { requestsChapterGeneration, continuesPendingChapter } from "../../lib/chapter-request";
+
 import { isStoryBibleRequest } from "../../lib/story-bible-request";
 
 
@@ -202,15 +204,6 @@ function getChapterNumberFromMessage(message: string): number | null {
   return CHAPTER_NUMBER_WORDS[wordedChapter[1]?.toLowerCase() ?? ""] ?? null;
 }
 
-function requestsChapterGeneration(message: string): boolean {
-  return (
-    /\b(?:write|generate|create)\b[\s\S]{0,100}\bchapter\b/i.test(message) ||
-    /\brewrite\b[\s\S]{0,100}\bchapter\b/i.test(message) ||
-    /\b(?:write|generate|create|start|continue|rewrite)\b[\s\S]{0,100}\bepilogue\b|\bepilogue\b[\s\S]{0,100}\b(?:write|generate|create|start|continue|rewrite)\b/i.test(
-      message,
-    )
-  );
-}
 
 function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
   const commandText = message.replace(
@@ -2062,8 +2055,17 @@ device.`,
         return;
       }
 
-      if (!bibleRequest && !hasPendingChapter && requestsChapterGeneration(trimmedMessage)) {
-        await queueChapterBackground({ operation: "generate", story: requestStory });
+      if (!bibleRequest && requestsChapterGeneration(trimmedMessage)) {
+        const currentPending = hasPendingChapter ? pendingGeneration : null;
+        const pendingNumber = currentPending?.generatedChapter.replaceChapterNumber ??
+          Math.max(0, ...requestStory.chapters.map(chapter => chapter.number)) + 1;
+        if (currentPending && continuesPendingChapter(trimmedMessage, pendingNumber)) {
+          await queueChapterBackground({ operation: "write", story: requestStory, pending: currentPending,
+            action: currentPending.draft.trim() ? "continue" : "start", sectionInstruction: trimmedMessage });
+        } else {
+          await queueChapterBackground({ operation: "generate", story: requestStory,
+            ...(currentPending ? { pending: currentPending } : {}) });
+        }
         return;
       }
 
