@@ -1,0 +1,617 @@
+{
+  "checked_at": "2026-11-04",
+  "applied_posts": [
+    {
+      "id": "b6ecf33a-da6e-47a1-aa54-5b9461e12abe",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 8,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/2e7d7aa56185611b-music-v1-sun-in-your-eyes.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/12ed7db2e7f3c057-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "6a12ceee-9890-48d0-afb9-681e22e671cc",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 3,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/2e7d7aa56185611b-music-v1-sun-in-your-eyes.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/12ed7db2e7f3c057-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "c0b171da-3917-4470-998e-2d15ed4fa777",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 6,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/7e04dc36-016c-48da-b62b-506415ff2b19.jpg",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/746a4d86037831cf.jpg"
+    },
+    {
+      "id": "b5ec649f-bc2c-482e-9182-fde6ed855f1a",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 3,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/9ba6049d8cda6cfd-music-v1-lonerism.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4f18f3e6fe8ca32e-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "35463464-ca3b-4364-a21d-d7cc94995a85",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 8,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/9ba6049d8cda6cfd-music-v1-lonerism.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4f18f3e6fe8ca32e-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "58d6327f-ac1d-41ec-861a-5293b56ff657",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 8,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/984f5f0972c69e81-music-v1-sun-in-your-eyes.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/6dc9c8e497ec7d21-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "5c36c028-e589-402c-82bc-387eba4bcdbc",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 3,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/984f5f0972c69e81-music-v1-sun-in-your-eyes.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/6dc9c8e497ec7d21-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "5080339b-017c-4278-b3e0-42bfca1a652a",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 6,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/bbf4147b-9ab9-4c3a-80df-c144f38693bf.jpg",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4cc61e542d58ad97.jpg"
+    },
+    {
+      "id": "34ced96c-e8b1-4191-aa47-25aef07c6b54",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 6,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/2a7d7aca-85dc-41ed-8b8a-0b7b087311f4.jpg",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/0ff19f97b33a2936.jpg"
+    },
+    {
+      "id": "d66f4598-c288-4bea-aff4-e8c1359f5be9",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 8,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/4e0d1f2bc5f150b7-music-v1-better-times.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/891457dcce282ca6-music-v1-better-times.mp4"
+    },
+    {
+      "id": "14b24e5b-da46-4b85-a17e-22efc33b7b70",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 3,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/4e0d1f2bc5f150b7-music-v1-better-times.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/891457dcce282ca6-music-v1-better-times.mp4"
+    },
+    {
+      "id": "42f9102f-a6c0-496f-bb6b-7c00784686b4",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 6,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/a3cdb50a-637d-45e2-a9dc-c64062163bec.jpg",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4d41523113959b2e.jpg"
+    },
+    {
+      "id": "1861319f-b18c-4d72-a8bb-91a8d2ed0dea",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 3,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/1141df0bca679acb-music-v1-better-times.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/de08aeaec8681e05-music-v1-better-times.mp4"
+    },
+    {
+      "id": "cbb692d8-bd81-45ba-af8d-fbb13cdceddc",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 8,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/1141df0bca679acb-music-v1-better-times.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/de08aeaec8681e05-music-v1-better-times.mp4"
+    },
+    {
+      "id": "05d2dd4a-589d-4f87-93d4-76a86ea7963f",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 3,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/b09a78bf23a712b8-music-v1-lonerism.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/23dd2a136144bc6a-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "35b14c3e-f596-4556-98f6-7a1bb3fd18bf",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 8,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/b09a78bf23a712b8-music-v1-lonerism.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/23dd2a136144bc6a-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "c9111689-8060-4d97-9dc9-81a4a296b47d",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 6,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/8b9d8e4e-e327-4334-89c5-3a7e0c557270.jpg",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/74486008e59cece2.jpg"
+    },
+    {
+      "id": "1ff847c6-55c8-43cc-acad-d017ecca47ba",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 8,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/4499e248497a8585-music-v1-better-times.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/2c07043505902d78-music-v1-better-times.mp4"
+    },
+    {
+      "id": "067c1ec0-4c5b-4b41-8fa9-5d0b54c762c8",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 3,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/4499e248497a8585-music-v1-better-times.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/2c07043505902d78-music-v1-better-times.mp4"
+    },
+    {
+      "id": "0e0775be-31ca-4d53-a69c-23d83b600b71",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 6,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/b688f84444de1652-music-v1-lonerism.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/2ddcd876e3e633af-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "f1cad6ac-0203-44e4-a5fb-c4d03af14008",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 9,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/bce1fcbc95704e61-music-v1-lonerism.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4bc035b709370869-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "ee9a3648-33b6-41c0-88ad-f5acd2a29b9f",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 4,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/bce1fcbc95704e61-music-v1-lonerism.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4bc035b709370869-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "e804cfd3-db4d-4ca4-abf2-5bdc3d515e32",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 3,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/6da2c8533f7effc0-music-v1-sun-in-your-eyes.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/32e2b4e15ddde63e-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "a2c4734a-8b56-422c-866a-b1bc938e24fd",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 8,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/6da2c8533f7effc0-music-v1-sun-in-your-eyes.mp4",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/32e2b4e15ddde63e-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "14deecca-6991-4bed-acfa-30f1f352fe31",
+      "user_id": "c8fcb780-183a-4301-ab38-051a5ec7755f",
+      "expected_version": 6,
+      "expected_media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/b2120bf4-a3f9-407f-a98d-8c078bd0ea16.jpg",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/1b5ffd75fa648116.jpg"
+    }
+  ],
+  "held_posts": [
+    {
+      "id": "85592590-8688-4ae6-8d8e-faf5cc8db0b4",
+      "platform": "facebook",
+      "book_slug": "executive-dysfunction",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-09 10:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/2470bd0e491958b0-music-v1-better-times.mp4"
+    },
+    {
+      "id": "c63308f8-1c18-462b-bf26-6c536fb96dab",
+      "platform": "tiktok",
+      "book_slug": "executive-dysfunction",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-09 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/b918d5b3430001c5-music-v1-better-times.mp4"
+    },
+    {
+      "id": "e0bde9a8-b945-4e09-8835-e745c3569c36",
+      "platform": "youtube",
+      "book_slug": "executive-dysfunction",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-09 21:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/b918d5b3430001c5-music-v1-better-times.mp4"
+    },
+    {
+      "id": "a3b69099-53e9-4850-9a3b-f4720ebda126",
+      "platform": "youtube",
+      "book_slug": "borrow-my-calm",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-10 12:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/3ee6b9bb8f411354-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "4a6b58a8-f25f-4f82-818a-28cbb1fe044e",
+      "platform": "tiktok",
+      "book_slug": "borrow-my-calm",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-10 20:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/3ee6b9bb8f411354-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "f0b8e3a8-bb82-4ad6-987a-bf450f135a1c",
+      "platform": "tiktok",
+      "book_slug": "break-my-guard",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-11 10:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/5f836cb68721c913-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "70b9a0b8-0cc0-4965-a1f6-01c3ef414333",
+      "platform": "youtube",
+      "book_slug": "break-my-guard",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-11 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/5f836cb68721c913-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "3063502b-2c7c-4136-8694-093a8aaa0e3b",
+      "platform": "tiktok",
+      "book_slug": "trouble-like-you",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-12 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/74561a7177af1491-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "6d0e5c69-de27-44d0-b7ba-f76acaf54422",
+      "platform": "youtube",
+      "book_slug": "trouble-like-you",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-12 21:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/74561a7177af1491-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "642e11ff-4156-433a-948d-d469875abaa8",
+      "platform": "youtube",
+      "book_slug": "lost-and-found",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-13 12:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/444a13c9cff343e5-music-v1-better-times.mp4"
+    },
+    {
+      "id": "287625cd-efb1-4465-99e1-3913f93224ec",
+      "platform": "tiktok",
+      "book_slug": "lost-and-found",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-13 20:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/444a13c9cff343e5-music-v1-better-times.mp4"
+    },
+    {
+      "id": "ceb3d9dd-2728-4b6b-bff8-5b4893a620f4",
+      "platform": "tiktok",
+      "book_slug": "the-captains-rule",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-14 10:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/e770b112dde69801-music-v1-better-times.mp4"
+    },
+    {
+      "id": "33edfd42-c52e-4af9-b384-65247e2ac983",
+      "platform": "youtube",
+      "book_slug": "the-captains-rule",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-14 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/e770b112dde69801-music-v1-better-times.mp4"
+    },
+    {
+      "id": "b187f05a-0df3-477c-8695-8a4f70a2d98f",
+      "platform": "tiktok",
+      "book_slug": "coach-curious",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-15 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/8291e60ea3cba530-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "aca03491-4b14-4f60-88f4-07966f79a180",
+      "platform": "youtube",
+      "book_slug": "coach-curious",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-15 21:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/8291e60ea3cba530-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "9dae903a-a9f9-44e1-941f-5f516f6e4fc3",
+      "platform": "tiktok",
+      "book_slug": "call-my-bluff",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-16 10:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/312dc7ff15efefda-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "1092bad9-0a78-4df7-ad1f-794d0e850d71",
+      "platform": "youtube",
+      "book_slug": "call-my-bluff",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-16 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/312dc7ff15efefda-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "709f6a74-cd99-4d7a-b6cf-d3e391b45ea5",
+      "platform": "facebook",
+      "book_slug": "the-long-way-back",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-17 10:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/bbfb41681e178a0b-music-v1-better-times.mp4"
+    },
+    {
+      "id": "f7fc5f29-32e7-4666-8f7d-6facbb1ff73f",
+      "platform": "tiktok",
+      "book_slug": "the-long-way-back",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-17 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/0835797aaaee67fc-music-v1-better-times.mp4"
+    },
+    {
+      "id": "61c327ca-7a3a-4cfa-8627-6f0d21be54ff",
+      "platform": "youtube",
+      "book_slug": "the-long-way-back",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-17 21:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/0835797aaaee67fc-music-v1-better-times.mp4"
+    },
+    {
+      "id": "38ebeb5d-b37a-416e-a3db-0a50ea0cf975",
+      "platform": "youtube",
+      "book_slug": "after-class",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-18 12:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/019f8104a3d8bb9f-music-v1-better-times.mp4"
+    },
+    {
+      "id": "b96f66aa-0037-4e31-a4d2-8788ee2a60dd",
+      "platform": "tiktok",
+      "book_slug": "after-class",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-18 20:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/019f8104a3d8bb9f-music-v1-better-times.mp4"
+    },
+    {
+      "id": "2288b6e1-9d90-48b8-9488-1afc6d2cbeab",
+      "platform": "tiktok",
+      "book_slug": "fault-line-friction",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-19 10:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/30e727489a3656f0-music-v1-better-times.mp4"
+    },
+    {
+      "id": "3a1ef089-368c-4d15-90b7-ad03b537eea2",
+      "platform": "youtube",
+      "book_slug": "fault-line-friction",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-19 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/30e727489a3656f0-music-v1-better-times.mp4"
+    },
+    {
+      "id": "d65d1483-a6f7-4933-8a83-4a6b08b366d0",
+      "platform": "tiktok",
+      "book_slug": "after-sunset",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-20 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/212a30519c326d81-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "ec5b1e28-d42e-4d97-a85a-99a371216eee",
+      "platform": "youtube",
+      "book_slug": "after-sunset",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-20 21:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/212a30519c326d81-music-v1-lonerism.mp4"
+    },
+    {
+      "id": "a0dc1f43-e22c-473e-abb9-a8fcf5a3c23e",
+      "platform": "youtube",
+      "book_slug": "cold-as-puck",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-21 12:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/025baf76ec562c39-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "94bec878-54fe-44ae-8131-beb7b2e024fd",
+      "platform": "facebook",
+      "book_slug": "cold-as-puck",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-21 12:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/6c3a10c6-27e4-4cff-bcff-e05d4d5ed0de-full-frame-v2.jpg"
+    },
+    {
+      "id": "fdea2afd-b1be-492b-bd36-ac24ba8cc507",
+      "platform": "tiktok",
+      "book_slug": "cold-as-puck",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-21 20:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/025baf76ec562c39-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "142a2f00-b6ce-40fe-900d-5171c452a54d",
+      "platform": "tiktok",
+      "book_slug": "no-clean-lines",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-22 10:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/620b2788eddd4be2-music-v1-sun-in-your-eyes.mp4"
+    },
+    {
+      "id": "281bee8d-3dbc-4977-8f74-501eea2df561",
+      "platform": "youtube",
+      "book_slug": "no-clean-lines",
+      "prior_status": "approved",
+      "scheduled_at": "2026-11-22 18:00:00+00",
+      "media_path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/content-v2/620b2788eddd4be2-music-v1-sun-in-your-eyes.mp4"
+    }
+  ],
+  "media": [
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/12ed7db2e7f3c057-music-v1-sun-in-your-eyes.mp4",
+      "sha256": "30ed31cdbe24ae81286aaed1e99673ba745d37070ebaf653e89108c3244fb74d",
+      "size": 1969550,
+      "book_slug": "under-pressure",
+      "date": "2026-11-04",
+      "media_type": "video",
+      "post_ids": [
+        "b6ecf33a-da6e-47a1-aa54-5b9461e12abe",
+        "6a12ceee-9890-48d0-afb9-681e22e671cc"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/746a4d86037831cf.jpg",
+      "sha256": "b1a8fc7a12021ecebcc7286c06c76bb0074776dbbc9a86e270089bcd85bc30e2",
+      "size": 435690,
+      "book_slug": "off-limits",
+      "date": "2026-11-05",
+      "media_type": "image",
+      "post_ids": [
+        "c0b171da-3917-4470-998e-2d15ed4fa777"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4f18f3e6fe8ca32e-music-v1-lonerism.mp4",
+      "sha256": "e08647b83b7f1cdba1c0b1ff77374e3e76df68afc0c807523f5ca519c2b8f767",
+      "size": 2049272,
+      "book_slug": "off-limits",
+      "date": "2026-11-05",
+      "media_type": "video",
+      "post_ids": [
+        "b5ec649f-bc2c-482e-9182-fde6ed855f1a",
+        "35463464-ca3b-4364-a21d-d7cc94995a85"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/6dc9c8e497ec7d21-music-v1-sun-in-your-eyes.mp4",
+      "sha256": "d63a9acd81b0d18d444f79431625d83e5fcdb3900961568c74c29a13dfc4b63c",
+      "size": 2304110,
+      "book_slug": "house-rules",
+      "date": "2026-11-06",
+      "media_type": "video",
+      "post_ids": [
+        "58d6327f-ac1d-41ec-861a-5293b56ff657",
+        "5c36c028-e589-402c-82bc-387eba4bcdbc"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4cc61e542d58ad97.jpg",
+      "sha256": "543f6a410e9f0b2539f9263522e1c6921a24205c5fb054b6d6e8825ce2462ca3",
+      "size": 506182,
+      "book_slug": "house-rules",
+      "date": "2026-11-06",
+      "media_type": "image",
+      "post_ids": [
+        "5080339b-017c-4278-b3e0-42bfca1a652a"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/0ff19f97b33a2936.jpg",
+      "sha256": "6a1e08bbf2fb34db6a4626e3b4a87ba52fb2d49dd6b849c17e4860d297680abb",
+      "size": 427498,
+      "book_slug": "mine",
+      "date": "2026-11-07",
+      "media_type": "image",
+      "post_ids": [
+        "34ced96c-e8b1-4191-aa47-25aef07c6b54"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/891457dcce282ca6-music-v1-better-times.mp4",
+      "sha256": "c337bb1b833d8abe8f5d1aa115827e84906f74735b3bdf8f34476579a41de2d5",
+      "size": 1987554,
+      "book_slug": "mine",
+      "date": "2026-11-07",
+      "media_type": "video",
+      "post_ids": [
+        "d66f4598-c288-4bea-aff4-e8c1359f5be9",
+        "14b24e5b-da46-4b85-a17e-22efc33b7b70"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4d41523113959b2e.jpg",
+      "sha256": "3a10256e25bb10672c91e9c02ae8d9bbcae0f6a53f04822e4c9de2db8fe18703",
+      "size": 453323,
+      "book_slug": "reapers-claim",
+      "date": "2026-11-08",
+      "media_type": "image",
+      "post_ids": [
+        "42f9102f-a6c0-496f-bb6b-7c00784686b4"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/de08aeaec8681e05-music-v1-better-times.mp4",
+      "sha256": "004f528930377ef755d009e4d1ae4fe60277343aab73f6f3f649c07319c6b952",
+      "size": 2164769,
+      "book_slug": "reapers-claim",
+      "date": "2026-11-08",
+      "media_type": "video",
+      "post_ids": [
+        "1861319f-b18c-4d72-a8bb-91a8d2ed0dea",
+        "cbb692d8-bd81-45ba-af8d-fbb13cdceddc"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/23dd2a136144bc6a-music-v1-lonerism.mp4",
+      "sha256": "51310a56a21a07b02b27319339d17ba108f98f03ac47472ef268126eab94e492",
+      "size": 2030626,
+      "book_slug": "under-pressure",
+      "date": "2026-11-23",
+      "media_type": "video",
+      "post_ids": [
+        "05d2dd4a-589d-4f87-93d4-76a86ea7963f",
+        "35b14c3e-f596-4556-98f6-7a1bb3fd18bf"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/74486008e59cece2.jpg",
+      "sha256": "7174e5d83c77e7ea33183fe240e206474fbf25e488a637d54bf934705465a56b",
+      "size": 458733,
+      "book_slug": "under-pressure",
+      "date": "2026-11-23",
+      "media_type": "image",
+      "post_ids": [
+        "c9111689-8060-4d97-9dc9-81a4a296b47d"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/2c07043505902d78-music-v1-better-times.mp4",
+      "sha256": "19ecf616be088ea059b37d0385ce51a20c43fd0e4f056135f10a585747e6d71d",
+      "size": 2033679,
+      "book_slug": "off-limits",
+      "date": "2026-11-24",
+      "media_type": "video",
+      "post_ids": [
+        "1ff847c6-55c8-43cc-acad-d017ecca47ba",
+        "067c1ec0-4c5b-4b41-8fa9-5d0b54c762c8"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/2ddcd876e3e633af-music-v1-lonerism.mp4",
+      "sha256": "df2babfc2f86e3ab40b723ad30349a58d42e2c8bfe39e43e997069c21d330365",
+      "size": 1998443,
+      "book_slug": "house-rules",
+      "date": "2026-11-25",
+      "media_type": "video",
+      "post_ids": [
+        "0e0775be-31ca-4d53-a69c-23d83b600b71"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/4bc035b709370869-music-v1-lonerism.mp4",
+      "sha256": "1d14cfa8004b9fa9df320d76963e38e1817ce95ec77de171ddb0a4f2da2c0725",
+      "size": 2300591,
+      "book_slug": "house-rules",
+      "date": "2026-11-25",
+      "media_type": "video",
+      "post_ids": [
+        "f1cad6ac-0203-44e4-a5fb-c4d03af14008",
+        "ee9a3648-33b6-41c0-88ad-f5acd2a29b9f"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/32e2b4e15ddde63e-music-v1-sun-in-your-eyes.mp4",
+      "sha256": "24152ad48db4980eabf7c2777b3412da67f775d9820f60d377d7de8e2b283b36",
+      "size": 1993954,
+      "book_slug": "mine",
+      "date": "2026-11-26",
+      "media_type": "video",
+      "post_ids": [
+        "e804cfd3-db4d-4ca4-abf2-5bdc3d515e32",
+        "a2c4734a-8b56-422c-866a-b1bc938e24fd"
+      ]
+    },
+    {
+      "path": "c8fcb780-183a-4301-ab38-051a5ec7755f/calendar/romance-v3/1b5ffd75fa648116.jpg",
+      "sha256": "92a009a3d656d843deabe27d19bb2097926c3fda941bce6513d6dffc5c74375f",
+      "size": 440149,
+      "book_slug": "mine",
+      "date": "2026-11-26",
+      "media_type": "image",
+      "post_ids": [
+        "14deecca-6991-4bed-acfa-30f1f352fe31"
+      ]
+    }
+  ]
+}
