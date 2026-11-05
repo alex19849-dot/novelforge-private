@@ -67,7 +67,7 @@ export async function createAionChapterPlan(input: {
     // One request only: no provider fallback, SDK retry or repair generation.
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST", headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "aion-labs/aion-3.5", messages, response_format: { type: "json_object" }, reasoning: { effort: "low" }, temperature: 0.2, max_tokens: 4000, provider: { allow_fallbacks: false } }),
+      body: JSON.stringify({ model: "aion-labs/aion-3.5", messages, response_format: { type: "json_object" }, reasoning: { effort: "low" }, temperature: 0.2, max_tokens: 8000, provider: { allow_fallbacks: false } }),
       signal: AbortSignal.timeout(240000),
     });
     const data = await response.json();

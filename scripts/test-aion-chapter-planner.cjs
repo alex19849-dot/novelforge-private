@@ -34,7 +34,7 @@ const copy = () => JSON.parse(JSON.stringify(plan));
   AbortSignal.timeout = originalTimeout;
   assert.equal(calls.length, 1);
   assert.equal(calls[0].body.model, 'aion-labs/aion-3.5');
-  assert.equal(calls[0].body.max_tokens, 4000);
+  assert.equal(calls[0].body.max_tokens, 8000);
   assert.equal(calls[0].body.provider.allow_fallbacks, false);
   assert.equal(calls[0].body.response_format.type, 'json_object');
   assert.equal(calls[0].body.messages[1].content, 'No graphic sexual escalation.');
