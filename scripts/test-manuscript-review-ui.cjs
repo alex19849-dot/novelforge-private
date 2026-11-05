@@ -24,7 +24,7 @@ async function click(text){const el=button(text);assert(el,`Missing button ${tex
  await click('Dismiss finding');assert.equal(patches,1);assert(!document.body.textContent.includes('Consider the context.'));
  const cb=document.querySelector('input[type=checkbox]');await act(async()=>{cb.click();await pause();});assert(button('Restore finding'));
  await click('Restore finding');assert.equal(patches,2);assert(button('Dismiss finding'));
- const changed={...story,chapters:[{...story.chapters[0],content:'Changed prose.'}]};await act(async()=>{root.render(React.createElement(Panel,{story:changed,busy:false}));await pause();});await act(pause);assert(document.body.textContent.includes('earlier manuscript or Story Bible version'));assert(button('Copy rewrite guidance').disabled);
+ const changed={...story,chapters:[{...story.chapters[0],content:'Changed prose.'}]};await act(async()=>{root.render(React.createElement(Panel,{story:changed,busy:false}));await pause();});await act(pause);assert(document.body.textContent.includes('earlier manuscript or Story Bible version'));assert(button('Apply fix').disabled);
  assert.equal(JSON.stringify(story),original);assert.deepEqual(postActions,['estimate','start']);
  await act(async()=>root.unmount());dom.window.close();
  console.log('PASS: explicit cost confirmation before start, one start only, unmount/reopen recovery, saved dismiss/restore, stale-report warning, no automatic edit or model retry.');

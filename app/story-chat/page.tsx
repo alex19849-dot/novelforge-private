@@ -17,6 +17,8 @@ import ChatPanel from "./components/ChatPanel";
 
 import ChapterPanel from "./components/ChapterPanel";
 import ManuscriptReviewPanel from "./components/ManuscriptReviewPanel";
+import { reviewSourceKey } from "../../lib/manuscript-review";
+import type { ReviewFixUndo } from "../../lib/manuscript-review-fix";
 
 import BiblePanel from "./components/BiblePanel";
 import MemoryPanel from "./components/MemoryPanel";
@@ -1502,6 +1504,30 @@ device.`,
     }
   }
 
+  async function applyReviewCorrection(body: Record<string, unknown>): Promise<{ undo: ReviewFixUndo | null; diagnostic?: { costUsd: number | null } | null }> {
+    const source = currentStoryRef.current;
+    if (!source || source.id !== body.storyId || isThinking || passageRewriteBusy.current) throw new Error("Wait for the current writing request to finish.");
+    passageRewriteBusy.current = true;
+    setIsThinking(true);
+    try {
+      if (await reviewSourceKey(source) !== body.currentSourceKey) throw new Error("The manuscript changed. Prepare the correction again.");
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) throw new Error("Sign in to NovelForge first.");
+      const response = await fetch("/api/story-chat/review/fix", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session.access_token}` }, body: JSON.stringify(body) });
+      const data = await response.json() as { error?: string; undo: ReviewFixUndo | null; diagnostic?: { costUsd: number | null } | null; savedStory?: { id: string; title: string; form: StoryBible; chapters: StoryChapter[]; story_state: StoryState; messages: StoryWorkspace["messages"]; created_at: string; updated_at: string } };
+      if (!response.ok || !data.savedStory) throw new Error(`${data.error ?? "The correction could not be saved."}${data.diagnostic?.costUsd != null ? ` Estimated model cost $${data.diagnostic.costUsd.toFixed(4)} USD.` : ""}`);
+      const row = data.savedStory;
+      if (currentStoryRef.current?.id === source.id) {
+        const metadata = getWorkspaceMetadata(row.story_state);
+        const next: StoryWorkspace = { ...source, ...metadata, id: row.id, title: row.title, storyBible: row.form, chapters: row.chapters, storyState: row.story_state, messages: row.messages, createdAt: row.created_at, updatedAt: row.updated_at };
+        currentStoryRef.current = next;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        setStory(next);
+      }
+      return { undo: data.undo, diagnostic: data.diagnostic };
+    } finally { passageRewriteBusy.current = false; setIsThinking(false); }
+  }
+
   function undoReaderRewrite(undo: PassageRewriteUndo) {
     const source = currentStoryRef.current;
     if (!source || isThinking || passageRewriteBusy.current) throw new Error("Wait for the current writing request to finish.");
@@ -2817,7 +2843,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
           </div>
         )}
 
-        {activeTab === "review" && <ManuscriptReviewPanel key={story.id} story={story} busy={isThinking} />}
+        {activeTab === "review" && <ManuscriptReviewPanel key={story.id} story={story} busy={isThinking} onApplyCorrection={applyReviewCorrection} />}
 
         {activeTab === "memory" && <MemoryPanel key={story.id} story={story} busy={isThinking} onCorrections={corrections => {
           if (isThinking) return;

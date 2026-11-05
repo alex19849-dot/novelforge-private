@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../../../lib/supabaseClient';
 import { reviewSourceKey, type ReviewQuote, type ReviewKind, type SavedReview } from '../../../lib/manuscript-review';
+import type { ReviewFixTarget, ReviewFixUndo } from '../../../lib/manuscript-review-fix';
 import type { StoryWorkspace } from '../types';
 
 const kindLabels: Record<ReviewKind, string> = { clear_error: 'Clear error', possible_issue: 'Possible issue', editorial_opinion: 'Editorial opinion' };
 const button = 'rounded-lg border border-white/20 px-4 py-2 text-sm font-medium disabled:opacity-40';
 const money = (value: number) => `$${value.toFixed(value < 0.01 ? 4 : 2)} USD`;
 
-export default function ManuscriptReviewPanel({ story, busy }: { story: StoryWorkspace; busy: boolean }) {
+type ApplyCorrection = (body: Record<string, unknown>) => Promise<{ undo: ReviewFixUndo | null; diagnostic?: { costUsd: number | null } | null }>;
+export default function ManuscriptReviewPanel({ story, busy, onApplyCorrection }: { story: StoryWorkspace; busy: boolean; onApplyCorrection?: ApplyCorrection }) {
   const [jobs, setJobs] = useState<SavedReview[]>([]);
   const [selected, setSelected] = useState('');
   const [quote, setQuote] = useState<ReviewQuote | null>(null);
@@ -17,6 +19,12 @@ export default function ManuscriptReviewPanel({ story, busy }: { story: StoryWor
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [decisionBusy, setDecisionBusy] = useState(false);
+  const [correction, setCorrection] = useState<{ reviewId: string; findingId: string; sourceKey: string; options: { target: ReviewFixTarget; quote: { maximumUsd: number; estimatedUsd: number } }[]; targetId: string; decision: string } | null>(null);
+  const [fixUndo, setFixUndo] = useState<ReviewFixUndo | null>(null);
+  const [fixBusy, setFixBusy] = useState(false);
+  const fixLock = useRef(false);
+  const correctionDialog = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (correction) { correctionDialog.current?.focus(); correctionDialog.current?.scrollIntoView?.({ block: "center" }); } }, [correction?.findingId]);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [filter, setFilter] = useState<'all' | ReviewKind>('all');
@@ -34,10 +42,10 @@ export default function ManuscriptReviewPanel({ story, busy }: { story: StoryWor
     return () => { cancelled = true; };
   }, [story.title, story.storyBible, story.chapters]);
 
-  const api = useCallback(async (method: string, body?: unknown) => {
+  const api = useCallback(async (method: string, body?: unknown, fix = false) => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) throw new Error('Sign in to NovelForge first.');
-    const response = await fetch(`/api/story-chat/review${method === 'GET' ? `?storyId=${encodeURIComponent(story.id)}` : ''}`, { method, headers: { Authorization: `Bearer ${data.session.access_token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), cache: 'no-store' });
+    const response = await fetch(`/api/story-chat/review${fix ? '/fix' : ''}${method === 'GET' ? `?storyId=${encodeURIComponent(story.id)}` : ''}`, { method, headers: { Authorization: `Bearer ${data.session.access_token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}), cache: 'no-store' });
     const value = await response.json();
     if (!response.ok) throw new Error(value.error || 'The review request failed.');
     return value;
@@ -102,6 +110,29 @@ export default function ManuscriptReviewPanel({ story, busy }: { story: StoryWor
     } catch (e) { if (mounted.current) setError(e instanceof Error ? e.message : 'The decision could not be saved.'); }
     finally { if (mounted.current) setDecisionBusy(false); }
   }
+  async function prepareCorrection(findingId: string) {
+    if (!job || !sourceKey || busy || fixLock.current) return;
+    fixLock.current = true; setFixBusy(true); setError('');
+    try {
+      const data = await api('POST', { action: 'prepare', storyId: story.id, reviewId: job.id, findingId, currentSourceKey: sourceKey }, true);
+      const options = data.targets as { target: ReviewFixTarget; quote: { maximumUsd: number; estimatedUsd: number } }[];
+      if (!options.length) throw new Error('The reviewed text has changed or has no bounded correction target. No model call was made.');
+      const preferred = options.filter(o => o.target.kind === 'chapter').at(-1) ?? options[0];
+      if (mounted.current) setCorrection({ reviewId: job.id, findingId, sourceKey, options, targetId: preferred.target.id, decision: '' });
+    } catch (e) { if (mounted.current) setError(e instanceof Error ? e.message : 'The correction could not be prepared.'); }
+    finally { fixLock.current = false; if (mounted.current) setFixBusy(false); }
+  }
+  async function applyCorrection(undo = false) {
+    if (!onApplyCorrection || fixLock.current || busy || !sourceKey || (!undo && !correction) || (undo && !fixUndo)) return;
+    fixLock.current = true; setFixBusy(true); setError('');
+    try {
+      const chosen = correction?.options.find(o => o.target.id === correction.targetId);
+      const body = undo ? { action: 'undo', storyId: story.id, currentSourceKey: sourceKey, undo: fixUndo } : { action: 'apply', storyId: story.id, reviewId: correction!.reviewId, findingId: correction!.findingId, targetId: chosen!.target.id, currentSourceKey: correction!.sourceKey, decision: correction!.decision, approvedBudgetUsd: chosen!.quote.maximumUsd };
+      const data = await onApplyCorrection(body);
+      if (mounted.current) { setFixUndo(data.undo); setCorrection(null); setNotice(undo ? 'Correction undone and saved.' : `Correction applied and saved.${data.diagnostic?.costUsd != null ? ` Estimated model cost ${money(data.diagnostic.costUsd)}.` : ''}`); }
+    } catch (e) { if (mounted.current) setError(`${e instanceof Error ? e.message : 'The correction could not be applied.'} No automatic retry was sent.`); }
+    finally { fixLock.current = false; if (mounted.current) setFixBusy(false); }
+  }
   return <section className="min-h-0 flex-1 overflow-y-auto px-4 py-6 pb-32 text-neutral-200 sm:px-6">
     <div className="mx-auto max-w-5xl space-y-5">
       <header><h2 className="text-2xl font-semibold text-white">Review manuscript</h2><p className="mt-2 text-sm text-neutral-400">Terra reviews your saved chapters with the Story Bible. Findings are proposals for you to judge. Reviewing never changes your manuscript.</p></header>
@@ -118,6 +149,17 @@ export default function ManuscriptReviewPanel({ story, busy }: { story: StoryWor
         </div>}
       </div>
       {notice && <p role="status" className="rounded-xl border border-pink-400/30 p-4 text-sm text-pink-200">{notice}</p>}
+      {fixUndo && <div className="rounded-xl border border-white/15 p-4"><button className={button} disabled={fixBusy || busy || !sourceKey} onClick={() => void applyCorrection(true)}>Undo last correction</button><p className="mt-2 text-xs text-neutral-400">Undo is available here until you leave this screen. It will refuse to overwrite newer edits.</p></div>}
+      {correction && (() => { const selectedTarget = correction.options.find(o => o.target.id === correction.targetId)!; return <div ref={correctionDialog} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby="review-fix-title" className="space-y-3 rounded-xl border border-pink-400/50 bg-neutral-900 p-5">
+        <h3 id="review-fix-title" className="text-lg font-semibold">Confirm correction</h3>
+        <p className="text-sm">Terra will apply the finding’s suggested correction directly to the selected text. The rest of the manuscript stays as it is.</p>
+        <label className="block text-sm">Text to fix<select className="mt-1 w-full rounded border border-white/15 bg-neutral-950 p-2" value={correction.targetId} disabled={fixBusy} onChange={e => setCorrection({ ...correction, targetId: e.target.value })}>{correction.options.map(o => <option key={o.target.id} value={o.target.id}>{o.target.label}</option>)}</select></label>
+        <details><summary className="cursor-pointer text-sm">Original text to be replaced</summary><p className="mt-2 max-h-60 overflow-y-auto whitespace-pre-wrap text-sm">{selectedTarget.target.original}</p></details>
+        <label className="block text-sm">{selectedTarget.target.kind === 'bible' ? 'Which fact should be kept? Required for a Bible change.' : 'Optional author decision, if the finding needs one.'}<textarea className="mt-1 w-full rounded border border-white/15 bg-neutral-950 p-2" rows={2} maxLength={2000} value={correction.decision} disabled={fixBusy} onChange={e => setCorrection({ ...correction, decision: e.target.value })} /></label>
+        <p className="text-sm">One Terra correction call. Indicative cost {money(selectedTarget.quote.estimatedUsd)}; conservative model-charge allowance {money(selectedTarget.quote.maximumUsd)} at configured rates, excluding tax/conversion. Undo does not use a model.</p>
+        {correction.sourceKey !== sourceKey && <p className="text-sm text-amber-200">The story changed after this correction was prepared. Cancel and prepare it again.</p>}
+        <div className="flex flex-wrap gap-3"><button className={`${button} bg-pink-500/20`} disabled={fixBusy || busy || correction.sourceKey !== sourceKey || (selectedTarget.target.kind === 'bible' && !correction.decision.trim())} onClick={() => void applyCorrection(false)}>{fixBusy ? 'Applying…' : 'Confirm cost and apply fix'}</button><button className={button} disabled={fixBusy} onClick={() => setCorrection(null)}>Cancel correction</button></div>
+      </div>; })()}
       {error && <p role="alert" className="rounded-xl border border-red-400/30 p-4 text-sm text-red-200">{error}</p>}
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">Saved reviews<select className="w-full rounded-lg border border-white/15 bg-neutral-900 p-3" value={job?.id ?? ''} onChange={e => setSelected(e.target.value)}>{!jobs.length && <option value="">{loading ? 'Loading…' : 'No reviews yet'}</option>}{jobs.map(j => <option key={j.id} value={j.id}>{new Date(j.created_at).toLocaleString()} · {j.status}</option>)}</select></label>
@@ -126,7 +168,7 @@ export default function ManuscriptReviewPanel({ story, busy }: { story: StoryWor
       {job && <div className="space-y-3 rounded-xl border border-white/10 p-4">
         {job.status === 'generating' && <p role="status" className="text-pink-200">Review running in the background. You can leave the tab or app.</p>}
         {job.status === 'failed' && <p className="text-red-200">{job.error_message} A charge may have occurred even without a complete report. Starting another review is a new paid request.</p>}
-        {stale && <p className="text-amber-200">This report refers to an earlier manuscript or Story Bible version. Quotations refer to that saved version.</p>}
+        {stale && <p className="text-amber-200">This report refers to an earlier manuscript or Story Bible version. Quotations refer to that saved version. Unchanged passages can still be fixed individually; changed targets will be blocked.</p>}
         {job.diagnostic && <p className="text-sm text-neutral-400">Terra 6.1 · {(job.diagnostic.durationMs / 1000).toFixed(1)} seconds · {job.diagnostic.inputTokens.toLocaleString()} input tokens · {job.diagnostic.outputTokens.toLocaleString()} output tokens · {job.diagnostic.costUsd === null ? 'Cost unavailable' : `Estimated model cost ${money(job.diagnostic.costUsd)}`}</p>}
       </div>}
       {report && <>
@@ -145,7 +187,7 @@ export default function ManuscriptReviewPanel({ story, busy }: { story: StoryWor
           {!f.evidenceChecked && <p className="text-sm text-amber-200">Evidence needs verification. This finding is not treated as an established error.</p>}
           {f.evidence.map((e,i) => <div key={i} className="border-l-2 border-pink-400/40 pl-3"><p className="mb-1 text-xs text-neutral-400">{e.chapterId ? `Chapter ${e.chapterNumber}: ${e.chapterTitle}` : e.sourceId === 'bible' ? 'Story Bible' : e.sourceId} · {e.paragraphId} · {e.verified ? 'Exact quotation found' : 'Quotation/location not verified'}</p><blockquote className="whitespace-pre-wrap break-words text-sm italic">{e.quote}</blockquote></div>)}
           <p className="whitespace-pre-wrap text-sm"><strong>Suggested direction:</strong> {f.correctionDirection}</p>
-          <div className="flex flex-wrap gap-3"><button className={button} disabled={decisionBusy} onClick={() => void dismiss(f.id, !job.dismissed_ids.includes(f.id))}>{job.dismissed_ids.includes(f.id) ? 'Restore finding' : 'Dismiss finding'}</button><button className={button} disabled={!f.evidenceChecked || stale || !sourceKey} onClick={() => { if (!navigator.clipboard) { setError('Clipboard access is unavailable. Select and copy the suggestion directly.'); return; } void navigator.clipboard.writeText(`${f.evidence.map(e => `${e.chapterId ? `Chapter ${e.chapterNumber}` : 'Story Bible'} (${e.paragraphId}):\n${e.quote}`).join('\n\n')}\n\nReview suggestion (judge against the current text): ${f.correctionDirection}`).then(() => setNotice('Rewrite guidance copied. Paste it into the existing passage guidance box when you want to make a change.')).catch(() => setError('Clipboard access failed. You can select and copy the suggestion directly.')); }}>Copy rewrite guidance</button></div>
+          <div className="flex flex-wrap gap-3"><button className={button} disabled={decisionBusy} onClick={() => void dismiss(f.id, !job.dismissed_ids.includes(f.id))}>{job.dismissed_ids.includes(f.id) ? 'Restore finding' : 'Dismiss finding'}</button><button className={button} disabled={!onApplyCorrection || !f.evidenceChecked || !sourceKey || busy || fixBusy} onClick={() => void prepareCorrection(f.id)}>Apply fix</button></div>
         </article>)}
       </>}
     </div>
