@@ -1,4 +1,5 @@
-import { selectedProseWriter, proseCostEstimate, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION } from "../../../../lib/prose-writer";
+import { selectPassageEditor, passageEditCost } from "../../../../lib/passage-editor";
+import { selectedProseWriter, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: (error as Error).message, diagnostics }, { status: 409 });
     }
     const isAion = selectedWriter.model === "aion";
-    const proseWriter = selectedProseWriter(body.storyState, text(body.instruction));
+    const proseWriter = selectPassageEditor(passage, body.storyState, text(body.instruction));
     model = isAion ? "aion-labs/aion-3.5" : proseWriter.model;
     provider = isAion ? "openrouter" : "openai";
     if (!(isAion ? process.env.OPENROUTER_API_KEY : process.env.OPENAI_API_KEY)) {
@@ -136,8 +137,9 @@ export async function POST(request: Request) {
       inputTokens = response.usage?.input_tokens ?? 0;
       outputTokens = response.usage?.output_tokens ?? 0;
       totalTokens = response.usage?.total_tokens ?? inputTokens + outputTokens;
-      const cached = response.usage?.input_tokens_details?.cached_tokens ?? 0;
-      costUsd = proseCostEstimate(proseWriter.model, inputTokens, outputTokens, cached);
+      const details = response.usage?.input_tokens_details as { cached_tokens?: number; cache_write_tokens?: number } | undefined;
+      const cached = details?.cached_tokens ?? 0;
+      costUsd = passageEditCost(proseWriter.model, inputTokens, outputTokens, cached, details?.cache_write_tokens ?? 0);
       costType = "estimated";
       if (response.status !== "completed") throw new Error("The writer did not finish the replacement. Your chapter is unchanged.");
       replacement = response.output_text?.trim() ?? "";
