@@ -59,8 +59,8 @@ export async function POST(request:Request){
       const result=JSON.parse(output);
       if(typeof result.needsDecision==='string')return json({error:result.needsDecision,diagnostic,needsDecision:true},422);
       if(typeof result.replacement!=='string'||!result.replacement.trim()||result.replacement===chosen.target.original)throw new Error('The editor did not propose a changed replacement. Your manuscript is unchanged.');
-      patch=patchReviewTarget(snapshot,chosen.target,result.replacement);
-      undo={storyId:body.storyId,target:chosen.target,before:patch.before,after:patch.after};dirty=chosen.target.chapterNumber??Math.min(...snapshot.chapters.map(c=>c.number));
+      const changed=patchReviewTarget(snapshot,chosen.target,result.replacement);patch=changed;
+      undo={storyId:body.storyId,target:chosen.target,before:changed.before,after:changed.after};dirty=chosen.target.chapterNumber??Math.min(...snapshot.chapters.map(c=>c.number));
     }
     const dirtyFrom=saved.story_state?.continuityDirtyFromChapter;
     const state={...saved.story_state,...(Number.isFinite(dirty)?{continuityDirtyFromChapter:Math.min(dirtyFrom??dirty,dirty)}:{})};
