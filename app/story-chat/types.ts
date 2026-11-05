@@ -2,7 +2,7 @@ import type { ChapterNarrativeMemory, MemoryCorrection } from "../../lib/narrati
 
 import type { StoryIntent } from "../../src/lib/detect-story-intent";
 
-export type ActiveTab = "chat" | "chapters" | "bible" | "memory";
+export type ActiveTab = "chat" | "chapters" | "bible" | "memory" | "review";
 export type ChatRole = "user" | "assistant";
 
 export type ChatMessage = {

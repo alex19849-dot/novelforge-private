@@ -16,6 +16,7 @@ import { supabase } from "../../lib/supabaseClient";
 import ChatPanel from "./components/ChatPanel";
 
 import ChapterPanel from "./components/ChapterPanel";
+import ManuscriptReviewPanel from "./components/ManuscriptReviewPanel";
 
 import BiblePanel from "./components/BiblePanel";
 import MemoryPanel from "./components/MemoryPanel";
@@ -2600,6 +2601,7 @@ transition ${
                     Story Bible
                   </button>
                 )}
+                {story && <button type="button" onClick={() => { setActiveTab("review"); setIsMenuOpen(false); }} className={`w-full rounded-xl px-4 py-3 text-left font-semibold ${activeTab === "review" ? "bg-white/10 text-white" : "text-neutral-400 hover:bg-white/5 hover:text-white"}`}>Review manuscript</button>}
                 {story && <button type="button" onClick={() => { setActiveTab("memory"); setIsMenuOpen(false); }} className={`w-full rounded-xl px-4 py-3 text-left font-semibold ${activeTab === "memory" ? "bg-white/10 text-white" : "text-neutral-400 hover:bg-white/5 hover:text-white"}`}>Memory</button>}
               </div>
 
@@ -2814,6 +2816,8 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
         )}
+
+        {activeTab === "review" && <ManuscriptReviewPanel key={story.id} story={story} busy={isThinking} />}
 
         {activeTab === "memory" && <MemoryPanel key={story.id} story={story} busy={isThinking} onCorrections={corrections => {
           if (isThinking) return;

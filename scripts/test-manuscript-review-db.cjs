@@ -1,0 +1,13 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');const {PGlite}=require('@electric-sql/pglite');
+(async()=>{const db=new PGlite();await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;create table public.stories(id uuid primary key,user_id uuid not null);`);
+await db.exec(fs.readFileSync('docs/manuscript-review.sql','utf8'));
+const owner='11111111-1111-4111-8111-111111111111',other='44444444-4444-4444-8444-444444444444',sid='22222222-2222-4222-8222-222222222222',jid='33333333-3333-4333-8333-333333333333';
+await db.query('insert into auth.users values ($1),($2)',[owner,other]);await db.query('insert into stories values ($1,$2)',[sid,owner]);
+await db.query("insert into manuscript_review_jobs(id,story_id,user_id,source_key,input,approved_budget_usd) values($1,$2,$3,'hash','{}',0.2)",[jid,sid,owner]);
+await assert.rejects(()=>db.query("insert into manuscript_review_jobs(id,story_id,user_id,source_key,input,approved_budget_usd) values('55555555-5555-4555-8555-555555555555',$1,$2,'hash','{}',0.2)",[sid,owner]),/duplicate key/);
+await db.exec(`set role authenticated;set request.jwt.claim.sub='${owner}';`);assert.equal((await db.query('select id from manuscript_review_jobs')).rows.length,1);
+await db.exec(`set request.jwt.claim.sub='${other}';`);assert.equal((await db.query('select id from manuscript_review_jobs')).rows.length,0);
+await assert.rejects(()=>db.query("update manuscript_review_jobs set status='completed'"),/permission denied/);
+await db.exec('reset role;set role anon;');await assert.rejects(()=>db.query('select * from manuscript_review_jobs'),/permission denied/);
+await db.exec('reset role;');await db.query('delete from stories where id=$1',[sid]);assert.equal((await db.query('select id from manuscript_review_jobs')).rows.length,0);
+await db.close();console.log('PASS: real SQL schema, active-review uniqueness, owner-only RLS reads, no anonymous access or direct client writes, story-deletion cascade.');})().catch(e=>{console.error(e);process.exitCode=1;});
