@@ -109,6 +109,16 @@ function cleanChapterParagraphs(chapter: ExportChapter): string[] {
 }
 
 function buildInlineRuns(text: string): TextRun[] {
+  const message = text.match(/^([A-Za-z][A-Za-z0-9 .'-]{0,30}):\s*([\s\S]+)$/);
+  if (message) {
+    const separator = text.slice(message[1].length + 1, text.length - message[2].length);
+    const style = { color: "000000", size: 24, font: "Garamond" };
+    return [
+      new TextRun({ ...style, text: message[1] + ":", bold: true }),
+      new TextRun({ ...style, text: separator }),
+      new TextRun({ ...style, text: message[2], italics: true }),
+    ];
+  }
   const runs: TextRun[] = [];
   const pattern = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|_[^_\n]+_)/g;
   let previousIndex = 0;

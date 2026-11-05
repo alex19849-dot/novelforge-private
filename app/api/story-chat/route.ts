@@ -1,4 +1,5 @@
 import { requestsChapterGeneration } from "../../../lib/chapter-request";
+import { PROSE_BALANCE_INSTRUCTION } from "../../../lib/prose-writer";
 import OpenAI from "openai";
 import { isStoryBibleRequest, parseStoryBibleImport, requestsNewBibleWorkspace, bibleOutputAllowance } from "../../../lib/story-bible-request";
 import { createAionBibleEdit } from "../../../lib/aion-story-bible";
@@ -2968,6 +2969,9 @@ ${latestMessage}
             content: `
 You are NovelForge's chapter-planning editor.
 
+${PROSE_BALANCE_INSTRUCTION}
+Plan space for that balance within the author's requested events; do not invent events or dialogue to meet percentages.
+
 Create or amend one saved chapter plan. Return planning only, never novel
 prose. The user is an experienced commercial romance author.
 
@@ -3160,6 +3164,8 @@ ${latestMessage}
 
 ${FOCUSED_CHAT_PROMPT}`) || SYSTEM_PROMPT;
       const focusedSystemPrompt = `${focusedRolePrompt}
+
+${usesCompactChapterPlan ? PROSE_BALANCE_INSTRUCTION + " Plan space for this balance within the author's requested events; do not invent events or dialogue to meet percentages." : ""}
 
 USER INTENT
 

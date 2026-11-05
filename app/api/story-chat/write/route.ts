@@ -1,6 +1,6 @@
 // NovelForge original-voice restoration with targeted realism safeguards.
 import OpenAI from "openai";
-import { selectedProseWriter, proseCostEstimate } from "../../../../lib/prose-writer";
+import { selectedProseWriter, proseCostEstimate, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 
 import { NextResponse } from "next/server";
@@ -352,6 +352,8 @@ async function writeSpecialistScene(input: {
   const latestDirection = input.sectionInstruction || sectionBrief.continuationGuidance || "No additional continuation instruction supplied.";
   const prompt = [
     "You are NovelForge's specialist explicit sex writer for commercial adult MM romance.",
+    PROSE_BALANCE_INSTRUCTION,
+    TEXT_MESSAGE_INSTRUCTION,
     input.continuation
       ? "Write only NEW prose continuing from the exact last sentence of the author's current edited draft. The draft is accepted prose, not an outline to regenerate. Do not restart the assigned beat or repeat actions, dialogue, reactions or discoveries already on the page. Return finished prose followed by <END_SECTION>, with no heading, analysis, notes or markdown."
       : "Write only the missing scene represented by the supplied marker. Return finished novel prose only, with no heading, marker, analysis, notes or markdown.",
@@ -677,6 +679,8 @@ function getAction(value: unknown): SectionAction {
 
 function mainWriterSystemPrompt(handoff: boolean, action: SectionAction): string {
   return [
+    PROSE_BALANCE_INSTRUCTION,
+    TEXT_MESSAGE_INSTRUCTION,
     "You are NovelForge, writing polished natural adult MM romance as a skilled human novelist. The complete Chapter Contract and its original author guidance govern the requested events, order, endpoint, exclusions and length.",
     handoff
       ? "On a start action, write only the chapter framework and unassigned beats. Each Aion-assigned beat belongs exclusively to Aion: insert its marker exactly once at its start and write none of its actions, dialogue, reactions or endpoint. If that beat is last, stop at the marker. Do not complete the assigned scene before leaving its marker."
@@ -790,7 +794,9 @@ function getPrompt(input: {
     "Use the Story Bible, continuity ledger and prior prose as background knowledge, not a checklist to narrate. Do not routinely list what is in the room, where everyone is, what the character has done, or what he already knows, wants or feels to re-establish the scene. Carry known facts silently; bring a detail or earlier event into the prose when it changes his present perception, choice, dialogue or action, or when the reader needs brief orientation. Let thoughts follow the unfolding moment rather than repeatedly taking stock. Keep purposeful atmosphere, necessary reminders and character-specific observations, but avoid inventory paragraphs, recap lists and repeated summaries in internal monologue. Do not compensate by stripping out interiority or making the prose sparse.",
     "Keep the reader close to the POV character's experience as events happen. Between dialogue and action, favour his immediate private thoughts, reactions, interpretations, wants and impulses over incidental descriptions of the surroundings. Let us hear what he wants to say but withholds, the meaning he reads into another person's words or behaviour, what he hopes will happen and what he decides to do next. Use his own natural vocabulary and rhythm, not a detached explanation of his psychology. A small revealing reaction is enough; each thought need not deliver a major realisation or name an emotion. Give important moments room to breathe without restating what the reader already understands.",
     "Keep description selective and seen through this POV. Establish enough place, position and physical action for the reader to follow the scene, then let the character's inner experience carry more of the narration. Notice surroundings when they affect what he does, catch his attention for a personal reason, trigger a specific thought or alter the mood or stakes. Do not routinely open scenes with weather, smells, traffic noise or a room inventory, or fill conversational pauses with unrelated objects and movements. Preserve necessary physical clarity and atmosphere without repeatedly pulling attention away from the people.",
-    "Weave thoughts into the live exchange rather than stopping the scene for a long internal essay. Give him space to react before he answers when that reaction matters, but do not insert a thought after every spoken line or action. Vary the balance with the scene's pressure and the character's voice; use no fixed thought-to-description ratio. Keep his attention moving as the exchange changes. Avoid circular rumination, repeated denials, repeated reassurance, recaps of his feelings, therapy language and explanations of every implication. Carry an established feeling forward through a fresh interpretation, choice or response rather than rehearsing its explanation again.",
+    "Weave thoughts into the live exchange rather than stopping the scene for a long internal essay. Give him space to react before he answers when that reaction matters, but do not insert a thought after every spoken line or action. Vary the local balance with the scene's pressure and the character's voice while working toward the default chapter balance. Keep his attention moving as the exchange changes. Avoid circular rumination, repeated denials, repeated reassurance, recaps of his feelings, therapy language and explanations of every implication. Carry an established feeling forward through a fresh interpretation, choice or response rather than rehearsing its explanation again.",
+    PROSE_BALANCE_INSTRUCTION,
+    TEXT_MESSAGE_INSTRUCTION,
     "Let narration and internal thought be equally easy to follow. Use the POV character's natural vocabulary and concrete observations. Keep figurative language and comic comparisons when they sharpen what he notices or feels, but allow ordinary actions and thoughts to stand plainly. Do not turn every movement into a witty analogy, abstract verdict or miniature performance. Choose precise, natural phrasing when an ornate comparison makes the reader reconstruct a simple meaning. Preserve varied sentence rhythms, emotional depth and individual voice; clarity does not require clipped prose, an explanation of every implication or simplified characters.",
     "Choose incidental objects and environmental details from the actual place, activity, weather and people. Do not repeatedly furnish unrelated scenes with paper napkins or open windows, or replace them with another stock prop used everywhere. An open window needs a plausible reason, not a default place in every room. Reuse an established detail when continuity or a deliberate motif makes it matter; otherwise omit unnecessary business rather than adding decorative novelty. Read the supplied continuity and recent prose for repeated set dressing.",
     "Give clothing the variety real people have, consistent with each person's taste, budget, work, age, setting and weather. Do not default the cast to grey, charcoal, green and blue shirts. Allow other colours, prints, fabrics, fits and styles where natural, including brighter or patterned clothes when they suit the person. Differentiate wardrobes without assigning every character one permanent colour, making everyone fashionable or listing an outfit at every entrance. Mention clothing when it serves POV, attraction, character or action. Preserve the current outfit within a scene and carry it across continuous scenes unless a change is shown or established; do not invent an opportunity to change clothes merely for variety.",
@@ -1064,12 +1070,6 @@ function repetitionWarnings(
   ) {
     warnings.push(
       "This section overuses a physical or internal reaction already used in the chapter. Review it before continuing.",
-    );
-  }
-
-  if ((section.match(/:/g) ?? []).length > 3) {
-    warnings.push(
-      "This section uses colons unusually often for novel prose. Review whether the narration has become list-like or explanatory.",
     );
   }
 

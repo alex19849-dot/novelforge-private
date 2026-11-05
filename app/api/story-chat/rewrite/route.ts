@@ -1,4 +1,4 @@
-import { selectedProseWriter, proseCostEstimate } from "../../../../lib/prose-writer";
+import { selectedProseWriter, proseCostEstimate, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
@@ -79,6 +79,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `${isAion ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY"} is not configured.`, diagnostics }, { status: 500 });
     }
     const prompt = [
+      PROSE_BALANCE_INSTRUCTION,
+      TEXT_MESSAGE_INSTRUCTION,
       "You are NovelForge's bounded-passage editor. Return only the complete replacement for PASSAGE TO REPLACE, without labels, notes, markdown, reasoning or alternatives.",
       "Follow AUTHOR INSTRUCTION. The chapter, Bible, continuity and contract are context, not requests to generate a chapter. Preserve the passage's POV, tense, voice, established facts and positions. Match its beginning and ending to the unchanged surrounding prose. Do not repeat either boundary, add later events or return the rest of the chapter. Preserve the passage's approximate length unless the author requests a different length. Every romantic or sexual character is an adult aged eighteen or older.",
       "Use natural contractions, fluid contemporary prose and individual character voices. Dialogue must make sense on the first read, with a clear connection between replies. Let sarcasm arise from words and immediate context. Mix ordinary responses with selective humour; avoid chains of polished retorts, shared bureaucratic jokes, therapy language, explanations of jokes and elaborate comparisons that obscure meaning. Preserve emotional intensity and subtext without making the literal exchange confusing. Never use em dashes or en dashes.",
