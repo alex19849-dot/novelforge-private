@@ -1,4 +1,4 @@
-import { isStoryBibleRequest, stripAionPrefix } from "./story-bible-request";
+import { isStoryBibleRequest, isPastedChapterGuidance, stripAionPrefix } from "./story-bible-request";
 
 // Shared by chat submission and the planner. A prose request must enter the
 // durable chapter queue before the first planning/model call starts.
@@ -11,8 +11,7 @@ export function requestsChapterGeneration(message: string): boolean {
   if (/\bepilogue\b[\s\S]{0,100}\b(?:write|generate|create|start|continue|rewrite)\b/i.test(text)) return true;
   if (/^(?:please\s+)?(?:next\s+chapter|write\s+the\s+next|continue(?:\s+writing)?|carry\s+on|keep\s+going)[.!\s]*$/i.test(text.split("\n")[0].trim())) return true;
   // Pasted chapter guidance is also a writing request without an added verb.
-  return /^(?:#{1,6}\s*)?(?:\*\*)?(?:chapter\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b|epilogue\b)[^\n]*\n/i.test(text)
-    && /^\s*(?:POV|Timing|Endpoint)\s*:/im.test(text);
+  return isPastedChapterGuidance(text);
 }
 
 export function continuesPendingChapter(message: string, pendingChapterNumber: number | null): boolean {

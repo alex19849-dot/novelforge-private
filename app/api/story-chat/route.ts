@@ -1220,18 +1220,17 @@ function sanitiseStoryBible(value: unknown): StoryBible {
   };
 }
 
-function hasCompleteStoryBible(storyBible: StoryBible): boolean {
-  return Boolean(
-    storyBible.premise &&
-      storyBible.relationship &&
-      storyBible.subgenre &&
-      storyBible.setting &&
-      storyBible.pov &&
-      storyBible.heatLevel &&
-      storyBible.burnPacing &&
-      storyBible.tropes.length > 0 &&
-      storyBible.characters.length > 0,
-  );
+function missingStoryBibleFields(storyBible: StoryBible): string[] {
+  const fields: [keyof StoryBible, string][] = [
+    ["premise", "Premise"], ["relationship", "Relationship"],
+    ["subgenre", "Subgenre"], ["setting", "Setting"], ["pov", "POV"],
+    ["heatLevel", "Heat level"], ["burnPacing", "Burn pacing"],
+    ["tropes", "Tropes"], ["characters", "Characters"],
+  ];
+  return fields.filter(([key]) => {
+    const value = storyBible[key];
+    return Array.isArray(value) ? value.length === 0 : !value;
+  }).map(([, label]) => label);
 }
 
 function mergeUniqueStrings(
@@ -2440,6 +2439,15 @@ workspace.`,
         /\b(?:write|rewrite|rewriting|continue|generate|expand)\b[\s\S]{0,80}\b(?:chapter|scene|prose|passage)\b/i.test(
           chapterRequestText,
         ));
+    if (isWriterMode) {
+      const missingFields = missingStoryBibleFields(sanitiseStoryBible(currentStory.storyBible));
+      if (missingFields.length) {
+        return NextResponse.json({
+          error: `Your saved Story Bible is missing: ${missingFields.join(", ")}. Add those fields before generating a chapter. No model call was made and your saved draft is unchanged.`,
+          diagnostics: planningDiagnostics,
+        }, { status: 400 });
+      }
+    }
     const usesCompactChapterPlan =
       requestStage === "plan" && isWriterMode && intent !== "create_story";
     const explicitChapterWordRange = getExplicitChapterWordRange(latestMessage);
@@ -3518,8 +3526,8 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
       throw new Error("The model did not return a usable story title.");
     }
 
-    if (isWriterMode && !hasCompleteStoryBible(mergedStoryBible)) {
-      throw new Error("The model returned an incomplete story bible.");
+    if (isWriterMode && missingStoryBibleFields(mergedStoryBible).length) {
+      throw new Error(`The chapter response is missing Story Bible fields: ${missingStoryBibleFields(mergedStoryBible).join(", ")}. Your saved Story Bible and draft are unchanged.`);
     }
 
     const chapterBrief =

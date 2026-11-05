@@ -83,6 +83,37 @@ const request = message => new Request('https://example.test/api/story-chat', { 
     assert.equal(actual.storyBible.notes.length, 15); assert.equal(actual.storyBible.characters.length, 5);
     console.log('PASS: supplied complete Bible imports with all 15 notes and 5 character entries.');
   }
+  const guidance = 'CHAPTER 1, KAINON\nFirst-person present. Night one.\n\nPURPOSE\nEstablish the leads.\n- Preserve the Story Bible.\n- End when Jesse accepts the ride.';
+  const readyBible = { premise: 'Two men meet.', relationship: 'MM romance.', subgenre: 'Contemporary.', setting: 'Millbank.', pov: 'First person present.', heatLevel: 'High heat.', burnPacing: 'Medium burn.', tropes: ['Forced proximity'], characters: ['Kainon, bar owner.', 'Jesse, new arrival.'], notes: ['Preserve the supplied events.'] };
+  const chapterStory = { ...structuredClone(story), title: 'The Lowdown', chapters: [], storyBible: readyBible, messages: [{ id: 1, role: 'user', content: guidance }] };
+  const chapterRequest = bible => new Request('https://example.test/api/story-chat', { method: 'POST', body: JSON.stringify({ stage: 'plan', story: { ...chapterStory, storyBible: bible } }) });
+  const beforeTerra = terraCalls.length;
+  const beforeAion = calls.length;
+  for (const [changedBible, missing] of [
+    [{ ...readyBible, heatLevel: '', tropes: [] }, ['Heat level', 'Tropes']],
+    [{ ...readyBible, heatLevel: '  ' }, ['Heat level']],
+    [{ ...readyBible, tropes: [] }, ['Tropes']],
+  ]) {
+    const snapshot = JSON.stringify(changedBible);
+    const blocked = await route.POST(chapterRequest(changedBible));
+    assert.equal(blocked.status, 400);
+    assert(blocked.body.error.includes(missing.join(', ')));
+    assert(blocked.body.error.includes('No model call was made'));
+    assert.deepEqual(blocked.body.diagnostics, []);
+    assert.equal(JSON.stringify(changedBible), snapshot);
+  }
+  assert.equal(terraCalls.length, beforeTerra);
+  assert.equal(calls.length, beforeAion);
+  const planned = { reply: 'Ready.', storyTitle: 'The Lowdown', generatedChapter: { kind: 'chapter', title: 'Chapter 1', povCharacter: 'Kainon', content: '', replaceChapterNumber: null }, sectionBrief: { chapterNumber: 1, chapterKind: 'chapter', chapterTitle: 'Chapter 1', povCharacter: 'Kainon', authorDirection: guidance, originalGuidance: guidance, continuationBoundary: 'Night one.', requiredBeats: [{ order: 1, instruction: 'Jesse accepts the ride.', specialistWriter: null, approximateWordTarget: null }], endpoint: 'Jesse accepts the ride.', exclusions: [], targetWordRange: { minimum: 2000, preferred: 3000, maximum: 4000 } } };
+  let chapterCalls = 0;
+  global.fetch = async (_url, init) => { chapterCalls++; const input = JSON.parse(init.body); assert.equal(input.model, 'aion-labs/aion-3.5'); assert(input.messages.some(m => m.content.includes(guidance))); return { ok: true, status: 200, json: async () => ({ usage: { prompt_tokens: 10, completion_tokens: 20, cost: .0001 }, choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(planned) } }] }) }; };
+  const chapterResponse = await route.POST(chapterRequest(readyBible));
+  assert.equal(chapterResponse.status, 200, JSON.stringify(chapterResponse.body));
+  assert.equal(chapterCalls, 1);
+  assert.equal(terraCalls.length, beforeTerra);
+  assert.deepEqual(chapterResponse.body.story.storyBible, readyBible);
+  assert.equal(JSON.parse(chapterResponse.body.chapterBrief).originalGuidance, guidance);
+  console.log('PASS: Lowdown-style guidance reaches chapter planning; missing Heat level/Tropes rejected before any paid call, exact missing fields reported, ready Bible and original chapter guidance preserved.');
   const page = fs.readFileSync('app/story-chat/page.tsx', 'utf8');
   assert(page.includes('&& !bibleRequest'));
   assert(page.includes('if (!bibleRequest && requestsChapterGeneration(trimmedMessage))'));

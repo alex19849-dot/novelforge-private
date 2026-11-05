@@ -4,9 +4,17 @@ export function stripAionPrefix(message: string): string {
   return message.replace(/^\s*aion(?:\s*[:,-]\s*|\s+)/i, "").trim();
 }
 
+export function isPastedChapterGuidance(message: string): boolean {
+  const text = stripAionPrefix(message);
+  return /^(?:#{1,6}\s*)?(?:\*\*)?(?:chapter\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b|epilogue\b)[^\n]*\n/i.test(text)
+    && (/^\s*(?:POV|Timing|Endpoint)\s*:/im.test(text)
+      || /^\s*(?:first|third)[ -]person\s+(?:present|past)\b/im.test(text));
+}
+
 // Inspect the instruction, not chapter prose or future events inside a pasted Bible.
 export function isStoryBibleRequest(message: string): boolean {
   const text = stripAionPrefix(message);
+  if (isPastedChapterGuidance(text)) return false;
   if (/^(?:please\s+)?(?:write|generate|continue|rewrite|expand)\s+(?:(?:the|my|this|next)\s+)*(?:chapter|epilogue|scene|passage|paragraph|prose)\b/i.test(text)) return false;
   if (/^(?:rewrite|edit|revise|expand)\s+(?:(?:this|the|my)\s+)?(?:passage|scene|chapter|paragraph|extract)\b|^rewrite\s+this\s*[:\n]/i.test(text)) return false;
   const instruction = text.split(/^\s*(?:#{1,6}\s*)?PREMISE\s*:?\s*$/im)[0];

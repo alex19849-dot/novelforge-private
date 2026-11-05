@@ -10,6 +10,10 @@ function load(file) {
 }
 const routing=load('lib/chapter-request.ts');
 const bible=load('lib/story-bible-request.ts');
+const lowdownGuidance = 'CHAPTER 1, KAINON\nFirst-person present. Night one.\n\nPURPOSE\nEstablish Kainon and Jesse.\n\nOPENING\n- Follow the Story Bible.\n- End with Jesse accepting the ride.';
+assert(routing.requestsChapterGeneration(lowdownGuidance));
+assert(!bible.isStoryBibleRequest(lowdownGuidance));
+assert(routing.requestsChapterGeneration('AION: ' + lowdownGuidance));
 for(const text of ['Write CHAPTER 9\nPOV: Sam','Continue chapter 2 from the last sentence.','Start the next chapter.','Chapter 9\nPOV: Sam\nTiming: Friday.\n1. He arrives.','## CHAPTER 10\nPOV: Sam','EPILOGUE\nTiming: One year later.','Next chapter.','**CHAPTER 12**\nPOV: Sam','Next chapter.\nPOV: Sam','Continue','Keep going.','Carry on.']) assert(routing.requestsChapterGeneration(text),text);
 for(const text of ['Do not write Chapter 9.','Please do not generate a chapter.','Outline chapter 9 before we write chapter 9.','Explain why chapter 9 failed.','Can you review chapter 9?','Rewrite this passage.','Update the Story Bible. Do not write a chapter.','Create a new story bible with 18 chapters.','What did chapter 9 establish?']) assert(!routing.requestsChapterGeneration(text),text);
 assert(routing.continuesPendingChapter('Continue chapter 2.',2));
@@ -31,7 +35,7 @@ async function submit(text,pending){
 }
 (async()=>{
  const pending={storyId:'story',generatedChapter:{replaceChapterNumber:2},draft:'Existing edited draft.',chapterBrief:'Contract'};
- for(const text of ['Write chapter 2.','Continue chapter 2.','Chapter 2\nPOV: Sam\nTiming: Friday.','Next chapter.']){
+ for(const text of ['Write chapter 2.','Continue chapter 2.','Chapter 2\nPOV: Sam\nTiming: Friday.','Next chapter.',lowdownGuidance]){
   const calls=await submit(text);assert.equal(calls.length,1,text);assert.equal(calls[0].operation,'generate');assert.equal(calls[0].story.messages.at(-1).content,text);
  }
  let calls=await submit('Continue chapter 2.',pending);assert.equal(calls[0].operation,'write');assert.equal(calls[0].action,'continue');assert.equal(calls[0].pending,pending);assert.equal(calls[0].sectionInstruction,'Continue chapter 2.');
