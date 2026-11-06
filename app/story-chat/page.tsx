@@ -15,7 +15,7 @@ import { supabase } from "../../lib/supabaseClient";
 
 import ChatPanel from "./components/ChatPanel";
 import ChapterGuidanceCard from "./components/ChapterGuidanceCard";
-import { chapterGuidanceSourceKey, requestsChapterGuidance, revisesChapterGuidance, parkChapterDraft } from "../../lib/chapter-guidance";
+import { chapterGuidanceSourceKey, requestsChapterGuidance, revisesChapterGuidance, parkChapterDraft, withoutChapterGuidance, discardsChapterGuidance } from "../../lib/chapter-guidance";
 
 import ChapterPanel from "./components/ChapterPanel";
 import ManuscriptReviewPanel from "./components/ManuscriptReviewPanel";
@@ -656,6 +656,8 @@ export default function StoryChatPage() {
   const [hasLoadedRemoteStory, setHasLoadedRemoteStory] = useState(false);
 
   const [input, setInput] = useState("");
+  const chatInputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => { if (!input && chatInputRef.current) chatInputRef.current.style.height = "auto"; }, [input]);
 
   const [isThinkingLocal, setIsThinking] = useState(false);
   const [backgroundBusy, setBackgroundBusy] = useState(false);
@@ -1878,6 +1880,23 @@ device.`,
     currentStoryRef.current = next;
   }
 
+  async function discardChapterGuidance() {
+    const current = currentStoryRef.current;
+    if (!current?.storyState.chapterGuidanceDraft || isThinking || guidanceConfirmInFlight.current) return;
+    setIsThinking(true);
+    try {
+      const next = withoutChapterGuidance(current);
+      await persistStory(next);
+      currentStoryRef.current = next;
+      setBackgroundNotice("Chapter guidance discarded. Your chapters and unfinished prose are unchanged.");
+    } catch (error) {
+      setStory(current); currentStoryRef.current = current;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      setBackgroundNotice(error instanceof Error ? error.message : "The guidance could not be discarded.");
+      throw error;
+    } finally { setIsThinking(false); }
+  }
+
   async function confirmChapterGuidance(text: string) {
     const current = currentStoryRef.current;
     const draft = current?.storyState.chapterGuidanceDraft;
@@ -1951,6 +1970,11 @@ device.`,
     setIsThinking(true);
 
     try {
+      if (discardsChapterGuidance(trimmedMessage)) {
+        const next = withoutChapterGuidance(requestStory);
+        await persistStory({ ...next, messages: [...next.messages, { id: Date.now() + 1, role: "assistant", content: requestStory.storyState.chapterGuidanceDraft ? "Chapter guidance discarded. Your chapters and unfinished prose are unchanged." : "There is no active chapter guidance to discard." }] });
+        return;
+      }
       if (isAionRequest) {
         const currentPending = hasPendingChapter ? pendingGeneration : null;
         const latestChapter = requestStory.chapters.at(-1) ?? null;
@@ -2844,13 +2868,12 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
         )}
 
         {activeTab === "chat" && (
-          <div className="min-h-0 flex flex-1 flex-col overflow-y-auto">
-            <ChatPanel messages={visibleChatMessages} isThinking={isThinking} />
-            {story.storyState.chapterGuidanceDraft?.text && !story.storyState.chapterGuidanceDraft.awaitingAnswer && <ChapterGuidanceCard
+          <ChatPanel messages={visibleChatMessages} isThinking={isThinking}
+            guidanceDraft={story.storyState.chapterGuidanceDraft}
+            guidance={story.storyState.chapterGuidanceDraft?.text && !story.storyState.chapterGuidanceDraft.awaitingAnswer ? <ChapterGuidanceCard
               key={story.id} draft={story.storyState.chapterGuidanceDraft} busy={isThinking}
               hasPendingChapter={Boolean(pendingForCurrentStory)}
-              onSave={saveChapterGuidance} onConfirm={confirmChapterGuidance} />}
-          </div>
+              onSave={saveChapterGuidance} onConfirm={confirmChapterGuidance} onDiscard={discardChapterGuidance} /> : null} />
         )}
 
         {activeTab === "chapters" && (
@@ -2946,21 +2969,14 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
         )}
 
         {activeTab === "chat" && (
-          <footer className="shrink-0 border-t border-white/10 bg-neutral-950/95 px-4 py-4 backdrop-blur sm:px-5">
+          <footer className="shrink-0 border-t border-white/10 bg-neutral-950/95 px-4 py-3 backdrop-blur sm:px-5">
             {currentDiagnostics.length > 0 && (
-              <details className="mb-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-neutral-300">
+              <details className="mb-2 text-xs text-neutral-400">
                 <summary className="cursor-pointer font-medium text-neutral-300">
-                  {formatGenerationDiagnostics(
-                    currentDiagnostics,
-                    pendingForCurrentStory
-                      ? isThinking
-                        ? "in progress"
-                        : "failed"
-                      : "succeeded",
-                  )}
+                  Generation details
                 </summary>
 
-                <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
+                <div className="mt-2 max-h-32 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-neutral-900 p-3">
                   {currentDiagnostics.map((diagnostic, index) => (
                     <p
                       key={`${diagnostic.stage}-${diagnostic.attempt}-${index}`}
@@ -2988,9 +3004,15 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
 
             <form onSubmit={sendMessage} className="flex items-end gap-3">
               <textarea
+                ref={chatInputRef}
+                aria-label="Message NovelForge"
                 value={input}
                 disabled={isThinking}
-                onChange={(event) => setInput(event.target.value)}
+                onChange={(event) => {
+                  setInput(event.target.value);
+                  event.currentTarget.style.height = "auto";
+                  event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 144)}px`;
+                }}
                 onKeyDown={(event) => {
                   if (
                     event.key === "Enter" &&
@@ -3007,9 +3029,9 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
                     ? "Ask NovelForge about the current draft..."
                     : "Tell NovelForge anything..."
                 }
-                rows={pendingForCurrentStory ? 3 : 5}
-                className="min-h-14 flex-1 resize-none rounded-2xl border
-border-white/10 bg-white/5 px-5 py-4 text-base text-white outline-none
+                rows={1}
+                className="max-h-36 min-h-12 flex-1 resize-none rounded-2xl border
+border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none
 placeholder:text-neutral-600 focus:border-pink-500
 disabled:cursor-not-allowed disabled:opacity-60"
               />
@@ -3017,7 +3039,7 @@ disabled:cursor-not-allowed disabled:opacity-60"
               <button
                 type="submit"
                 disabled={!input.trim() || isThinking}
-                className="h-14 rounded-2xl bg-pink-500 px-6 font-semibold text-white
+                className="h-12 rounded-2xl bg-pink-500 px-5 font-semibold text-white
 transition hover:bg-pink-400 disabled:cursor-not-allowed
 disabled:opacity-40"
               >
@@ -3025,9 +3047,7 @@ disabled:opacity-40"
               </button>
             </form>
 
-            <p className="mt-3 text-center text-xs text-neutral-600">
-              Your story workspace saves automatically on this device.
-            </p>
+
           </footer>
         )}
       </div>

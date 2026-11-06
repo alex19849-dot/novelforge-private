@@ -1,3 +1,4 @@
+import { isGuidanceProposal } from './chapter-guidance';
 import type { StoryWorkspace } from '../app/story-chat/types';
 import { createAionChapterPlan, assertChapterPlanSchema } from './aion-chapter-planner';
 
@@ -28,13 +29,13 @@ For an existing chapter rewrite, use only chapters before the requested chapter 
 const schema = { type: 'object', additionalProperties: false, required: ['guidance', 'question'], properties: { guidance: { type: 'string' }, question: { type: 'string' } } };
 export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: Parameters<typeof createAionChapterPlan>[0]['diagnostics']) {
   const previousCount = diagnostics.length;
-  const { parkedChapterDrafts: _parked, ...promptState } = story.storyState;
+  const { parkedChapterDrafts: _parked, chapterGuidanceDraft: _draft, ...promptState } = story.storyState;
   try {
     const response = await createAionChapterPlan({ messages: [
       { role: 'system', content: CHAPTER_GUIDANCE_PROMPT },
       { role: 'user', content: JSON.stringify({ storyBible: story.storyBible, storyState: promptState,
         savedChapterIndex: story.chapters.map(c => ({ number: c.number, title: c.title, pov: c.povCharacter })),
-        recentChapters: story.chapters.slice(-3), conversation: story.messages.slice(-12),
+        recentChapters: story.chapters.slice(-3), conversation: story.messages.filter(message => message.role !== 'assistant' || !isGuidanceProposal(message.content)).slice(-12),
         guidanceBeingRevised: story.storyState.chapterGuidanceDraft?.text ?? null }) }
     ], schema, diagnostics, attempt: 1 });
     const output: unknown = JSON.parse(response.output_text);
