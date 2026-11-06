@@ -16,7 +16,7 @@ export default function ChatPanel({ messages, isThinking, guidanceDraft, guidanc
   useLayoutEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    if (hasCurrentGuidance && guidanceRef.current) container.scrollTop = guidanceRef.current.offsetTop - container.offsetTop;
+    if (hasCurrentGuidance && guidanceRef.current) container.scrollTop = guidanceRef.current.offsetTop;
     else container.scrollTop = container.scrollHeight;
   }, [messages.length, guidanceDraft?.updatedAt, hasCurrentGuidance]);
   return <section aria-label="Story conversation" ref={scrollContainerRef} className="relative min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-5 sm:px-6">
