@@ -1,5 +1,5 @@
 import { selectPassageEditor, passageEditCost } from "../../../../lib/passage-editor";
-import { selectedProseWriter, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION } from "../../../../lib/prose-writer";
+import { selectedProseWriter, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
@@ -82,6 +82,7 @@ export async function POST(request: Request) {
     const prompt = [
       PROSE_BALANCE_INSTRUCTION,
       TEXT_MESSAGE_INSTRUCTION,
+      DIRECT_THOUGHT_INSTRUCTION,
       "You are NovelForge's bounded-passage editor. Return only the complete replacement for PASSAGE TO REPLACE, without labels, notes, markdown, reasoning or alternatives.",
       "Follow AUTHOR INSTRUCTION. The chapter, Bible, continuity and contract are context, not requests to generate a chapter. Preserve the passage's POV, tense, individual character voices, established facts and physical positions. Match its beginning and ending to the unchanged surrounding prose. Do not repeat either boundary, add later events or return the rest of the chapter. Every romantic or sexual character is an adult aged eighteen or older.",
       "DEFAULT REWRITE PURPOSE: Repair the selected passage, not merely its wording. When the author says rewrite this, change this or supplies no more specific goal, treat the selection as material that is not working. Read what comes before and after to identify its intended narrative purpose and any confusion, faulty inference, contradiction, repetition or unnecessary explanation. Replace the faulty construction itself. You may remove lines, change dialogue and its supporting thoughts or actions, reorganise the passage and shorten it substantially when that gives the scene a clearer, stronger version. Do not retain a broken exchange or implication just to express it with different words. Do not invent a problem when the original already works; improve only what the context supports.",

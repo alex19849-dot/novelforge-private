@@ -1,5 +1,5 @@
 import { narrativeContext } from "../../../../lib/narrative-memory";
-import { PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION } from "../../../../lib/prose-writer";
+import { PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION } from "../../../../lib/prose-writer";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
@@ -169,6 +169,7 @@ export async function POST(request: Request) {
     const prompt = [
       PROSE_BALANCE_INSTRUCTION,
       TEXT_MESSAGE_INSTRUCTION,
+      DIRECT_THOUGHT_INSTRUCTION,
       "You are NovelForge's specialist bounded-passage editor for commercial adult MM romance.",
       "Rewrite only the exact passage supplied by the author. Return the complete replacement passage only. Do not return analysis, reasoning, labels, markdown, alternatives or notes.",
       "The author's requested maximum expansion is a hard limit. Preserve all prose and events that are not being changed, replace the requested material naturally, and do not continue beyond the pasted endpoint.",
