@@ -759,7 +759,7 @@ export default function ChapterPanel({
             className="fixed z-[60] flex w-[264px] max-w-[calc(100vw-16px)] gap-1 rounded-xl border border-white/20 bg-neutral-950 p-1 text-sm font-semibold text-white shadow-xl"
             style={{ left: selectedPassage.left, top: selectedPassage.top }}>
             <button type="button" className="min-h-11 flex-1 rounded-lg px-3 hover:bg-white/10 focus:bg-white/10"
-              onClick={() => void applyPassageRewrite(selectedPassage, "Rewrite this passage with fresh, natural wording. Preserve its meaning, events, POV, tense, approximate length and connection to the surrounding prose.")}>Change this</button>
+              onClick={() => void applyPassageRewrite(selectedPassage, "Repair and replace this passage so it makes sense in the scene. Use the surrounding prose to fix confusing dialogue, faulty logic, unnecessary repetition or misplaced thoughts. Remove what does not work and write the strongest coherent replacement, rather than paraphrasing the same lines. Keep the intended scene development, established facts, character voice, POV and tense. The replacement may be shorter or structurally different; do not pad it to match the original length. Return only the replacement for the selected text.")}>Change this</button>
             <button type="button" className="min-h-11 flex-1 rounded-lg bg-pink-500 px-3"
               onClick={() => { setGuidedPassage(selectedPassage); setSelectedPassage(null); setSelectionInstruction(""); setRewriteError(""); document.getSelection()?.removeAllRanges(); }}>Guide this</button>
           </div>
