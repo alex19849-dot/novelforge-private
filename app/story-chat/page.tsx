@@ -14,6 +14,8 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 
 import ChatPanel from "./components/ChatPanel";
+import ChapterGuidanceCard from "./components/ChapterGuidanceCard";
+import { chapterGuidanceSourceKey, requestsChapterGuidance, revisesChapterGuidance } from "../../lib/chapter-guidance";
 
 import ChapterPanel from "./components/ChapterPanel";
 import ManuscriptReviewPanel from "./components/ManuscriptReviewPanel";
@@ -1864,6 +1866,40 @@ device.`,
     await queueChapterBackground({ operation: "complete", story: baseStory, pending, action: pending.draft.trim() ? "continue" : "start", sectionInstruction });
   }
 
+  const guidanceConfirmInFlight = useRef(false);
+
+  async function saveChapterGuidance(text: string) {
+    const current = currentStoryRef.current;
+    if (!current?.storyState.chapterGuidanceDraft || isThinking) return;
+    const next = { ...current, storyState: { ...current.storyState, chapterGuidanceDraft: {
+      ...current.storyState.chapterGuidanceDraft, text, updatedAt: new Date().toISOString(),
+    } }, updatedAt: new Date().toISOString() };
+    await persistStory(next);
+    currentStoryRef.current = next;
+  }
+
+  async function confirmChapterGuidance(text: string) {
+    const current = currentStoryRef.current;
+    const draft = current?.storyState.chapterGuidanceDraft;
+    if (!current || !draft || isThinking || guidanceConfirmInFlight.current) return;
+    if (pendingGeneration?.storyId === current.id) throw new Error("Complete or discard the current draft first.");
+    guidanceConfirmInFlight.current = true;
+    setIsThinking(true);
+    try {
+      if (await chapterGuidanceSourceKey(current) !== draft.sourceKey) throw new Error("The story changed after this guidance was drafted. Ask chat to refresh the guidance before confirming.");
+      // Check the saved source too, so a second device's newer edits are not overwritten.
+      const { data: remote, error } = await supabase.from("stories").select("form,chapters,story_state").eq("id", current.id).eq("user_id", userId).single();
+      if (error || !remote) throw new Error("The saved story could not be checked. Your guidance is preserved.");
+      if (await chapterGuidanceSourceKey({ ...current, storyBible: remote.form, chapters: remote.chapters ?? [], storyState: remote.story_state ?? {} }) !== draft.sourceKey) throw new Error("The saved story changed on another device. Reopen it and refresh the guidance before confirming.");
+      const { chapterGuidanceDraft: _draft, ...state } = current.storyState;
+      const approved: StoryWorkspace = { ...current, storyState: state,
+        messages: [...current.messages, { id: Date.now(), role: "user", content: text }], updatedAt: new Date().toISOString() };
+      await persistStory(approved);
+      currentStoryRef.current = approved;
+      await queueChapterBackground({ operation: "generate", story: approved });
+    } finally { guidanceConfirmInFlight.current = false; setIsThinking(false); }
+  }
+
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1871,7 +1907,7 @@ device.`,
     const deletionRequest = getChapterDeletionRequest(trimmedMessage);
     const hasPendingChapter = pendingGeneration?.storyId === story?.id;
     const bibleRequest = isStoryBibleRequest(trimmedMessage);
-    const isAionRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage) && !bibleRequest;
+    const isAionRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage) && !bibleRequest && !requestsChapterGuidance(trimmedMessage) && !requestsChapterGeneration(trimmedMessage);
 
     if (!story || !trimmedMessage || isThinking) {
       return;
@@ -2079,6 +2115,23 @@ device.`,
           clearPendingGeneration();
         }
 
+        return;
+      }
+
+      const wantsGuidance = !bibleRequest && (
+        requestsChapterGuidance(trimmedMessage) ||
+        requestStory.storyState.chapterGuidanceDraft?.awaitingAnswer ||
+        (requestsChapterGeneration(trimmedMessage) && !(hasPendingChapter && continuesPendingChapter(trimmedMessage, pendingGeneration?.generatedChapter.replaceChapterNumber ?? Math.max(0, ...requestStory.chapters.map(c => c.number)) + 1))) ||
+        (Boolean(requestStory.storyState.chapterGuidanceDraft) && revisesChapterGuidance(trimmedMessage))
+      );
+      if (wantsGuidance) {
+        const response = await fetch("/api/story-chat", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ story: requestStory, stage: "plan", guidanceOnly: true }),
+        });
+        const data = await readApiJson(response);
+        if (!isStoryChatResponse(data) || data.generatedChapter) throw new Error("The guidance response was invalid. No prose generation was started.");
+        await persistStory(data.story);
         return;
       }
 
@@ -2767,7 +2820,13 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
         )}
 
         {activeTab === "chat" && (
-          <ChatPanel messages={visibleChatMessages} isThinking={isThinking} />
+          <div className="min-h-0 flex flex-1 flex-col overflow-y-auto">
+            <ChatPanel messages={visibleChatMessages} isThinking={isThinking} />
+            {story.storyState.chapterGuidanceDraft?.text && !story.storyState.chapterGuidanceDraft.awaitingAnswer && <ChapterGuidanceCard
+              key={story.id} draft={story.storyState.chapterGuidanceDraft} busy={isThinking}
+              hasPendingChapter={Boolean(pendingForCurrentStory)}
+              onSave={saveChapterGuidance} onConfirm={confirmChapterGuidance} />}
+          </div>
         )}
 
         {activeTab === "chapters" && (

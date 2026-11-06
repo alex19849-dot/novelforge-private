@@ -1,3 +1,5 @@
+import { chapterGuidanceSourceKey } from "../../../lib/chapter-guidance";
+import { draftChapterGuidance } from "../../../lib/chapter-guidance-provider";
 import { requestsChapterGeneration } from "../../../lib/chapter-request";
 import { PROSE_BALANCE_INSTRUCTION } from "../../../lib/prose-writer";
 import OpenAI from "openai";
@@ -1444,6 +1446,7 @@ function parseRequestBody(value: unknown): {
   story: StoryWorkspace;
   stage: "complete" | "plan";
   chatOnly: boolean;
+  guidanceOnly: boolean;
   draftContext: string;
 } | null {
   function isStoryWorkspace(value: unknown): value is StoryWorkspace {
@@ -1465,6 +1468,7 @@ function parseRequestBody(value: unknown): {
     story?: StoryWorkspace;
     stage?: unknown;
     chatOnly?: unknown;
+    guidanceOnly?: unknown;
     draftContext?: unknown;
   };
 
@@ -1480,6 +1484,7 @@ function parseRequestBody(value: unknown): {
     story: body.story,
     stage: body.stage === "plan" ? "plan" : "complete",
     chatOnly: body.chatOnly === true,
+    guidanceOnly: body.guidanceOnly === true,
     draftContext:
       typeof body.draftContext === "string"
         ? body.draftContext.trim().slice(-40000)
@@ -2233,6 +2238,21 @@ export async function POST(request: Request) {
           status: 400,
         },
       );
+    }
+
+    // Author-facing guidance never enters contract/prose/Bible mutation paths.
+    if (parsedBody.guidanceOnly) {
+      const result = await draftChapterGuidance(currentStory, planningDiagnostics);
+      const reply = result.guidance || result.question;
+      const nextStory: StoryWorkspace = {
+        ...currentStory,
+        storyState: { ...currentStory.storyState, lastGenerationDiagnostics: planningDiagnostics,
+          chapterGuidanceDraft: { text: result.guidance || currentStory.storyState.chapterGuidanceDraft?.text || "", sourceKey: await chapterGuidanceSourceKey(currentStory), updatedAt: new Date().toISOString(), awaitingAnswer: !result.guidance } },
+        messages: [...currentStory.messages, { id: Date.now(), role: "assistant", content: reply }],
+        updatedAt: new Date().toISOString(),
+      };
+      return NextResponse.json({ reply, intent: "general_chat", story: nextStory,
+        generatedChapter: null, chapterBrief: "", diagnostics: planningDiagnostics });
     }
 
     const conversation = currentStory.messages

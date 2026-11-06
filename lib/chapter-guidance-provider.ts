@@ -1,0 +1,51 @@
+import type { StoryWorkspace } from '../app/story-chat/types';
+import { createAionChapterPlan, assertChapterPlanSchema } from './aion-chapter-planner';
+
+export const CHAPTER_GUIDANCE_PROMPT = `You draft detailed chapter guidance for an author's review, not novel prose and not an approved chapter contract. Return JSON with guidance and question strings. If a crucial author decision is missing, leave guidance empty and ask one focused question. Otherwise leave question empty.
+Use this readable plain-text format, with normal line breaks, no code fences, tables or long dashes:
+WRITE CHAPTER [number] (use REWRITE CHAPTER only when the author explicitly requests replacing a saved chapter)
+POV: [established character and tense]
+TIME: [placement relative to the preceding chapter]
+
+PURPOSE
+A specific paragraph describing what this chapter changes for the leads.
+
+CONTINUITY FROM CHAPTER [previous number]
+- Relevant established facts and practical agreements the writer must preserve.
+
+[DESCRIPTIVE SCENE HEADING]
+- Detailed actionable guidance covering the sequence, dialogue opportunities, private thoughts, attraction, behaviour, friction and practical logistics.
+[Further scene headings as the chapter needs, never a fixed three-beat template.]
+
+ENDING
+The precise final action or realisation, and where the chapter stops.
+
+EXCLUSIONS
+- Applicable limits from the author or established pacing.
+Match the author's requested level of detail, normally several developed bullets per scene. Make guidance specific enough to write from, without scripting every line or filling space. Keep romance and the leads' inner lives central, according to this book's genre and the author's direction. Let attraction register through specific traits the POV character notices. Humour should arise naturally, not in every exchange. Do not turn the chapter into a checklist of scenery or recap.
+For an existing chapter rewrite, use only chapters before the requested chapter as prior history; later chapters are future constraints, never events that have already happened at that point. Use the Story Bible, saved continuity and actual preceding chapter to ground facts. Distinguish proposed events from established history. Do not invent prior disclosures, meetings, exact wages, schedules, injuries, relationship milestones or supporting-character identities. Preserve exact amounts and times when supplied. If revising, return the complete revised guidance and preserve unaffected requirements. Do not recycle completed discoveries or conflicts. No new numerical word target unless supplied by the author or already established for this book. Use the author's explicit chapter number or the next saved chapter number. Do not change the Bible, saved chapters or canon. Nothing is approved until the author confirms.`;
+
+const schema = { type: 'object', additionalProperties: false, required: ['guidance', 'question'], properties: { guidance: { type: 'string' }, question: { type: 'string' } } };
+export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: Parameters<typeof createAionChapterPlan>[0]['diagnostics']) {
+  const previousCount = diagnostics.length;
+  try {
+    const response = await createAionChapterPlan({ messages: [
+      { role: 'system', content: CHAPTER_GUIDANCE_PROMPT },
+      { role: 'user', content: JSON.stringify({ storyBible: story.storyBible, storyState: story.storyState,
+        savedChapterIndex: story.chapters.map(c => ({ number: c.number, title: c.title, pov: c.povCharacter })),
+        recentChapters: story.chapters.slice(-3), conversation: story.messages.slice(-12),
+        guidanceBeingRevised: story.storyState.chapterGuidanceDraft?.text ?? null }) }
+    ], schema, diagnostics, attempt: 1 });
+    const output: unknown = JSON.parse(response.output_text);
+    assertChapterPlanSchema(output, schema);
+    const result = output as { guidance: string; question: string };
+    if (result.guidance.trim()) {
+      for (const heading of [/^(?:RE)?WRITE CHAPTER \d+\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^CONTINUITY FROM CHAPTER/im, /^ENDING\s*$/im, /^EXCLUSIONS\s*$/im]) {
+        if (!heading.test(result.guidance)) throw new Error('The guidance draft was incomplete. Your chapters are unchanged; no automatic retry was started.');
+      }
+    } else if (!result.question.trim()) throw new Error('No chapter guidance was returned. No automatic retry was started.');
+    return { guidance: result.guidance.trim(), question: result.question.trim() };
+  } finally {
+    diagnostics.slice(previousCount).forEach(d => { d.stage = 'chapter_guidance'; });
+  }
+}

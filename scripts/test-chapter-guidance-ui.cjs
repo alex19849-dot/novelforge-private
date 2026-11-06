@@ -1,0 +1,13 @@
+const fs=require('fs'),assert=require('node:assert/strict'),ts=require('typescript');
+const {JSDOM}=require('jsdom');const dom=new JSDOM('<div id="root"></div>');Object.assign(global,{window:dom.window,document:dom.window.document,HTMLElement:dom.window.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true});
+const React=require('react'),{act}=React,{createRoot}=require('react-dom/client');
+const m={exports:{}};new Function('require','module','exports',ts.transpileModule(fs.readFileSync('app/story-chat/components/ChapterGuidanceCard.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText)(require,m,m.exports);const Card=m.exports.default;
+(async()=>{const root=createRoot(document.getElementById('root'));let saves=[],confirms=[];const props={draft:{text:'WRITE CHAPTER 3\nOriginal direction',updatedAt:'now',sourceKey:'key'},busy:false,hasPendingChapter:false,onSave:async x=>saves.push(x),onConfirm:async x=>confirms.push(x)};
+ await act(async()=>root.render(React.createElement(Card,props)));assert.equal(confirms.length,0);const area=document.querySelector('textarea');assert.equal(area.wrap,'');assert.equal(area.value,props.draft.text);
+ await act(async()=>document.querySelectorAll('button')[0].click());assert.deepEqual(saves,[props.draft.text]);assert.equal(confirms.length,0);
+ await act(async()=>document.querySelectorAll('button')[1].click());assert.deepEqual(confirms,[props.draft.text]);
+ await act(async()=>root.render(React.createElement(Card,{...props,hasPendingChapter:true})));assert(document.querySelectorAll('button')[1].disabled);
+ await act(async()=>root.render(React.createElement(Card,{...props,busy:true})));assert(document.querySelector('textarea').disabled);assert([...document.querySelectorAll('button')].every(x=>x.disabled));
+ await act(async()=>root.render(React.createElement(Card,{...props,onConfirm:async()=>{throw Error('Story changed')}})));await act(async()=>document.querySelectorAll('button')[1].click());assert(document.querySelector('[role=alert]').textContent.includes('Story changed'));
+ await act(async()=>root.unmount());console.log('PASS: guidance is readable/editable, save never confirms, explicit confirmation callback, pending/busy guards, visible errors. Mocked, no paid calls.');
+})().catch(e=>{console.error(e);process.exitCode=1});

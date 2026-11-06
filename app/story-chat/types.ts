@@ -286,6 +286,8 @@ export type GenerationDiagnostic = {
 };
 
 export type StoryState = {
+  /** Author-facing proposal, never completed canon or a writing contract. */
+  chapterGuidanceDraft?: { text: string; sourceKey: string; updatedAt: string; awaitingAnswer?: boolean };
   memoryCorrections?: MemoryCorrection[];
   importantFacts: string[];
   characterStates: string[];
