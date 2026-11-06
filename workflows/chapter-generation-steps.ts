@@ -198,6 +198,9 @@ export async function finishChapterJob(id: string) {
   const job = await getJob(id);
   if (job.status !== 'generating') return;
   const state = job.checkpoint as Checkpoint;
+  // Recovery copies are workspace metadata, not prose/continuity input.
+  const parked = (job.input as ChapterJobInput).story.storyState.parkedChapterDrafts;
+  if (parked && !state.story.storyState.parkedChapterDrafts) state.story = { ...state.story, storyState: { ...state.story.storyState, parkedChapterDrafts: parked } };
   const result = { story: state.story, pending: state.pending ?? null, recoveryPending: state.pending ?? (job.input as ChapterJobInput).pending ?? null };
   const { error } = await jobAdmin().from('story_generation_jobs').update({ result, error_message: state.error ?? '', stage: 'ready', updated_at: new Date().toISOString() }).eq('id', id);
   if (error) throw new Error('The generated chapter could not be saved.');

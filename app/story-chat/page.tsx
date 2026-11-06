@@ -15,7 +15,7 @@ import { supabase } from "../../lib/supabaseClient";
 
 import ChatPanel from "./components/ChatPanel";
 import ChapterGuidanceCard from "./components/ChapterGuidanceCard";
-import { chapterGuidanceSourceKey, requestsChapterGuidance, revisesChapterGuidance } from "../../lib/chapter-guidance";
+import { chapterGuidanceSourceKey, requestsChapterGuidance, revisesChapterGuidance, parkChapterDraft } from "../../lib/chapter-guidance";
 
 import ChapterPanel from "./components/ChapterPanel";
 import ManuscriptReviewPanel from "./components/ManuscriptReviewPanel";
@@ -1882,7 +1882,6 @@ device.`,
     const current = currentStoryRef.current;
     const draft = current?.storyState.chapterGuidanceDraft;
     if (!current || !draft || isThinking || guidanceConfirmInFlight.current) return;
-    if (pendingGeneration?.storyId === current.id) throw new Error("Complete or discard the current draft first.");
     guidanceConfirmInFlight.current = true;
     setIsThinking(true);
     try {
@@ -1892,12 +1891,29 @@ device.`,
       if (error || !remote) throw new Error("The saved story could not be checked. Your guidance is preserved.");
       if (await chapterGuidanceSourceKey({ ...current, storyBible: remote.form, chapters: remote.chapters ?? [], storyState: remote.story_state ?? {} }) !== draft.sourceKey) throw new Error("The saved story changed on another device. Reopen it and refresh the guidance before confirming.");
       const { chapterGuidanceDraft: _draft, ...state } = current.storyState;
-      const approved: StoryWorkspace = { ...current, storyState: state,
+      const approved: StoryWorkspace = { ...current, storyState: { ...state, parkedChapterDrafts: parkChapterDraft(current, pendingGeneration) },
         messages: [...current.messages, { id: Date.now(), role: "user", content: text }], updatedAt: new Date().toISOString() };
       await persistStory(approved);
       currentStoryRef.current = approved;
-      await queueChapterBackground({ operation: "generate", story: approved });
+      await queueChapterBackground({ operation: "generate", story: approved, ...(pendingGeneration?.storyId === current.id ? { pending: pendingGeneration } : {}) });
     } finally { guidanceConfirmInFlight.current = false; setIsThinking(false); }
+  }
+
+  async function restorePreviousDraft(id: string) {
+    const current = currentStoryRef.current;
+    if (!current || isThinking) return;
+    const entry = current.storyState.parkedChapterDrafts?.find(item => item.id === id);
+    if (!entry) return;
+    setIsThinking(true);
+    try {
+      const parked = parkChapterDraft(current, pendingGeneration).filter(item => item.id !== id);
+      const next = { ...current, storyState: { ...current.storyState, parkedChapterDrafts: parked }, updatedAt: new Date().toISOString() };
+      await persistStory(next);
+      currentStoryRef.current = next;
+      savePendingGeneration(entry.pending);
+      setActiveTab("chapters"); setReaderOpen(true);
+    } catch (error) { setBackgroundNotice(error instanceof Error ? error.message : "The previous draft could not be reopened."); }
+    finally { setIsThinking(false); }
   }
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
@@ -2548,6 +2564,14 @@ font-semibold text-white outline-none placeholder:text-neutral-600"
             </div>
           </div>
         </header>
+
+        {Boolean(story.storyState.parkedChapterDrafts?.length) && <details className="shrink-0 border-b border-white/10 px-5 py-3 text-sm text-neutral-300">
+          <summary className="cursor-pointer">Previous drafts ({story.storyState.parkedChapterDrafts?.length})</summary>
+          <p className="mt-2 text-neutral-400">Reopening one also keeps your current unfinished draft.</p>
+          {story.storyState.parkedChapterDrafts?.map(entry => <button key={entry.id} type="button" disabled={isThinking} onClick={() => void restorePreviousDraft(entry.id)} className="mt-2 mr-3 rounded-lg border border-white/20 px-3 py-2 disabled:opacity-40">
+            Open {entry.pending.generatedChapter.title || "previous draft"} ({new Date(entry.parkedAt).toLocaleString()})
+          </button>)}
+        </details>}
 
         {backgroundNotice && (
           <div role="status" aria-live="polite" className="shrink-0 border-b border-white/10 px-5 py-3 text-sm text-neutral-300">

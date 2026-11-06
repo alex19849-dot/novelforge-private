@@ -28,10 +28,11 @@ For an existing chapter rewrite, use only chapters before the requested chapter 
 const schema = { type: 'object', additionalProperties: false, required: ['guidance', 'question'], properties: { guidance: { type: 'string' }, question: { type: 'string' } } };
 export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: Parameters<typeof createAionChapterPlan>[0]['diagnostics']) {
   const previousCount = diagnostics.length;
+  const { parkedChapterDrafts: _parked, ...promptState } = story.storyState;
   try {
     const response = await createAionChapterPlan({ messages: [
       { role: 'system', content: CHAPTER_GUIDANCE_PROMPT },
-      { role: 'user', content: JSON.stringify({ storyBible: story.storyBible, storyState: story.storyState,
+      { role: 'user', content: JSON.stringify({ storyBible: story.storyBible, storyState: promptState,
         savedChapterIndex: story.chapters.map(c => ({ number: c.number, title: c.title, pov: c.povCharacter })),
         recentChapters: story.chapters.slice(-3), conversation: story.messages.slice(-12),
         guidanceBeingRevised: story.storyState.chapterGuidanceDraft?.text ?? null }) }

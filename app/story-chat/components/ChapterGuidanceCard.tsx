@@ -16,7 +16,7 @@ export default function ChapterGuidanceCard({ draft, busy, hasPendingChapter, on
   const inFlight = useRef(false);
   useEffect(() => { setText(draft.text); setError(''); }, [draft.text, draft.updatedAt]);
   async function act(confirm: boolean) {
-    if (busy || inFlight.current || !text.trim() || confirm && hasPendingChapter) return;
+    if (busy || inFlight.current || !text.trim()) return;
     inFlight.current = true; setWorking(true); setError('');
     try { await (confirm ? onConfirm : onSave)(text.trim()); }
     catch (e) { setError(e instanceof Error ? e.message : 'The guidance could not be saved.'); }
@@ -26,11 +26,11 @@ export default function ChapterGuidanceCard({ draft, busy, hasPendingChapter, on
     <h2 className="font-semibold text-pink-300">Review chapter guidance</h2>
     <p className="mt-2 text-sm text-neutral-400">Edit below, or send changes in chat. Chapter prose starts when you confirm. Saving guidance does not generate prose.</p>
     <textarea aria-label="Chapter guidance" value={text} disabled={busy || working} onChange={e => setText(e.target.value)} rows={14} className="mt-3 w-full resize-y whitespace-pre-wrap break-words rounded-xl bg-neutral-950 p-3 text-base leading-6 text-neutral-200" />
-    {hasPendingChapter && <p className="mt-2 text-sm text-amber-300">Complete or discard the current chapter draft before starting another chapter.</p>}
+    {hasPendingChapter && <p className="mt-2 text-sm text-amber-300">Your unfinished draft will be kept in Previous drafts before the approved chapter starts.</p>}
     {error && <p role="alert" className="mt-2 text-sm text-red-300">{error}</p>}
     <div className="mt-3 flex flex-wrap gap-3">
       <button type="button" disabled={busy || working || !text.trim()} onClick={() => void act(false)} className="rounded-xl border border-white/20 px-4 py-3 text-white disabled:opacity-40">Save guidance</button>
-      <button type="button" disabled={busy || working || !text.trim() || hasPendingChapter} onClick={() => void act(true)} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white disabled:opacity-40">{working ? 'Saving...' : 'Confirm guidance and write'}</button>
+      <button type="button" disabled={busy || working || !text.trim()} onClick={() => void act(true)} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold text-white disabled:opacity-40">{working ? 'Saving...' : 'Confirm guidance and write'}</button>
     </div>
   </section>;
 }

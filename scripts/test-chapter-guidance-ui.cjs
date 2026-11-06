@@ -6,8 +6,8 @@ const m={exports:{}};new Function('require','module','exports',ts.transpileModul
  await act(async()=>root.render(React.createElement(Card,props)));assert.equal(confirms.length,0);const area=document.querySelector('textarea');assert.equal(area.wrap,'');assert.equal(area.value,props.draft.text);
  await act(async()=>document.querySelectorAll('button')[0].click());assert.deepEqual(saves,[props.draft.text]);assert.equal(confirms.length,0);
  await act(async()=>document.querySelectorAll('button')[1].click());assert.deepEqual(confirms,[props.draft.text]);
- await act(async()=>root.render(React.createElement(Card,{...props,hasPendingChapter:true})));assert(document.querySelectorAll('button')[1].disabled);
+ await act(async()=>root.render(React.createElement(Card,{...props,hasPendingChapter:true})));assert(!document.querySelectorAll('button')[1].disabled);assert(document.body.textContent.includes('kept in Previous drafts'));await act(async()=>document.querySelectorAll('button')[1].click());assert.equal(confirms.length,2);
  await act(async()=>root.render(React.createElement(Card,{...props,busy:true})));assert(document.querySelector('textarea').disabled);assert([...document.querySelectorAll('button')].every(x=>x.disabled));
  await act(async()=>root.render(React.createElement(Card,{...props,onConfirm:async()=>{throw Error('Story changed')}})));await act(async()=>document.querySelectorAll('button')[1].click());assert(document.querySelector('[role=alert]').textContent.includes('Story changed'));
- await act(async()=>root.unmount());console.log('PASS: guidance is readable/editable, save never confirms, explicit confirmation callback, pending/busy guards, visible errors. Mocked, no paid calls.');
+ await act(async()=>root.unmount());console.log('PASS: guidance is readable/editable, save never confirms, explicit confirmation callback, pending draft no longer disables confirmation; busy guards, visible errors. Mocked, no paid calls.');
 })().catch(e=>{console.error(e);process.exitCode=1});

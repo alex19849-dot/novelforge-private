@@ -1,3 +1,5 @@
+import type { PendingChapterGeneration } from "./generation";
+
 import type { ChapterNarrativeMemory, MemoryCorrection } from "../../lib/narrative-memory";
 
 import type { StoryIntent } from "../../src/lib/detect-story-intent";
@@ -286,6 +288,8 @@ export type GenerationDiagnostic = {
 };
 
 export type StoryState = {
+  /** Unfinished work retained when approved guidance starts a different draft. */
+  parkedChapterDrafts?: Array<{ id: string; parkedAt: string; pending: PendingChapterGeneration }>;
   /** Author-facing proposal, never completed canon or a writing contract. */
   chapterGuidanceDraft?: { text: string; sourceKey: string; updatedAt: string; awaitingAnswer?: boolean };
   memoryCorrections?: MemoryCorrection[];
