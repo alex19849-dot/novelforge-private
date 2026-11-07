@@ -1,4 +1,5 @@
 "use client";
+import { bounded, readStoryLibrary, type LibrarySession } from "../../lib/story-library-client";
 
 import { requestsChapterGeneration, continuesPendingChapter } from "../../lib/chapter-request";
 
@@ -646,6 +647,11 @@ export default function StoryChatPage() {
   const [story, setStory] = useState<StoryWorkspace | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
+  const librarySessionRef = useRef<LibrarySession | null>(null);
+  const [libraryError, setLibraryError] = useState("");
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryRetry, setLibraryRetry] = useState(0);
+  const [accountEmail, setAccountEmail] = useState("");
 
   const [email, setEmail] = useState("");
 
@@ -666,7 +672,7 @@ export default function StoryChatPage() {
   const [recoveredDraft, setRecoveredDraft] = useState<PendingChapterGeneration | null>(null);
   const backgroundJobRef = useRef<string | null>(null);
   const backgroundSubmitInFlight = useRef(false);
-  const isThinking = isThinkingLocal || backgroundBusy || Boolean(userId && story && backgroundCheckedFor !== story.id);
+  const isThinking = isThinkingLocal || backgroundBusy || Boolean(userId && !hasLoadedRemoteStory) || Boolean(userId && story && backgroundCheckedFor !== story.id);
 
   const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -740,31 +746,21 @@ export default function StoryChatPage() {
     }, 5000);
 
     function applySession(
-      session: {
-        user?: { id?: string } | null;
-      } | null,
+      session: LibrarySession | null,
     ) {
       if (!isActive) {
         return;
       }
 
+      librarySessionRef.current = session;
+      setAccountEmail(session?.user?.email ?? "");
       const id = session?.user?.id ?? null;
 
       window.clearTimeout(authTimeoutId);
       setUserId(id);
       setAuthChecked(true);
 
-      if (id) {
-        window.setTimeout(() => {
-          if (!isActive) {
-            return;
-          }
 
-          void loadStoryList(id).catch((error) => {
-            console.error("Failed to load stories:", error);
-          });
-        }, 0);
-      }
     }
 
     async function loadUser() {
@@ -796,40 +792,34 @@ export default function StoryChatPage() {
     };
   }, []);
 
+  async function activeLibrarySession() {
+    const known = librarySessionRef.current;
+    if (known?.access_token && (!known.expires_at || known.expires_at * 1000 > Date.now() + 30000)) return { data: { session: known } };
+    const result = await bounded(supabase.auth.getSession());
+    librarySessionRef.current = result.data.session;
+    if (!result.data.session?.access_token) throw new Error("Sign in again to load and complete saved chapters. Your stories are kept.");
+    return result;
+  }
+  async function savedStoryRead(storyId?: string) {
+    const { data: { session } } = await activeLibrarySession();
+    const id = session?.user?.id;
+    if (!session?.access_token || !id) throw new Error("Sign in again to load your saved stories.");
+    return readStoryLibrary(session.access_token, id, storyId);
+  }
   async function loadStoryList(currentUserId: string) {
-    const { data, error } = await supabase
-
-      .from("stories")
-
-      .select("id, title, created_at, updated_at")
-
-      .eq("user_id", currentUserId)
-
-      .order("updated_at", {
-        ascending: false,
-      });
-
-    if (error) {
-      console.error(
-        "Could not load story list:",
-
-        error,
-      );
-
-      return;
-    }
-
-    setStories(
-      (data ?? []).map((item) => ({
-        id: item.id,
-
-        title: item.title || "Untitled Story",
-
-        createdAt: item.created_at,
-
-        updatedAt: item.updated_at,
-      })),
-    );
+    setLibraryLoading(true);
+    try {
+      const result = await savedStoryRead();
+      if (librarySessionRef.current?.user?.id !== currentUserId || result.account?.id !== currentUserId) throw new Error("Your sign-in changed. Reconnect your saved stories.");
+      const rows = result.stories ?? [];
+      setStories(rows.map(item => ({ id: item.id, title: item.title || "Untitled Story", createdAt: item.created_at, updatedAt: item.updated_at })));
+      setAccountEmail(result.account?.email ?? ""); setLibraryError("");
+      return rows;
+    } catch (error) { setLibraryError(error instanceof Error ? error.message : "Saved stories could not be loaded."); throw error; }
+    finally { setLibraryLoading(false); }
+  }
+  async function reconnectStories() {
+    setHasLoadedRemoteStory(false); setLibraryError(""); setLibraryRetry(value => value + 1);
   }
 
   async function openStory(storyId: string, options: { keepLocalDraft?: boolean } = {}) {
@@ -837,24 +827,9 @@ export default function StoryChatPage() {
       return;
     }
 
-    const { data, error } = await supabase
-
-      .from("stories")
-
-      .select("*")
-
-      .eq("id", storyId)
-
-      .eq("user_id", userId)
-
-      .single();
-
-    if (error || !data) {
-      console.error("Could not open story:", error);
-
-      if (options.keepLocalDraft) throw new Error("The saved story could not be refreshed. Your draft is unchanged.");
-      return;
-    }
+    const result = await savedStoryRead(storyId);
+    if (librarySessionRef.current?.user?.id !== userId) throw new Error("The signed-in account changed while loading. Retry saved stories.");
+    const data = result.story!;
 
     window.localStorage.setItem(
       "novelforge-current-story-id",
@@ -1102,7 +1077,7 @@ undone.`,
       if (stopped || checking) return;
       checking = true;
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await activeLibrarySession();
         if (!session?.access_token) { setBackgroundNotice("Sign in again to check or complete background chapters. Your saved draft is kept."); return; }
         const id = backgroundJobRef.current;
         const response = await fetch(`/api/story-chat/jobs?storyId=${encodeURIComponent(storyId!)}${id ? `&id=${encodeURIComponent(id)}` : ""}`, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
@@ -1166,134 +1141,28 @@ undone.`,
   }, [userId, story?.id, hasLoadedRemoteStory]);
 
   useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    setHasLoadedRemoteStory(false); setLibraryError("");
     async function loadStory() {
       try {
-        const currentStoryId = window.localStorage.getItem(
-          "novelforge-current-story-id",
-        );
-
-        if (userId) {
-          let data = null;
-
-          if (currentStoryId) {
-            const { data: current } = await supabase
-
-              .from("stories")
-
-              .select("*")
-
-              .eq("id", currentStoryId)
-
-              .eq("user_id", userId)
-
-              .maybeSingle();
-
-            data = current;
-          }
-
-          if (!data) {
-            const { data: latest } = await supabase
-
-              .from("stories")
-
-              .select("*")
-
-              .eq("user_id", userId)
-
-              .order("updated_at", { ascending: false })
-
-              .limit(1)
-
-              .maybeSingle();
-
-            data = latest;
-          }
-
-          if (data) {
-            window.localStorage.setItem(
-              "novelforge-current-story-id",
-
-              data.id,
-            );
-
-            const workspaceMetadata = getWorkspaceMetadata(data.story_state);
-
-            setStory({
-              id: data.id,
-
-              title: data.title,
-
-              seriesType: workspaceMetadata.seriesType,
-
-              seriesTitle: workspaceMetadata.seriesTitle,
-
-              bookNumber: workspaceMetadata.bookNumber,
-
-              lineage: workspaceMetadata.lineage,
-
-              messages: data.messages ?? [],
-
-              chapters: data.chapters ?? [],
-
-              storyBible: data.form ?? EMPTY_STORY_BIBLE,
-
-              storyState: data.story_state ?? {},
-
-              createdAt: data.created_at,
-
-              updatedAt: data.updated_at,
-            });
-
-            const remotePending = parseRemotePendingGeneration(
-              data.custom_rewrite,
-            );
-
-            if (remotePending?.storyId === data.id) {
-              setPendingGeneration(remotePending);
-              window.localStorage.setItem(
-                PENDING_GENERATION_KEY,
-                JSON.stringify(remotePending),
-              );
-            }
-
-            setHasLoaded(true);
-
-            setHasLoadedRemoteStory(true);
-
-            return;
-          }
-        }
-
-        const savedStory = window.localStorage.getItem(STORAGE_KEY);
-
-        if (!savedStory) {
-          setStory(createEmptyStory());
-        } else {
-          const parsedStory = JSON.parse(savedStory);
-
-          if (isStoryWorkspace(parsedStory)) {
-            setStory(parsedStory);
-          } else {
-            setStory(createEmptyStory());
-          }
-        }
+        const rows = await loadStoryList(userId!);
+        if (cancelled) return;
+        const selected = localStorage.getItem("novelforge-current-story-id");
+        const id = rows.find(row => row.id === selected)?.id ?? rows[0]?.id;
+        if (id) {
+          await openStory(id, { keepLocalDraft: true });
+          if (cancelled) return;
+          setDraftFocusKey(key => key + 1);
+        } else { setStory(createEmptyStory()); setPendingGeneration(null); }
+        setHasLoaded(true); setHasLoadedRemoteStory(true);
       } catch (error) {
-        console.error(
-          "Could not load the saved story:",
-
-          error,
-        );
-
-        setStory(createEmptyStory());
-      } finally {
-        setHasLoaded(true);
-
-        setHasLoadedRemoteStory(true);
+        if (!cancelled) { setLibraryError(error instanceof Error ? error.message : "Saved stories could not be loaded."); setHasLoaded(true); }
       }
     }
-
-    loadStory();
-  }, [userId]);
+    void loadStory();
+    return () => { cancelled = true; };
+  }, [userId, libraryRetry]);
 
   useEffect(() => {
     if (!hasLoaded || !hasLoadedRemoteStory || !story || isThinking || backgroundCheckedFor !== story.id) {
@@ -1530,7 +1399,7 @@ device.`,
     setIsThinking(true);
     try {
       if (await reviewSourceKey(source) !== body.currentSourceKey) throw new Error("The manuscript changed. Prepare the correction again.");
-      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: sessionData } = await activeLibrarySession();
       if (!sessionData.session) throw new Error("Sign in to NovelForge first.");
       const response = await fetch("/api/story-chat/review/fix", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session.access_token}` }, body: JSON.stringify(body) });
       const data = await response.json() as { error?: string; undo: ReviewFixUndo | null; diagnostic?: { costUsd: number | null } | null; savedStory?: { id: string; title: string; form: StoryBible; chapters: StoryChapter[]; story_state: StoryState; messages: StoryWorkspace["messages"]; created_at: string; updated_at: string } };
@@ -1791,6 +1660,7 @@ device.`,
   }
 
   async function persistStory(nextStory: StoryWorkspace) {
+    if (userId && !hasLoadedRemoteStory) throw new Error("Reconnect your saved stories before saving. The server copy is protected.");
     setStory(nextStory);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStory));
 
@@ -1853,7 +1723,7 @@ device.`,
     backgroundJobRef.current = id;
     let submitted = false;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await activeLibrarySession();
       if (!session?.access_token) throw new Error("Sign in before starting background generation.");
       submitted = true;
       const response = await fetch("/api/story-chat/jobs", {
@@ -2550,6 +2420,22 @@ text-white transition hover:bg-pink-400"
     );
   }
 
+  if (userId && !hasLoadedRemoteStory) {
+    return <main className="flex min-h-[100dvh] items-center justify-center bg-neutral-950 px-5 text-white">
+      <section className="w-full max-w-lg rounded-2xl border border-white/10 bg-neutral-900 p-6">
+        <p className="text-xs font-semibold tracking-widest text-pink-400">NOVELFORGE</p>
+        <h1 className="mt-3 text-xl font-semibold">{libraryError ? "Saved stories couldn't load" : "Loading your saved stories..."}</h1>
+        {accountEmail && <p className="mt-2 break-words text-sm text-neutral-400">Signed in as {accountEmail}</p>}
+        <p role="status" className="mt-3 text-sm leading-6 text-neutral-300">{libraryError || "Checking the saved account and latest chapter draft."}</p>
+        <p className="mt-3 text-sm text-neutral-400">Your local storage is kept. No local copy will overwrite a story while this connection is unavailable.</p>
+        {libraryError && <div className="mt-5 flex flex-wrap gap-3">
+          <button type="button" onClick={() => void reconnectStories()} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold">Retry saved stories</button>
+          <button type="button" onClick={() => void supabase.auth.signOut({ scope: "local" })} className="rounded-xl border border-white/20 px-4 py-3">Sign in again</button>
+        </div>}
+      </section>
+    </main>;
+  }
+
   if (!hasLoaded || !story) {
     return (
       <main className="min-h-screen bg-neutral-950 text-white">
@@ -2771,13 +2657,16 @@ text-neutral-500"
                   Your Stories
                 </p>
 
+                {accountEmail && <p className="mb-2 break-words text-xs text-neutral-400">Signed in as {accountEmail}</p>}
+                <button type="button" disabled={libraryLoading || isThinking} onClick={() => void reconnectStories()} className="mb-3 rounded-lg border border-white/20 px-3 py-2 text-sm disabled:opacity-40">{libraryLoading ? "Loading stories..." : "Reload saved stories"}</button>
+                {libraryError && <p role="alert" className="mb-3 text-sm text-red-300">{libraryError}</p>}
                 <div className="space-y-2">
                   {stories.length === 0 ? (
                     <div
                       className="rounded-xl border border-white/10 bg-white/5 p-4
 text-neutral-400"
                     >
-                      No stories found.
+                      {libraryLoading ? "Loading saved stories..." : "No stories are saved under this signed-in account."}
                     </div>
                   ) : (
                     stories.map((item) => (
