@@ -688,6 +688,10 @@ export default function StoryChatPage() {
     useState<PendingChapterGeneration | null>(null);
 
   const [sectionInstruction, setSectionInstruction] = useState("");
+  const pendingGenerationRef = useRef(pendingGeneration);
+  pendingGenerationRef.current = pendingGeneration;
+  const [draftFocusKey, setDraftFocusKey] = useState(0);
+
   const passageRewriteBusy = useRef(false);
   const currentStoryRef = useRef(story);
   const currentPendingRef = useRef(pendingGeneration);
@@ -828,7 +832,7 @@ export default function StoryChatPage() {
     );
   }
 
-  async function openStory(storyId: string) {
+  async function openStory(storyId: string, options: { keepLocalDraft?: boolean } = {}) {
     if (!userId) {
       return;
     }
@@ -848,6 +852,7 @@ export default function StoryChatPage() {
     if (error || !data) {
       console.error("Could not open story:", error);
 
+      if (options.keepLocalDraft) throw new Error("The saved story could not be refreshed. Your draft is unchanged.");
       return;
     }
 
@@ -859,7 +864,7 @@ export default function StoryChatPage() {
 
     const workspaceMetadata = getWorkspaceMetadata(data.story_state);
 
-    setStory({
+    let loadedStory: StoryWorkspace = {
       id: data.id,
 
       title: data.title,
@@ -883,9 +888,18 @@ export default function StoryChatPage() {
       createdAt: data.created_at,
 
       updatedAt: data.updated_at,
-    });
+    };
 
     const remotePending = parseRemotePendingGeneration(data.custom_rewrite);
+    const localPending = pendingGenerationRef.current;
+    if (options.keepLocalDraft && localPending?.storyId === data.id && localPending.draft.trim() &&
+        (localPending.draft !== remotePending?.draft || localPending.chapterBrief !== remotePending?.chapterBrief)) {
+      loadedStory = { ...loadedStory, storyState: { ...loadedStory.storyState, parkedChapterDrafts: parkChapterDraft(loadedStory, localPending) }, updatedAt: new Date().toISOString() };
+    }
+    setStory(loadedStory);
+    currentStoryRef.current = loadedStory;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedStory));
+
 
     if (remotePending?.storyId === data.id) {
       setPendingGeneration(remotePending);
@@ -1089,7 +1103,7 @@ undone.`,
       checking = true;
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) return;
+        if (!session?.access_token) { setBackgroundNotice("Sign in again to check or complete background chapters. Your saved draft is kept."); return; }
         const id = backgroundJobRef.current;
         const response = await fetch(`/api/story-chat/jobs?storyId=${encodeURIComponent(storyId!)}${id ? `&id=${encodeURIComponent(id)}` : ""}`, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
         const data = await readApiJson(response) as { job?: { id: string; status: string; stage: string; updated_at: string; error_message: string; result?: { story: StoryWorkspace; pending: PendingChapterGeneration | null; recoveryPending?: PendingChapterGeneration | null } } | null };
@@ -1126,6 +1140,7 @@ undone.`,
       } catch (error) {
         if (!stopped) setBackgroundNotice(error instanceof Error ? error.message : "Chapter progress could not be checked. Checking again shortly.");
       } finally {
+        if (!stopped) setBackgroundCheckedFor(storyId!);
         checking = false;
         if (!stopped) {
           clearTimeout(timer);
@@ -1836,9 +1851,11 @@ device.`,
     setBackgroundNotice(input.operation === "memory" ? "Starting memory analysis. Once accepted, you can leave this tab or app." : "Starting chapter generation. Once accepted, you can leave this tab or app.");
     const id = crypto.randomUUID();
     backgroundJobRef.current = id;
+    let submitted = false;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Sign in before starting background generation.");
+      submitted = true;
       const response = await fetch("/api/story-chat/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
@@ -1850,6 +1867,7 @@ device.`,
       setBackgroundNotice(input.operation === "memory" ? "Memory analysis is running in the background. You can return when ready." : "Chapter generation is running in the background. You can use another tab or app and return when ready.");
       window.dispatchEvent(new Event("novelforge-chapter-job"));
     } catch (error) {
+      if (!submitted) { backgroundJobRef.current = null; setBackgroundBusy(false); }
       // A lost response does not prove that the server rejected the job.
       // Poll its saved ID before allowing another paid submission.
       setBackgroundNotice(error instanceof Error ? error.message : "Checking whether the chapter job started.");
@@ -1858,6 +1876,18 @@ device.`,
       backgroundSubmitInFlight.current = false;
       window.dispatchEvent(new Event("novelforge-chapter-job"));
     }
+  }
+
+  async function refreshSavedStory() {
+    const current = currentStoryRef.current;
+    if (!current || isThinking) return;
+    setIsThinking(true);
+    try {
+      await openStory(current.id, { keepLocalDraft: true });
+      setDraftFocusKey(key => key + 1);
+      setBackgroundNotice("Saved story refreshed. Any different local draft is kept in Previous drafts.");
+    } catch (error) { setBackgroundNotice(error instanceof Error ? error.message : "The saved story could not be refreshed."); }
+    finally { setIsThinking(false); }
   }
 
   async function writeChapterSection(pending: PendingChapterGeneration, baseStory: StoryWorkspace, action: SectionAction) {
@@ -2891,6 +2921,9 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
               onRewritePassage={rewritePassage}
               onUndoPassageRewrite={undoReaderRewrite}
               isWriting={isThinking}
+              generationNotice={backgroundNotice}
+              onRefreshStory={() => void refreshSavedStory()}
+              draftFocusKey={draftFocusKey}
               readerTheme={readerTheme}
               setReaderTheme={setReaderTheme}
               readerFontSize={readerFontSize}

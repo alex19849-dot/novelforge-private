@@ -37,6 +37,9 @@ type ChapterPanelProps = {
   onRewritePassage?: (request: PassageRewriteRequest) => Promise<PassageRewriteResult>;
   onUndoPassageRewrite?: (undo: PassageRewriteUndo) => void;
   isWriting?: boolean;
+  generationNotice?: string;
+  onRefreshStory?: () => void;
+  draftFocusKey?: number;
   onSaveChapter: (
     chapterId: string,
     updates: {
@@ -96,6 +99,9 @@ export default function ChapterPanel({
   onRewritePassage,
   onUndoPassageRewrite,
   isWriting = false,
+  generationNotice = "",
+  onRefreshStory,
+  draftFocusKey = 0,
   readerTheme,
   setReaderTheme,
   readerFontSize,
@@ -382,6 +388,12 @@ export default function ChapterPanel({
     setActiveChapterId(chapterId);
   }
 
+  useLayoutEffect(() => {
+    if (!readerOpen || !draftFocusKey || !draftWorkspace) return;
+    const frame = requestAnimationFrame(() => goToChapter("__draft__"));
+    return () => cancelAnimationFrame(frame);
+  }, [draftFocusKey, readerOpen, draftWorkspace?.chapterNumber]);
+
   function moveChapter(direction: -1 | 1) {
     const currentIndex = navigationItems.findIndex(
       (item) => item.id === activeChapterId,
@@ -607,7 +619,7 @@ export default function ChapterPanel({
           ref={readerRef}
           onScroll={handleScroll}
           className={`absolute inset-0 overflow-y-auto overscroll-y-contain px-5 py-12 sm:px-8 sm:py-16 ${
-            controlsVisible || isEditing ? "pb-40 pt-20" : ""
+            controlsVisible || isEditing || draftWorkspace ? "pb-48 pt-20" : ""
           }`}
           style={{
             WebkitOverflowScrolling: "touch",
@@ -780,7 +792,7 @@ export default function ChapterPanel({
           </div>
         )}
 
-        {(controlsVisible || isEditing) && (
+        {(controlsVisible || isEditing || Boolean(draftWorkspace)) && (
           <header
             className={`absolute inset-x-0 top-0 z-40 flex min-h-14 items-center justify-between border-b px-3 py-2 backdrop-blur ${chromeClasses}`}
           >
@@ -840,6 +852,7 @@ export default function ChapterPanel({
                 >
                   Aa
                 </button>
+                {onRefreshStory && <button type="button" disabled={isWriting || rewriteRunning} onClick={onRefreshStory} className="rounded-lg border border-current/15 px-3 py-2 text-sm disabled:opacity-40">Refresh</button>}
                 <button
                   type="button"
                   onClick={startEditing}
@@ -856,7 +869,7 @@ export default function ChapterPanel({
           </header>
         )}
 
-        {controlsVisible && !isEditing && (
+        {(controlsVisible || Boolean(draftWorkspace)) && !isEditing && (
           <footer
             className={`absolute inset-x-0 bottom-0 z-40 max-h-[65dvh] overflow-y-auto border-t px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur ${chromeClasses}`}
           >
@@ -1014,7 +1027,8 @@ export default function ChapterPanel({
               </div>
             )}
 
-            <div className="mx-auto flex max-w-3xl items-center justify-between gap-2">
+            {generationNotice && <p role="status" className="mx-auto mb-2 max-h-20 max-w-3xl overflow-y-auto break-words text-xs leading-5">{generationNotice}</p>}
+            <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-2">
               <div className="flex min-w-0 flex-1 items-center gap-1">
                 <button
                   type="button"
@@ -1063,7 +1077,9 @@ export default function ChapterPanel({
                   Guide
                 </button>
               )}
-              {draftWorkspace && (
+              {draftWorkspace && activeChapterId !== "__draft__" && <button type="button" disabled={isWriting || rewriteRunning} onClick={() => goToChapter("__draft__")} className="rounded-lg border border-pink-500/40 px-3 py-2 text-sm font-semibold">Open Chapter {draftWorkspace.chapterNumber} draft</button>}
+              {draftWorkspace && onCompleteDraft && <button type="button" onClick={onCompleteDraft} disabled={draftWorkspace.isGenerating || rewriteRunning || !draftWorkspace.content.trim()} className="rounded-lg border border-emerald-600/40 px-3 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-40">Complete chapter {draftWorkspace.chapterNumber}</button>}
+              {draftWorkspace && activeChapterId === "__draft__" && (
                 <>
                   <button
                     type="button"
@@ -1104,19 +1120,7 @@ export default function ChapterPanel({
                     Discard
                   </button>
                 )}
-                {onCompleteDraft && (
-                  <button
-                    type="button"
-                    onClick={onCompleteDraft}
-                    disabled={
-                      draftWorkspace.isGenerating ||
-                      !draftWorkspace.content.trim()
-                    }
-                    className="rounded-lg border border-emerald-600/40 px-3 py-2 text-emerald-700 disabled:opacity-40"
-                  >
-                    Complete chapter
-                  </button>
-                )}
+
               </div>
             )}
           </footer>
