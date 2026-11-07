@@ -8,10 +8,14 @@ export async function bounded<T>(promise: PromiseLike<T>, milliseconds = 15000):
   finally { if (timer) clearTimeout(timer); }
 }
 export async function readStoryLibrary(token: string, expectedUserId: string, storyId?: string) {
-  const response = await fetch(`/api/story-chat/library${storyId ? `?storyId=${encodeURIComponent(storyId)}` : ''}`, {
-    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(20000),
-  });
-  const body = await response.json() as { error?: string; account?: { id: string; email: string }; stories?: StoryListRow[]; story?: SavedStoryRow };
+  let response: Response;
+  try { response = await fetch(`/api/story-chat/library${storyId ? `?storyId=${encodeURIComponent(storyId)}` : ''}`, {
+    headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: AbortSignal.timeout(35000),
+  }); } catch (error) {
+    if (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) throw new Error('The app did not receive the saved-story response in time. Your saved stories and local copy are kept.');
+    throw new Error('The app could not reach the saved-story service. Your saved stories and local copy are kept.');
+  }
+  const body = await response.json().catch(() => ({ error: `The saved-story service returned connection status ${response.status}. Your saved copies are kept.` })) as { error?: string; account?: { id: string; email: string }; stories?: StoryListRow[]; story?: SavedStoryRow };
   if (!response.ok) throw new Error(body.error ?? 'Saved stories could not be loaded. Retry the connection.');
   if (body.account?.id !== expectedUserId) throw new Error('Your sign-in changed. Sign in again with the account that owns your stories.');
   if (storyId ? !body.story || body.story.id !== storyId : !Array.isArray(body.stories)) throw new Error('The saved-story response was incomplete. Your local copy has not replaced it.');
