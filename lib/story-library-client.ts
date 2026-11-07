@@ -15,8 +15,8 @@ export async function readStoryLibrary(token: string, expectedUserId: string, st
     if (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) throw new Error('The app did not receive the saved-story response in time. Your saved stories and local copy are kept.');
     throw new Error('The app could not reach the saved-story service. Your saved stories and local copy are kept.');
   }
-  const body = await response.json().catch(() => ({ error: `The saved-story service returned connection status ${response.status}. Your saved copies are kept.` })) as { error?: string; account?: { id: string; email: string }; stories?: StoryListRow[]; story?: SavedStoryRow };
-  if (!response.ok) throw new Error(body.error ?? 'Saved stories could not be loaded. Retry the connection.');
+  const body = await response.json().catch(() => ({ error: 'The app could not read the saved-story response. Your saved copies are kept.' })) as { error?: string; account?: { id: string; email: string }; stories?: StoryListRow[]; story?: SavedStoryRow };
+  if (!response.ok || body.error) throw new Error(body.error ?? 'Saved stories could not be loaded. Retry the connection.');
   if (body.account?.id !== expectedUserId) throw new Error('Your sign-in changed. Sign in again with the account that owns your stories.');
   if (storyId ? !body.story || body.story.id !== storyId : !Array.isArray(body.stories)) throw new Error('The saved-story response was incomplete. Your local copy has not replaced it.');
   return body;
