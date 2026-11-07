@@ -881,7 +881,7 @@ export default function StoryChatPage() {
           if (isStoryWorkspace(cached) && cached.id === data.id && Date.parse(cached.updatedAt) > Date.parse(data.updated_at)) {
             localStorage.setItem(`novelforge-local-recovery:${data.id}`, raw);
           }
-        } catch { /* An unreadable cache does not replace verified server data. */ }
+        } catch (error) { if (!(error instanceof SyntaxError)) throw error; }
       }
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedStory));
