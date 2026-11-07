@@ -858,7 +858,7 @@ export default function StoryChatPage() {
 
       storyBible: data.form ?? EMPTY_STORY_BIBLE,
 
-      storyState: data.story_state ?? {},
+      storyState: data.story_state ?? EMPTY_STORY_STATE,
 
       createdAt: data.created_at,
 
