@@ -109,7 +109,7 @@ function cleanChapterParagraphs(chapter: ExportChapter): string[] {
 }
 
 function buildInlineRuns(text: string): TextRun[] {
-  const message = text.match(/^([A-Za-z][A-Za-z0-9 .'-]{0,30}):\s*([\s\S]+)$/);
+  const message = text.match(/^([A-Z][A-Z .'-]{0,30}):\s+([\s\S]+)$/);
   if (message) {
     const separator = text.slice(message[1].length + 1, text.length - message[2].length);
     const style = { color: "000000", size: 24, font: "Garamond" };

@@ -66,7 +66,7 @@ type ChapterPanelProps = {
   onOpenChapterPlan?: () => void;
 };
 
-const MESSAGE_PATTERN = /^([A-Za-z][A-Za-z0-9 .'-]{0,30}):\s*([\s\S]+)$/;
+const MESSAGE_PATTERN = /^([A-Z][A-Z .'-]{0,30}):\s+([\s\S]+)$/;
 
 function progressKey(storyId: string): string {
   return `novelforge-reader-scroll-${storyId}`;
