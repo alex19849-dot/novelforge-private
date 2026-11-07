@@ -873,6 +873,17 @@ export default function StoryChatPage() {
     }
     setStory(loadedStory);
     currentStoryRef.current = loadedStory;
+    if (options.keepLocalDraft) {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        try {
+          const cached: unknown = JSON.parse(raw);
+          if (isStoryWorkspace(cached) && cached.id === data.id && Date.parse(cached.updatedAt) > Date.parse(data.updated_at)) {
+            localStorage.setItem(`novelforge-local-recovery:${data.id}`, raw);
+          }
+        } catch { /* An unreadable cache does not replace verified server data. */ }
+      }
+    }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(loadedStory));
 
 
