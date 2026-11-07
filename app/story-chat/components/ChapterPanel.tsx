@@ -619,7 +619,7 @@ export default function ChapterPanel({
           ref={readerRef}
           onScroll={handleScroll}
           className={`absolute inset-0 overflow-y-auto overscroll-y-contain px-5 py-12 sm:px-8 sm:py-16 ${
-            controlsVisible || isEditing || draftWorkspace ? "pb-48 pt-20" : ""
+            controlsVisible || isEditing ? "pb-48 pt-20" : ""
           }`}
           style={{
             WebkitOverflowScrolling: "touch",
@@ -792,7 +792,7 @@ export default function ChapterPanel({
           </div>
         )}
 
-        {(controlsVisible || isEditing || Boolean(draftWorkspace)) && (
+        {(controlsVisible || isEditing) && (
           <header
             className={`absolute inset-x-0 top-0 z-40 flex min-h-14 items-center justify-between border-b px-3 py-2 backdrop-blur ${chromeClasses}`}
           >
@@ -869,7 +869,7 @@ export default function ChapterPanel({
           </header>
         )}
 
-        {(controlsVisible || Boolean(draftWorkspace)) && !isEditing && (
+        {controlsVisible && !isEditing && (
           <footer
             className={`absolute inset-x-0 bottom-0 z-40 max-h-[65dvh] overflow-y-auto border-t px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 backdrop-blur ${chromeClasses}`}
           >
