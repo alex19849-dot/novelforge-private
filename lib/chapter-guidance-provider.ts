@@ -11,7 +11,7 @@ TIME: [placement relative to the preceding chapter]
 PURPOSE
 A specific paragraph describing what this chapter changes for the leads.
 
-CONTINUITY FROM CHAPTER [previous number]
+CONTINUITY FROM CHAPTER [previous number] (for Chapter 1, use CONTINUITY FROM STORY BIBLE)
 - Relevant established facts and practical agreements the writer must preserve.
 
 [DESCRIPTIVE SCENE HEADING]
@@ -28,6 +28,14 @@ For an existing chapter rewrite, use only chapters before the requested chapter 
 
 const schema = { type: 'object', additionalProperties: false, required: ['guidance', 'question'], properties: { guidance: { type: 'string' }, question: { type: 'string' } } };
 export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: Parameters<typeof createAionChapterPlan>[0]['diagnostics']) {
+  // A full author-supplied brief already is the guidance. Do not pay a model
+  // to rewrite it, or reject it because it uses the author's own scene headings.
+  const latest = story.messages.at(-1);
+  const supplied = latest?.role === 'user' ? latest.content.trim() : '';
+  const suppliedHeadings = [/^(?:RE)?WRITE CHAPTER \d+\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^(?:ENDING|ENDPOINT)\s*:?\s*$/im];
+  if (supplied.length >= 400 && suppliedHeadings.every(heading => heading.test(supplied)) && /^[-*]\s+\S/m.test(supplied)) {
+    return { guidance: supplied, question: '' };
+  }
   const previousCount = diagnostics.length;
   const { parkedChapterDrafts: _parked, chapterGuidanceDraft: _draft, ...promptState } = story.storyState;
   try {
@@ -42,7 +50,10 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
     assertChapterPlanSchema(output, schema);
     const result = output as { guidance: string; question: string };
     if (result.guidance.trim()) {
-      for (const heading of [/^(?:RE)?WRITE CHAPTER \d+\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^CONTINUITY FROM CHAPTER/im, /^ENDING\s*$/im, /^EXCLUSIONS\s*$/im]) {
+      const headings = [/^(?:RE)?WRITE CHAPTER \d+\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^ENDING\s*$/im, /^EXCLUSIONS\s*$/im];
+      // Chapter 1 has no preceding chapter. Opening continuity belongs to the Bible.
+      if (!/^(?:RE)?WRITE CHAPTER 1\s*$/im.test(result.guidance)) headings.push(/^CONTINUITY FROM CHAPTER/im);
+      for (const heading of headings) {
         if (!heading.test(result.guidance)) throw new Error('The guidance draft was incomplete. Your chapters are unchanged; no automatic retry was started.');
       }
     } else if (!result.question.trim()) throw new Error('No chapter guidance was returned. No automatic retry was started.');
