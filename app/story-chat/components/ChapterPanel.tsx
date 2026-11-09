@@ -1079,7 +1079,24 @@ export default function ChapterPanel({
               )}
               {draftWorkspace && activeChapterId !== "__draft__" && <button type="button" disabled={isWriting || rewriteRunning} onClick={() => goToChapter("__draft__")} className="rounded-lg border border-pink-500/40 px-3 py-2 text-sm font-semibold">Open Chapter {draftWorkspace.chapterNumber} draft</button>}
               {draftWorkspace && onCompleteDraft && <button type="button" onClick={onCompleteDraft} disabled={draftWorkspace.isGenerating || rewriteRunning || !draftWorkspace.content.trim()} className="rounded-lg border border-emerald-600/40 px-3 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-40">Complete chapter {draftWorkspace.chapterNumber}</button>}
-              {draftWorkspace && activeChapterId === "__draft__" && (
+              {draftWorkspace?.content.includes("[[AION_SCENE_") && onGenerateNextSection && (
+                <button type="button" onClick={onGenerateNextSection}
+                  disabled={draftWorkspace.isGenerating || rewriteRunning}
+                  className="rounded-lg bg-pink-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">
+                  {draftWorkspace.isGenerating ? "Writing..." : "Retry AION scene"}
+                </button>
+              )}
+              {draftWorkspace && onDiscardDraft && (
+                <button type="button"
+                  onClick={() => {
+                    if (window.confirm("Discard this unfinished chapter draft? Saved chapters will stay unchanged.")) onDiscardDraft();
+                  }}
+                  disabled={draftWorkspace.isGenerating || rewriteRunning}
+                  className="rounded-lg border border-current/15 px-3 py-2 text-sm disabled:opacity-40">
+                  Discard draft
+                </button>
+              )}
+              {draftWorkspace && !draftWorkspace.content.includes("[[AION_SCENE_") && activeChapterId === "__draft__" && (
                 <>
                   <button
                     type="button"
@@ -1110,16 +1127,7 @@ export default function ChapterPanel({
                     Rewrite last
                   </button>
                 )}
-                {onDiscardDraft && (
-                  <button
-                    type="button"
-                    onClick={onDiscardDraft}
-                    disabled={draftWorkspace.isGenerating}
-                    className="rounded-lg border border-current/15 px-3 py-2 disabled:opacity-40"
-                  >
-                    Discard
-                  </button>
-                )}
+
 
               </div>
             )}
