@@ -56,7 +56,7 @@ NARRATIVE MEMORY RECORDS
 For each supplied chapter, add narrativeRecords: selective structured changes established by THAT chapter's completed prose, not by the Bible or earlier summaries. Never invent a fact to fill a category. Preserve the existing summary fields too. Usually 8 to 24 records suffice; 48 is an upper bound, not a target.
 Each record requires an exact, distinctive quote copied verbatim from that chapter (12 to 600 characters, enough to support the assertion). Do not quote a plan, a different chapter or a paraphrase. Unsupported or ambiguous evidence is discarded. Keep claim concise and factual; distinguish objective fact from a character's belief, fear, fantasy, lie or suspicion. A character's thought does not establish an objective fact about somebody else.
 Use stable semantic keys for the same proposition, relationship dimension, milestone, thread or pattern across chapters. Reuse keys from EXISTING MEMORY KEYS when updating them, including when closing a thread. Different milestones or propositions require different keys. A new key should describe its subject and topic, not its sentence wording or chapter number.
-Track relevant character traits/descriptions, relationships, attraction, trust, hostility, jealousy, private/public status, intimate milestones, conflicts, locations, objects, injuries, necessary clothing, promises, secrets, lies, discoveries, decisions, unresolved conversations, plot threads, emotional changes, revelations, world rules, timeline and meaningful repetition. Do not store routine props or every gesture.
+Track relevant character traits/descriptions, relationships, attraction, trust, hostility, jealousy, private/public status, intimate milestones, conflicts, locations, objects, injuries, necessary clothing, promises, secrets, lies, discoveries, decisions, unresolved conversations, plot threads, emotional changes, revelations, world rules, timeline and meaningful repetition. Record meaningful completed conversations as well as unresolved ones: preserve the topic, participants, disclosure or agreement and its outcome in conversation records, with RESOLVED where settled; add individual knowledge records for facts actually disclosed. A chapter having structured records does not mean its completed exchanges may be omitted. Do not store routine props or every gesture.
 Use world_rule records for established venue capabilities and limitations, including explicit absences, with status CURRENT and an exact supporting quote. Distinguish a venue serving food itself from customers bringing takeout. For meaningful past actions, record who did what to whom so later callbacks cannot reverse the participants. Preserve clothing, positions and access constraints at an unfinished scene boundary when the next action depends on them, without making them unresolved emotional threads. Record supported elapsed time or first-meeting anchors; do not convert figurative exaggeration into a literal count. Never infer that an unmentioned kitchen, key or clothing change exists.
 For knowledge records, subject is the individual character (or @reader for reader-only knowledge), claim is the proposition known/believed, and status is KNOWS, BELIEVES, SUSPECTS, MISUNDERSTANDS or DOES_NOT_KNOW. Use DOES_NOT_KNOW only when prose explicitly establishes ignorance. Missing evidence is UNKNOWN, not proof of ignorance. State eventTime when the event happened and learnedTime when this character learned it; leave either empty when unestablished. This chapter is the source of the learning event, not necessarily the original event. Never transfer private narration to another character. Record how the source passage establishes their knowledge.
 Use thread/promise/secret/lie/conversation/conflict records with OPEN, DEVELOPING, RESOLVED or ABANDONED where applicable. Keep resolved issues resolved unless new evidence genuinely reopens them. Retain the same key so introduction and resolution remain traceable. Do not resolve a thread merely because it is absent from this chapter.
@@ -149,6 +149,29 @@ export function retrieveNarrativeMemory(state: Partial<StoryState>, query: Memor
   return { records: picked, text: lines.join("\n").slice(0, budget) };
 }
 
+// Completed exchanges can exist only in the older ledger summary fields even
+// when every chapter also has structured records. Keep a bounded cross-chapter
+// history; structured coverage does not imply every settled topic was extracted.
+function completedChapterBeats(state: Partial<StoryState>, query: MemoryQuery, budget: number) {
+  const boundary = Math.min(query.beforeChapter ?? Infinity, state.continuityDirtyFromChapter ?? Infinity);
+  const candidates = (state.chapterLedger ?? []).filter(entry => entry.chapterNumber < boundary)
+    .flatMap(entry => strings(entry.repeatedBeats).map(outcome => ({
+      chapterNumber: entry.chapterNumber, outcome: outcome.slice(0, 700),
+      score: relevantScore(outcome, query, entry.chapterNumber),
+    })))
+    .sort((a, b) => b.score - a.score || b.chapterNumber - a.chapterNumber);
+  const result: Array<{ chapterNumber: number; outcome: string }> = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const key = normalise(candidate.outcome);
+    if (seen.has(key)) continue;
+    const item = { chapterNumber: candidate.chapterNumber, outcome: candidate.outcome };
+    if (JSON.stringify([...result, item]).length > budget) continue;
+    result.push(item); seen.add(key);
+  }
+  return result.sort((a, b) => a.chapterNumber - b.chapterNumber);
+}
+
 // One shared projection for every model-facing path. Raw chapter snapshots and
 // unbounded cumulative lists must not be serialized into generation prompts.
 export function narrativeContext(value: unknown, query: MemoryQuery = {}): Record<string, unknown> {
@@ -168,6 +191,9 @@ export function narrativeContext(value: unknown, query: MemoryQuery = {}): Recor
   const result: Record<string, unknown> = {
     relevantStoryMemory: structured.text,
     legacyNotesAreUnverifiedSummaries: true,
+    completedChapterBeats: completedChapterBeats(state, query, Math.min(4500, Math.floor(budget * 0.25))),
+    completedChapterBeatsInstruction: "Earlier completed exchanges and conclusions from accepted chapter summaries, not new scene requirements. Do not repeat their disclosure, question or reassurance as if it never happened. A continuing external problem does not undo an answer already given. Later on-page changes and author memory corrections take precedence. These summaries do not transfer private knowledge to another character.",
+
     importantFacts: limit(state.importantFacts), characterStates: limit(state.characterStates, 5), relationshipStates: limit(state.relationshipStates, 5),
     unresolvedThreads: limit(state.unresolvedThreads, 8), characterKnowledge: limit(state.characterKnowledge, 8), repetitionWarnings: limit(state.repetitionWarnings, 6),
     timeline: [...limit((state.timeline ?? []).filter(t => !t.startsWith("CURRENT CLOCK:")), 3), ...(state.timeline ?? []).filter(t => t.startsWith("CURRENT CLOCK:")).slice(-1)],
