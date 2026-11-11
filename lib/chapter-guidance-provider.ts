@@ -5,6 +5,7 @@ import { createAionChapterPlan, assertChapterPlanSchema } from './aion-chapter-p
 export const CHAPTER_GUIDANCE_PROMPT = `You draft detailed chapter guidance for an author's review, not novel prose and not an approved chapter contract. Return JSON with guidance and question strings. If a crucial author decision is missing, leave guidance empty and ask one focused question. Otherwise leave question empty.
 Use this readable plain-text format, with normal line breaks, no code fences, tables or long dashes:
 WRITE CHAPTER [number] (use REWRITE CHAPTER only when the author explicitly requests replacing a saved chapter)
+For an epilogue, use WRITE EPILOGUE (or REWRITE EPILOGUE) instead. Keep the same POV, TIME, continuity and ending fields.
 POV: [established character and tense]
 TIME: [placement relative to the preceding chapter]
 
@@ -33,7 +34,13 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
   const latest = story.messages.at(-1);
   const supplied = latest?.role === 'user' ? latest.content.trim() : '';
   const suppliedHeadings = [/^(?:RE)?WRITE CHAPTER \d+\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^(?:ENDING|ENDPOINT)\s*:?\s*$/im];
-  if (supplied.length >= 400 && suppliedHeadings.every(heading => heading.test(supplied)) && /^[-*]\s+\S/m.test(supplied)) {
+  // Epilogues use an unnumbered heading and often put the endpoint in a
+  // final bullet. Preserve a complete supplied brief verbatim for review.
+  const suppliedEpilogue = /^(?:RE)?WRITE EPILOGUE\s*$/im.test(supplied)
+    && /^POV:\s*\S/im.test(supplied) && /^TIME:\s*\S/im.test(supplied)
+    && (supplied.match(/^[-*]\s+\S/gm)?.length ?? 0) >= 3
+    && /^(?:[-*]\s+)?(?:END(?:ING|POINT)?\b|STOP\b)\s*:?\s*\S/im.test(supplied);
+  if (supplied.length >= 400 && (suppliedHeadings.every(heading => heading.test(supplied)) || suppliedEpilogue) && /^[-*]\s+\S/m.test(supplied)) {
     return { guidance: supplied, question: '' };
   }
   const previousCount = diagnostics.length;
@@ -50,7 +57,7 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
     assertChapterPlanSchema(output, schema);
     const result = output as { guidance: string; question: string };
     if (result.guidance.trim()) {
-      const headings = [/^(?:RE)?WRITE CHAPTER \d+\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^ENDING\s*$/im, /^EXCLUSIONS\s*$/im];
+      const headings = [/^(?:RE)?WRITE (?:CHAPTER \d+|EPILOGUE)\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^ENDING\s*$/im, /^EXCLUSIONS\s*$/im];
       // Chapter 1 has no preceding chapter. Opening continuity belongs to the Bible.
       if (!/^(?:RE)?WRITE CHAPTER 1\s*$/im.test(result.guidance)) headings.push(/^CONTINUITY FROM CHAPTER/im);
       for (const heading of headings) {
@@ -62,3 +69,4 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
     diagnostics.slice(previousCount).forEach(d => { d.stage = 'chapter_guidance'; });
   }
 }
+

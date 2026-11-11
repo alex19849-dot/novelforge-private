@@ -22,13 +22,13 @@ export function parkChapterDraft(story: StoryWorkspace, pending: import('../app/
 }
 
 export function isGuidanceProposal(text: string): boolean {
-  return /^\s*(?:RE)?WRITE CHAPTER \d+\s*\r?\n[\s\S]*?\bPOV:/i.test(text);
+  return /^\s*(?:RE)?WRITE (?:CHAPTER \d+|EPILOGUE)\s*\r?\n[\s\S]*?\bPOV:/i.test(text);
 }
 export function guidanceMessageIndex(messages: StoryWorkspace['messages'], text: string): number {
-  const heading = text.match(/^\s*((?:RE)?WRITE CHAPTER \d+)\b/i)?.[1].toUpperCase();
+  const heading = text.match(/^\s*((?:RE)?WRITE (?:CHAPTER \d+|EPILOGUE))\b/i)?.[1].toUpperCase();
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
-    if (message.role === 'assistant' && (message.content.trim() === text.trim() || heading && isGuidanceProposal(message.content) && message.content.match(/^\s*((?:RE)?WRITE CHAPTER \d+)\b/i)?.[1].toUpperCase() === heading)) return i;
+    if (message.role === 'assistant' && (message.content.trim() === text.trim() || heading && isGuidanceProposal(message.content) && message.content.match(/^\s*((?:RE)?WRITE (?:CHAPTER \d+|EPILOGUE))\b/i)?.[1].toUpperCase() === heading)) return i;
   }
   return -1;
 }
@@ -42,3 +42,4 @@ export function withoutChapterGuidance(story: StoryWorkspace): StoryWorkspace {
 export function discardsChapterGuidance(message: string): boolean {
   return /^(?:please\s+)?(?:discard|delete|clear|remove|scrap)\s+(?:(?:the|this|current)\s+)*(?:chapter\s+)?(?:guidance|guidence|outline|plan)[.!\s]*$/i.test(message.trim());
 }
+
