@@ -1,4 +1,5 @@
 import { memoryCoverage } from "../lib/narrative-memory";
+import { priorProseContext } from '../lib/prose-history';
 import { jobAdmin } from '../lib/social-job-db';
 import type { ChapterJobInput } from '../lib/chapter-job';
 import type { StoryWorkspace, GenerationDiagnostic, StoryChapter, StoryChatResponse } from '../app/story-chat/types';
@@ -129,6 +130,7 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
         ...(specialist ? { phase: 'fill_specialist' } : {}), action,
         storyBible: state.story.storyBible, storyState: getStoryStateBeforeChapter(state.story.storyState, replacement),
         recentChapters: (replacement === null ? state.story.chapters : state.story.chapters.filter(chapter => chapter.number < replacement)).slice(-2),
+        priorWritingContext: priorProseContext(state.story.chapters, state.story.storyState, { beforeChapter: replacement ?? undefined, pov: pending.generatedChapter.povCharacter }),
         chapterBrief: pending.chapterBrief, chapterTitle: pending.generatedChapter.title, povCharacter: pending.generatedChapter.povCharacter,
         chapterDraft: pending.draft, sectionToRewrite: action === 'rewrite' ? pending.lastSection ?? '' : '', sectionInstruction: input.sectionInstruction ?? '', latestUserMessage: pending.latestUserMessage,
       })));
@@ -220,5 +222,6 @@ export async function failChapterJob(id: string, message: string) {
   const { error: persistError } = await jobAdmin().rpc('finish_story_generation_job', { p_job_id: id });
   if (persistError) await jobAdmin().from('story_generation_jobs').update({ status: 'failed' }).eq('id', id).eq('status', 'generating');
 }
+
 
 

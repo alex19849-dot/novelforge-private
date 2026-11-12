@@ -2,6 +2,7 @@
 import OpenAI from "openai";
 import { selectedProseWriter, proseCostEstimate, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
+import { priorProseContext, PROSE_HISTORY_LIMIT } from "../../../../lib/prose-history";
 
 import { NextResponse } from "next/server";
 
@@ -32,6 +33,7 @@ type WriterRequest = {
   storyBible?: unknown;
   storyState?: unknown;
   recentChapters?: unknown;
+  priorWritingContext?: unknown;
   chapterBrief?: unknown;
   chapterTitle?: unknown;
   povCharacter?: unknown;
@@ -338,6 +340,7 @@ async function writeSpecialistScene(input: {
   diagnostics: GenerationDiagnostic[];
   continuation?: boolean;
   sectionInstruction?: string;
+  priorWritingContext?: string;
 }): Promise<string> {
   if (!process.env.OPENROUTER_API_KEY) {
     throw new Error(
@@ -362,7 +365,7 @@ async function writeSpecialistScene(input: {
     input.continuation
       ? "Preserve the fixed first-person POV, tense, character voices, current physical positions, established boundaries and continuity. Begin after the exact final sentence of the supplied edited draft and follow the author's latest continuation direction."
       : "Preserve the fixed first-person POV, tense, character voices, physical staging, established boundaries and continuity. Begin exactly after BEFORE THE MARKER and end exactly before AFTER THE MARKER so the inserted prose reads as one uninterrupted chapter.",
-    "Make the intimacy particular to these men and this stage of their relationship. It must reveal character, change the relationship or raise the emotional stakes. Let touch move naturally according to position, desire and response rather than returning repeatedly to waists and arms; avoid an anatomy inventory. Avoid a generic escalation sequence, recycled dirty talk, repeated reassurance, automatic soft aftercare and abrupt emotional breakthroughs that the contract does not authorise.",
+    "Make the intimacy particular to these men and this stage of their relationship. Pleasure, playfulness, familiarity and established affection are valid purposes; do not force a new milestone or emotional breakthrough each time. Compare the supplied earlier encounters for repeated progression, initiative, mood, language and aftermath. Preserve the requested acts and explicit detail while letting tempo and responses belong to this encounter. Let touch follow position, desire and response; recognise the same repeated gesture under different wording, including hands behind necks or fingers at the nape. Keep purposeful touch without replacing it with an anatomy inventory. Avoid recycled dirty talk, repeated reassurance and automatic soft aftercare; preserve any aftermath the author requests.",
     "Keep the POV character's attraction specific to what he finds appealing about this man, using selective physical, vocal or behavioural observations grounded in fixed appearance and the supplied prose. Do not repeat a favourite feature as a refrain or explain every response. Preserve established clothing, positions, objects and room conditions across the insertion boundaries. Do not introduce stock paper napkins, open windows or a default muted-colour outfit as generic scene decoration.",
     "Describe clothes in the POV character's everyday vocabulary, not a fashion catalogue. Do not default to rust, rust-coloured or rust-colored, or repeatedly attach -coloured/-colored to basic colours. Avoid replacing that habit with another stock shade or a forced synonym. Use ordinary colour words when this person would notice them; often the fit, condition, print or garment itself matters more than its exact shade. Do not mention a colour at every entrance or turn each outfit into an inventory. Preserve established garments within continuous scenes and honour author-specified descriptions.",
     "Use natural contractions and complete contemporary sentences. Never use em dashes or en dashes. Do not recap earlier prose, repeat the first line after the marker or continue into later chapter beats.",
@@ -388,6 +391,8 @@ async function writeSpecialistScene(input: {
       JSON.stringify(cleanVoiceProfiles(input.storyState, input.povCharacter), null, 2),
     "CONTINUITY STATE:\n" +
       JSON.stringify(cleanStoryState(input.storyState, input.povCharacter, input.chapterBrief + "\n" + (input.sectionInstruction ?? "")), null, 2),
+    input.priorWritingContext || "",
+    "CURRENT DRAFT REPETITION SIGNALS, REVIEW ONLY:\n" + chapterRepetitionReport(input.assembledDraft).join("\n"),
     CONTINUITY_CONSISTENCY_INSTRUCTION,
     "BEFORE THE MARKER:\n" + context.before,
     "AFTER THE MARKER:\n" + context.after,
@@ -708,6 +713,7 @@ function getPrompt(input: {
   sectionInstruction: string;
   latestUserMessage: string;
   specialistScenes: SpecialistScene[];
+  priorWritingContext?: string;
 }): string {
   const sectionBrief = readSectionBrief(input.chapterBrief);
   const originalGuidance =
@@ -828,7 +834,7 @@ function getPrompt(input: {
     "Let attraction, awareness, emotional attachment and physical escalation develop at the pace established by the Story Bible, current guidance and events already shown. Do not force the next romantic milestone merely because the characters share a scene. Vary purposeful hand placement according to the bodies' positions and what each person wants or responds to; do not repeatedly default to touching waists and arms or turn touch into an anatomy inventory.",
     "When attraction is established or the current guidance calls for it, let the POV character register what he personally finds attractive, sexy or distracting about the other man. Select concrete physical attributes, movement, voice, expression or the way clothes fit, consistent with fixed appearance and the immediate action. Let desire colour what catches his attention and how he responds, rather than relying on generic handsome labels, scent and proximity alone. Different men notice and value different things; keep that preference individual and allow it to deepen with familiarity. A character in denial may notice before admitting why, without naming himself obsessed or explaining every reaction. Do not invent major physical traits, force attraction before the planned stage, insert an admiring inventory, repeat the same favourite feature every encounter or turn every glance into arousal. Preserve anger and conflict when present; attraction does not automatically soften either man or settle their dispute.",
     "When CURRENT GUIDANCE calls for explicit intimacy, write it openly, vividly and moment by moment. Keep the bodies and movement physically clear. Make the language, tempo, humour, hunger, vulnerability, power and aftermath specific to these men and this point in their relationship.",
-    "Do not use a standard escalation sequence, anatomy inventory, recycled dirty talk, repeated reassurance, procedural checklists or an automatic soft aftercare scene. Intimacy must reveal character, change the relationship or create a consequence, and it must not repeat the shape or language of an earlier encounter.",
+    "Do not default to a standard escalation sequence, anatomy inventory, recycled dirty talk, repeated reassurance, procedural checklist or automatic soft aftercare. Compare supplied prior encounters instead of recreating their progression, initiative, mood, language and aftermath by habit. Preserve the author's requested acts, scene development, explicit detail, emotional intensity and any requested aftermath. Pleasure, playfulness, familiarity and established affection can be enough; do not invent a confession, conflict, escalation or relationship milestone to justify an encounter. Familiar preferences can recur naturally without reproducing an entire earlier scene.",
     specialistInstruction,
     "POV",
     "Use the Story Bible's POV and tense. Default to first-person present only if neither is specified. Remain in " +
@@ -858,6 +864,7 @@ function getPrompt(input: {
       (draftRepetitionReport.length
         ? draftRepetitionReport.join("\n")
         : "No tracked pattern has crossed its review threshold."),
+    input.priorWritingContext || "",
     input.action === "rewrite"
       ? "SECTION TO REWRITE, READ ONLY\n" + input.sectionToRewrite
       : "",
@@ -1192,6 +1199,8 @@ export async function POST(request: Request) {
     const chapterDraft = cleanString(body.chapterDraft);
     const sectionToRewrite = cleanString(body.sectionToRewrite);
     const sectionBrief = readSectionBrief(chapterBrief);
+    const priorWritingContext = cleanString(body.priorWritingContext).slice(0, PROSE_HISTORY_LIMIT)
+      || priorProseContext(body.recentChapters, body.storyState, { beforeChapter: sectionBrief.chapterNumber, pov: povCharacter });
     const latestUserMessage = cleanString(body.latestUserMessage);
     const phase = cleanString(body.phase);
     const sectionInstruction = cleanString(body.sectionInstruction) || sectionBrief.continuationGuidance || "";
@@ -1244,6 +1253,7 @@ export async function POST(request: Request) {
           povCharacter,
           diagnostics,
           sectionInstruction,
+          priorWritingContext,
         });
         const section = chapterDraft.replace(nextScene.marker, replacement);
         const specialistScenesPending = specialistScenes.some((scene) =>
@@ -1344,6 +1354,7 @@ export async function POST(request: Request) {
           diagnostics,
           continuation: true,
           sectionInstruction,
+          priorWritingContext,
         });
         return NextResponse.json({
           section,
@@ -1377,6 +1388,7 @@ export async function POST(request: Request) {
       sectionInstruction,
       latestUserMessage: cleanString(body.latestUserMessage),
       specialistScenes,
+      priorWritingContext,
     });
 
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -1543,6 +1555,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 

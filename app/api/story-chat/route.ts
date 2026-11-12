@@ -3193,7 +3193,7 @@ ${latestMessage}
 ${FOCUSED_CHAT_PROMPT}`) || SYSTEM_PROMPT;
       const focusedSystemPrompt = `${focusedRolePrompt}
 
-${usesCompactChapterPlan ? PROSE_BALANCE_INSTRUCTION + " Plan space for this balance within the author's requested events; do not invent events or dialogue to meet percentages." : ""}
+${usesCompactChapterPlan ? PROSE_BALANCE_INSTRUCTION + " Plan space for these scene-led priorities within the author's requested events; preserve substantial inner thoughts and feelings without inventing events or padding dialogue." : ""}
 
 USER INTENT
 
@@ -3792,6 +3792,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     );
   }
 }
+
 
 
 
