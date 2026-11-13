@@ -1,3 +1,4 @@
+import {ROMANCE_STYLE} from './social-romance-style';
 import sharp from 'sharp';
 /** Reserve a central cover region on the AI's 2:3 artwork canvas. */
 export function originalCoverLayout(portrait:boolean) {
@@ -11,6 +12,7 @@ export function originalCoverLayout(portrait:boolean) {
 export function originalCoverBackgroundPrompt(brief:string,portrait:boolean,bookTitle:string) {
   const box=originalCoverLayout(portrait);
   return [
+    ROMANCE_STYLE,
     'Create finished background artwork and promotional typography for an adult romance book advertisement. Objects, ice, lighting and typography only. No people, bodies, faces, or intimate imagery.',
     `The book is ${bookTitle}. The final format is ${portrait?'9:16 vertical TikTok':'4:5 Facebook/Instagram feed'}, with your full 1024x1536 canvas fitted inside it without cropping. Keep every word at least 80 pixels away from the edges of that canvas.`,
     `IMPORTANT: The application inserts the genuine book-cover file separately after generation. Do not draw, copy, fetch, recreate or alter any cover. Do not render a blank cover, device, mockup or placeholder box. Leave the central rectangle x=${box.left}, y=${box.top}, width=${box.width}, height=${box.height} on your 1024x1536 canvas free of text and foreground objects. Continue the background naturally behind that region.`,

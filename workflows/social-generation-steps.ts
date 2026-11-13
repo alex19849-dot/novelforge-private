@@ -88,7 +88,7 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
     if(match) { await attachMedia(job,task,match.media_path!,match.quality_notes??'',match.media_type!); return null; }
     const book=first.book_slug?job.config.books.find(b=>b.slug===first.book_slug)!:generalReaderBook();
     request={model:'gpt-6-astra',background:true,store:true,reasoning:{effort:'low'},max_output_tokens:1000,
-      input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,(first.platform==='tiktok'||first.platform==='youtube'),book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)},...(book.coverUrl?[{type:'input_image' as const,image_url:book.coverUrl,detail:'high' as const}]:[])]}],
+      input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,(first.platform==='tiktok'||first.platform==='youtube'),book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)}]}],
       tools:[{type:'image_generation',model:'gpt-image-2',size:'1024x1536',quality:'medium',output_format:'jpeg',output_compression:92,background:'opaque'}],tool_choice:{type:'image_generation'}};
   }
   try { return (await ai().responses.create(request)).id; }

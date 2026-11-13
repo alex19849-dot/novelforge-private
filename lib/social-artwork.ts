@@ -1,3 +1,4 @@
+import {ROMANCE_STYLE} from './social-romance-style';
 import OpenAI from "openai";
 
 import { NextResponse } from "next/server";
@@ -280,17 +281,15 @@ export function posterPrompt(
     (platform === "tiktok" || platform === "youtube")
       ? "The tool output will be centre-cropped from 2:3 to a final 9:16 short-video poster. Keep every important word, face, cover and call to action inside the central 84 percent of the width. Keep important content away from interface areas near the right and bottom edges. Compose specifically for that final crop."
       : "The tool output will be centre-cropped from 2:3 to a final 4:5 Facebook or Instagram feed poster. Keep every important word, face, cover and call to action inside the central 83 percent of the height. Compose specifically for that final crop.",
+    "APPROVED MARLOW QUINN VISUAL IDENTITY",
+    ROMANCE_STYLE,
     "AUTHOR CONTROL",
     "The author's guidance below is the creative brief. Each generation must be art-directed specifically for that brief and must not reuse a fixed layout.",
-    "The author may request any combination of people, environments, rooms, landscapes, objects, props, devices, typography, icons, illustration, photography, collage, paint, texture, lighting or abstract graphics. Create what the guidance requests and make cohesive supporting decisions from its theme.",
+    "Use book-specific environments, objects, photography, texture, typography and lighting in the approved romantic identity. No people or human figures. A stale brief asking for narrow sports lettering or brush script must not override the approved serif direction.",
     "Do not impose a gothic, sports, office, floral, dark, Kindle, trope-list or any other default style. Do not add a permanent footer, fixed icon row, standard heading position or repeated composition.",
     "Do not introduce irrelevant imagery. Every visible element must support the author's brief, the supplied cover or the verified book facts.",
-    book.coverUrl?"COVER FIDELITY":"GENERAL READER CONTENT: no book cover, device, book title, sales footer or invented character/book attribution. The short social line is original, not a book extract.",
-    ["book_promotion", "new_release"].includes(contentType)
-      ? "The supplied image is the genuine book cover. Use that exact cover as the hero. Preserve its artwork, title, author name, spelling, colours and proportions. Never redesign, rewrite, crop away or replace its contents."
-      : "The supplied genuine cover is a factual reference, not a mandatory layout element. Create the requested hook, humour, question or character-conflict artwork. Include the exact cover only when the creative brief asks for it. Do not force a book advert, device or sales footer onto reader-engagement artwork. If the cover is used, preserve it exactly.",
-    "If the guidance requests a Kindle or device, place the genuine cover naturally inside a large realistic dimensional device with matching perspective, screen reflections, rim lighting, contact shadow and environmental integration.",
-    "If no device is requested, present the genuine cover in the manner requested by the author.",
+    book.title?"BOOK-SPECIFIC CONTENT: exact title and author typography, no fabricated quotes.":"GENERAL READER CONTENT: no book attribution or sales footer. The social line is original, not an extract.",
+    "For book-specific posts identify the genuine book by exact title and author in readable typography. Do not reproduce a cover that contains a person. A cover is not required for a promotion in this people-free campaign.",
     "DESIGN STANDARD",
     "Create professional contemporary BookTok and romance advertising artwork with strong visual hierarchy, confident scale, deliberate spacing, readable typography, depth and a clear reading order.",
     "Avoid corporate cards, dashboard boxes, tiny covers, generic icon rows, rigid left columns, excessive dead space, weak detached CTAs and flat template-like arrangements unless the author explicitly asks for one of those treatments.",
@@ -410,6 +409,7 @@ export async function inspectPoster(
               "Inspect this generated social poster once.",
               `Platform: ${platform}.`,
               `Author guidance: ${guidance}`,
+              ROMANCE_STYLE,
               `Verified book facts: ${JSON.stringify({
                 title: book.title,
                 author: book.author,
@@ -419,27 +419,27 @@ export async function inspectPoster(
                 kindleUnlimited: book.kindleUnlimited,
                 amazonUrl: book.amazonUrl,
               })}`,
-              book.coverUrl?"The first image is the finished poster. The second image is the genuine cover reference.":"This is general reader entertainment. There is no book or cover. Judge the supplied brief, legibility and originality; do not request a cover, book attribution, website or sales CTA.",
+              book.title?"Inspect the finished poster against the verified book facts. Covers are optional; title typography is intentional in this people-free campaign.":"General reader entertainment: no book attribution or sales footer.",
               "Check prompt adherence, wording legibility and cover fidelity. Use scores from 0 to 100.",
               !["book_promotion", "new_release"].includes(contentType)
                 ? "This is hook or reader-engagement artwork. A cover is optional unless the guidance requires it. When no cover is required or shown, score coverFidelity as 100 (not applicable) and do not mark review merely because there is no cover."
-                : "The genuine book cover should be present and faithful.",
-              "Mark review when any score is below 70. Keep the summary under 240 characters.",
+                : "This campaign uses people-free title-and-author typography. A cover is optional; do not mark review for its absence. When absent, coverFidelity is 100 (not applicable).",
+              "Mark review when any score is below 70, when text is clipped or too small for a phone, or when people, human figures, brush script, distressed lettering or condensed sports fonts appear. Keep the summary under 240 characters.",
               "Also write the finished social post that accompanies this artwork. Create an engaging hook title, a substantial natural caption, a clear reading call to action and strong relevant hashtags.",
               "Create a motion map for animating this exact finished poster without redrawing it. All coordinates must be normalized from 0 to 1 and describe top-left x, top-left y, width and height on the finished poster.",
-              "Mark the genuine cover or Kindle as one hero region. Mark the visible promotional hook, each separate trope treatment, the main CTA, website and any visually useful detail as separate regions only when actually visible.",
+              "Mark the main book-specific photographic object or scene as the hero region, or the genuine cover only if one is actually present. Mark the visible promotional hook, each separate trope treatment, the main CTA, website and any visually useful detail as separate regions only when actually visible.",
               "Keep each box tight around its visible element but include a small breathing margin. Do not guess a region that is absent. Set available true only when the hero is confidently located.",
               "Choose one camera movement and up to four effects that suit this poster's actual artwork and the author's guidance. Do not default every poster to gothic mist or particles. Use the poster's strongest vivid accent as a six-digit hex colour.",
               platform === "facebook"
-                ? "For Facebook, write 90 to 170 words and provide 6 to 8 relevant hashtags."
+                ? "For Facebook, write a natural 25 to 70 word caption and provide up to 5 relevant hashtags."
                 : platform === "instagram"
-                  ? "For Instagram, write 70 to 140 words and provide exactly 5 strong relevant hashtags."
-                  : "For TikTok, write a keyword-rich title, a lively 80 to 160 word description and exactly 5 strong relevant hashtags.",
+                  ? "For Instagram, write a concise 20 to 60 word caption and provide exactly 5 strong relevant hashtags."
+                  : "For TikTok and YouTube, write a keyword-rich title and concise 20 to 60 word description with exactly 5 relevant hashtags.",
               "Use only the verified book facts and author guidance. Do not invent quotes, prices, reviews, awards, rankings, release status or plot claims. Do not use em dashes or en dashes.",
             ].join(" "),
           },
           { type: "input_image", image_url: imageDataUrl, detail: "high" },
-          ...(book.coverUrl?[{ type: "input_image" as const, image_url: book.coverUrl, detail: "high" as const }]:[]),
+
         ],
       }],
       max_output_tokens: 1200,
@@ -518,7 +518,7 @@ async function generatePoster(
       role: "user",
       content: [
         { type: "input_text", text: posterPrompt(book, platform, outputType, guidance, revision, contentType) },
-        ...(book.coverUrl?[{ type: "input_image" as const, image_url: book.coverUrl, detail: "high" as const }]:[]),
+
       ],
     }],
     tools: [{
