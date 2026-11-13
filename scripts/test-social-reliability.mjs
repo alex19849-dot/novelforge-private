@@ -1,0 +1,67 @@
+import assert from 'node:assert/strict';
+import {registerHooks,stripTypeScriptTypes} from 'node:module';
+import {existsSync,readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
+import {createHmac} from 'node:crypto';
+import vm from 'node:vm';
+registerHooks({resolve(specifier,context,next){if(specifier.startsWith('.')&&context.parentURL){const url=new URL(specifier,context.parentURL);if(!/\.[a-z]+$/i.test(url.pathname)&&existsSync(fileURLToPath(url)+'.ts'))return next(specifier+'.ts',context);}return next(specifier,context);}});
+const {publisherNeedsRecovery,publicationTooLate,reconciliationExpired,PUBLISHER_VERSION}=await import('../lib/social-reliability.ts');
+const {validMaintenanceSignature}=await import('../lib/social-maintenance-auth.ts');
+const {createBufferPost,readBufferPost,matchingBufferPosts}=await import('../lib/buffer-publishing.ts');
+const {readPostMetricsBatch}=await import('../lib/social-analytics-provider.ts');
+const now=Date.now(),at=String(Math.floor(now/1000)),secret='fixture-only';
+const sig=createHmac('sha256',secret).update(`${at}:social-maintenance-v1`).digest('hex');
+assert.equal(validMaintenanceSignature(at,sig,secret,now),true);
+for(const args of [[at,sig,undefined,now],[at,sig,'wrong',now],[at,sig,secret,now+301000],[at,'bad',secret,now],[String(Number(at)+600),sig,secret,now]])assert.equal(validMaintenanceSignature(...args),false);
+const healthy={enabled:true,worker_version:PUBLISHER_VERSION,heartbeat_at:new Date(now).toISOString()};
+assert.equal(publisherNeedsRecovery(healthy,now),false);
+assert.equal(publisherNeedsRecovery({...healthy,enabled:false,worker_version:''},now),false);
+assert.equal(publisherNeedsRecovery({...healthy,worker_version:''},now),true);
+assert.equal(publisherNeedsRecovery({...healthy,heartbeat_at:new Date(now-9*60000).toISOString()},now),true);
+assert.equal(publisherNeedsRecovery({...healthy,heartbeat_at:null,updated_at:new Date(now).toISOString()},now),false);
+const cutover=new Date(now-3*3600000).toISOString(),recent=new Date(now-2*3600000).toISOString();
+assert.equal(publicationTooLate(recent,cutover,now),false);
+assert.equal(publicationTooLate(recent,new Date(now).toISOString(),now),true);
+assert.equal(reconciliationExpired(new Date(now-3600000).toISOString(),11,now),false);
+assert.equal(reconciliationExpired(new Date(now-25*3600000).toISOString(),11,now),true);
+const savedFetch=globalThis.fetch;process.env.BUFFER_API_KEY=secret;
+try{
+ const accepted={id:'accepted',channelId:'channel',status:'sending',createdAt:new Date(now).toISOString()};
+ globalThis.fetch=async()=>Response.json({data:{createPost:{__typename:'PostActionSuccess',post:accepted}},errors:[{message:'Optional decoration failed',path:['createPost','post','externalLink']}]});
+ assert.equal((await createBufferPost({channelId:'channel'})).id,'accepted');
+ globalThis.fetch=async()=>Response.json({data:{post:accepted},errors:[{message:'Optional decoration failed',path:['post','externalLink']}]});
+ assert.equal((await readBufferPost('accepted')).id,'accepted');
+ globalThis.fetch=async()=>Response.json({data:{createPost:{__typename:'PostActionSuccess',post:{...accepted,channelId:'wrong'}}}});
+ await assert.rejects(()=>createBufferPost({channelId:'channel'}),error=>error.kind==='unknown');
+ const metric=id=>({id,metricsUpdatedAt:new Date(now).toISOString(),metrics:[{type:'views',value:12,unit:'count'}]});
+ globalThis.fetch=async()=>Response.json({data:{p0:metric('good'),p1:null},errors:[{message:'Unavailable',path:['p1'],extensions:{code:'NOT_FOUND'}}]});
+ let batch=await readPostMetricsBatch(['good','bad']);assert.equal(batch.posts.length,1);assert.equal(batch.issues[0].id,'bad');
+ let reads=0;
+ globalThis.fetch=async(_url,options)=>{reads++;const ids=Object.values(JSON.parse(options.body).variables);if(ids.includes('bad'))return Response.json({data:null,errors:[{path:['p'+ids.indexOf('bad')],extensions:{code:'NOT_FOUND'}}]});return Response.json({data:Object.fromEntries(ids.map((id,i)=>['p'+i,metric(id)]))});};
+ batch=await readPostMetricsBatch(['good1','bad','good2']);assert.deepEqual(batch.posts.map(p=>p.id),['good1','good2']);assert.equal(batch.issues.length,1);assert.ok(reads<=5);
+ reads=0;globalThis.fetch=async()=>{reads++;return Response.json({data:null,errors:[{extensions:{code:'UNAUTHORIZED'}}]});};
+ batch=await readPostMetricsBatch(['one','two','three']);assert.equal(reads,1);assert.equal(batch.issues.length,3);
+ const source=readFileSync(new URL('../workflows/social-analytics.ts',import.meta.url),'utf8');
+ const code=stripTypeScriptTypes(source.replace(/^import .*;\n/gm,'').replace('export async function','async function'));
+ const calls=[];const context=vm.createContext({prepareAnalytics:async()=>Array.from({length:42},(_,i)=>String(i)),collectAnalyticsBatch:async(_owner,_token,ids)=>{if(ids[0]==='20')throw Error('Isolated batch failure');return{requested:ids.length,received:ids.length,usable:ids.length,issues:[]};},finishAnalytics:async(_owner,_token,coverage)=>calls.push(coverage),failAnalytics:async()=>assert.fail('A partial batch must not kill the report')});
+ vm.runInContext(code,context);await context.collectSocialAnalytics('owner','token');assert.equal(calls[0].received,22);assert.equal(calls[0].requested,42);assert.equal(calls[0].issues.length,20);
+}finally{globalThis.fetch=savedFetch;}
+console.log('PASS: signed/expired maintenance requests, healthy/paused/stale worker decisions, future-only recovery window, accepted IDs with warnings, isolated GraphQL resolver failures, global auth failure bounds, and partial analytics completion.');
+// Exercise the actual recovery operation, including pause and concurrent CAS.
+const recoverySource=readFileSync(new URL('../lib/social-publishing-server.ts',import.meta.url),'utf8');
+const recoveryCode=stripTypeScriptTypes(recoverySource.slice(recoverySource.indexOf('export async function recoverPublisher')).replace('export async function','async function'));
+async function recoveryCase({enabled=true,stale=true,loseClaim=false,failStart=false}={}){
+ let state={user_id:'owner',enabled,lease:'old',generation:3,worker_version:PUBLISHER_VERSION,heartbeat_at:new Date(now-(stale?9:0)*60000).toISOString(),updated_at:new Date(now).toISOString(),workflow_run_id:'old-run'};
+ let starts=0;
+ const db={from(){let updates=null,filters=[];const query={select(){return query;},eq(key,value){filters.push([key,value]);return query;},is(key,value){filters.push([key,value]);return query;},update(value){updates=value;return query;},async maybeSingle(){return {data:{...state},error:null};},then(resolve){if(loseClaim&&updates?.lease){state.enabled=false;}const matches=filters.every(([key,value])=>state[key]===value);if(updates&&matches)state={...state,...updates};return Promise.resolve({data:matches?[{user_id:'owner'}]:[],error:null}).then(resolve);}};return query;}};
+ const context=vm.createContext({jobAdmin:()=>db,PUBLISHER_VERSION,publisherNeedsRecovery,randomUUID:()=> 'replacement',publishSocialCalendar:()=>{},start:async()=>{starts++;if(failStart)throw Error('Simulated outage');return {runId:'replacement-run'};}});
+ vm.runInContext(recoveryCode,context);
+ if(failStart)await assert.rejects(()=>context.recoverPublisher('owner'));else await context.recoverPublisher('owner');
+ return {state,starts};
+}
+assert.equal((await recoveryCase({enabled:false})).starts,0);
+assert.equal((await recoveryCase({stale:false})).starts,0);
+assert.equal((await recoveryCase({loseClaim:true})).starts,0);
+let recovery=await recoveryCase();assert.equal(recovery.starts,1);assert.equal(recovery.state.lease,'replacement');assert.equal(recovery.state.workflow_run_id,'replacement-run');
+recovery=await recoveryCase({failStart:true});assert.equal(recovery.state.enabled,true);assert.match(recovery.state.last_error,/retrying/);
+console.log('PASS: actual worker replacement preserves pause, rejects a lost recovery claim, fences the old lease, and keeps recovery enabled after a start failure.');

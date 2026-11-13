@@ -15,7 +15,7 @@ export async function GET(request:Request) {
   try {
     const db=jobAdmin();
     const [settings,publications]=await Promise.all([
-      db.from('social_publishing_settings').select('enabled,channels,preflight_at,heartbeat_at,last_error').eq('user_id',account.id).maybeSingle(),
+      db.from('social_publishing_settings').select('enabled,channels,preflight_at,heartbeat_at,updated_at,maintenance_checked_at,last_error').eq('user_id',account.id).maybeSingle(),
       db.from('social_publications').select('post_id,state,attempt,poll_count,provider_post_id,external_link,next_check_at,published_at,last_error,safe_to_retry,updated_at').eq('user_id',account.id).order('updated_at',{ascending:false}).limit(300),
     ]);
     if(settings.error||publications.error) throw new Error('The automatic publisher is being set up. Refresh shortly.');

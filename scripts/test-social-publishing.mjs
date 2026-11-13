@@ -24,6 +24,10 @@ const claim=(row,options={})=>db.query('select * from social_claim_publication($
 for(const row of [draft,future,foreign,late])assert.equal((await claim(row)).rows.length,0);
 assert.equal((await claim(own,{version:0})).rows.length,0);assert.equal((await claim(own,{lease:randomUUID()})).rows.length,0);
 await db.query('update social_publishing_settings set enabled=false where user_id=$1',[owner]);assert.equal((await claim(own)).rows.length,0);await db.query('update social_publishing_settings set enabled=true where user_id=$1',[owner]);
+await db.query("update social_publishing_settings set reliability_from=now()-interval '3 hours' where user_id=$1",[owner]);
+const recoverable=await post('approved',-7200),tooOld=await post('approved',-8*3600);
+assert.equal((await claim(recoverable)).rows.length,1,'Future-cutover approved posts recover after a two hour outage');
+assert.equal((await claim(tooOld)).rows.length,0,'Legacy posts are not resurrected');
 const first=(await claim(own)).rows[0];assert.equal(first.attempt,1);assert.equal((await claim(own)).rows.length,0);
 assert.equal((await db.query('select status from social_posts where id=$1',[own.id])).rows[0].status,'publishing');
 await db.exec('set role authenticated');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[owner]);
@@ -46,7 +50,7 @@ try {
  globalThis.fetch=async()=>{calls++;return new Response('',{status:429,headers:{'retry-after':'120'}});};await assert.rejects(()=>createBufferPost(input),e=>e instanceof BufferPublishError&&e.kind==='retry'&&e.retryAfter===120);assert.equal(calls,1);
  globalThis.fetch=async()=>{throw new TypeError('socket lost after acceptance');};await assert.rejects(()=>createBufferPost(input),e=>e.kind==='unknown');
  const post={id:'provider-one',channelId:'tt',text:input.text,via:'api',createdAt:new Date().toISOString(),status:'sending',assets:[{source:'https://example.com/clip.mp4'}]};
- assert.equal(matchingBufferPosts([post],input,'2020-01-01').length,1);assert.equal(matchingBufferPosts([post,{...post,id:'duplicate'}],input,'2020-01-01').length,2);assert.equal(matchingBufferPosts([{...post,channelId:'wrong'}],input,'2020-01-01').length,0);
+ assert.equal(matchingBufferPosts([post],input,new Date(Date.now()-60000).toISOString()).length,1);assert.equal(matchingBufferPosts([post,{...post,id:'duplicate'}],input,new Date(Date.now()-60000).toISOString()).length,2);assert.equal(matchingBufferPosts([{...post,channelId:'wrong'}],input,new Date(Date.now()-60000).toISOString()).length,0);
  globalThis.fetch=async()=>Response.json({data:{createPost:{__typename:'PostActionSuccess',post}}});assert.equal((await createBufferPost(input)).id,'provider-one');
 }finally{globalThis.fetch=savedFetch;}
 await db.close();console.log('PASS: approved payload, bounded 429 retry, ambiguous response held, exact provider reconciliation, no automatic duplicate mutation.');

@@ -3,7 +3,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {supabase} from '../../lib/supabaseClient';
 import {DEFAULT_STRATEGY,FAMILIES,FAMILY_LABELS,familyWeights} from '../../lib/social-strategy';
 import type {ContentFamily,StrategySettings,LearningReport} from '../../lib/social-strategy';
-type State={status:string;last_collected_at:string|null;last_error:string;report:LearningReport|Record<string,never>};
+type State={coverage?:{checked_at?:string;requested?:number;received?:number;usable?:number;complete?:boolean};status:string;last_collected_at:string|null;last_error:string;report:LearningReport|Record<string,never>};
 const input='mt-1 w-full rounded-xl border border-white/15 bg-neutral-950 px-3 py-2';
 export default function StrategyPanel({books}:{books:{slug:string;title:string}[]}){
  const [settings,setSettings]=useState<StrategySettings>(DEFAULT_STRATEGY),[state,setState]=useState<State|null>(null),[message,setMessage]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[ready,setReady]=useState(false);
@@ -39,8 +39,9 @@ export default function StrategyPanel({books}:{books:{slug:string;title:string}[
    return <div key={platform.platform} className="rounded-xl bg-black/25 p-3"><h4 className="font-semibold capitalize">{platform.platform}</h4>{patterns.length?patterns.map(pattern=><p key={pattern.value} className="mt-2 text-sm">{FAMILY_LABELS[pattern.value as ContentFamily]??pattern.value}: {pattern.discovery!=null?`${Math.round((Math.exp(pattern.discovery)-1)*100)}% relative discovery`: 'Discovery unavailable'}{pattern.conversion!=null?`; ${Math.round((Math.exp(pattern.conversion)-1)*100)}% relative clicks`:''}. <span className="text-neutral-400">{pattern.posts} posts.</span></p>):<p className="mt-2 text-sm text-neutral-400">Collecting evidence. No winners declared yet.</p>}<p className="mt-2 text-xs text-neutral-400">Next mix: about {Math.round(weights.book_promotion)}% direct promotion.</p></div>;
   })}</div>}
   <p className="mt-3 text-xs text-neutral-400">Buffer metrics are experimental and may arrive a day later. Unavailable metrics stay unknown. Clicks do not prove book sales. Older posts help baselines; their missing content labels are not guessed. Comparisons use the same platform, media format and post-age group; patterns need 12 comparable posts overall and 5 examples across 3 dates.</p>
-  {state?.last_collected_at&&<p className="mt-1 text-xs text-neutral-500">Last checked: {new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/London',dateStyle:'medium',timeStyle:'short'}).format(new Date(state.last_collected_at))} UK time.</p>}
+  {state?.last_collected_at&&<p className="mt-1 text-xs text-neutral-500">Last usable collection: {new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/London',dateStyle:'medium',timeStyle:'short'}).format(new Date(state.last_collected_at))} UK time.</p>}
   {report?.source_updated_at&&Date.now()-Date.parse(report.source_updated_at)>72*3600000&&<p className="mt-2 text-sm text-amber-200">The latest provider measurements are over three days old. Treat these patterns as historical.</p>}
+  {state?.coverage?.checked_at&&<p className="mt-1 text-xs text-neutral-400">Latest collection: {state.coverage.received??0}/{state.coverage.requested??0} posts retrieved, {state.coverage.usable??0} with usable measurements{state.coverage.complete?'':' (partial)'}. Missing measurements are not counted as zero.</p>}
   {state?.last_error&&<p role="status" className="mt-2 text-sm text-amber-200">{state.last_error}</p>}
   <details className="mt-4"><summary className="cursor-pointer font-semibold">Change strategy and exclusions</summary><form onSubmit={event=>{event.preventDefault();void action('save');}} className="mt-3 space-y-4">
    <fieldset disabled={!ready||busy} className="space-y-4">

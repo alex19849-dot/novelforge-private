@@ -1,5 +1,6 @@
 import {getWorkflowMetadata} from 'workflow';
 import {jobAdmin} from '../lib/social-job-db';
+import {publicationTooLate,reconciliationExpired} from '../lib/social-reliability';
 import {bufferPayload,BufferPublishError,createBufferPost,readBufferPost,recentBufferPosts,matchingBufferPosts} from '../lib/buffer-publishing';
 import type {ProviderPost} from '../lib/buffer-publishing';
 import type {SocialPlatform,CalendarPost} from '../lib/social-calendar';
@@ -13,7 +14,7 @@ async function result(item:Publication,state:string,options:{id?:string;link?:st
 async function observe(item:Publication,post:ProviderPost) {
   if(post.status==='sent') return result(item,'published',{id:post.id,link:post.externalLink});
   if(post.status==='error'||post.status==='draft'||post.status==='needs_approval') return result(item,'failed',{id:post.id,error:post.error?.message||`Buffer returned ${post.status}. Check this post in Buffer before retrying.`});
-  if(item.poll_count>=20) return result(item,'attention',{id:post.id,error:'Buffer has not confirmed publication yet. Check Buffer history, then use Check publishing status. No duplicate was sent.'});
+  if(reconciliationExpired(item.submitted_at,item.poll_count)) return result(item,'attention',{id:post.id,error:'Buffer has not confirmed publication yet. Check Buffer history, then use Check publishing status. No duplicate was sent.'});
   return result(item,'accepted',{id:post.id,error:'',delay:item.poll_count<3?30:300});
 }
 async function reconcile(item:Publication,channels:any) {
@@ -24,10 +25,10 @@ async function reconcile(item:Publication,channels:any) {
     const since=new Date(Date.parse(item.submitted_at)-60000).toISOString();
     const candidates=matchingBufferPosts(await recentBufferPosts(channel.organizationId,channel.id,since),item.payload,since);
     if(candidates.length===1) return await observe(item,candidates[0]);
-    if(candidates.length>1||item.poll_count>=10) return result(item,'attention',{error:'Buffer did not provide one confirmed matching post. Check Buffer history before retrying. No duplicate was sent.'});
-    return result(item,'uncertain',{error:'Waiting for Buffer to confirm whether it accepted the request. No duplicate will be submitted.',delay:120});
+    if(candidates.length>1||reconciliationExpired(item.submitted_at,item.poll_count)) return result(item,'attention',{error:'Buffer did not provide one confirmed matching post. Check Buffer history before retrying. No duplicate was sent.'});
+    return result(item,'uncertain',{error:'Waiting for Buffer to confirm whether it accepted the request. No duplicate will be submitted.',delay:item.poll_count<10?120:900});
   }catch(error) {
-    if(item.poll_count>=20) return result(item,'attention',{error:'Buffer status could not be confirmed. Use Check publishing status after checking the connection.'});
+    if(reconciliationExpired(item.submitted_at,item.poll_count)) return result(item,'attention',{error:'Buffer status could not be confirmed. Use Check publishing status after checking the connection.'});
     return result(item,item.provider_post_id?'accepted':'uncertain',{error:error instanceof Error?error.message:'Buffer status is temporarily unavailable.',delay:error instanceof BufferPublishError?error.retryAfter:300});
   }
 }
@@ -72,7 +73,7 @@ export async function publishingTick(owner:string,lease:string,generation:number
     }
     const retryTimes:number[]=[];
     for(const post of due as CalendarPost[]) {
-      if(Date.parse(post.scheduled_at!)<Date.now()-30*60_000) {await failBeforeSubmission(post,'This posting time was missed by more than 30 minutes. Return it to a draft and choose a new time.');continue;}
+      if(publicationTooLate(post.scheduled_at!,settings.reliability_from)) {await failBeforeSubmission(post,'This posting time is outside the safe recovery window. Choose a new time before publishing.');continue;}
       const {data:previous,error:previousError}=await db.from('social_publications').select('*').eq('post_id',post.id).eq('user_id',owner).maybeSingle();
       if(previousError) throw new Error('Duplicate protection could not be checked.');
       if(previous&&!(previous.state==='retry'&&previous.safe_to_retry&&Date.parse(previous.next_check_at)<=Date.now())) {if(previous.state==='retry'&&previous.safe_to_retry&&previous.next_check_at) retryTimes.push(Date.parse(previous.next_check_at));continue;}

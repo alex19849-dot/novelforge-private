@@ -3,24 +3,24 @@ import {useEffect,useRef,useState} from 'react';
 import {supabase} from '../../lib/supabaseClient';
 import type {CalendarPost} from '../../lib/social-calendar';
 type Entry={post_id:string;state:string;attempt:number;external_link?:string;next_check_at?:string;last_error:string;safe_to_retry:boolean;provider_post_id?:string;published_at?:string};
-type Settings={enabled:boolean;channels:Record<string,{name:string}>;preflight_at?:string;heartbeat_at?:string;last_error:string};
+type Settings={enabled:boolean;channels:Record<string,{name:string}>;preflight_at?:string;heartbeat_at?:string;updated_at?:string;maintenance_checked_at?:string;last_error:string};
 const button='rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40';
-export default function PublishingPanel({posts,onEnabledChange,onReload}:{posts:CalendarPost[];onEnabledChange:(enabled:boolean)=>void;onReload:()=>void}) {
+export default function PublishingPanel({posts,onEnabledChange,onStatesChange,onReload}:{posts:CalendarPost[];onStatesChange:(states:Record<string,string>)=>void;onEnabledChange:(enabled:boolean)=>void;onReload:()=>void}) {
   const [settings,setSettings]=useState<Settings|null>(null),[entries,setEntries]=useState<Entry[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false);
   const [showAll,setShowAll]=useState(false);
   const account=useRef<string|null>(null);
-  const callbacks=useRef({onEnabledChange,onReload});callbacks.current={onEnabledChange,onReload};
+  const callbacks=useRef({onEnabledChange,onStatesChange,onReload});callbacks.current={onEnabledChange,onStatesChange,onReload};
   async function load() {
     try {
       const {data}=await supabase.auth.getSession();
-      if(!data.session){account.current=null;setSettings(null);setEntries([]);callbacks.current.onEnabledChange(false);return;}
+      if(!data.session){account.current=null;setSettings(null);setEntries([]);callbacks.current.onStatesChange({});callbacks.current.onEnabledChange(false);return;}
       const owner=data.session.user.id;account.current=owner;
       const response=await fetch('/api/social-studio/publishing',{headers:{Authorization:`Bearer ${data.session.access_token}`},cache:'no-store',signal:AbortSignal.timeout(12000)});
-      const result=await response.json();if(account.current!==owner)return;if(!response.ok){if(response.status===401||response.status===403){setSettings(null);setEntries([]);callbacks.current.onEnabledChange(false);}throw new Error(result.error);}
-      setSettings(result.settings);setEntries(result.publications);callbacks.current.onEnabledChange(Boolean(result.settings?.enabled));setError('');
+      const result=await response.json();if(account.current!==owner)return;if(!response.ok){if(response.status===401||response.status===403){setSettings(null);setEntries([]);callbacks.current.onStatesChange({});callbacks.current.onEnabledChange(false);}throw new Error(result.error);}
+      setSettings(result.settings);setEntries(result.publications);callbacks.current.onStatesChange(Object.fromEntries(result.publications.map((entry:Entry)=>[entry.post_id,entry.state])));callbacks.current.onEnabledChange(Boolean(result.settings?.enabled));setError('');
     }catch(error){setError(error instanceof Error?error.message:'Publishing status could not be loaded.');}
   }
-  useEffect(()=>{void load();const timer=window.setInterval(()=>void load(),15000);const {data}=supabase.auth.onAuthStateChange((_event,session)=>{if(!session||account.current&&account.current!==session.user.id){account.current=null;setSettings(null);setEntries([]);callbacks.current.onEnabledChange(false);}});return()=>{window.clearInterval(timer);data.subscription.unsubscribe();};},[]);
+  useEffect(()=>{void load();const timer=window.setInterval(()=>void load(),15000);const {data}=supabase.auth.onAuthStateChange((_event,session)=>{if(!session||account.current&&account.current!==session.user.id){account.current=null;setSettings(null);setEntries([]);callbacks.current.onStatesChange({});callbacks.current.onEnabledChange(false);}});return()=>{window.clearInterval(timer);data.subscription.unsubscribe();};},[]);
   async function action(action:string,postId?:string) {
     setBusy(true);setError('');
     try {
@@ -34,15 +34,18 @@ export default function PublishingPanel({posts,onEnabledChange,onReload}:{posts:
   const next=posts.filter(post=>post.status==='approved'&&Boolean(settings?.channels?.[post.platform])&&post.scheduled_at&&Date.parse(post.scheduled_at)>Date.now()).sort((a,b)=>a.scheduled_at!.localeCompare(b.scheduled_at!))[0];
   const attention=entries.filter(entry=>['failed','attention','uncertain'].includes(entry.state));
   const history=[...attention,...entries.filter(entry=>!attention.includes(entry))].slice(0,showAll?300:30);
+  const stale=Boolean(settings?.enabled&&Date.now()-Date.parse(settings.heartbeat_at??settings.updated_at??'2000-01-01')>8*60_000);
+  const recoveryStale=Boolean(settings?.enabled&&Date.now()-Date.parse(settings.maintenance_checked_at??'2000-01-01')>6*60_000);
   return <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-4" aria-labelledby="publishing-title">
-    <div className="flex flex-wrap items-center justify-between gap-3"><h3 id="publishing-title" className="font-bold">Automatic publishing: {settings?.enabled?'ON':'OFF'}</h3>
+    <div className="flex flex-wrap items-center justify-between gap-3"><h3 id="publishing-title" className="font-bold">Automatic publishing: {settings?.enabled?stale?'RECOVERING':recoveryStale?'ON, RECOVERY CHECK OVERDUE':'ON':'OFF'}</h3>
       <div className="flex flex-wrap gap-2"><button type="button" disabled={busy||!settings?.preflight_at} onClick={()=>void action(settings?.enabled?'pause':'enable')} className={`${button} ${settings?.enabled?'':'bg-emerald-600'}`}>{busy?'Updating...':settings?.enabled?'Pause publishing':'Enable automatic publishing'}</button><button type="button" disabled={busy} onClick={()=>void action('check')} className={button}>Check publishing status</button></div>
     </div>
     <button type="button" disabled={busy} onClick={()=>void action('youtube')} className={`${button} mt-3`}>Use Facebook, TikTok and YouTube (Instagram manual)</button>
     <p className="mt-2 text-sm text-neutral-300">Approved posts stay editable here until their posting time, then NovelForge sends them to Buffer automatically. You can close this page. Pausing prevents new posts from starting; a post already being sent may finish.</p>
     {settings?.channels&&<p className="mt-2 text-xs text-emerald-300">{Object.entries(settings.channels).map(([platform,channel])=>`${platform}: ${channel.name}`).join(' · ')}</p>}
     {settings?.enabled&&next&&<p className="mt-2 text-sm">Next: {next.platform} · {new Date(next.scheduled_at!).toLocaleString('en-GB',{timeZone:'Europe/London',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} UK · {next.book_title}</p>}
-    {settings?.enabled&&settings.heartbeat_at&&Date.now()-Date.parse(settings.heartbeat_at)>15*60_000&&<p className="mt-2 text-sm text-amber-200">The publisher has not checked in recently. Pause and enable it again to restart.</p>}
+    {stale&&<p role="status" className="mt-2 text-sm text-amber-200">The publisher has not checked in recently. Automatic recovery checks every two minutes.</p>}
+    {recoveryStale&&<p role="status" className="mt-2 text-sm text-amber-200">The independent recovery check is overdue. Publishing may continue, but recovery monitoring needs attention.</p>}
     {(error||settings?.last_error)&&<p role="alert" className="mt-2 text-sm text-amber-200">{error||settings?.last_error}</p>}
     {entries.length>0&&<details className="mt-3" open={attention.length>0}><summary className="cursor-pointer text-sm font-semibold">Publishing history ({entries.filter(entry=>entry.state==='published').length} published{attention.length?`, ${attention.length} need attention`:''})</summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">{history.map(entry=>{const post=posts.find(post=>post.id===entry.post_id);return <div key={entry.post_id} className="rounded-lg border border-white/10 p-3 text-sm">

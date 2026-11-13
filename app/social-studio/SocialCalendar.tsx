@@ -26,6 +26,7 @@ const editable = (post: CalendarPost) => ['draft', 'approved'].includes(post.sta
 
 export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Book[]; seed: CalendarSeed | null; onSeedUsed: () => void }) {
   const [publishingEnabled,setPublishingEnabled] = useState(false);
+  const [publicationStates,setPublicationStates]=useState<Record<string,string>>({});
   const [posts, setPosts] = useState<CalendarPost[]>([]);
   const [start, setStart] = useState(() => londonDate());
   const [selected, setSelected] = useState(() => londonDate());
@@ -310,7 +311,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     const related = reviewOnly ? (reviewGroups.get(post.media_path || post.id) ?? [post]) : [post];
     return <article key={post.id} className="rounded-xl border border-white/10 bg-neutral-950 p-4">
       {reviewOnly && <p className="mb-2 text-sm font-semibold text-amber-200">{post.scheduled_at ? new Date(post.scheduled_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/London'}) : 'Undated draft'}</p>}
-      <div className="flex flex-wrap justify-between gap-2"><span className="font-semibold capitalize">{post.platform} · {post.scheduled_at ? londonTime(post.scheduled_at) : 'No date'}</span><span className="rounded-full bg-white/10 px-2 py-1 text-xs capitalize">{post.status==='approved'&&publishingEnabled?'Scheduled':post.status}</span></div>
+      <div className="flex flex-wrap justify-between gap-2"><span className="font-semibold capitalize">{post.platform} · {post.scheduled_at ? londonTime(post.scheduled_at) : 'No date'}</span><span className="rounded-full bg-white/10 px-2 py-1 text-xs capitalize">{publicationStates[post.id]==='attention'?'Needs attention':publicationStates[post.id]==='uncertain'?'Checking confirmation':post.status==='approved'&&publishingEnabled?'Scheduled':post.status}</span></div>
       <p className="mt-2 text-sm text-pink-300">{post.book_title || 'General reader post'} · {POST_LABELS[post.post_type]}</p>
       {reviewOnly && related.length > 1 && <p className="mt-2 text-sm text-neutral-400">Shared artwork: {related.map(item=>item.platform).join(', ')}. Each platform caption is listed below.</p>}
       {post.title && <h4 className="mt-2 font-semibold">{post.title}</h4>}
@@ -340,7 +341,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       <div><p className="text-xs font-semibold uppercase tracking-widest text-pink-400">Plan ahead</p><h2 id="calendar-title" className="mt-1 text-2xl font-bold">Your 30-day calendar</h2><p className="mt-2 text-sm text-neutral-400">Let your AI create the month, then review and approve its posts. Times are UK time. Approved posts publish automatically when automatic publishing is on.</p></div>
       <div className="flex gap-2"><button type="button" disabled={Boolean(editor) || saving || loading || planning || mediaBusy} onClick={() => { setEditor(fresh()); setConfirmDelete(false); setNotice(''); }} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400 disabled:opacity-40">Manual draft</button><button type="button" disabled={loading || saving || Boolean(editor) || planning || mediaBusy} onClick={() => void load()} className={buttonClass}>Refresh</button></div>
     </div>
-    <PublishingPanel posts={posts} onEnabledChange={setPublishingEnabled} onReload={()=>void load(true)} />
+    <PublishingPanel posts={posts} onEnabledChange={setPublishingEnabled} onStatesChange={setPublicationStates} onReload={()=>void load(true)} />
     <StrategyPanel books={books}/>
     <p className="mt-3 text-xs text-neutral-400">Timing tests, in UK time: Facebook 10 am / noon / 6 pm; TikTok 10 am / 6 pm / 8 pm; Instagram noon / 7 pm / 9 pm. These are balanced test slots, not proven audience peaks. New batches favour qualified winners while continuing to test alternatives. You can edit individual times.</p>
     <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-500/5 p-4">

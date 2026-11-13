@@ -6,9 +6,10 @@ export class BufferPublishError extends Error {
   retryAfter:number;
   constructor(message:string,kind:'retry'|'rejected'|'unknown',retryAfter=300){super(message);this.kind=kind;this.retryAfter=retryAfter;}
 }
-export type ProviderPost={id:string;status:string;channelId:string;text:string;createdAt:string;sentAt?:string;externalLink?:string;via?:string;assets:{source:string;mimeType:string}[];error?:{message:string;supportUrl?:string}};
+export type ProviderPost={id:string;status:string;channelId:string;text?:string;createdAt:string;sentAt?:string;externalLink?:string;via?:string;assets?:{source:string;mimeType:string}[];error?:{message:string;supportUrl?:string}};
 const fields='id status channelId text createdAt sentAt externalLink via assets { source mimeType } error { message supportUrl }';
-export async function bufferRequest<T>(document:string,variables:unknown={},mutating=false):Promise<T> {
+export type BufferGraphQLError={message?:string;path?:(string|number)[];extensions?:{code?:string}};
+export async function bufferEnvelope<T>(document:string,variables:unknown={},mutating=false):Promise<{data?:T;errors?:BufferGraphQLError[]}> {
   const key=process.env.BUFFER_API_KEY?.trim();
   if(!key) throw new BufferPublishError('BUFFER_API_KEY is missing from this deployment.','rejected');
   let response:Response;
@@ -17,8 +18,12 @@ export async function bufferRequest<T>(document:string,variables:unknown={},muta
   if(response.status===429) throw new BufferPublishError('Buffer rate-limited the request. Retrying automatically.','retry',Math.max(60,Math.min(3600,Number(response.headers.get('retry-after'))||300)));
   if([400,401,403,422].includes(response.status)) throw new BufferPublishError('Buffer rejected this request. Check the connection and API permissions.','rejected');
   if(!response.ok) throw new BufferPublishError('Buffer is temporarily unavailable.',mutating?'unknown':'retry');
-  let result:{data?:T;errors?:unknown[]};
+  let result:{data?:T;errors?:BufferGraphQLError[]};
   try {result=await response.json();}catch{throw new BufferPublishError('Buffer returned an unreadable response.',mutating?'unknown':'retry');}
+  return result;
+}
+export async function bufferRequest<T>(document:string,variables:unknown={},mutating=false):Promise<T> {
+  const result=await bufferEnvelope<T>(document,variables,mutating);
   if(result.errors?.length||!result.data) throw new BufferPublishError('Buffer could not confirm the operation. Check API permissions and the saved publishing error.',mutating?'unknown':'retry');
   return result.data;
 }
@@ -46,13 +51,19 @@ export function bufferPayload(post:CalendarPost,channel:BufferChannel,storageUrl
   return {channelId:channel.id,text,assets,metadata,mode:'shareNow',schedulingType:'automatic',needsApproval:false,saveToDraft:false,aiAssisted:generated,source:`novelforge:${post.id}`};
 }
 export async function createBufferPost(input:Record<string,unknown>):Promise<ProviderPost> {
-  const {createPost}=await bufferRequest<{createPost:{__typename:string;post?:ProviderPost;message?:string}}>(`mutation NovelForgeCreatePost($input:CreatePostInput!){ createPost(input:$input){__typename ... on PostActionSuccess {post{${fields}}} ... on MutationError {message}}}`,{input},true);
+  const envelope=await bufferEnvelope<{createPost:{__typename:string;post?:ProviderPost;message?:string}}>(`mutation NovelForgeCreatePost($input:CreatePostInput!){ createPost(input:$input){__typename ... on PostActionSuccess {post{id status channelId createdAt externalLink}} ... on MutationError {message}}}`,{input},true);
+  const createPost=envelope.data?.createPost;
+  // A provider reference survives warnings on optional fields. Never lose an
+  // accepted post ID or repeat its mutation because a decoration failed.
+  if(createPost?.post?.id&&createPost.post.channelId===input.channelId&&typeof createPost.post.status==='string')return createPost.post;
+  if(envelope.errors?.length||!createPost)throw new BufferPublishError('Buffer did not confirm acceptance. Checking history before any retry.','unknown');
   if(!createPost.post) throw new BufferPublishError((createPost.message||'Buffer rejected the post.').slice(0,1000),'rejected');
-  return createPost.post;
+  throw new BufferPublishError('Buffer returned an incomplete publication reference. Checking history before any retry.','unknown');
 }
 export async function readBufferPost(id:string):Promise<ProviderPost> {
-  const result=await bufferRequest<{post:ProviderPost}>(`query NovelForgePost($id:PostId!){post(input:{id:$id}){${fields}}}`,{id});
-  return result.post;
+  const result=await bufferEnvelope<{post:ProviderPost}>(`query NovelForgePost($id:PostId!){post(input:{id:$id}){id status channelId createdAt externalLink error{message supportUrl}}}`,{id});
+  if(result.data?.post?.id===id&&typeof result.data.post.status==='string')return result.data.post;
+  throw new BufferPublishError('Buffer could not read the current publication status.','retry');
 }
 export async function deleteBufferDraft(id:string) {
   const {deletePost}=await bufferRequest<{deletePost:{__typename:string;message?:string}}>('mutation NovelForgeDeleteDraft($id:PostId!){deletePost(input:{id:$id}){__typename ... on MutationError {message}}}',{id},true);
@@ -65,6 +76,6 @@ export async function recentBufferPosts(organizationId:string,channelId:string,s
 }
 export function matchingBufferPosts(posts:ProviderPost[],payload:any,since:string) {
   const sources=(payload.assets??[]).map(asset=>(asset.video??asset.image)?.url).sort();
-  return posts.filter(post=>post.channelId===payload.channelId&&post.text===payload.text&&post.via==='api'&&post.status!=='draft'&&Date.parse(post.createdAt)>=Date.parse(since)&&JSON.stringify((post.assets??[]).map(asset=>asset.source).sort())===JSON.stringify(sources));
+  return posts.filter(post=>post.channelId===payload.channelId&&post.text===payload.text&&post.via==='api'&&post.status!=='draft'&&Date.parse(post.createdAt)>=Date.parse(since)&&Date.parse(post.createdAt)<=Date.parse(since)+11*60_000&&JSON.stringify((post.assets??[]).map(asset=>asset.source).sort())===JSON.stringify(sources));
 }
 

@@ -10,7 +10,7 @@ export async function GET(request:Request){
  try{
   const db=jobAdmin();const [preferences,state]=await Promise.all([
    db.from('social_strategy_settings').select('settings').eq('user_id',user.id).maybeSingle(),
-   db.from('social_learning_state').select('status,last_started_at,last_collected_at,next_collect_at,last_error,report').eq('user_id',user.id).maybeSingle(),
+   db.from('social_learning_state').select('status,last_started_at,last_collected_at,next_collect_at,last_error,report,coverage').eq('user_id',user.id).maybeSingle(),
   ]);
   if(preferences.error||state.error)throw Error('The social strategy could not be loaded.');
   return jobJson({settings:cleanStrategy(preferences.data?.settings),state:state.data});
