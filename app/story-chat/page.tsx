@@ -17,7 +17,7 @@ import { supabase } from "../../lib/supabaseClient";
 
 import ChatPanel from "./components/ChatPanel";
 import ChapterGuidanceCard from "./components/ChapterGuidanceCard";
-import { chapterGuidanceSourceKey, requestsChapterGuidance, revisesChapterGuidance, parkChapterDraft, withoutChapterGuidance, discardsChapterGuidance } from "../../lib/chapter-guidance";
+import { chapterGuidanceSourceKey, matchesChapterGuidanceSource, requestsChapterGuidance, revisesChapterGuidance, parkChapterDraft, withoutChapterGuidance, discardsChapterGuidance } from "../../lib/chapter-guidance";
 
 import ChapterPanel from "./components/ChapterPanel";
 import ManuscriptReviewPanel from "./components/ManuscriptReviewPanel";
@@ -1829,11 +1829,11 @@ device.`,
     guidanceConfirmInFlight.current = true;
     setIsThinking(true);
     try {
-      if (await chapterGuidanceSourceKey(current) !== draft.sourceKey) throw new Error("The story changed after this guidance was drafted. Ask chat to refresh the guidance before confirming.");
+      if (!await matchesChapterGuidanceSource(current, draft.sourceKey)) throw new Error("The story changed after this guidance was drafted. Ask chat to refresh the guidance before confirming.");
       // Check the saved source too, so a second device's newer edits are not overwritten.
       const { data: remote, error } = await supabase.from("stories").select("form,chapters,story_state").eq("id", current.id).eq("user_id", userId).single();
       if (error || !remote) throw new Error("The saved story could not be checked. Your guidance is preserved.");
-      if (await chapterGuidanceSourceKey({ ...current, storyBible: remote.form, chapters: remote.chapters ?? [], storyState: remote.story_state ?? {} }) !== draft.sourceKey) throw new Error("The saved story changed on another device. Reopen it and refresh the guidance before confirming.");
+      if (!await matchesChapterGuidanceSource({ ...current, storyBible: remote.form, chapters: remote.chapters ?? [], storyState: remote.story_state ?? {} }, draft.sourceKey)) throw new Error("The saved story changed on another device. Reopen it and refresh the guidance before confirming.");
       const { chapterGuidanceDraft: _draft, ...state } = current.storyState;
       const approved: StoryWorkspace = { ...current, storyState: { ...state, parkedChapterDrafts: parkChapterDraft(current, pendingGeneration) },
         messages: [...current.messages, { id: Date.now(), role: "user", content: text }], updatedAt: new Date().toISOString() };
@@ -2923,7 +2923,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
             {currentDiagnostics.length > 0 && (
               <details className="mb-2 text-xs text-neutral-400">
                 <summary className="cursor-pointer font-medium text-neutral-300">
-                  Generation details
+                  Generation details, AION scene-writing calls: {currentDiagnostics.filter(d => d.stage === "aion_automatic_intimacy_scene").length}
                 </summary>
 
                 <div className="mt-2 max-h-32 space-y-2 overflow-y-auto rounded-xl border border-white/10 bg-neutral-900 p-3">
@@ -2936,7 +2936,7 @@ transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-50"
                           : "text-neutral-400"
                       }
                     >
-                      {diagnostic.stage.replaceAll("_", " ")},{" "}
+                      {diagnostic.stage === "aion_automatic_intimacy_scene" ? "AION scene writing" : diagnostic.stage.replaceAll("_", " ")}, {diagnostic.model},{" "}
                       {diagnostic.status ?? "succeeded"},{" "}
                       {diagnostic.totalTokens.toLocaleString()} tokens,{" "}
                       {(diagnostic.durationMs / 1000).toFixed(1)} seconds,{" "}

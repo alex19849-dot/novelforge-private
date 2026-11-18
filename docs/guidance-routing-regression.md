@@ -1,0 +1,13 @@
+# Guidance source and specialist assignment regression, 18 November 2026
+
+The style-learning release added a temporary authorStyleContext field to the planner's workspace. Guidance was hashed before that field was removed on save, so even an empty field made the same saved story appear changed. Reproduced against the saved Naughty by Nature Chapter 10 guidance: the stored source key exactly matched the unchanged source plus authorStyleContext="", and did not match the saved source without it.
+
+chapterSourceFingerprint now excludes this transport-only context along with diagnostics and workspace metadata. matchesChapterGuidanceSource also accepts the exact old hash for the same unchanged source with the temporary field, allowing existing affected guidance to be confirmed without another model call. Both local and saved-source checks remain; actual chapter, Bible and continuity changes still reject old guidance.
+
+The saved Chapter 6 and 8 contracts contained a required specialist scene but null writer assignments. The planner's instructions overemphasised explicit AION/EXPLICIT labels. The writer treated every null assignment as authoritative, so these requests silently stayed with the main writer. Chapter 5 had an explicit AION heading and its diagnostics confirm an automatic AION call. Chapter 7 and 9 guidance deliberately did not require a full scene; those remain ordinary assignments.
+
+New routedSpecialistBeats recovers affirmative requested specialist work from the beat itself, preserving explicit assignments and rejecting negated/optional mentions. It runs when preparing new contracts and when reading older saved contracts in the writer. It does not invent scenes or revise accepted prose. The existing marker handoff and provider calls remain unchanged. The planner instruction clarifies that the work requested determines assignment even without a model-name heading.
+
+Generation details now shows the number of AION scene-writing calls in the summary and the actual model on each stage line, distinguishing planning from writing.
+
+Validation: actual saved guidance hash reproduced and accepted by compatibility check; changing real manuscript content rejects it. Saved contracts 5/6/8 resolve one specialist assignment each; 7/9 resolve none. Actual writer POST with a mistakenly null assignment produces a main-writer marker, one mocked AION fill, unchanged surrounding prose and the separate AION scene diagnostic. Neutral mock output only. Full Next production build/typecheck passes. No paid calls, source manuscripts, pending drafts, database rows or model settings changed during the fix. Private fixtures remain local and are not committed.

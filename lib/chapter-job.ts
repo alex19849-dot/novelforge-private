@@ -14,7 +14,7 @@ export type ChapterJobInput = {
 // Ignore transport-only metadata, but never silently overwrite changed prose,
 // Bible, or continuity. Sorting makes JSON object key order irrelevant.
 export function chapterSourceFingerprint(story: StoryWorkspace): string {
-  const { workspaceMetadata: _metadata, lastGenerationDiagnostics: _diagnostics, ...state } = story.storyState as Record<string, unknown>;
+  const { workspaceMetadata: _metadata, lastGenerationDiagnostics: _diagnostics, authorStyleContext: _styleContext, ...state } = story.storyState as Record<string, unknown>;
   const sort = (value: unknown): unknown => Array.isArray(value)
     ? value.map(sort)
     : value && typeof value === 'object'

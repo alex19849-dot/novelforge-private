@@ -5,6 +5,7 @@ import { PROSE_BALANCE_INSTRUCTION } from "../../../lib/prose-writer";
 import OpenAI from "openai";
 import { isStoryBibleRequest, parseStoryBibleImport, requestsNewBibleWorkspace, bibleOutputAllowance } from "../../../lib/story-bible-request";
 import { createAionBibleEdit } from "../../../lib/aion-story-bible";
+import { routedSpecialistBeats } from "../../../lib/specialist-routing";
 import { requestStyleContext } from "../../../lib/author-style-server";
 import { getStoryStateBeforeChapter as historicalStoryState } from "../../story-chat/generation";
 import { narrativeContext, type MemoryQuery } from "../../../lib/narrative-memory";
@@ -1654,7 +1655,7 @@ ORDERED REQUIRED BEATS
 Every required beat must include specialistWriter: "aion" or null. This is a
 routing field, separate from the prose instruction. Preserve the author's
 explicit per-beat specialist labels in this field: a beat labelled EXPLICIT or
-AION is assigned "aion". All ordinary beats are null. Read the original author
+AION is assigned "aion". A requested on-page sexual scene or specified sexual act also requires "aion" even without an AION or EXPLICIT heading. Never assign such a required scene null merely because the author did not supply a specialist label. Ordinary kissing, affectionate contact, negated scenes and optional possibilities do not by themselves require an assignment. All ordinary beats are null. Read the original author
 guidance when assigning the field, not just your paraphrased instruction. If
 one labelled beat contains several requested actions, keep all of those actions
 in ONE required beat, in their supplied order. Do not subdivide a continuous
@@ -3390,7 +3391,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
           )
             ? directOutput.sectionBrief.requiredBeats
             : [];
-          const requiredBeats = readAuthorLabelledBeats(latestMessage) ?? rawRequiredBeats
+          const requiredBeats = routedSpecialistBeats(readAuthorLabelledBeats(latestMessage) ?? rawRequiredBeats
             .filter(
               (beat) =>
                 Boolean(beat) &&
@@ -3407,7 +3408,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
               beat.approximateWordTarget > 0
                 ? { approximateWordTarget: beat.approximateWordTarget }
                 : {}),
-            }));
+            })));
           const returnedTarget = directOutput.sectionBrief?.targetWordRange;
           const returnedMinimum = Number(returnedTarget?.minimum);
           const returnedPreferred = Number(returnedTarget?.preferred);

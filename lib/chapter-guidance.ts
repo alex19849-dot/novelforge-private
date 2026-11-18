@@ -14,6 +14,20 @@ export async function chapterGuidanceSourceKey(story: StoryWorkspace): Promise<s
   return Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Compatibility for guidance drafted during the temporary-style-context regression.
+// Accept only the exact historical hash of this same source, never a changed book.
+export async function matchesChapterGuidanceSource(story: StoryWorkspace, expected: string): Promise<boolean> {
+  if (await chapterGuidanceSourceKey(story) === expected) return true;
+  const { chapterGuidanceDraft: _draft, parkedChapterDrafts: _parked, ...state } = story.storyState;
+  const source = JSON.parse(chapterSourceFingerprint({...story,storyState:state}));
+  source.state.authorStyleContext = story.storyState.authorStyleContext ?? '';
+  const sort = (value: unknown): unknown => Array.isArray(value) ? value.map(sort)
+    : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([,v])=>v!==undefined).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,sort(v)])) : value;
+  const digest = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(sort(source))));
+  const legacy = Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+  return legacy === expected;
+}
+
 export function parkChapterDraft(story: StoryWorkspace, pending: import('../app/story-chat/generation').PendingChapterGeneration | null | undefined) {
   const parked = story.storyState.parkedChapterDrafts ?? [];
   if (!pending || pending.storyId !== story.id || !pending.draft.trim()) return parked;
@@ -42,4 +56,5 @@ export function withoutChapterGuidance(story: StoryWorkspace): StoryWorkspace {
 export function discardsChapterGuidance(message: string): boolean {
   return /^(?:please\s+)?(?:discard|delete|clear|remove|scrap)\s+(?:(?:the|this|current)\s+)*(?:chapter\s+)?(?:guidance|guidence|outline|plan)[.!\s]*$/i.test(message.trim());
 }
+
 

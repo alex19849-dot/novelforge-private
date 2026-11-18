@@ -1,5 +1,6 @@
 // NovelForge original-voice restoration with targeted realism safeguards.
 import OpenAI from "openai";
+import { routedSpecialistBeats } from "../../../../lib/specialist-routing";
 import { selectedProseWriter, proseCostEstimate, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 import { priorProseContext, PROSE_HISTORY_LIMIT } from "../../../../lib/prose-history";
@@ -198,7 +199,7 @@ function explicitSpecialistScenes(
     /\b(?:explicit|graphic|open[ -]door|on[ -]page sex|sex scene|hate sex|rough sex|full sex|oral sex|anal sex|blow[ -]?job|hand[ -]?job|penetrat(?:e|es|ed|ing|ion|ive)|orgasm|climax(?:es|ed|ing)?|masturbat\w*|wank\w*|jerk(?:ing|s|ed)?\s+(?:each other\s+)?off|perking\s+off|hands?\s+(?:inside|down)\s+(?:his|their|the|each other's)?\s*boxers|(?:get|gets|getting)\s+each other off)\b/i;
   const negativePattern =
     /\b(?:do not depict (?:intimacy|sexual contact)|no sexual contact)\b/i;
-  const beats = sectionBrief.requiredBeats ?? [];
+  const beats = routedSpecialistBeats(sectionBrief.requiredBeats ?? []);
   const originalGuidance = sectionBrief.originalGuidance || latestUserMessage;
   const guidanceRequestsExplicit = explicitPattern.test(originalGuidance);
   const sexualBeatPattern =
@@ -1209,7 +1210,7 @@ export async function POST(request: Request) {
     const sectionInstruction = cleanString(body.sectionInstruction) || sectionBrief.continuationGuidance || "";
     const writer = selectedProseWriter(body.storyState, sectionInstruction);
     const assignedScenes = explicitSpecialistScenes(sectionBrief, latestUserMessage);
-    const finalBeat = sectionBrief.requiredBeats?.at(-1);
+    const finalBeat = routedSpecialistBeats(sectionBrief.requiredBeats ?? []).at(-1);
     const terminalScene = finalBeat?.specialistWriter !== null
       ? assignedScenes.find((scene) => scene.instruction === finalBeat?.instruction)
       : undefined;
