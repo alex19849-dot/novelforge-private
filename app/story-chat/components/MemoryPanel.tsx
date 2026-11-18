@@ -1,5 +1,6 @@
 "use client";
 
+import AuthorStylePanel from "./AuthorStylePanel";
 import { useMemo, useState } from "react";
 import type { StoryWorkspace } from "../types";
 import { MEMORY_KINDS, MEMORY_STATUSES, memoryBuildEstimate, memoryCoverage, projectNarrativeMemory, type MemoryCorrection, type MemoryKind, type MemoryStatus } from "../../../lib/narrative-memory";
@@ -30,6 +31,7 @@ export default function MemoryPanel({ story, busy, onCorrections, onBuild }: Pro
   const buttonClass = "rounded-lg border border-white/15 px-3 py-2 text-sm disabled:opacity-40";
   return <section className="flex-1 overflow-y-auto px-4 py-6 pb-32 text-neutral-200 sm:px-6">
     <div className="mx-auto max-w-5xl space-y-5">
+      <AuthorStylePanel story={story} busy={busy} />
       <header><h2 className="text-2xl font-semibold text-white">Narrative memory</h2><p className="mt-2 text-sm text-neutral-400">Accepted manuscript history, separate from the Story Bible. Your corrections take precedence over extraction.</p></header>
       <div className="rounded-xl border border-white/10 p-4">
         <p>{coverage.complete} of {coverage.total} chapters have current, source-backed memory.</p>
@@ -71,3 +73,4 @@ export default function MemoryPanel({ story, busy, onCorrections, onBuild }: Pro
     </div>
   </section>;
 }
+

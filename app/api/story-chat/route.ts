@@ -5,6 +5,7 @@ import { PROSE_BALANCE_INSTRUCTION } from "../../../lib/prose-writer";
 import OpenAI from "openai";
 import { isStoryBibleRequest, parseStoryBibleImport, requestsNewBibleWorkspace, bibleOutputAllowance } from "../../../lib/story-bible-request";
 import { createAionBibleEdit } from "../../../lib/aion-story-bible";
+import { requestStyleContext } from "../../../lib/author-style-server";
 import { getStoryStateBeforeChapter as historicalStoryState } from "../../story-chat/generation";
 import { narrativeContext, type MemoryQuery } from "../../../lib/narrative-memory";
 import { assertChapterPlanSchema, createAionChapterPlan } from "../../../lib/aion-chapter-planner";
@@ -2212,6 +2213,7 @@ export async function POST(request: Request) {
     const parsedBody = parseRequestBody(rawBody);
 
     const currentStory = parsedBody?.story;
+    if (currentStory) currentStory.storyState = {...currentStory.storyState, authorStyleContext: await requestStyleContext(request, (rawBody as {authorStyleContext?:unknown}).authorStyleContext)};
     const requestStage = parsedBody?.stage ?? "complete";
     const chatOnly = parsedBody?.chatOnly ?? false;
     const draftContext = parsedBody?.draftContext ?? "";
@@ -3792,6 +3794,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     );
   }
 }
+
 
 
 

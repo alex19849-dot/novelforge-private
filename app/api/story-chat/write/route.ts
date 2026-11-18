@@ -29,6 +29,7 @@ const openrouter = new OpenAI({
 type SectionAction = "start" | "continue" | "rewrite";
 
 type WriterRequest = {
+  authorStyleContext?: unknown;
   phase?: unknown;
   storyBible?: unknown;
   storyState?: unknown;
@@ -1199,8 +1200,10 @@ export async function POST(request: Request) {
     const chapterDraft = cleanString(body.chapterDraft);
     const sectionToRewrite = cleanString(body.sectionToRewrite);
     const sectionBrief = readSectionBrief(chapterBrief);
-    const priorWritingContext = cleanString(body.priorWritingContext).slice(0, PROSE_HISTORY_LIMIT)
-      || priorProseContext(body.recentChapters, body.storyState, { beforeChapter: sectionBrief.chapterNumber, pov: povCharacter });
+    const priorWritingContext = [
+      cleanString(body.priorWritingContext).slice(0, PROSE_HISTORY_LIMIT) || priorProseContext(body.recentChapters, body.storyState, { beforeChapter: sectionBrief.chapterNumber, pov: povCharacter }),
+      cleanString(body.authorStyleContext).slice(0,6500),
+    ].filter(Boolean).join("\n\n");
     const latestUserMessage = cleanString(body.latestUserMessage);
     const phase = cleanString(body.phase);
     const sectionInstruction = cleanString(body.sectionInstruction) || sectionBrief.continuationGuidance || "";
@@ -1555,6 +1558,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 
 

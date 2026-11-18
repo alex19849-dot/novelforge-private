@@ -1,4 +1,5 @@
 "use client";
+import { recordStyleCorrection } from "../../lib/author-style-client";
 import { bounded, readStoryLibrary, type LibrarySession } from "../../lib/story-library-client";
 
 import { requestsChapterGeneration, continuesPendingChapter } from "../../lib/chapter-request";
@@ -1341,8 +1342,9 @@ device.`,
     passageRewriteBusy.current = true;
     setIsThinking(true);
     try {
+      const {data:{session:styleSession}} = await activeLibrarySession();
       const response = await fetch("/api/story-chat/rewrite", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...(styleSession?{Authorization:`Bearer ${styleSession.access_token}`}:{}) },
         body: JSON.stringify({
           chapterContent: request.sourceContent,
           passage: request.passage, passageRange: request.range, instruction: request.instruction,
@@ -1396,6 +1398,7 @@ device.`,
       localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStory));
       setStory(nextStory);
       // Existing story and draft effects sync these edits to the signed-in account.
+      if (!isDraft) void recordStyleCorrection({storyId:sourceStory.id,chapterId:request.chapterId,before:request.sourceContent,after:content,instruction:request.instruction},setBackgroundNotice);
       return { content };
     } finally {
       passageRewriteBusy.current = false;
@@ -1422,6 +1425,10 @@ device.`,
         currentStoryRef.current = next;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
         setStory(next);
+        const targetId = data.undo?.target.chapterId ?? (body.undo as ReviewFixUndo | undefined)?.target.chapterId;
+        const before = source.chapters.find(c=>c.id===targetId)?.content;
+        const after = next.chapters.find(c=>c.id===targetId)?.content;
+        if (targetId && before !== undefined && after !== undefined) void recordStyleCorrection({storyId:source.id,chapterId:targetId,before,after},setBackgroundNotice);
       }
       return { undo: data.undo, diagnostic: data.diagnostic };
     } finally { passageRewriteBusy.current = false; setIsThinking(false); }
@@ -1452,6 +1459,7 @@ device.`,
     currentStoryRef.current = next;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setStory(next);
+    if (!draft) void recordStyleCorrection({storyId:source.id,chapterId:undo.chapterId,before:current,after:content,instruction:"Undo previous rewrite"},setBackgroundNotice);
   }
 
   function updateChapter(
@@ -1465,6 +1473,9 @@ device.`,
       content: string;
     },
   ) {
+    const source = currentStoryRef.current;
+    const previous = source?.chapters.find(c => c.id === chapterId);
+    if (source && previous) void recordStyleCorrection({storyId:source.id,chapterId,before:previous.content,after:updates.content},setBackgroundNotice);
     setStory((currentStory) => {
       if (!currentStory) {
         return currentStory;
@@ -1671,6 +1682,9 @@ device.`,
   }
 
   async function persistStory(nextStory: StoryWorkspace) {
+    // Shared preferences are loaded afresh, not retained as stale book canon.
+    nextStory = {...nextStory,storyState:{...nextStory.storyState}};
+    delete nextStory.storyState.authorStyleContext;
     if (userId && !hasLoadedRemoteStory) throw new Error("Reconnect your saved stories before saving. The server copy is protected.");
     setStory(nextStory);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStory));
@@ -2076,8 +2090,9 @@ device.`,
         (Boolean(requestStory.storyState.chapterGuidanceDraft) && revisesChapterGuidance(trimmedMessage))
       );
       if (wantsGuidance) {
+        const {data:{session:styleSession}} = await activeLibrarySession();
         const response = await fetch("/api/story-chat", {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST", headers: { "Content-Type": "application/json", ...(styleSession?{Authorization:`Bearer ${styleSession.access_token}`}:{}) },
           body: JSON.stringify({ story: requestStory, stage: "plan", guidanceOnly: true }),
         });
         const data = await readApiJson(response);
@@ -2228,10 +2243,12 @@ device.`,
         return;
       }
 
+      const {data:{session:styleSession}} = await activeLibrarySession();
       const response = await fetch("/api/story-chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...(styleSession?{Authorization:`Bearer ${styleSession.access_token}`} : {}),
         },
         body: JSON.stringify({
           stage: "plan",
@@ -2987,6 +3004,7 @@ disabled:opacity-40"
     </main>
   );
 }
+
 
 
 

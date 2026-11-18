@@ -1,3 +1,4 @@
+import { approvedStyleFor } from '../../../../lib/author-style-server';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import { start, getRun } from 'workflow/api';
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
     if (error || !saved) return json({ error: 'This story could not be found in your account. Save it before generating.' }, 404);
     const remote = { storyBible: saved.form, chapters: saved.chapters ?? [], storyState: saved.story_state ?? {} } as StoryWorkspace;
     if (chapterSourceFingerprint(remote) !== body.sourceFingerprint) return json({ error: 'This story changed on another device. Reopen it before generating so newer edits are preserved.' }, 409);
+    input.authorStyleContext = await approvedStyleFor(user.id);
     const { error: insertError } = await db.from('story_generation_jobs').insert({ id: body.id, story_id: input.story.id, user_id: user.id, input, source_updated_at: saved.updated_at, status: 'generating' });
     if (insertError) return json({ error: insertError.code === '23505' ? 'This story already has a chapter job starting. Reopen it to see progress.' : 'The chapter job could not be saved.' }, 409);
     ownedJob = body.id;
@@ -86,4 +88,5 @@ export async function GET(request: Request) {
     return json({ job: job ? summary : null });
   } catch (error) { return json({ error: error instanceof Error ? error.message : 'Chapter progress could not be loaded.' }, 503); }
 }
+
 

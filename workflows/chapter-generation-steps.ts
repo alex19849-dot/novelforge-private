@@ -100,9 +100,10 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
         }
       }
     } else if (state.phase === 'plan') {
-      const data = await readApiJson(await planChapter(request({ stage: 'plan', story: state.story, chatOnly: false }))) as StoryChatResponse;
+      const data = await readApiJson(await planChapter(request({ stage: 'plan', story: state.story, chatOnly: false, authorStyleContext: input.authorStyleContext ?? '' }))) as StoryChatResponse;
       if (!data.story || !Array.isArray(data.story.chapters)) throw new Error('The planner returned an invalid workspace.');
       state.story = data.story;
+      delete state.story.storyState.authorStyleContext;
       state.diagnostics.push(...(data.diagnostics ?? []));
       if (!data.generatedChapter) state.phase = 'ready';
       else {
@@ -127,7 +128,7 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       }
       const replacement = pending.generatedChapter.replaceChapterNumber;
       const data = await readApiJson(await writeChapter(request({
-        ...(specialist ? { phase: 'fill_specialist' } : {}), action,
+        ...(specialist ? { phase: 'fill_specialist' } : {}), action, authorStyleContext: input.authorStyleContext ?? '',
         storyBible: state.story.storyBible, storyState: getStoryStateBeforeChapter(state.story.storyState, replacement),
         recentChapters: (replacement === null ? state.story.chapters : state.story.chapters.filter(chapter => chapter.number < replacement)).slice(-2),
         priorWritingContext: priorProseContext(state.story.chapters, state.story.storyState, { beforeChapter: replacement ?? undefined, pov: pending.generatedChapter.povCharacter }),
@@ -222,6 +223,7 @@ export async function failChapterJob(id: string, message: string) {
   const { error: persistError } = await jobAdmin().rpc('finish_story_generation_job', { p_job_id: id });
   if (persistError) await jobAdmin().from('story_generation_jobs').update({ status: 'failed' }).eq('id', id).eq('status', 'generating');
 }
+
 
 
 

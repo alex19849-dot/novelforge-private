@@ -288,6 +288,8 @@ export type GenerationDiagnostic = {
 };
 
 export type StoryState = {
+  /** Bounded account-approved preferences carried as prompt context, never story canon. */
+  authorStyleContext?: string;
   /** Unfinished work retained when approved guidance starts a different draft. */
   parkedChapterDrafts?: Array<{ id: string; parkedAt: string; pending: PendingChapterGeneration }>;
   /** Author-facing proposal, never completed canon or a writing contract. */
@@ -367,6 +369,7 @@ export type StoryChatResponse = {
   /** A separately saved book seeded from the current story. */
   createdStory?: StoryWorkspace | null;
 };
+
 
 
 

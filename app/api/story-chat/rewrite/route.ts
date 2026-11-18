@@ -2,6 +2,7 @@ import { selectPassageEditor, passageEditCost } from "../../../../lib/passage-ed
 import { selectedProseWriter, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
+import { requestStyleContext } from "../../../../lib/author-style-server";
 import { NextResponse } from "next/server";
 import type { GenerationDiagnostic } from "../../../story-chat/types";
 import { findPassageRange, passageWriter } from "../../../story-chat/passageRewrite";
@@ -79,7 +80,9 @@ export async function POST(request: Request) {
     if (!(isAion ? process.env.OPENROUTER_API_KEY : process.env.OPENAI_API_KEY)) {
       return NextResponse.json({ error: `${isAion ? "OPENROUTER_API_KEY" : "OPENAI_API_KEY"} is not configured.`, diagnostics }, { status: 500 });
     }
+    const authorStyleContext = await requestStyleContext(request);
     const prompt = [
+      authorStyleContext,
       PROSE_BALANCE_INSTRUCTION,
       TEXT_MESSAGE_INSTRUCTION,
       DIRECT_THOUGHT_INSTRUCTION,
@@ -157,6 +160,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message, diagnostics }, { status: called ? 502 : 400 });
   }
 }
+
 
 
 

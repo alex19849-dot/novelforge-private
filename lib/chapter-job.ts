@@ -3,6 +3,7 @@ import type { PendingChapterGeneration, SectionAction } from '../app/story-chat/
 
 export type ChapterJobInput = {
   story: StoryWorkspace;
+  authorStyleContext?: string;
   pending?: PendingChapterGeneration;
   operation: 'generate' | 'write' | 'complete' | 'memory';
   memoryBuildApproved?: boolean;
@@ -21,4 +22,5 @@ export function chapterSourceFingerprint(story: StoryWorkspace): string {
       : value;
   return JSON.stringify(sort({ bible: story.storyBible, chapters: story.chapters, state }));
 }
+
 

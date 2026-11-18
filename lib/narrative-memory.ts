@@ -211,6 +211,8 @@ export function narrativeContext(value: unknown, query: MemoryQuery = {}): Recor
   }
   if (JSON.stringify(result).length > budget) result.currentScene = null;
   while (JSON.stringify(result).length > budget && String(result.relevantStoryMemory).length > 100) result.relevantStoryMemory = String(result.relevantStoryMemory).slice(0, Math.floor(String(result.relevantStoryMemory).length * 0.8));
+  // Preferences have their own bound; never displace story continuity to fit them.
+  if (state.authorStyleContext) result.authorStyleContext = text(state.authorStyleContext).slice(0,6500);
   return result;
 }
 
@@ -221,4 +223,5 @@ export function memoryBuildEstimate(chapters: StoryChapter[]): { lowUsd: number;
   // structured extraction output vary. Display uncertainty before starting.
   return { lowUsd: (inputTokens * 1.25 + chapters.length * 1200 * 7.5) / 1e6, highUsd: (inputTokens * 2 * 1.25 + batches * 32000 * 7.5) / 1e6, batches };
 }
+
 

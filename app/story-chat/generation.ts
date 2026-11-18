@@ -154,6 +154,7 @@ export function getStoryStateBeforeChapter(
 
   return {
     ...EMPTY_STORY_STATE,
+    authorStyleContext: state.authorStyleContext,
     memoryCorrections: (state.memoryCorrections ?? []).filter(correction => correction.chapterNumber < replacementNumber),
     importantFacts: unique(earlierLedger.flatMap((entry) => entry.newFacts)),
     relationshipStates: previousChapter?.relationshipShift
@@ -622,5 +623,6 @@ export function applyGeneratedChapter(
     updatedAt: now,
   };
 }
+
 
 
