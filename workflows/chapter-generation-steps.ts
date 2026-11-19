@@ -126,7 +126,7 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
         pending = { ...pending, chapterBrief: JSON.stringify({ ...brief, continuationGuidance: input.sectionInstruction.trim() }) };
         state.pending = pending;
       }
-      const replacement = pending.generatedChapter.replaceChapterNumber;
+      const replacement = pending.generatedChapter.kind === 'prologue' ? 0 : pending.generatedChapter.replaceChapterNumber;
       const data = await readApiJson(await writeChapter(request({
         ...(specialist ? { phase: 'fill_specialist' } : {}), action, authorStyleContext: input.authorStyleContext ?? '',
         storyBible: state.story.storyBible, storyState: getStoryStateBeforeChapter(state.story.storyState, replacement),
@@ -154,7 +154,7 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       const pending = state.pending!;
       const override = pending.qualityOverrideReady === true && pending.qualityCheckedDraft === pending.draft;
       if (!override) {
-        const data = await readApiJson(await reviewChapter(request({ storyBible: state.story.storyBible, storyState: getStoryStateBeforeChapter(state.story.storyState, pending.generatedChapter.replaceChapterNumber), chapterBrief: pending.chapterBrief, chapterTitle: pending.generatedChapter.title, povCharacter: pending.generatedChapter.povCharacter, chapterContent: pending.draft, minimumWordCount: pending.minimumWordCount, maximumWordCount: pending.maximumWordCount })));
+        const data = await readApiJson(await reviewChapter(request({ storyBible: state.story.storyBible, storyState: getStoryStateBeforeChapter(state.story.storyState, pending.generatedChapter.kind === 'prologue' ? 0 : pending.generatedChapter.replaceChapterNumber), chapterBrief: pending.chapterBrief, chapterTitle: pending.generatedChapter.title, povCharacter: pending.generatedChapter.povCharacter, chapterContent: pending.draft, minimumWordCount: pending.minimumWordCount, maximumWordCount: pending.maximumWordCount })));
         if (!isQualityResponse(data)) throw new Error('The quality worker returned an invalid review.');
         state.diagnostics.push(...data.diagnostics);
         if (!data.accepted || data.quality.findings.length) {
@@ -164,10 +164,10 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
           return true;
         }
       }
-      const replacement = pending.generatedChapter.replaceChapterNumber;
+      const replacement = pending.generatedChapter.kind === 'prologue' ? 0 : pending.generatedChapter.replaceChapterNumber;
       const before = state.story;
       const completed = applyGeneratedChapter(before, pending, pending.draft);
-      const number = replacement ?? Math.max(0, ...before.chapters.map(chapter => chapter.number)) + 1;
+      const number = pending.generatedChapter.kind === 'prologue' ? 0 : replacement ?? Math.max(0, ...before.chapters.map(chapter => chapter.number)) + 1;
       const rebuild = !before.storyState.chapterLedger?.length || replacement !== null && replacement < Math.max(0, ...before.chapters.map(chapter => chapter.number));
       state.story = completed;
       state.ledgerBatches = rebuild ? ledgerBatches(completed.chapters) : [[completed.chapters.find(chapter => chapter.number === number)!]];

@@ -1,3 +1,5 @@
+import { requestedSpecialSection } from './story-section';
+import { getStoryStateBeforeChapter } from '../app/story-chat/generation';
 import { isGuidanceProposal } from './chapter-guidance';
 import type { StoryWorkspace } from '../app/story-chat/types';
 import { createAionChapterPlan, assertChapterPlanSchema } from './aion-chapter-planner';
@@ -5,14 +7,14 @@ import { createAionChapterPlan, assertChapterPlanSchema } from './aion-chapter-p
 export const CHAPTER_GUIDANCE_PROMPT = `You draft detailed chapter guidance for an author's review, not novel prose and not an approved chapter contract. Return JSON with guidance and question strings. If a crucial author decision is missing, leave guidance empty and ask one focused question. Otherwise leave question empty.
 Use this readable plain-text format, with normal line breaks, no code fences, tables or long dashes:
 WRITE CHAPTER [number] (use REWRITE CHAPTER only when the author explicitly requests replacing a saved chapter)
-For an epilogue, use WRITE EPILOGUE (or REWRITE EPILOGUE) instead. Keep the same POV, TIME, continuity and ending fields.
+For a prologue or epilogue, use WRITE PROLOGUE / WRITE EPILOGUE (or REWRITE) instead. A prologue precedes Chapter 1 and must not assume later events have already happened. An epilogue follows the main story. Keep the same POV, TIME, continuity and ending fields.
 POV: [established character and tense]
 TIME: [placement relative to the preceding chapter]
 
 PURPOSE
 A specific paragraph describing what this chapter changes for the leads.
 
-CONTINUITY FROM CHAPTER [previous number] (for Chapter 1, use CONTINUITY FROM STORY BIBLE)
+CONTINUITY FROM CHAPTER [previous number] (for Chapter 1 or a prologue, use CONTINUITY FROM STORY BIBLE)
 - Relevant established facts and practical agreements the writer must preserve.
 
 [DESCRIPTIVE SCENE HEADING]
@@ -33,33 +35,35 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
   // to rewrite it, or reject it because it uses the author's own scene headings.
   const latest = story.messages.at(-1);
   const supplied = latest?.role === 'user' ? latest.content.trim() : '';
-  const suppliedHeadings = [/^(?:RE)?WRITE CHAPTER \d+\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^(?:ENDING|ENDPOINT)\s*:?\s*$/im];
-  // Epilogues use an unnumbered heading and often put the endpoint in a
+  const suppliedHeadings = [/^(?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE)\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^(?:ENDING|ENDPOINT)\s*:?\s*$/im];
+  // Prologues and epilogues use an unnumbered heading and often put the endpoint in a
   // final bullet. Preserve a complete supplied brief verbatim for review.
-  const suppliedEpilogue = /^(?:RE)?WRITE EPILOGUE\s*$/im.test(supplied)
+  const suppliedSpecialSection = /^(?:RE)?WRITE (?:PROLOGUE|EPILOGUE)\s*$/im.test(supplied)
     && /^POV:\s*\S/im.test(supplied) && /^TIME:\s*\S/im.test(supplied)
     && (supplied.match(/^[-*]\s+\S/gm)?.length ?? 0) >= 3
     && /^(?:[-*]\s+)?(?:END(?:ING|POINT)?\b|STOP\b)\s*:?\s*\S/im.test(supplied);
-  if (supplied.length >= 400 && (suppliedHeadings.every(heading => heading.test(supplied)) || suppliedEpilogue) && /^[-*]\s+\S/m.test(supplied)) {
+  if (supplied.length >= 400 && (suppliedHeadings.every(heading => heading.test(supplied)) || suppliedSpecialSection) && /^[-*]\s+\S/m.test(supplied)) {
     return { guidance: supplied, question: '' };
   }
+  const isPrologue = requestedSpecialSection(supplied.replace(/^(?:plan|outline)\s+/i, "Write ")) === "prologue";
+  const priorState = isPrologue ? getStoryStateBeforeChapter(story.storyState, 0) : story.storyState;
   const previousCount = diagnostics.length;
-  const { parkedChapterDrafts: _parked, chapterGuidanceDraft: _draft, ...promptState } = story.storyState;
+  const { parkedChapterDrafts: _parked, chapterGuidanceDraft: _draft, ...promptState } = priorState;
   try {
     const response = await createAionChapterPlan({ messages: [
       { role: 'system', content: CHAPTER_GUIDANCE_PROMPT },
       { role: 'user', content: JSON.stringify({ storyBible: story.storyBible, storyState: promptState,
-        savedChapterIndex: story.chapters.map(c => ({ number: c.number, title: c.title, pov: c.povCharacter })),
-        recentChapters: story.chapters.slice(-3), conversation: story.messages.filter(message => message.role !== 'assistant' || !isGuidanceProposal(message.content)).slice(-12),
+        savedChapterIndex: (isPrologue ? [] : story.chapters).map(c => ({ number: c.number, title: c.title, pov: c.povCharacter })),
+        recentChapters: isPrologue ? [] : story.chapters.slice(-3), conversation: story.messages.filter(message => message.role !== 'assistant' || !isGuidanceProposal(message.content)).slice(-12),
         guidanceBeingRevised: story.storyState.chapterGuidanceDraft?.text ?? null }) }
     ], schema, diagnostics, attempt: 1 });
     const output: unknown = JSON.parse(response.output_text);
     assertChapterPlanSchema(output, schema);
     const result = output as { guidance: string; question: string };
     if (result.guidance.trim()) {
-      const headings = [/^(?:RE)?WRITE (?:CHAPTER \d+|EPILOGUE)\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^ENDING\s*$/im, /^EXCLUSIONS\s*$/im];
+      const headings = [/^(?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE)\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^ENDING\s*$/im, /^EXCLUSIONS\s*$/im];
       // Chapter 1 has no preceding chapter. Opening continuity belongs to the Bible.
-      if (!/^(?:RE)?WRITE CHAPTER 1\s*$/im.test(result.guidance)) headings.push(/^CONTINUITY FROM CHAPTER/im);
+      if (!/^(?:RE)?WRITE (?:CHAPTER 1|PROLOGUE)\s*$/im.test(result.guidance)) headings.push(/^CONTINUITY FROM CHAPTER/im);
       for (const heading of headings) {
         if (!heading.test(result.guidance)) throw new Error('The guidance draft was incomplete. Your chapters are unchanged; no automatic retry was started.');
       }
@@ -69,4 +73,5 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
     diagnostics.slice(previousCount).forEach(d => { d.stage = 'chapter_guidance'; });
   }
 }
+
 

@@ -1,3 +1,4 @@
+import { requestedSpecialSection, specialSectionTitle } from "../../../lib/story-section";
 import { chapterGuidanceSourceKey } from "../../../lib/chapter-guidance";
 import { draftChapterGuidance } from "../../../lib/chapter-guidance-provider";
 import { requestsChapterGeneration } from "../../../lib/chapter-request";
@@ -98,16 +99,6 @@ function getExplicitTitleChange(message: string): string | null {
   return null;
 }
 
-function requestsEpilogue(message: string): boolean {
-  return (
-    /\b(?:write|generate|create|start|continue|rewrite)\s+(?:the\s+|an\s+|my\s+|this\s+)?epilogue\b/i.test(
-      message,
-    ) ||
-    /\bepilogue\s*[,;:]?\s*(?:please\s+)?(?:write|generate|create|start|continue|rewrite)(?:\s+it|\s+this|\s+now)?\b/i.test(
-      message,
-    )
-  );
-}
 
 function requestsDerivedBook(message: string): boolean {
   return /\b(?:create|start|make|set up|plan|build)\b[\s\S]{0,120}\b(?:sequel|spin[ -]?off|next book|book\s*2|series book)\b/i.test(
@@ -544,7 +535,7 @@ const directSectionBriefSchema = {
         "replaceChapterNumber",
       ],
       properties: {
-        kind: { type: "string", enum: ["chapter", "epilogue"] },
+        kind: { type: "string", enum: ["chapter", "prologue", "epilogue"] },
         title: { type: "string" },
         povCharacter: { type: "string" },
         content: { type: "string" },
@@ -571,7 +562,7 @@ const directSectionBriefSchema = {
       ],
       properties: {
         chapterNumber: { type: "integer" },
-        chapterKind: { type: "string", enum: ["chapter", "epilogue"] },
+        chapterKind: { type: "string", enum: ["chapter", "prologue", "epilogue"] },
         chapterTitle: { type: "string" },
         povCharacter: { type: "string" },
         authorDirection: { type: "string" },
@@ -972,7 +963,7 @@ function sanitiseEditableChapterPlan(
   const chapterNumber =
     typeof raw.chapterNumber === "number" &&
     Number.isInteger(raw.chapterNumber) &&
-    raw.chapterNumber > 0
+    raw.chapterNumber >= 0
       ? raw.chapterNumber
       : fallbackChapterNumber;
   const title = cleanString(raw.title);
@@ -1109,7 +1100,7 @@ function validateCanonicalChapterPlan(
     ) ||
     typeof plan.chapterNumber !== "number" ||
     !Number.isInteger(plan.chapterNumber) ||
-    plan.chapterNumber < 1
+    plan.chapterNumber < 0
   ) {
     throw new Error("The canonical chapter plan is missing required metadata.");
   }
@@ -1710,6 +1701,7 @@ chapter with a deliberate time jump, state the requested or clearly implied
 jump. Do not recap prior prose.
 
 For a normal new chapter, generatedChapter.kind and chapterKind are "chapter".
+For a prologue, both are "prologue", the title is "Prologue", and its internal chapterNumber is 0, before Chapter 1.
 For an epilogue, both are "epilogue", the title is "Epilogue", and its internal
 chapterNumber is the next available number. For a rewrite,
 replaceChapterNumber is the requested existing number. Otherwise it is null.
@@ -2310,7 +2302,9 @@ export async function POST(request: Request) {
     const detectedIntent = detectStoryIntent(latestMessage);
     const startsNewStory = newBibleWorkspace || detectedIntent === "create_story";
     const epilogueRequested =
-      !startsNewStory && requestsEpilogue(latestMessage);
+      !startsNewStory && requestedSpecialSection(latestMessage) === "epilogue";
+    const prologueRequested = !startsNewStory && requestedSpecialSection(latestMessage) === "prologue";
+    const specialKind = prologueRequested ? "prologue" : epilogueRequested ? "epilogue" : null;
     let intent = detectedIntent;
 
     if (
@@ -2367,7 +2361,7 @@ export async function POST(request: Request) {
         chapterRequestText,
       ) ||
       /\bwrite\s+(?:the\s+)?next\s+chapter\b/i.test(chapterRequestText) ||
-      epilogueRequested;
+      epilogueRequested || prologueRequested;
 
     if (
       !startsNewStory &&
@@ -2475,7 +2469,9 @@ workspace.`,
       requestStage === "plan" && isWriterMode && intent !== "create_story";
     const explicitChapterWordRange = getExplicitChapterWordRange(latestMessage);
 
-    const requestedChapterNumber = getRequestedChapterNumber(latestMessage);
+    const existingSpecial = specialKind ? currentStory.chapters.find(c => specialSectionTitle(c).toLowerCase() === specialKind) : undefined;
+    const requestedChapterNumber = existingSpecial?.number ?? (prologueRequested ? 0 : getRequestedChapterNumber(latestMessage));
+    if (existingSpecial && !/\brewrite\b/i.test(latestMessage.split("\n")[0])) throw new Error(`${specialSectionTitle(existingSpecial)} already exists. Ask to rewrite it if you want a replacement; the existing prose is preserved.`);
     const savedChapterPlans = currentStory.storyState.chapterPlans ?? [];
     const latestDraftPlan =
       [...savedChapterPlans]
@@ -2528,7 +2524,7 @@ workspace.`,
           (chapter) => chapter.number === rewriteTarget.number - 1,
         ) ?? null)
       : null;
-    const planningStoryState = rewriteTarget
+    const planningStoryState = prologueRequested ? getStoryStateBeforeChapter(currentStory.storyState, 0) : rewriteTarget
       ? getStoryStateBeforeChapter(
           currentStory.storyState,
           rewriteTarget.number,
@@ -2537,11 +2533,11 @@ workspace.`,
     const planningPromptState = getCompactPlanningStoryState(planningStoryState, {
       pov: latestMessage.match(/\bPOV\s*:\s*([^\r\n]+)/i)?.[1] ?? rewriteTarget?.povCharacter ?? "",
       guidance: latestMessage,
-      beforeChapter: rewriteTarget?.number,
+      beforeChapter: prologueRequested ? 0 : rewriteTarget?.number,
     });
     const planningChapterLedger = planningPromptState.chapterLedger ?? [];
     const planningLatestLedgerEntry = planningChapterLedger.at(-1) ?? null;
-    const planningLatestChapter = rewriteTarget
+    const planningLatestChapter = prologueRequested ? null : rewriteTarget
       ? rewritePrecedingChapter
       : latestChapter;
     const continuityHandoff = {
@@ -2573,7 +2569,7 @@ workspace.`,
       })),
       recentChapterAnchors: currentStory.chapters
         .filter(
-          (chapter) => !rewriteTarget || chapter.number < rewriteTarget.number,
+          (chapter) => !prologueRequested && (!rewriteTarget || chapter.number < rewriteTarget.number),
         )
         .slice(-3)
         .map((chapter) => ({
@@ -2605,7 +2601,7 @@ workspace.`,
       bookNumber: currentStory.bookNumber,
       chapters: currentStory.chapters
         .filter(
-          (chapter) => !rewriteTarget || chapter.number < rewriteTarget.number,
+          (chapter) => !prologueRequested && (!rewriteTarget || chapter.number < rewriteTarget.number),
         )
         .map((chapter) => ({
           number: chapter.number,
@@ -3369,19 +3365,19 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
         if (usesCompactChapterPlan) {
           assertChapterPlanSchema(rawOutput, directSectionBriefSchema);
           const directOutput = rawOutput as DirectSectionBriefOutput;
-          const expectedChapterNumber =
+          const expectedChapterNumber = prologueRequested ? 0 :
             rewriteTarget?.number ??
             (Math.max(
               0,
               ...currentStory.chapters.map((chapter) => chapter.number),
             ) +
               1);
-          const forcedKind = epilogueRequested ? "epilogue" : "chapter";
+          const forcedKind = specialKind ?? "chapter";
           const generatedChapter = {
             ...directOutput.generatedChapter,
             kind: forcedKind,
-            title: epilogueRequested
-              ? "Epilogue"
+            title: specialKind
+              ? (prologueRequested ? "Prologue" : "Epilogue")
               : cleanString(directOutput.generatedChapter.title),
             content: "",
             replaceChapterNumber: rewriteTarget?.number ?? null,
@@ -3519,7 +3515,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
     const reply =
       cleanString(parsedOutput.reply) ||
       (isWriterMode
-        ? `${epilogueRequested ? "Epilogue" : `Chapter ${fallbackChapterNumber}`} section prepared and ready for drafting.`
+        ? `${prologueRequested ? "Prologue" : epilogueRequested ? "Epilogue" : `Chapter ${fallbackChapterNumber}`} section prepared and ready for drafting.`
         : "");
 
     if (!reply) {
@@ -3573,7 +3569,7 @@ Use this draft only to answer the user's question. Never rewrite, continue, repa
         throw new Error("The model did not return chapter metadata.");
       }
 
-      const expectedChapterNumber =
+      const expectedChapterNumber = prologueRequested ? 0 :
         parsedOutput.generatedChapter.replaceChapterNumber ??
         Math.max(0, ...currentStory.chapters.map((chapter) => chapter.number)) +
           1;

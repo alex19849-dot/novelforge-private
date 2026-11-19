@@ -1,3 +1,4 @@
+import { sectionLabel } from "../../../lib/story-section";
 import { NextResponse } from "next/server";
 import {
   AlignmentType,
@@ -14,6 +15,7 @@ import {
 
 type ExportChapter = {
   number: number;
+  kind?: "chapter" | "prologue" | "epilogue";
   title: string;
   povCharacter: string;
   content: string;
@@ -61,6 +63,7 @@ function cleanChapters(value: unknown): ExportChapter[] {
         typeof chapter.number === "number" && Number.isFinite(chapter.number)
           ? chapter.number
           : index + 1,
+      kind: chapter.kind === "prologue" ? "prologue" as const : chapter.kind === "epilogue" ? "epilogue" as const : "chapter" as const,
       title: cleanText(chapter.title, `Chapter ${index + 1}`),
       povCharacter: cleanText(chapter.povCharacter),
       content: cleanText(chapter.content),
@@ -335,7 +338,7 @@ function buildContentsPage(chapters: ExportChapter[]) {
       hyperlink: true,
       headingStyleRange: "1-1",
       cachedEntries: chapters.map((chapter) => ({
-        title: `Chapter ${chapter.number}`,
+        title: sectionLabel(chapter),
         level: 1,
         href: `chapter_${chapter.number}`,
       })),
@@ -359,7 +362,7 @@ function buildChapter(chapter: ExportChapter, index: number) {
           id: `chapter_${chapter.number}`,
           children: [
             new TextRun({
-              text: `Chapter ${chapter.number}`,
+              text: sectionLabel(chapter),
               bold: true,
               color: "000000",
               size: 32,
@@ -567,3 +570,4 @@ export async function POST(request: Request) {
     );
   }
 }
+

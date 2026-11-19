@@ -43,7 +43,7 @@ export function priorProseContext(chapters: unknown, state: unknown = {}, query:
   const memory = state && typeof state === 'object' ? state as Partial<StoryState> : {};
   const boundary = Math.min(query.beforeChapter ?? Infinity, memory.continuityDirtyFromChapter ?? Infinity);
   const accepted: Chapter[] = (Array.isArray(chapters) ? chapters : [])
-    .filter((c): c is Chapter => Boolean(c) && typeof c === 'object' && Number.isInteger(c.number) && c.number > 0 && c.number < boundary && typeof c.content === 'string' && Boolean(c.content.trim()))
+    .filter((c): c is Chapter => Boolean(c) && typeof c === 'object' && Number.isInteger(c.number) && c.number >= 0 && c.number < boundary && typeof c.content === 'string' && Boolean(c.content.trim()))
     .sort((a, b) => a.number - b.number);
   const records = projectNarrativeMemory(memory, boundary).filter(r => {
     const source = accepted.find(c => c.number === r.evidence.chapterNumber);
@@ -82,3 +82,4 @@ export function priorProseContext(chapters: unknown, state: unknown = {}, query:
   if (parts.length === 2) return '';
   return parts.join('\n');
 }
+

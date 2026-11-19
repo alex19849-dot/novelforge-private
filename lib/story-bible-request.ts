@@ -1,3 +1,4 @@
+import { requestedSpecialSection } from "./story-section";
 import type { StoryBible } from "../app/story-chat/types";
 
 export function stripAionPrefix(message: string): string {
@@ -6,7 +7,7 @@ export function stripAionPrefix(message: string): string {
 
 export function isPastedChapterGuidance(message: string): boolean {
   const text = stripAionPrefix(message);
-  return /^(?:#{1,6}\s*)?(?:\*\*)?(?:chapter\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b|epilogue\b)[^\n]*\n/i.test(text)
+  return /^(?:#{1,6}\s*)?(?:\*\*)?(?:chapter\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b|(?:prologue|epilogue)\b)[^\n]*\n/i.test(text)
     && (/^\s*(?:POV|Timing|Endpoint)\s*:/im.test(text)
       || /^\s*(?:first|third)[ -]person\s+(?:present|past)\b/im.test(text));
 }
@@ -14,8 +15,8 @@ export function isPastedChapterGuidance(message: string): boolean {
 // Inspect the instruction, not chapter prose or future events inside a pasted Bible.
 export function isStoryBibleRequest(message: string): boolean {
   const text = stripAionPrefix(message);
-  if (isPastedChapterGuidance(text)) return false;
-  if (/^(?:please\s+)?(?:write|generate|continue|rewrite|expand)\s+(?:(?:the|my|this|next)\s+)*(?:chapter|epilogue|scene|passage|paragraph|prose)\b/i.test(text)) return false;
+  if (isPastedChapterGuidance(text) || requestedSpecialSection(text)) return false;
+  if (/^(?:please\s+)?(?:write|generate|continue|rewrite|expand)\s+(?:(?:the|my|this|next)\s+)*(?:chapter|prologue|epilogue|scene|passage|paragraph|prose)\b/i.test(text)) return false;
   if (/^(?:rewrite|edit|revise|expand)\s+(?:(?:this|the|my)\s+)?(?:passage|scene|chapter|paragraph|extract)\b|^rewrite\s+this\s*[:\n]/i.test(text)) return false;
   const instruction = text.split(/^\s*(?:#{1,6}\s*)?PREMISE\s*:?\s*$/im)[0];
   if (/\b(?:story\s*bible|bible)\b/i.test(instruction)) return true;
@@ -53,3 +54,4 @@ export function bibleOutputAllowance(message: string): number {
   // Small edits stay bounded; long imports have room for JSON and reasoning.
   return Math.min(24000, Math.max(6000, Math.ceil(message.length / 2) + 3000));
 }
+

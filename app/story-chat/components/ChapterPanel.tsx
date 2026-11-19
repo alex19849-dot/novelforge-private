@@ -10,6 +10,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { sectionLabel, specialSectionTitle } from "../../../lib/story-section";
 import type { StoryChapter } from "../types";
 import type { PassageRewriteRequest, PassageRewriteResult, PassageRewriteUndo } from "../passageRewrite";
 import { readerParagraphs, selectedReaderPassage, type ReaderPassage } from "../readerSelection";
@@ -165,31 +166,27 @@ export default function ChapterPanel({
     orderedChapters.find((chapter) => chapter.id === editingChapterId) ?? null;
   const editingDraft =
     editingChapterId === "__draft__" && Boolean(draftWorkspace);
-  const draftIsEpilogue =
-    draftWorkspace?.title.trim().toLowerCase() === "epilogue";
+  const draftSpecialTitle = draftWorkspace ? specialSectionTitle(draftWorkspace) : "";
   const hasReadableContent =
     orderedChapters.length > 0 || Boolean(draftWorkspace);
   const navigationItems = useMemo(
     () => [
       ...orderedChapters.map((chapter) => ({
         id: chapter.id,
-        label:
-          chapter.kind === "epilogue"
-            ? "Epilogue"
-            : `Chapter ${chapter.number}`,
+        label: sectionLabel(chapter),
       })),
       ...(draftWorkspace
         ? [
             {
               id: "__draft__",
-              label: draftIsEpilogue
-                ? "Epilogue draft"
+              label: draftSpecialTitle
+                ? `${draftSpecialTitle} draft`
                 : `Chapter ${draftWorkspace.chapterNumber} draft`,
             },
           ]
         : []),
     ],
-    [draftIsEpilogue, draftWorkspace, orderedChapters],
+    [draftSpecialTitle, draftWorkspace, orderedChapters],
   );
   const activeNavigationIndex = navigationItems.findIndex(
     (item) => item.id === activeChapterId,
@@ -593,17 +590,17 @@ export default function ChapterPanel({
     number: number,
     title: string,
     pov: string,
-    epilogue = false,
+    specialTitle = "",
   ) {
     return (
       <div className="pb-8 pt-3 sm:pb-10">
-        {!epilogue && (
+        {!specialTitle && (
           <p className="font-sans text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
             Chapter {number}
           </p>
         )}
         <h1 className="mt-3 break-words text-3xl font-bold leading-tight sm:text-4xl">
-          {epilogue ? "Epilogue" : title || `Chapter ${number}`}
+          {specialTitle || title || `Chapter ${number}`}
         </h1>
         {pov && <p className={`mt-2 italic ${mutedClasses}`}>{pov}</p>}
       </div>
@@ -646,7 +643,7 @@ export default function ChapterPanel({
                   {editingThisChapter ? (
                     <>
                       <div className="pb-8 pt-3 sm:pb-10">
-                        {chapter.kind !== "epilogue" && (
+                        {!specialSectionTitle(chapter) && (
                           <p className="font-sans text-xs font-semibold uppercase tracking-[0.2em] text-pink-500">
                             Chapter {chapter.number}
                           </p>
@@ -669,9 +666,7 @@ export default function ChapterPanel({
                       <textarea
                         ref={editAreaRef}
                         aria-label={
-                          chapter.kind === "epilogue"
-                            ? "Edit Epilogue"
-                            : `Edit Chapter ${chapter.number}`
+                          `Edit ${sectionLabel(chapter)}`
                         }
                         value={editContent}
                         onChange={(event) =>
@@ -691,7 +686,7 @@ export default function ChapterPanel({
                         chapter.number,
                         chapter.title,
                         chapter.povCharacter,
-                        chapter.kind === "epilogue",
+                        specialSectionTitle(chapter),
                       )}
                       <div data-reader-content={chapter.id}>
                         {readerParagraphs(chapter.content).map((paragraph, index) =>
@@ -719,13 +714,13 @@ export default function ChapterPanel({
                       draftWorkspace.chapterNumber,
                       draftWorkspace.title,
                       draftWorkspace.povCharacter,
-                      draftIsEpilogue,
+                      draftSpecialTitle,
                     )}
                     <textarea
                       ref={editAreaRef}
                       aria-label={
-                        draftIsEpilogue
-                          ? "Edit Epilogue draft"
+                        draftSpecialTitle
+                          ? `Edit ${draftSpecialTitle} draft`
                           : `Edit Chapter ${draftWorkspace.chapterNumber} draft`
                       }
                       value={editContent}
@@ -746,7 +741,7 @@ export default function ChapterPanel({
                       draftWorkspace.chapterNumber,
                       draftWorkspace.title,
                       draftWorkspace.povCharacter,
-                      draftIsEpilogue,
+                      draftSpecialTitle,
                     )}
                     <div data-reader-content="__draft__">
                       {readerParagraphs(draftWorkspace.content).map((paragraph, index) =>
@@ -808,13 +803,11 @@ export default function ChapterPanel({
               {isEditing ? (
                 <p className="text-xs opacity-60">
                   {editingDraft
-                    ? draftIsEpilogue
-                      ? "Epilogue draft"
+                    ? draftSpecialTitle
+                      ? `${draftSpecialTitle} draft`
                       : `Chapter ${draftWorkspace?.chapterNumber ?? ""} draft`
                     : editingChapter
-                      ? editingChapter.kind === "epilogue"
-                        ? "Epilogue"
-                        : `Chapter ${editingChapter.number}`
+                      ? sectionLabel(editingChapter)
                       : "Editing"}
                 </p>
               ) : (
@@ -1043,9 +1036,7 @@ export default function ChapterPanel({
                   {activeChapterId === "__draft__" && draftWorkspace
                     ? `Draft, ${countWords(draftWorkspace.content)} words`
                     : activeChapter
-                      ? activeChapter.kind === "epilogue"
-                        ? "Epilogue"
-                        : `Chapter ${activeChapter.number}`
+                      ? sectionLabel(activeChapter)
                       : "Continuous reading"}
                 </p>
                 <button
@@ -1157,4 +1148,5 @@ export default function ChapterPanel({
     </section>
   );
 }
+
 

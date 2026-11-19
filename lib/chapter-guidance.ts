@@ -2,7 +2,7 @@ import type { StoryWorkspace } from '../app/story-chat/types';
 import { chapterSourceFingerprint } from './chapter-job';
 
 export function requestsChapterGuidance(message: string): boolean {
-  return /\b(?:guidance|guidence|plan|outline)\b[\s\S]{0,100}\bchapter\b|\bchapter\b[\s\S]{0,100}\b(?:guidance|guidence|plan|outline)\b/i.test(message);
+  return /\b(?:guidance|guidence|plan|outline)\b[\s\S]{0,100}\b(?:chapter|prologue|epilogue)\b|\b(?:chapter|prologue|epilogue)\b[\s\S]{0,100}\b(?:guidance|guidence|plan|outline)\b/i.test(message);
 }
 export function revisesChapterGuidance(message: string): boolean {
   return /^(?:please\s+)?(?:change|revise|redo|adjust|add|remove|make|keep|instead|less|more|don't|do not)\b/i.test(message.trim());
@@ -36,13 +36,13 @@ export function parkChapterDraft(story: StoryWorkspace, pending: import('../app/
 }
 
 export function isGuidanceProposal(text: string): boolean {
-  return /^\s*(?:RE)?WRITE (?:CHAPTER \d+|EPILOGUE)\s*\r?\n[\s\S]*?\bPOV:/i.test(text);
+  return /^\s*(?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE)\s*\r?\n[\s\S]*?\bPOV:/i.test(text);
 }
 export function guidanceMessageIndex(messages: StoryWorkspace['messages'], text: string): number {
-  const heading = text.match(/^\s*((?:RE)?WRITE (?:CHAPTER \d+|EPILOGUE))\b/i)?.[1].toUpperCase();
+  const heading = text.match(/^\s*((?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE))\b/i)?.[1].toUpperCase();
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
-    if (message.role === 'assistant' && (message.content.trim() === text.trim() || heading && isGuidanceProposal(message.content) && message.content.match(/^\s*((?:RE)?WRITE (?:CHAPTER \d+|EPILOGUE))\b/i)?.[1].toUpperCase() === heading)) return i;
+    if (message.role === 'assistant' && (message.content.trim() === text.trim() || heading && isGuidanceProposal(message.content) && message.content.match(/^\s*((?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE))\b/i)?.[1].toUpperCase() === heading)) return i;
   }
   return -1;
 }

@@ -1,3 +1,4 @@
+import { requestedSpecialSection } from "./story-section";
 import { isStoryBibleRequest, isPastedChapterGuidance, stripAionPrefix } from "./story-bible-request";
 
 // Shared by chat submission and the planner. A prose request must enter the
@@ -7,9 +8,10 @@ export function requestsChapterGeneration(message: string): boolean {
   const text = stripAionPrefix(message).trim();
   if (/^(?:please\s+)?(?:do\s+not|don't|never)\s+(?:write|generate|create|start|continue|rewrite|expand)\b/i.test(text)) return false;
   if (/^(?:(?:can|could|would)\s+you\s+)?(?:please\s+)?(?:plan|outline|map|discuss|review|check|explain|analyse|analyze)\b/i.test(text)) return false;
-  if (/\b(?:write|generate|create|start|continue|rewrite|expand)\b[\s\S]{0,100}\b(?:chapter|epilogue)\b/i.test(text)) return true;
-  if (/\bepilogue\b[\s\S]{0,100}\b(?:write|generate|create|start|continue|rewrite)\b/i.test(text)) return true;
+  if (/\b(?:write|generate|create|start|continue|rewrite|expand)\b[\s\S]{0,100}\b(?:chapter|prologue|epilogue)\b/i.test(text)) return true;
+  if (/\b(?:prologue|epilogue)\b[\s\S]{0,100}\b(?:write|generate|create|start|continue|rewrite)\b/i.test(text)) return true;
   if (/^(?:please\s+)?(?:next\s+chapter|write\s+the\s+next|continue(?:\s+writing)?|carry\s+on|keep\s+going)[.!\s]*$/i.test(text.split("\n")[0].trim())) return true;
+  if (requestedSpecialSection(text)) return true;
   // Pasted chapter guidance is also a writing request without an added verb.
   return isPastedChapterGuidance(text);
 }
@@ -20,3 +22,4 @@ export function continuesPendingChapter(message: string, pendingChapterNumber: n
   const requested = text.match(/\bchapter\s+(\d+)\b/i);
   return !requested || Number(requested[1]) === pendingChapterNumber;
 }
+

@@ -568,7 +568,10 @@ export function applyGeneratedChapter(
   const now = new Date().toISOString();
   const chapterMetadata = pending.generatedChapter;
   const replacementNumber = chapterMetadata.replaceChapterNumber;
-  const nextChapterNumber =
+  if (chapterMetadata.kind === "prologue" && replacementNumber === null && story.chapters.some(chapter => chapter.number === 0 || chapter.kind === "prologue")) {
+    throw new Error("A prologue already exists. Rewrite it to replace the saved prologue.");
+  }
+  const nextChapterNumber = chapterMetadata.kind === "prologue" ? 0 :
     story.chapters.length > 0
       ? Math.max(...story.chapters.map((chapter) => chapter.number)) + 1
       : 1;
@@ -619,7 +622,7 @@ export function applyGeneratedChapter(
         createdAt: now,
         updatedAt: now,
       },
-    ],
+    ].sort((a,b)=>a.number-b.number),
     updatedAt: now,
   };
 }

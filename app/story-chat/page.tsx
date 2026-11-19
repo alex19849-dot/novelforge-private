@@ -2491,7 +2491,7 @@ justify-center px-5"
     story.storyState.lastGenerationDiagnostics ??
     [];
   const pendingChapterNumber = pendingForCurrentStory
-    ? (pendingForCurrentStory.generatedChapter.replaceChapterNumber ??
+    ? (pendingForCurrentStory.generatedChapter.kind === "prologue" ? 0 : pendingForCurrentStory.generatedChapter.replaceChapterNumber ??
       Math.max(0, ...chapters.map((chapter) => chapter.number)) + 1)
     : null;
 

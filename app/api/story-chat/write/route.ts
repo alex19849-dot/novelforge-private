@@ -152,7 +152,7 @@ function readSectionBrief(value: string): Partial<SectionWritingBrief> {
         typeof parsed.chapterNumber === "number"
           ? parsed.chapterNumber
           : undefined,
-      chapterKind: parsed.chapterKind === "epilogue" ? "epilogue" : "chapter",
+      chapterKind: parsed.chapterKind === "prologue" ? "prologue" : parsed.chapterKind === "epilogue" ? "epilogue" : "chapter",
       chapterTitle: cleanString(parsed.chapterTitle || parsed.title),
       povCharacter: cleanString(parsed.povCharacter),
       authorDirection: cleanString(parsed.authorDirection),

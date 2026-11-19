@@ -45,7 +45,7 @@ export type StoryBiblePatch = {
   removeNotes: string[];
 };
 
-export type StoryChapterKind = "chapter" | "epilogue";
+export type StoryChapterKind = "chapter" | "prologue" | "epilogue";
 
 export type StoryChapter = {
   id: string;
