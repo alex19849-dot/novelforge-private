@@ -56,7 +56,11 @@ export async function POST(request:Request) {
       if(body.action==='check') {
         const {data,error}=await db.from('social_publications').select('post_id,provider_post_id').eq('user_id',account.id).eq('state','attention');
         if(error) throw new Error('Publishing history could not be checked.');
+        const {data:currentPosts,error:currentError}=data.length?await db.from('social_posts').select('id').eq('user_id',account.id).in('id',data.map(item=>item.post_id)).neq('status','cancelled'):{data:[],error:null};
+        if(currentError)throw Error('Current publishing issues could not be checked.');
+        const activeIds=new Set((currentPosts??[]).map(post=>post.id));
         for(const item of data) {
+          if(!activeIds.has(item.post_id))continue;
           const {error}=await db.from('social_publications').update({state:item.provider_post_id?'accepted':'uncertain',poll_count:0,next_check_at:new Date().toISOString()}).eq('post_id',item.post_id).eq('user_id',account.id).eq('state','attention');
           if(error) throw new Error('This status check could not be queued.');
         }

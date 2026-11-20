@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+const {postSection,workspaceGroups}=await import('../lib/social-workspace.ts');
+const now=Date.parse('2026-11-20T12:00:00Z');
+const post={id:'a',campaign_id:'campaign',status:'draft',scheduled_at:null};
+assert.equal(postSection({...post,status:'cancelled',quality_notes:'old warning'},'attention',now),'discarded');
+assert.equal(postSection({...post,status:'published',quality_notes:'old warning'},'attention',now),'history');
+assert.equal(postSection(post,undefined,now),'drafts');
+assert.equal(postSection({...post,quality_notes:'Text is clipped'},undefined,now),'issues');
+assert.equal(postSection({...post,status:'failed'},undefined,now),'issues');
+assert.equal(postSection({...post,status:'approved',scheduled_at:'2026-11-21T12:00:00Z'},undefined,now),'scheduled');
+assert.equal(postSection({...post,status:'approved',scheduled_at:'2026-11-19T12:00:00Z'},undefined,now),'issues');
+const groups=workspaceGroups([post,{...post,id:'b'},{...post,id:'c',campaign_id:'other'}]);
+assert.deepEqual(groups.map(group=>group.map(p=>p.id)),[['a','b'],['c']]);
+console.log('PASS: discarded entries stay out even with stale provider warnings, published history survives, issues stay visible, expired approvals are flagged, and platform variants share one card.');

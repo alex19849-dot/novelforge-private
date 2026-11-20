@@ -4,10 +4,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
 import PublishingPanel from './PublishingPanel';
 import StrategyPanel from './StrategyPanel';
+import BufferConnection from './BufferConnection';
+import StudioDialog from './StudioDialog';
+import StudioPostCard from './StudioPostCard';
+import {postSection,workspaceGroups} from '../../lib/social-workspace';
+import type {StudioView,StudioCounts} from '../../lib/social-workspace';
 import {editedMetadata} from '../../lib/social-strategy';
 import { musicForPath } from '../../lib/social-music';
 import { readyForApproval } from '../../lib/social-approval';
-import { addDays, calendarDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, AUTOMATED_PLATFORMS, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
+import { addDays, calendarError, londonDate, londonSchedule, londonTime, POST_LABELS, POST_TYPES, AUTOMATED_PLATFORMS, SOCIAL_PLATFORMS } from '../../lib/social-calendar';
 import type { CalendarPost, CalendarSeed, SocialPlatform } from '../../lib/social-calendar';
 
 type BackgroundJob = { id:string; start_date:string; job_type:'plan'|'media'; operation?:string; status:'generating'|'completed'|'failed'|'paused'; completed_tasks:number; total_tasks:number; created_count:number; error_message:string; cancel_requested:boolean };
@@ -18,20 +23,19 @@ type Editor = {
   platform: SocialPlatform; postType: string; title: string; caption: string; hashtags: string;
   date: string; time: string; source?: string; mediaType: 'image' | 'video' | null; mimeType?: string;
   file?: File; mediaBlob?: Blob; removeMedia: boolean;
-  includesCover:boolean; creativeBrief: string; plannedMediaType: 'image' | 'video' | '';
+  reviewed:boolean; includesCover:boolean; creativeBrief: string; plannedMediaType: 'image' | 'video' | '';
 };
 const inputClass = 'mt-1 w-full rounded-xl border border-white/15 bg-neutral-950 px-3 py-2 text-white outline-none focus:border-pink-500';
 const buttonClass = 'rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-40';
 const editable = (post: CalendarPost) => ['draft', 'approved'].includes(post.status);
 
-export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Book[]; seed: CalendarSeed | null; onSeedUsed: () => void }) {
+export default function SocialCalendar({ books, seed, onSeedUsed,view='scheduled',onNavigate,onCounts,demoPosts }: { books: Book[]; seed: CalendarSeed | null; onSeedUsed: () => void;view?:StudioView;onNavigate?:(view:StudioView)=>void;onCounts?:(counts:StudioCounts)=>void;demoPosts?:CalendarPost[] }) {
   const [publishingEnabled,setPublishingEnabled] = useState(false);
   const [publicationStates,setPublicationStates]=useState<Record<string,string>>({});
-  const [posts, setPosts] = useState<CalendarPost[]>([]);
-  const [start, setStart] = useState(() => londonDate());
-  const [selected, setSelected] = useState(() => londonDate());
+  const [posts, setPosts] = useState<CalendarPost[]>(demoPosts??[]);
+  const start = londonDate();
+  const selected = londonDate();
   const [platform, setPlatform] = useState('all');
-  const [reviewOnly, setReviewOnly] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,39 +55,15 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   const savingRef = useRef(false);
   const accountRef = useRef<string | null>(null);
   const loadingRef = useRef(false);
-  const initialRangeRef = useRef(false);
   const writeRevisionRef = useRef(0);
-  const days = useMemo(() => calendarDays(start), [start]);
   const visiblePosts = useMemo(() => posts.filter(post => platform === 'all' || post.platform === platform), [posts, platform]);
-  const postsByDate = useMemo(() => {
-    const groups = new Map<string, CalendarPost[]>();
-    for (const post of visiblePosts) {
-      if (!post.scheduled_at) continue;
-      const date = londonDate(post.scheduled_at);
-      groups.set(date, [...(groups.get(date) ?? []), post]);
-    }
-    return groups;
-  }, [visiblePosts]);
   const approvalDrafts = visiblePosts.filter(post => post.status === 'draft' && (!post.scheduled_at || Date.parse(post.scheduled_at) > Date.now()));
-  const readyPosts = approvalDrafts.filter(post => readyForApproval(post));
+  const readyPosts = approvalDrafts.filter(post => !post.quality_notes?.trim() && readyForApproval(post));
   const musicNeeded = posts.filter(post=>(post.platform==='tiktok'||post.platform==='youtube') && ['draft','approved'].includes(post.status) && post.media_path && post.scheduled_at && Date.parse(post.scheduled_at)>Date.now() && !musicForPath(post.media_path)).length;
-  const blockedDrafts = approvalDrafts.length - readyPosts.length;
-  const reviewArtworkCount = new Set(posts.filter(post => post.quality_notes?.trim()).map(post => post.media_path || post.id)).size;
-  const reviewGroups = useMemo(() => {
-    const flaggedAssets = new Set(posts.filter(post => post.quality_notes?.trim()).map(post => post.media_path || post.id));
-    const groups = new Map<string, CalendarPost[]>();
-    for(const post of visiblePosts) {
-      const key = post.media_path || post.id;
-      if(flaggedAssets.has(key)) groups.set(key,[...(groups.get(key) ?? []),post]);
-    }
-    return groups;
-  },[posts,visiblePosts]);
-  const reviewPosts = [...reviewGroups.values()].map(group => group.find(post => post.quality_notes?.trim()) ?? group[0]);
-  const selectedPosts = postsByDate.get(selected) ?? [];
-  const drafts = useMemo(() => visiblePosts.filter(post => !post.scheduled_at), [visiblePosts]);
   const missingMediaGroups = useMemo(() => new Set(posts.filter(post => post.status === 'draft' && post.planned_media_type && !post.media_path && post.scheduled_at && londonDate(post.scheduled_at) >= start && londonDate(post.scheduled_at) < addDays(start, 30)).map(post => `${post.campaign_id}:${post.book_slug}:${(post.platform==='tiktok'||post.platform==='youtube') ? 'portrait' : 'feed'}:${post.planned_media_type}:${post.creative_brief}`)).size, [posts, start]);
 
   async function load(silent = false) {
+    if(demoPosts){setLoading(false);return;}
     if (loadingRef.current) return;
     loadingRef.current = true;
     const readRevision = writeRevisionRef.current;
@@ -103,12 +83,6 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         if (accountRef.current === data.user.id) {
           const current = result.job as BackgroundJob | null;
           setJob(current);
-          if(!initialRangeRef.current) {
-            initialRangeRef.current = true;
-            if(current?.start_date && addDays(current.start_date,30) > londonDate()) {
-              setStart(current.start_date); setSelected(current.start_date > londonDate() ? current.start_date : londonDate());
-            }
-          }
           if(current && current.status !== 'generating') setNotice(previous => previous.startsWith('Generation started in the background.') ? '' : previous);
           const active = current?.status === 'generating';
           generatingRef.current = active;
@@ -120,10 +94,11 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     finally { loadingRef.current = false; if (!silent) setLoading(false); }
   }
   useEffect(() => {
+    if(demoPosts){setLoading(false);return;}
     void load();
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session || (accountRef.current && accountRef.current !== session.user.id)) {
-        setPosts([]); setEditor(null); setJob(null); setUndoBatch([]); setReviewOnly(false); initialRangeRef.current = false; setPlanning(false); setMediaBusy(false); generatingRef.current = false; accountRef.current = null;
+        setPosts([]); setEditor(null); setJob(null); setUndoBatch([]); setPlanning(false); setMediaBusy(false); generatingRef.current = false; accountRef.current = null;
       }
     });
     const interval = window.setInterval(() => { void load(true); }, 10000);
@@ -142,14 +117,14 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       platform: initial?.platform ?? 'facebook', postType: initial?.media_type === 'video' ? 'video' : 'premise_hook',
       title: initial?.title ?? '', caption: initial?.caption ?? '', hashtags: initial?.hashtags.join(' ') ?? '', date, time: '19:00',
       source: initial?.mediaSource, mediaBlob: initial?.mediaBlob, mediaType: initial?.media_type ?? null, mimeType: initial?.mimeType, removeMedia: false,
-      includesCover:false, creativeBrief: '', plannedMediaType: initial?.media_type ?? '',
+      reviewed:false, includesCover:false, creativeBrief: '', plannedMediaType: initial?.media_type ?? '',
     };
   }
   useEffect(() => {
     if (!seed || generatingRef.current) return;
     // Do not silently replace an editor that contains unsaved work.
     if (editor) return;
-    setEditor(fresh(selected, seed)); setNotice(''); setError(''); onSeedUsed();
+    onNavigate?.('drafts');setEditor(fresh(selected, seed)); setNotice(''); setError(''); onSeedUsed();
     document.getElementById('social-calendar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [seed, editor, planning, mediaBusy]);
 
@@ -160,13 +135,14 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       platform: post.platform, postType: post.post_type, title: post.title, caption: post.caption, hashtags: post.hashtags.join(' '),
       date: post.scheduled_at ? londonDate(post.scheduled_at) : '', time: post.scheduled_at ? londonTime(post.scheduled_at) : '19:00',
       mediaType: post.media_type, removeMedia: false,
-      includesCover:post.content_metadata?.includes_cover===true, creativeBrief: post.creative_brief ?? '', plannedMediaType: post.planned_media_type ?? '',
+      reviewed:false, includesCover:post.content_metadata?.includes_cover===true, creativeBrief: post.creative_brief ?? '', plannedMediaType: post.planned_media_type ?? '',
     });
     setError(''); setNotice(''); setConfirmDelete(false);
   }
   function field<K extends keyof Editor>(key: K, value: Editor[K]) { setEditor(current => current ? { ...current, [key]: value } : null); }
 
   async function save(approve: boolean) {
+    if(demoPosts){setNotice('This is a read-only preview.');return;}
     if (!editor || savingRef.current || generatingRef.current) return;
     savingRef.current = true; setSaving(true); setError(''); setNotice('');
     let uploadedPath: string | null = null;
@@ -176,6 +152,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       if (authError || !data.user) throw new Error('Sign in again before saving your post.');
       const scheduledAt = editor.date ? londonSchedule(editor.date, editor.time) : null;
       if (approve && (!scheduledAt || Date.parse(scheduledAt) <= Date.now())) throw new Error('Choose a future date and time before approving.');
+      if(approve && editor.existing?.quality_notes?.trim() && !editor.reviewed)throw new Error('Review the artwork issue and tick the review box before approving.');
       if (approve && !editor.caption.trim()) throw new Error('Add a caption before approving.');
       if (editor.title.length > 240 || editor.caption.length > 10000) throw new Error('Keep the title within 240 characters and caption within 10,000.');
       const hashtags = [...new Set(editor.hashtags.split(/\s+/).filter(Boolean).map(tag => tag.startsWith('#') ? tag : `#${tag}`))];
@@ -200,6 +177,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         book_slug: editor.bookSlug, book_title: editor.bookTitle, platform: editor.platform, post_type: editor.postType,
         title: editor.title.trim(), caption: editor.caption.trim(), hashtags, media_path: mediaPath, media_type: mediaType,
         scheduled_at: scheduledAt, status: approve ? 'approved' : 'draft',
+        quality_notes:editor.reviewed?'':editor.existing?.quality_notes??'',
         creative_brief: editor.creativeBrief.trim(), planned_media_type: editor.plannedMediaType || null,
         content_metadata:editor.existing?{...editedMetadata(editor.existing,{post_type:editor.postType,caption:editor.caption.trim(),title:editor.title.trim(),creative_brief:editor.creativeBrief.trim(),book_slug:editor.bookSlug}),includes_cover:editor.includesCover,...(editor.file||editor.mediaBlob||editor.source||editor.removeMedia?{visual_type:undefined,hook_type:undefined}:{})}:{},
       };
@@ -210,8 +188,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       if (result.error) throw new Error(result.error.code === 'PGRST116' ? 'This post changed in another tab. Close the editor and refresh the calendar before editing again.' : calendarError(result.error));
       const post = result.data as CalendarPost;
       setPosts(current => [...current.filter(item => item.id !== post.id), post]);
-      if (editor.date) { setSelected(editor.date); if (!days.includes(editor.date)) setStart(editor.date); }
-      setEditor(null); setNotice(approve ? `Approved and saved.${publishingEnabled?' It will publish automatically at the saved time.':' Enable automatic publishing when ready.'}` : 'Draft saved to your calendar.');
+      setEditor(null); onNavigate?.(approve?'scheduled':'drafts'); setNotice(approve ? `Approved and saved.${publishingEnabled?' It will publish automatically at the saved time.':' Enable automatic publishing when ready.'}` : 'Draft saved to your calendar.');
       void notifyPublisher();
     } catch (failure) {
       // A database timeout may have committed successfully. Keep its media rather than risk breaking that post.
@@ -250,6 +227,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   }
 
   async function remove() {
+    if(demoPosts)return;
     if (!editor?.existing || savingRef.current) return;
     savingRef.current = true; setSaving(true); setError('');
     try {
@@ -260,6 +238,7 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
     finally { savingRef.current = false; setSaving(false); }
   }
   async function startGeneration(kind:'plan'|'media'|'music', onlyPost?:CalendarPost) {
+    if(demoPosts)return;
     if (generatingRef.current || savingRef.current || editor) return;
     generatingRef.current = true; setError(''); setNotice('');
     if (kind === 'plan') setPlanning(true); else setMediaBusy(true);
@@ -280,7 +259,6 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
       if (!response.ok) { if(response.status !== 504) localStorage.removeItem(storageKey); throw new Error(result.error || 'The job could not be started.'); }
       localStorage.removeItem(storageKey);
       accepted = result.status === 'generating';
-      if (kind === 'plan') { setStart(firstDay); setSelected(firstDay); }
       setNotice(result.message || (accepted ? 'Generation started in the background. You can leave NovelForge or close this tab. Your progress and completed posts are saved automatically.' : 'This job has already finished. Refresh to see its saved results.'));
       await load(true);
     } catch(failure) {
@@ -306,56 +284,26 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
   async function blockTopic(topic:string){
     try{const {data}=await supabase.auth.getSession();if(!data.session)throw Error('Sign in first.');const response=await fetch('/api/social-studio/strategy',{method:'POST',headers:{Authorization:`Bearer ${data.session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({action:'block',topic})});const result=await response.json();if(!response.ok)throw Error(result.error);setNotice('This topic is excluded from future generation.');window.dispatchEvent(new Event('social-strategy-updated'));}catch(error){setError(error instanceof Error?error.message:'The topic could not be blocked.');}
   }
-  function card(post: CalendarPost) {
-    const url = post.media_path ? supabase.storage.from('social-media').getPublicUrl(post.media_path).data.publicUrl : null;
-    const related = reviewOnly ? (reviewGroups.get(post.media_path || post.id) ?? [post]) : [post];
-    return <article key={post.id} className="rounded-xl border border-white/10 bg-neutral-950 p-4">
-      {reviewOnly && <p className="mb-2 text-sm font-semibold text-amber-200">{post.scheduled_at ? new Date(post.scheduled_at).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'long',year:'numeric',timeZone:'Europe/London'}) : 'Undated draft'}</p>}
-      <div className="flex flex-wrap justify-between gap-2"><span className="font-semibold capitalize">{post.platform} · {post.scheduled_at ? londonTime(post.scheduled_at) : 'No date'}</span><span className="rounded-full bg-white/10 px-2 py-1 text-xs capitalize">{publicationStates[post.id]==='attention'?'Needs attention':publicationStates[post.id]==='uncertain'?'Checking confirmation':post.status==='approved'&&publishingEnabled?'Scheduled':post.status}</span></div>
-      <p className="mt-2 text-sm text-pink-300">{post.book_title || 'General reader post'} · {POST_LABELS[post.post_type]}</p>
-      {reviewOnly && related.length > 1 && <p className="mt-2 text-sm text-neutral-400">Shared artwork: {related.map(item=>item.platform).join(', ')}. Each platform caption is listed below.</p>}
-      {post.title && <h4 className="mt-2 font-semibold">{post.title}</h4>}
-      <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-300">{post.caption || 'Caption to write'}</p>
-      <p className="mt-2 break-words text-sm text-pink-300">{post.hashtags.join(' ')}</p>
-      {post.platform==='instagram'&&<p className="mt-2 text-sm text-amber-200">Instagram: prepared for manual posting.</p>}
-      {url&&<a href={url} target="_blank" rel="noreferrer" download className={`${buttonClass} mt-3 mr-2 inline-block`}>Download media</a>}
-      <button type="button" className={`${buttonClass} mt-3`} onClick={()=>void navigator.clipboard.writeText([post.caption.replace(/\\n/g,'\n'),post.hashtags.join(' ')].join('\n\n'))}>Copy caption</button>
-      {url && (post.media_type === 'video' ? <video src={url} controls preload="none" className="mt-3 max-h-64 rounded-lg" /> : <img src={url} loading="lazy" alt={post.title || 'Post artwork'} className="mt-3 max-h-64 rounded-lg" />)}
-      {musicForPath(post.media_path) && <p className="mt-2 text-xs text-emerald-300">Music included: {musicForPath(post.media_path)!.title} · Licensed backing track</p>}
-      {post.quality_notes && <p className="mt-3 text-sm text-amber-200">Artwork review: {post.quality_notes}</p>}
-      {reviewOnly && related.filter(item=>item.id!==post.id).map(item=><details key={item.id} className="mt-3 rounded-lg border border-white/10 p-3 text-sm">
-        <summary className="cursor-pointer font-semibold capitalize">{item.platform} · {item.scheduled_at ? new Date(item.scheduled_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'Europe/London'})+' · '+londonTime(item.scheduled_at) : 'No date'}</summary>
-        <p className="mt-2 font-semibold">{item.title}</p><p className="mt-2 whitespace-pre-wrap text-neutral-300">{item.caption}</p><p className="mt-2 text-pink-300">{item.hashtags.join(' ')}</p>
-        {item.quality_notes && item.quality_notes!==post.quality_notes && <p className="mt-2 text-amber-200">Artwork review: {item.quality_notes}</p>}
-        {editable(item) && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={()=>edit(item)} className={`${buttonClass} mt-3`}>Edit {item.platform} post</button>}
-      </details>)}
-      {post.creative_brief && <details className="mt-3 text-sm text-neutral-400"><summary className="cursor-pointer">AI creative brief</summary><p className="mt-2 whitespace-pre-wrap">{post.creative_brief}</p></details>}
-      {post.status === 'draft' && post.planned_media_type && !post.media_path && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={() => void generateMedia(post)} className={`${buttonClass} mt-3 mr-3 bg-violet-600`}>AI: create {post.planned_media_type === 'video' ? 'video' : 'artwork'}</button>}
-      {typeof post.content_metadata?.topic==='string'&&<button type="button" onClick={()=>void blockTopic(post.content_metadata!.topic as string)} className={`${buttonClass} mt-3 mr-2`}>Don’t reuse this topic</button>}
-      {editable(post) && <button type="button" disabled={Boolean(editor) || saving || planning || mediaBusy} onClick={() => edit(post)} className={`${buttonClass} mt-3`}>Edit / reschedule</button>}
-    </article>;
-  }
-
-  return <section id="social-calendar" aria-labelledby="calendar-title" className="mb-7 scroll-mt-28 rounded-2xl border border-pink-500/30 bg-neutral-900 p-4 sm:p-6">
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div><p className="text-xs font-semibold uppercase tracking-widest text-pink-400">Plan ahead</p><h2 id="calendar-title" className="mt-1 text-2xl font-bold">Your 30-day calendar</h2><p className="mt-2 text-sm text-neutral-400">Let your AI create the month, then review and approve its posts. Times are UK time. Approved posts publish automatically when automatic publishing is on.</p></div>
-      <div className="flex gap-2"><button type="button" disabled={Boolean(editor) || saving || loading || planning || mediaBusy} onClick={() => { setEditor(fresh()); setConfirmDelete(false); setNotice(''); }} className="rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400 disabled:opacity-40">Manual draft</button><button type="button" disabled={loading || saving || Boolean(editor) || planning || mediaBusy} onClick={() => void load()} className={buttonClass}>Refresh</button></div>
-    </div>
-    <PublishingPanel posts={posts} onEnabledChange={setPublishingEnabled} onStatesChange={setPublicationStates} onReload={()=>void load(true)} />
-    <StrategyPanel books={books}/>
-    <p className="mt-3 text-xs text-neutral-400">Timing tests, in UK time: Facebook 10 am / noon / 6 pm; TikTok 10 am / 6 pm / 8 pm; Instagram noon / 7 pm / 9 pm. These are balanced test slots, not proven audience peaks. New batches favour qualified winners while continuing to test alternatives. You can edit individual times.</p>
-    <div className="mt-4 rounded-xl border border-violet-400/25 bg-violet-500/5 p-4">
-      <h3 className="font-bold">TikTok backing music</h3>
-      <p className="mt-2 text-sm text-neutral-300">New AI TikTok and YouTube posts automatically become portrait videos with licensed music. Existing posters and silent clips can be prepared together in the background. Captions, dates and approvals are kept. Instagram content remains available for manual posting.</p>
-      <button type="button" disabled={loading || saving || planning || mediaBusy || Boolean(editor) || !musicNeeded} onClick={()=>void startGeneration('music')} className={`${buttonClass} mt-3 bg-violet-600`}>{job?.status==='generating' && job.operation==='music' ? 'Adding music in the background...' : `Add music to all TikTok posts (${musicNeeded})`}</button>
-    </div>
-    <div className="mt-4 flex flex-wrap gap-3" aria-label="Calendar views">
-      <button type="button" aria-pressed={!reviewOnly} disabled={saving || Boolean(editor)} onClick={()=>setReviewOnly(false)} className={`${buttonClass} ${!reviewOnly?'border-pink-400 bg-pink-500/15':''}`}>Calendar</button>
-      <button type="button" aria-pressed={reviewOnly} disabled={saving || Boolean(editor)} onClick={()=>{setReviewOnly(true);setPlatform('all');}} className={`${buttonClass} border-amber-400/40 ${reviewOnly?'bg-amber-500/15':''}`}>Needs review ({reviewArtworkCount} {reviewArtworkCount===1?'poster':'posters'})</button>
-    </div>
-    {!reviewOnly && <div className="mt-5 rounded-2xl border border-pink-500/25 bg-pink-500/5 p-4">
-      <h3 className="text-lg font-bold">Let your AI create the month</h3>
-      <p className="mt-2 text-sm text-neutral-300">30 book-specific daily ideas, with separate captions and five hashtags for each selected platform. Hooks, tropes, character conflict, humour, reader questions and promotion are mixed automatically.</p>
+  const buckets={scheduled:posts.filter(p=>postSection(p,publicationStates[p.id])==='scheduled'),drafts:posts.filter(p=>postSection(p,publicationStates[p.id])==='drafts'),issues:posts.filter(p=>postSection(p,publicationStates[p.id])==='issues'),history:posts.filter(p=>postSection(p,publicationStates[p.id])==='history')};
+  const counts={scheduled:buckets.scheduled.length,drafts:buckets.drafts.length,issues:buckets.issues.length,history:buckets.history.length};
+  useEffect(()=>{onCounts?.(counts);},[counts.scheduled,counts.drafts,counts.issues,counts.history,onCounts]);
+  const listingView=view==='scheduled'||view==='drafts'||view==='issues'||view==='history';
+  const listed=listingView?buckets[view].filter(p=>platform==='all'||p.platform===platform):[];
+  const groups=workspaceGroups(listed);
+  if(view==='history')groups.reverse();
+  const headings={scheduled:['Scheduled','Your approved posts, in posting order.'],drafts:['Drafts','Review the artwork and caption before anything goes out.'],issues:['Issues','Only current posts that need your attention.'],history:['Published','A record of what has already gone out.']};
+  return <section id="social-calendar" aria-label="Post workspace" className="scroll-mt-40">
+    <PublishingPanel posts={posts} onEnabledChange={setPublishingEnabled} onStatesChange={setPublicationStates} onReload={()=>void load(true)} mode={view==='settings'?'settings':view==='issues'?'issues':view==='history'?'history':'compact'} onManage={()=>onNavigate?.('settings')} demo={Boolean(demoPosts)}/>
+    {view==='settings'&&<div className="space-y-5"><BufferConnection/><details className="rounded-2xl border border-white/10 bg-neutral-900/60 p-5"><summary className="cursor-pointer font-semibold">Content strategy & analytics</summary><StrategyPanel books={books}/></details><details className="rounded-2xl border border-white/10 bg-neutral-900/60 p-5"><summary className="cursor-pointer font-semibold">Backing music</summary><p className="mt-3 text-sm leading-6 text-neutral-400">New TikTok and YouTube clips use licensed backing music. Prepare existing silent drafts here.</p><button type="button" disabled={loading||saving||planning||mediaBusy||!musicNeeded} onClick={()=>void startGeneration('music')} className={`${buttonClass} mt-3`}>Prepare music ({musicNeeded})</button></details></div>}
+    {listingView&&<>
+      <div className="mb-6 mt-5 flex flex-wrap items-end justify-between gap-4"><div><h2 className="text-2xl font-semibold tracking-tight">{headings[view][0]}</h2><p className="mt-2 text-sm text-neutral-400">{headings[view][1]}</p></div><div className="flex items-center gap-2"><label className="text-sm"><span className="sr-only">Filter by platform</span><select aria-label="Filter by platform" value={platform} onChange={event=>setPlatform(event.target.value)} className="rounded-xl border border-white/10 bg-neutral-900 px-3 py-2.5 text-sm"><option value="all">All platforms</option>{SOCIAL_PLATFORMS.map(p=><option key={p} value={p}>{p}</option>)}</select></label><button type="button" onClick={()=>void load()} disabled={loading||saving} className={buttonClass}>Refresh</button></div></div>
+      {view==='drafts'&&readyPosts.length>0&&<div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-white/10 p-3"><button type="button" disabled={saving||planning||mediaBusy||Boolean(editor)} onClick={()=>void setBatchApproval(true)} className="rounded-xl bg-rose-200 px-4 py-2.5 text-sm font-semibold text-neutral-950">Approve ready drafts ({readyPosts.length})</button>{undoBatch.length>0&&<button type="button" onClick={()=>void setBatchApproval(false)} className={buttonClass}>Undo approval</button>}<span className="text-xs text-neutral-400">Review each preview before approving a batch.</span></div>}
+      {loading?<p role="status" className="py-16 text-center text-neutral-400">Loading your posts…</p>:groups.length?<div className="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-3">{groups.map(group=><StudioPostCard key={group[0].campaign_id||group[0].id} posts={group} states={publicationStates} onEdit={edit} disabled={saving||planning||mediaBusy||Boolean(editor)}/>)}</div>:<div className="flex min-h-[380px] flex-col items-center justify-center rounded-3xl border border-dashed border-white/15 bg-gradient-to-b from-neutral-900/60 to-neutral-950 px-6 py-16 text-center"><span aria-hidden="true" className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 text-3xl text-rose-200">{view==='issues'?'✓':view==='history'?'↗':'▧'}</span><h3 className="text-2xl font-semibold">{view==='scheduled'?'A clean slate. Nothing scheduled.':view==='drafts'?'Your drafts start here.':view==='issues'?'No post issues.':'No published posts in this view.'}</h3><p className="mt-3 max-w-md text-sm leading-6 text-neutral-400">{view==='issues'?'There are no current posts needing attention. Discarded posts stay out of your workspace.':view==='history'?'Published posts will appear here with their saved captions and media.':'Create a post, check the artwork and caption, then choose when it goes out.'}</p>{(view==='scheduled'||view==='drafts')&&<button type="button" onClick={()=>onNavigate?.('create')} className="mt-7 rounded-xl bg-rose-200 px-5 py-3 text-sm font-semibold text-neutral-950 hover:bg-rose-100">Create a post</button>}</div>}
+    </>}
+    {view==='create'&&<div className="mb-6 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-2xl font-semibold">Create a post</h2><p className="mt-2 text-sm text-neutral-400">Choose a book below, or upload artwork you already have.</p></div><button type="button" disabled={saving||planning||mediaBusy||Boolean(editor)} onClick={()=>{setEditor(fresh());setConfirmDelete(false);}} className={buttonClass}>Upload / write a draft</button></div>}
+    {view==='create' && <details className="mt-5 rounded-2xl border border-pink-500/25 bg-pink-500/5 p-4">
+      <summary className="cursor-pointer font-semibold">Plan a content batch</summary>
+      <p className="mt-2 text-sm text-neutral-300">Optional batch planner. It saves drafts for review, with different concepts and captions for each platform. Existing posts are kept.</p>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="text-sm">First posting day<input type="date" value={planStart} min={londonDate()} onChange={event => setPlanStart(event.target.value)} disabled={planning || mediaBusy} className={inputClass} /></label>
         <label className="text-sm">Books to feature<select value={planBook} onChange={event => setPlanBook(event.target.value)} disabled={planning || mediaBusy} className={inputClass}><option value="all">Rotate all my books</option>{books.map(book => <option key={book.slug} value={book.slug}>{book.title}</option>)}</select></label>
@@ -368,48 +316,19 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         {job?.status === 'generating' && <button type="button" disabled={job.cancel_requested} onClick={() => void pauseGeneration()} className={buttonClass}>{job.cancel_requested ? 'Pausing after current item...' : 'Pause after current item'}</button>}
       </div>
       <p className="mt-3 text-xs text-neutral-400">Uses your existing AI API credits. Copy is saved first; artwork/video generation is a separate paid AI step. The button shows how many media items it will create (up to 60 for a full month across all three networks). Generation runs in the background. You can leave this page or close the tab. Completed content is saved automatically; pause and resume missing items whenever you like. Existing dates are kept, and nothing is published automatically yet.</p>
-      {job && <div role="status" className="mt-3 rounded-xl border border-white/15 p-3 text-sm">
+      {job?.status==='generating' && <div role="status" className="mt-3 rounded-xl border border-white/15 p-3 text-sm">
         <p className="font-semibold">{job.operation === 'music' ? 'Adding backing music' : job.job_type === 'plan' ? '30-day content' : 'Artwork / videos'}: {job.status === 'generating' ? 'running in the background' : job.status}</p>
         <p className="mt-1 text-neutral-300">{job.completed_tasks} of {job.total_tasks} {job.operation === 'music' ? 'soundtracks' : job.job_type === 'plan' ? 'batches' : 'media items'} saved{job.job_type === 'plan' ? ` · ${job.created_count} platform drafts` : ''}.</p>
         {job.status === 'generating' && <p className="mt-1 text-emerald-300">You can close NovelForge. Come back later to review the results.</p>}
         {job.error_message && <p className="mt-2 text-amber-200">{job.error_message} {!job.error_message.includes('image service blocked') && 'Use Generate again to fill missing dates or media.'}</p>}
-        {job.status === 'paused' && <p className="mt-2 text-neutral-300">Saved items are kept. Use Generate again to fill missing dates or media.</p>}
       </div>}
-    </div>}
-    <div aria-live="polite">{error && <p role="alert" className="mt-4 rounded-xl bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}{notice && <p className="mt-4 text-sm text-emerald-300">{notice}</p>}{seed && editor && <p className="mt-3 text-sm text-amber-200">A generated post is waiting. Save or close your current editor to open it.</p>}</div>
-    {!reviewOnly && <>
-    <div className="mt-5 flex flex-wrap items-end gap-3">
-      <label className="text-sm">Calendar starts<input aria-label="Calendar start date" type="date" value={start} onChange={event => { if (event.target.value) { setStart(event.target.value); setSelected(event.target.value); } }} className={inputClass} /></label>
-      <button type="button" className={buttonClass} onClick={() => { const date = addDays(start, -30); setStart(date); setSelected(date); }}>Previous 30 days</button>
-      <button type="button" className={buttonClass} onClick={() => { const date = londonDate(); setStart(date); setSelected(date); }}>Today</button>
-      <button type="button" className={buttonClass} onClick={() => { const date = addDays(start, 30); setStart(date); setSelected(date); }}>Next 30 days</button>
-      <label className="text-sm">Platform<select value={platform} onChange={event => setPlatform(event.target.value)} className={inputClass}><option value="all">All platforms</option>{SOCIAL_PLATFORMS.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
-    </div>
-    <div className="mt-4 rounded-xl border border-emerald-400/25 bg-emerald-500/5 p-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={loading || saving || planning || mediaBusy || Boolean(editor) || !readyPosts.length} onClick={() => void setBatchApproval(true)} className="rounded-xl bg-emerald-600 px-5 py-3 font-bold hover:bg-emerald-500 disabled:opacity-40">{bulkAction==='approve' ? 'Approving your posts...' : `Approve all ready posts (${readyPosts.length})`}</button>
-        {undoBatch.length > 0 && <button type="button" disabled={saving || planning || mediaBusy || Boolean(editor)} onClick={() => void setBatchApproval(false)} className={buttonClass}>{bulkAction==='undo' ? 'Undoing approval...' : 'Undo last bulk approval'}</button>}
-      </div>
-      <p className="mt-2 text-sm text-neutral-300">Approves all ready future drafts{platform==='all'?' across all platforms':` for ${platform}`}. Individual posts can still be edited.</p>
-      {blockedDrafts > 0 && <p className="mt-2 text-sm text-amber-200">{blockedDrafts} draft{blockedDrafts===1?' needs':'s need'} a future time, a valid caption or missing media before approval.</p>}
-    </div>
-    </>}
-    {loading ? <p className="mt-5 text-neutral-400">Loading your saved posts...</p> : reviewOnly ? <div id="social-review-list" className="mt-5" aria-labelledby="review-title">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h3 id="review-title" className="text-xl font-bold">Posts needing artwork review</h3><p className="mt-2 text-sm text-neutral-400">All dates together. Shared Facebook/Instagram artwork appears once, with both captions available.</p></div>
-        <label className="text-sm">Platform<select value={platform} onChange={event=>setPlatform(event.target.value)} className={inputClass}><option value="all">All platforms</option>{SOCIAL_PLATFORMS.map(value=><option key={value} value={value}>{value}</option>)}</select></label>
-      </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">{reviewPosts.map(card)}{!reviewPosts.length && <p className="text-sm text-neutral-300">No artwork review notes for these platforms.</p>}</div>
-    </div> : <>
-      <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-7">
-        {days.map(date => { const count = postsByDate.get(date)?.length ?? 0; return <button type="button" key={date} aria-pressed={selected === date} onClick={() => setSelected(date)} className={`min-h-24 rounded-xl border p-3 text-left ${selected === date ? 'border-pink-400 bg-pink-500/15' : 'border-white/10 bg-neutral-950 hover:border-white/30'}`}><span className="block text-xs text-neutral-400">{new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', month: 'short', timeZone: 'UTC' })}</span><span className="mt-1 block text-lg font-bold">{Number(date.slice(-2))}</span><span className="mt-1 block text-xs text-pink-300">{count ? `${count} post${count === 1 ? '' : 's'}` : 'Empty'}</span></button>; })}
-      </div>
-      <h3 className="mt-6 font-semibold">{new Date(`${selected}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })}</h3>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">{selectedPosts.map(card)}{!selectedPosts.length && <p className="text-sm text-neutral-400">No posts planned for this day. Add a draft or save a generated poster here.</p>}</div>
-      {drafts.length > 0 && <details className="mt-5"><summary className="cursor-pointer font-semibold">Undated drafts ({drafts.length})</summary><div className="mt-3 grid gap-3 sm:grid-cols-2">{drafts.map(card)}</div></details>}
-    </>}
-    {editor && <form onSubmit={event => { event.preventDefault(); void save(false); }} className="mt-6 space-y-4 rounded-2xl border border-pink-400/30 bg-neutral-950 p-4 sm:p-5">
-      <h3 className="text-xl font-bold">{editor.existing ? 'Edit calendar post' : 'New calendar post'}</h3>
+    </details>}
+
+    <div aria-live="polite">{!editor&&error&&<p role="alert" className="my-4 rounded-xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">{error}</p>}{notice&&<p role="status" className="my-4 rounded-xl bg-emerald-400/10 p-4 text-sm text-emerald-200">{notice}</p>}</div>
+    {editor && <StudioDialog busy={saving} onClose={()=>setEditor(null)}><form onSubmit={event => { event.preventDefault(); void save(false); }} className="space-y-4 bg-neutral-950 p-4 sm:p-5">
+      <h3 className="text-xl font-bold">{editor.existing ? 'Review your post' : 'New post'}</h3>
+      {error&&<p role="alert" className="rounded-xl bg-red-400/10 p-3 text-sm text-red-200">{error}</p>}
+      {editor.existing?.quality_notes&&<div className="rounded-xl bg-amber-300/10 p-4 text-sm text-amber-100"><p>{editor.existing.quality_notes}</p><label className="mt-3 flex gap-2"><input type="checkbox" checked={editor.reviewed} onChange={event=>field('reviewed',event.target.checked)}/>I have checked the artwork and resolved this issue.</label></div>}
       <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm">Book<select value={editor.bookSlug} onChange={event => { const book = books.find(item => item.slug === event.target.value); setEditor(current => current ? { ...current, bookSlug: book?.slug ?? '', bookTitle: book?.title ?? '' } : null); }} className={inputClass}><option value="">General reader post</option>{editor.bookSlug && !books.some(book => book.slug === editor.bookSlug) && <option value={editor.bookSlug}>{editor.bookTitle}</option>}{books.map(book => <option key={book.slug} value={book.slug}>{book.title}</option>)}</select></label>
         <label className="text-sm">Platform<select value={editor.platform} onChange={event => field('platform', event.target.value as SocialPlatform)} className={inputClass}>{SOCIAL_PLATFORMS.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -420,15 +339,14 @@ export default function SocialCalendar({ books, seed, onSeedUsed }: { books: Boo
         <label className="text-sm sm:col-span-2">Caption<textarea rows={6} maxLength={10000} value={editor.caption} onChange={event => field('caption', event.target.value)} className={inputClass} /></label>
         <label className="text-sm sm:col-span-2">Hashtags<input value={editor.hashtags} onChange={event => field('hashtags', event.target.value)} className={inputClass} /></label>
         <label className="text-sm">AI media format<select value={editor.plannedMediaType} onChange={event => field('plannedMediaType', event.target.value as Editor['plannedMediaType'])} className={inputClass}><option value="">Text only</option><option value="image">Image</option><option value="video">Animated video</option></select></label>
-        <label className="text-sm sm:col-span-2">AI creative brief<textarea rows={4} maxLength={5000} value={editor.creativeBrief} onChange={event => field('creativeBrief', event.target.value)} className={inputClass} /></label>
+        <label className="text-sm sm:col-span-2">Artwork direction<textarea rows={4} maxLength={5000} value={editor.creativeBrief} onChange={event => field('creativeBrief', event.target.value)} className={inputClass} /></label>
         <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" checked={editor.includesCover} onChange={event=>field('includesCover',event.target.checked)}/>This artwork includes a book cover</label>
         <label className="text-sm sm:col-span-2">Image or MP4 video<input type="file" accept="image/jpeg,image/png,image/webp,video/mp4" onChange={event => { const file = event.target.files?.[0]; if (file) setEditor(current => current ? { ...current, file, mediaBlob: undefined, source: undefined, removeMedia: false, mediaType: file.type.startsWith('video/') ? 'video' : 'image' } : null); }} className={inputClass} /></label>
         <div className="text-sm text-neutral-400 sm:col-span-2">{editor.file ? editor.file.name : editor.source ? 'Generated media will be saved with this draft.' : editor.existing?.media_path && !editor.removeMedia ? 'Existing media is attached.' : 'No media attached.'}{(editor.source || editor.file || editor.existing?.media_path) && !editor.removeMedia && <button type="button" className="ml-3 underline" onClick={() => setEditor(current => current ? { ...current, file: undefined, mediaBlob: undefined, source: undefined, mediaType: null, removeMedia: true } : null)}>Remove attachment</button>}</div>
       </fieldset>
-      <div className="flex flex-wrap gap-3"><button type="submit" disabled={saving} className={buttonClass}>{saving ? 'Saving...' : 'Save draft'}</button><button type="button" disabled={saving} onClick={() => void save(true)} className="rounded-xl bg-pink-500 px-4 py-2 font-semibold disabled:opacity-40">Save and approve</button><button type="button" disabled={saving} onClick={() => { setEditor(null); setConfirmDelete(false); }} className={buttonClass}>Cancel</button>{editor.existing && <button type="button" disabled={saving} onClick={() => setConfirmDelete(true)} className={`${buttonClass} text-red-300`}>Delete draft</button>}</div>
+      <div className="flex flex-wrap gap-3"><button type="submit" disabled={saving} className={buttonClass}>{saving ? 'Saving...' : 'Save draft'}</button><button type="button" disabled={saving} onClick={() => void save(true)} className="rounded-xl bg-pink-500 px-4 py-2 font-semibold disabled:opacity-40">Approve & schedule</button><button type="button" disabled={saving} onClick={() => { setEditor(null); setConfirmDelete(false); }} className={buttonClass}>Cancel</button>{editor.existing && <button type="button" disabled={saving} onClick={() => setConfirmDelete(true)} className={`${buttonClass} text-red-300`}>Delete draft</button>}</div>
       {confirmDelete && <div className="rounded-xl border border-red-400/30 p-3"><p className="text-sm">Delete this saved post?</p><div className="mt-2 flex gap-3"><button type="button" disabled={saving} onClick={() => void remove()} className={`${buttonClass} text-red-300`}>Delete post</button><button type="button" disabled={saving} onClick={() => setConfirmDelete(false)} className={buttonClass}>Keep post</button></div></div>}
       <p className="text-xs text-neutral-500">Approval makes this post eligible for automatic publishing at its saved time when automatic publishing is on.</p>
-    </form>}
+    </form></StudioDialog>}
   </section>;
 }
-

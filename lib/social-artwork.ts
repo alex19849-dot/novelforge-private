@@ -285,7 +285,7 @@ export function posterPrompt(
     ROMANCE_STYLE,
     "AUTHOR CONTROL",
     "The author's guidance below is the creative brief. Each generation must be art-directed specifically for that brief and must not reuse a fixed layout.",
-    "Use book-specific environments, objects, photography, texture, typography and lighting in the approved romantic identity. No people or human figures. A stale brief asking for narrow sports lettering or brush script must not override the approved serif direction.",
+    "Use book-specific environments, objects, photography, texture, typography and lighting in the approved romantic identity. No people or human figures. Stale briefs must not override the book-led direction. Reject generic paired-prop still lifes and choose readable typography appropriate to the book rather than a mandatory font family.",
     "Do not impose a gothic, sports, office, floral, dark, Kindle, trope-list or any other default style. Do not add a permanent footer, fixed icon row, standard heading position or repeated composition.",
     "Do not introduce irrelevant imagery. Every visible element must support the author's brief, the supplied cover or the verified book facts.",
     book.title?"BOOK-SPECIFIC CONTENT: exact title and author typography, no fabricated quotes.":"GENERAL READER CONTENT: no book attribution or sales footer. The social line is original, not an extract.",
@@ -424,7 +424,7 @@ export async function inspectPoster(
               !["book_promotion", "new_release"].includes(contentType)
                 ? "This is hook or reader-engagement artwork. A cover is optional unless the guidance requires it. When no cover is required or shown, score coverFidelity as 100 (not applicable) and do not mark review merely because there is no cover."
                 : "This campaign uses people-free title-and-author typography. A cover is optional; do not mark review for its absence. When absent, coverFidelity is 100 (not applicable).",
-              "Mark review when any score is below 70, when text is clipped or too small for a phone, or when people, human figures, brush script, distressed lettering or condensed sports fonts appear. Keep the summary under 240 characters.",
+              "Mark review when any score is below 70, when text is clipped or too small for a phone, or when people, human figures, generic paired-prop still lifes, corporate layouts or unreadable decorative lettering appear. Keep the summary under 240 characters.",
               "Also write the finished social post that accompanies this artwork. Create an engaging hook title, a substantial natural caption, a clear reading call to action and strong relevant hashtags.",
               "Create a motion map for animating this exact finished poster without redrawing it. All coordinates must be normalized from 0 to 1 and describe top-left x, top-left y, width and height on the finished poster.",
               "Mark the main book-specific photographic object or scene as the hero region, or the genuine cover only if one is actually present. Mark the visible promotional hook, each separate trope treatment, the main CTA, website and any visually useful detail as separate regions only when actually visible.",

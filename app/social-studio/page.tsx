@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import { supabase } from "../../lib/supabaseClient";
-import BufferConnection from "./BufferConnection";
 import SocialCalendar from "./SocialCalendar";
+import type { StudioView,StudioCounts } from "../../lib/social-workspace";
+import StudioNav from "./StudioNav";
 import type { CalendarSeed } from "../../lib/social-calendar";
 
 type CatalogueBook = {
@@ -527,6 +528,8 @@ function parseResponseText(text: string, status: number) {
 }
 
 export default function SocialStudioPage() {
+  const [studioView,setStudioView]=useState<StudioView>('scheduled');
+  const [studioCounts,setStudioCounts]=useState<StudioCounts>({scheduled:0,drafts:0,issues:0,history:0});
   const [catalogue, setCatalogue] = useState<CatalogueResponse | null>(null);
   const [catalogueError, setCatalogueError] = useState("");
   const [calendarSeed, setCalendarSeed] = useState<CalendarSeed | null>(null);
@@ -827,7 +830,7 @@ export default function SocialStudioPage() {
   return (
     <main className="min-h-[100dvh] bg-neutral-950 text-white">
       <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/95 px-5 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-4">
+        <div className="mx-auto flex max-w-7xl items-center gap-4">
           <a href="/story-chat" aria-label="Back to NovelForge" className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xl hover:bg-white/10">←</a>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-pink-500">NovelForge</p>
@@ -836,9 +839,10 @@ export default function SocialStudioPage() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-5 py-8">
-        <BufferConnection />
-        <SocialCalendar books={catalogue?.books ?? []} seed={calendarSeed} onSeedUsed={() => setCalendarSeed(null)} />
+      <StudioNav view={studioView} counts={studioCounts} onChange={setStudioView}/>
+      <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+        <SocialCalendar books={catalogue?.books ?? []} seed={calendarSeed} onSeedUsed={() => setCalendarSeed(null)} view={studioView} onNavigate={setStudioView} onCounts={setStudioCounts}/>
+        <div hidden={studioView!=='create'}>
         {selectedBook ? (
           <section className="overflow-hidden rounded-3xl border border-pink-500/30 bg-neutral-900 shadow-2xl">
             <div className="flex gap-4 border-b border-white/10 p-5 sm:gap-6">
@@ -854,13 +858,13 @@ export default function SocialStudioPage() {
             <div className="p-5 sm:p-7">
               <label htmlFor="creative-guidance" className="text-lg font-bold">What do you want to create?</label>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
-                Describe the complete result in your own words. Every generation is created fresh from this brief and the genuine cover. Nothing is added because of a built-in poster template.
+                Describe the mood, story tension and words you want readers to notice. Each concept should suit this book, with clear type and a composition of its own.
               </p>
               <textarea
                 id="creative-guidance"
                 value={instructions}
                 onChange={(event) => { setInstructions(event.target.value); clearResults(); }}
-                rows={8}
+                rows={4}
                 placeholder="Describe the style, layout, wording, imagery, colours, effects, cover placement, tropes, icons and call to action you want..."
                 className="mt-4 w-full resize-y rounded-2xl border border-white/10 bg-neutral-950 px-4 py-4 leading-6 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
               />
@@ -884,7 +888,7 @@ export default function SocialStudioPage() {
 
               <div className="mt-6">
                 <button type="button" disabled={Boolean(busy)} onClick={() => void createCampaign()} className="w-full rounded-xl bg-pink-500 px-4 py-4 font-bold transition hover:bg-pink-400 disabled:cursor-not-allowed disabled:opacity-40">
-                  {busy === "image" ? "Creating fresh posters..." : "Create Posters"}
+                  {busy === "image" ? "Creating artwork…" : "Create artwork"}
                 </button>
               </div>
 
@@ -928,8 +932,8 @@ export default function SocialStudioPage() {
                         </button>
 
                         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                          <button type="button" disabled={Boolean(busy) || Boolean(calendarSeed) || !image} onClick={() => { setCalendarSeed({ book_slug: selectedBook.slug, book_title: selectedBook.title, platform: post.platform, title: post.title, caption: post.caption, hashtags: post.hashtags, mediaSource: image!.dataUrl, media_type: "image", mimeType: "image/jpeg" }); document.getElementById("social-calendar")?.scrollIntoView({ behavior: "smooth" }); }} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-40">Save poster to calendar</button>
-                          {isVideo && <button type="button" disabled={Boolean(busy) || Boolean(calendarSeed)} onClick={() => { setCalendarSeed({ book_slug: selectedBook.slug, book_title: selectedBook.title, platform: post.platform, title: post.title, caption: post.caption, hashtags: post.hashtags, mediaSource: video.url, mediaBlob: video.blob, media_type: "video", mimeType: video.mimeType.split(";")[0] }); document.getElementById("social-calendar")?.scrollIntoView({ behavior: "smooth" }); }} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-40">Save video to calendar</button>}
+                          <button type="button" disabled={Boolean(busy) || Boolean(calendarSeed) || !image} onClick={() => { setStudioView('drafts');setCalendarSeed({ book_slug: selectedBook.slug, book_title: selectedBook.title, platform: post.platform, title: post.title, caption: post.caption, hashtags: post.hashtags, mediaSource: image!.dataUrl, media_type: "image", mimeType: "image/jpeg" }); document.getElementById("social-calendar")?.scrollIntoView({ behavior: "smooth" }); }} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-40">Save as draft</button>
+                          {isVideo && <button type="button" disabled={Boolean(busy) || Boolean(calendarSeed)} onClick={() => { setStudioView('drafts');setCalendarSeed({ book_slug: selectedBook.slug, book_title: selectedBook.title, platform: post.platform, title: post.title, caption: post.caption, hashtags: post.hashtags, mediaSource: video.url, mediaBlob: video.blob, media_type: "video", mimeType: video.mimeType.split(";")[0] }); document.getElementById("social-calendar")?.scrollIntoView({ behavior: "smooth" }); }} className="rounded-xl bg-emerald-600 px-4 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-40">Save video as draft</button>}
                           {image && <a href={image.dataUrl} download={`${selectedBook.slug}-${post.platform}.jpg`} className="flex items-center justify-center rounded-xl bg-pink-500 px-4 py-3 font-semibold hover:bg-pink-400">Download Poster</a>}
                           {isVideo && <a href={video.url} download={`${selectedBook.slug}-${post.platform}.${video.extension}`} className="flex items-center justify-center rounded-xl bg-violet-500 px-4 py-3 font-semibold hover:bg-violet-400">Download Video</a>}
                           <button type="button" disabled={Boolean(busy) || post.platform === "tiktok" || !image} onClick={() => void publish(post, "image")} className="rounded-xl border border-pink-400/40 bg-pink-500/10 px-4 py-3 font-semibold text-pink-200 hover:bg-pink-500/20 disabled:cursor-not-allowed disabled:opacity-40">
@@ -972,6 +976,7 @@ export default function SocialStudioPage() {
             </div>
           </>
         )}
+        </div>
       </section>
     </main>
   );

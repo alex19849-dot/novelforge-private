@@ -65,14 +65,14 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
         const [preferences,learning,recentRows]=await Promise.all([
           admin.from('social_strategy_settings').select('settings').eq('user_id',user.id).maybeSingle(),
           admin.from('social_learning_state').select('report').eq('user_id',user.id).maybeSingle(),
-          admin.from('social_posts').select('platform,book_slug,title,caption,content_metadata').eq('user_id',user.id).neq('status','cancelled').order('created_at',{ascending:false}).limit(120),
+          admin.from('social_posts').select('platform,book_slug,title,caption,creative_brief,content_metadata').eq('user_id',user.id).neq('status','cancelled').order('created_at',{ascending:false}).limit(120),
         ]);
         if(preferences.error||learning.error||recentRows.error)throw new Error('Your saved strategy could not be loaded.');
         const settings=cleanStrategy(preferences.data?.settings);
         const report=learning.data?.report?.version===1&&Date.parse(learning.data.report.updated_at)>Date.now()-7*86400000?learning.data.report as LearningReport:null;
         const recent=recentRows.data??[];
         const assignments=createStrategyAssignments(date,platforms,books,settings,report,recent as CalendarPost[]);
-        config={platforms,books,guidance:typeof body.guidance==='string'?body.guidance.slice(0,3000):'',strategy:{settings,report,recent:recent.map(p=>({platform:p.platform,caption:p.caption.slice(0,240)}))}};
+        config={platforms,books,guidance:typeof body.guidance==='string'?body.guidance.slice(0,3000):'',strategy:{settings,report,recent:recent.map(p=>({platform:p.platform,caption:p.caption.slice(0,240),creativeBrief:p.creative_brief?.slice(0,1200)??''}))}};
         for(let i=0;i<30;i+=5)tasks.push({ordinal:i/5,request:{assignments:assignments.slice(i,i+5)}});
       } else {
         const {data:rows,error}=await admin.from('social_posts').select('*').eq('user_id',user.id).eq('status','draft').is('media_path',null).not('planned_media_type','is',null).gte('scheduled_at',londonSchedule(date,'00:00')).lt('scheduled_at',londonSchedule(addDays(date,30),'00:00')).order('scheduled_at');
