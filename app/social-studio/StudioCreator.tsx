@@ -355,6 +355,7 @@ export default function StudioCreator({
   }
   async function save(post: Editable, approve: boolean) {
     if (!book || !result || inFlight.current) return;
+    const schedule = approve || post.saved?.status === "approved";
     inFlight.current = true;
     setBusy(post.id);
     setError("");
@@ -364,7 +365,7 @@ export default function StudioCreator({
       const { data } = await supabase.auth.getUser();
       if (!data.user) throw Error("Sign in again before saving.");
       const scheduled = post.date ? londonSchedule(post.date, post.time) : null;
-      if (approve && (!scheduled || Date.parse(scheduled) <= Date.now()))
+      if (schedule && (!scheduled || Date.parse(scheduled) <= Date.now()))
         throw Error("Choose a future UK posting date and time.");
       const track = musicForPath(post.mediaPath);
       const values = {
@@ -379,7 +380,7 @@ export default function StudioCreator({
         media_type: post.mediaType,
         planned_media_type: post.mediaType,
         scheduled_at: scheduled,
-        status: approve ? "approved" : "draft",
+        status: schedule ? "approved" : "draft",
         creative_brief: post.creativeBrief,
         quality_notes: "",
         content_metadata: {
@@ -395,11 +396,11 @@ export default function StudioCreator({
         },
       };
       if (!values.caption) throw Error("Write a caption before saving.");
-      if (approve && !readyForApproval({ ...values, status: "draft" }))
+      if (schedule && !readyForApproval({ ...values, status: "draft" }))
         throw Error(
           "Check the media, title and caption length before scheduling.",
         );
-      if (approve && post.platform === "instagram")
+      if (schedule && post.platform === "instagram")
         throw Error(
           "Instagram is managed manually. Save the draft and download its poster.",
         );
@@ -434,12 +435,12 @@ export default function StudioCreator({
       const saved = response.data as CalendarPost;
       edit(post.id, {
         saved,
-        notice: approve
+        notice: schedule
           ? "Approved for this platform’s selected time."
-          : "Draft saved.",
+          : "Draft saved. It will not post until you choose Approve & schedule.",
       });
       onSaved();
-      if (approve) {
+      if (schedule) {
         const h = await headers();
         const settingsResponse = await fetch("/api/social-studio/publishing", {
           headers: h,
@@ -768,7 +769,7 @@ export default function StudioCreator({
                 className={`${secondary} capitalize ${activePlatform === p.platform ? "border-rose-200/50 bg-rose-200/10 text-rose-100" : ""}`}
               >
                 {channelName(p.platform)}
-                {p.saved ? " ✓" : ""}
+                {p.saved ? p.saved.status === "approved" ? " · Scheduled" : p.saved.status === "draft" ? " · Draft" : " ✓" : ""}
               </button>
             ))}
           </div>
@@ -922,7 +923,7 @@ export default function StudioCreator({
                   onClick={() => void save(active, false)}
                   className={secondary}
                 >
-                  Save draft
+                  {active.saved?.status === "approved" ? "Save changes" : "Save draft"}
                 </button>
                 {active.platform !== "instagram" && (
                   <button

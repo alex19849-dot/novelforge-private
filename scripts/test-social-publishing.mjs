@@ -45,6 +45,14 @@ await db.exec('set role authenticated');await db.query("select set_config('reque
 console.log('PASS: actual database RLS, owner/worker/version/time/approval fences, atomic duplicate claim, retry gating, stale result rejection, published only after provider confirmation.');
 const channel={id:'tt',name:'marlow.quinn',service:'tiktok',organizationId:'org'};
 const input=bufferPayload({...own,platform:'tiktok',media_path:owner+'/calendar/clip.mp4',media_type:'video',hashtags:['#BookTok'],generation_run_id:randomUUID()},channel,'https://example.com/clip.mp4');assert.equal(input.schedulingType,'automatic');assert.equal(input.saveToDraft,false);assert.equal(input.metadata.tiktok.isAiGenerated,true);
+for(const platform of ['facebook','tiktok','youtube']) {
+ const type=platform==='facebook'?'image':'video';
+ const post={...own,platform,title:'Holiday Hookup',media_path:owner+'/creations/studio-preview/'+(type==='image'?'feed.jpg':'short.mp4'),media_type:type,hashtags:['#MMRomance']};
+ const created=bufferPayload(post,{...channel,service:platform},'https://example.com/studio-media');
+ assert.equal(created.assets.length,1);assert.equal(created.saveToDraft,false);assert.equal(created.mode,'shareNow');
+ assert.throws(()=>bufferPayload({...post,media_path:other+'/creations/foreign.mp4'},channel,''),/does not belong/);
+}
+
 const savedFetch=globalThis.fetch;process.env.BUFFER_API_KEY='fixture-only';let calls=0;
 try {
  globalThis.fetch=async()=>{calls++;return new Response('',{status:429,headers:{'retry-after':'120'}});};await assert.rejects(()=>createBufferPost(input),e=>e instanceof BufferPublishError&&e.kind==='retry'&&e.retryAfter===120);assert.equal(calls,1);

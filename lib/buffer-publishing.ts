@@ -43,7 +43,7 @@ export function bufferPayload(post:CalendarPost,channel:BufferChannel,storageUrl
   const text=[post.caption.trim(),post.hashtags.join(' ').trim()].filter(Boolean).join('\n\n');
   if(!text||text.length>(post.platform==='facebook'?10000:post.platform==='youtube'?5000:2200)) throw new Error(`${post.platform} caption and hashtags exceed its publishing limit.`);
   if(post.platform!=='facebook'&&!post.media_path) throw new Error(`${post.platform} needs media before publishing.`);
-  if(post.media_path&&!post.media_path.startsWith(`${post.user_id}/calendar/`)) throw new Error('The attached media does not belong to this calendar.');
+  if(post.media_path&&!['calendar','creations'].some(folder=>post.media_path!.startsWith(`${post.user_id}/${folder}/`))) throw new Error('The attached media does not belong to this account.');
   if(post.platform==='youtube'&&(!post.title.trim()||post.title.length>100||post.media_type!=='video')) throw new Error('YouTube needs an MP4 video and a title of at most 100 characters.');
   const assets=post.media_path?[post.media_type==='video'?{video:{url:storageUrl,metadata:{thumbnailOffset:1000}}}:{image:{url:storageUrl}}]:[];
   const generated=Boolean(post.generation_run_id);
