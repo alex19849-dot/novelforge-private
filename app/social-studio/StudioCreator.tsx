@@ -358,6 +358,8 @@ export default function StudioCreator({
     inFlight.current = true;
     setBusy(post.id);
     setError("");
+    setMessage("");
+    edit(post.id, { notice: undefined });
     try {
       const { data } = await supabase.auth.getUser();
       if (!data.user) throw Error("Sign in again before saving.");
@@ -425,7 +427,9 @@ export default function StudioCreator({
         throw Error(
           response.error.code === "23505" || response.error.code === "PGRST116"
             ? "This post may already be saved or changed in another tab. Check Drafts or Scheduled before trying again."
-            : response.error.message,
+            : response.error.code === "23514"
+              ? "This post could not be saved because its media or posting details were rejected. Your artwork is kept. Refresh Studio and retry Save draft or Approve and schedule, without generating again."
+              : "This post could not be saved. Your artwork and edits are kept. Try saving again.",
         );
       const saved = response.data as CalendarPost;
       edit(post.id, {
@@ -736,7 +740,7 @@ export default function StudioCreator({
             {error}
           </p>
         )}
-        {message && (
+        {message && !error && (
           <p
             role="status"
             className="rounded-xl border border-emerald-300/20 bg-emerald-400/5 p-4 text-sm text-emerald-100"
