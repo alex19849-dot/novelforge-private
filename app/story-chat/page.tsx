@@ -1,4 +1,5 @@
 "use client";
+import { sectionLabel, specialSectionTitle } from "../../lib/story-section";
 import { recordStyleCorrection } from "../../lib/author-style-client";
 import { bounded, readStoryLibrary, type LibrarySession } from "../../lib/story-library-client";
 
@@ -164,7 +165,8 @@ function getRequestedWordCount(message: string): number | null {
 type ChapterDeletionRequest =
   | { kind: "none" }
   | { kind: "ambiguous" }
-  | { kind: "exact"; chapterNumber: number };
+  | { kind: "exact"; chapterNumber: number }
+  | { kind: "special"; sectionKind: "prologue" | "epilogue" };
 
 const CHAPTER_NUMBER_WORDS: Record<string, number> = {
   one: 1,
@@ -217,6 +219,10 @@ function getChapterDeletionRequest(message: string): ChapterDeletionRequest {
     /\b(?:do\s+not|don't|never)\s+(?:delete|remove)\b/gi,
     "",
   );
+  const specialSection = commandText.match(/\b(?:delete|remove)\s+(?:(?:the|my|this|saved)\s+)*(prologue|epilogue)\b/i);
+  if (specialSection) {
+    return { kind: "special", sectionKind: specialSection[1].toLowerCase() as "prologue" | "epilogue" };
+  }
   const directlyRequestsChapterDeletion =
     /\b(?:delete|remove)\s+(?:the\s+)?(?:saved\s+)?chapter\b/i.test(
       commandText,
@@ -1867,7 +1873,7 @@ device.`,
     const deletionRequest = getChapterDeletionRequest(trimmedMessage);
     const hasPendingChapter = pendingGeneration?.storyId === story?.id;
     const bibleRequest = isStoryBibleRequest(trimmedMessage);
-    const isAionRequest = /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage) && !bibleRequest && !requestsChapterGuidance(trimmedMessage) && !requestsChapterGeneration(trimmedMessage);
+    const isAionRequest = deletionRequest.kind === "none" && /^\s*aion(?:\s*[:,-]|\s+)/i.test(trimmedMessage) && !bibleRequest && !requestsChapterGuidance(trimmedMessage) && !requestsChapterGeneration(trimmedMessage);
 
     if (!story || !trimmedMessage || isThinking) {
       return;
@@ -1968,7 +1974,7 @@ device.`,
               id: Date.now() + 1,
               role: "assistant",
               content:
-                "Which saved chapter number do you want me to delete? If you mean a Story Bible entry instead, name that entry.",
+                "Which section do you want me to delete? Name the chapter number, prologue or epilogue. If you mean a Story Bible entry instead, name that entry.",
             },
           ],
           updatedAt: new Date().toISOString(),
@@ -1978,20 +1984,31 @@ device.`,
         return;
       }
 
-      if (deletionRequest.kind === "exact") {
-        const chapterNumber = deletionRequest.chapterNumber;
-        const chapterExists = requestStory.chapters.some(
-          (chapter) => chapter.number === chapterNumber,
-        );
-        const pendingTargetNumber =
-          pendingGeneration?.storyId === requestStory.id
-            ? (pendingGeneration.generatedChapter.replaceChapterNumber ??
-              Math.max(
-                0,
-                ...requestStory.chapters.map((chapter) => chapter.number),
-              ) + 1)
-            : null;
-        const clearsPendingDraft = pendingTargetNumber === chapterNumber;
+      if (deletionRequest.kind === "exact" || deletionRequest.kind === "special") {
+        const pendingChapter = pendingGeneration?.storyId === requestStory.id
+          ? pendingGeneration.generatedChapter
+          : null;
+        const pendingTargetNumber = pendingChapter
+          ? pendingChapter.kind === "prologue" ? 0
+            : pendingChapter.replaceChapterNumber ??
+              Math.max(0, ...requestStory.chapters.map(chapter => chapter.number)) + 1
+          : null;
+        const savedSection = deletionRequest.kind === "special"
+          ? requestStory.chapters.find(chapter => specialSectionTitle(chapter).toLowerCase() === deletionRequest.sectionKind)
+          : requestStory.chapters.find(chapter => chapter.number === deletionRequest.chapterNumber);
+        const chapterNumber = deletionRequest.kind === "exact"
+          ? deletionRequest.chapterNumber
+          : savedSection?.number ??
+            (pendingChapter && specialSectionTitle(pendingChapter).toLowerCase() === deletionRequest.sectionKind
+              ? pendingTargetNumber! : deletionRequest.sectionKind === "prologue" ? 0 : -1);
+        const chapterLabel = savedSection ? sectionLabel(savedSection)
+          : deletionRequest.kind === "special"
+            ? deletionRequest.sectionKind === "prologue" ? "Prologue" : "Epilogue"
+            : `Chapter ${chapterNumber}`;
+        const chapterExists = Boolean(savedSection);
+        const clearsPendingDraft = pendingTargetNumber === chapterNumber &&
+          (deletionRequest.kind === "exact" || Boolean(pendingChapter &&
+            specialSectionTitle(pendingChapter).toLowerCase() === deletionRequest.sectionKind));
 
         if (!chapterExists) {
           const missingChapterStory: StoryWorkspace = {
@@ -2002,8 +2019,8 @@ device.`,
                 id: Date.now() + 1,
                 role: "assistant",
                 content: clearsPendingDraft
-                  ? `Chapter ${chapterNumber} was not saved, but its preserved draft has been cleared.`
-                  : `Chapter ${chapterNumber} does not exist, so nothing was deleted.`,
+                  ? `${chapterLabel} was not saved, but its preserved draft has been cleared.`
+                  : `${chapterLabel} does not exist, so nothing was deleted.`,
               },
             ],
             updatedAt: new Date().toISOString(),
@@ -2064,7 +2081,7 @@ device.`,
             {
               id: Date.now() + 1,
               role: "assistant",
-              content: `Chapter ${chapterNumber} has been deleted${
+              content: `${chapterLabel} has been deleted${
                 clearsPendingDraft
                   ? " and its preserved draft has been cleared"
                   : ""
