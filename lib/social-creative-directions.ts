@@ -88,7 +88,7 @@ export const HOOK_ANGLES = [
   "playful chemistry",
 ] as const;
 export type CreativeRecipe = {
-  fontStyle?: "serif" | "sans";
+  fontStyle?: "serif" | "sans" | "script";
   key: string;
   sceneMode: number;
   layout: number;
@@ -105,6 +105,7 @@ export type CreativeHistory = {
 export function nextCreativeDirection(
   history: CreativeHistory[],
   seed = 0,
+  book?: Pick<StudioBook, "subgenre">,
 ): CreativeRecipe {
   const used = new Set(history.map((h) => h.concept_key));
   const candidates: CreativeRecipe[] = [];
@@ -113,7 +114,8 @@ export function nextCreativeDirection(
       for (let p = 0; p < PALETTES.length; p++)
         for (let h = 0; h < HOOK_ANGLES.length; h++) {
           const key = [s, l, p, h].join(":");
-          if (!used.has(key))
+          const festive = /christmas|holiday|festive/i.test(book?.subgenre ?? "");
+          if (!used.has(key) && (!festive || [0, 1, 5].includes(p)))
             candidates.push({
               key,
               sceneMode: s,
@@ -300,7 +302,9 @@ export function reviewedPosterBrief(
           : recipe.layout;
   const typography =
     prompt.match(/Typography:\s*([^\n.]+)/i)?.[1]?.toLowerCase() ?? "";
-  const fontStyle = typography.includes("sans")
+  const fontStyle = typography.includes("script")
+    ? "script"
+    : typography.includes("sans")
     ? "sans"
     : typography.includes("serif")
       ? "serif"

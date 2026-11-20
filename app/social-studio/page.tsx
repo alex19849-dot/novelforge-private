@@ -53,7 +53,7 @@ export default function SocialStudioPage() {
   }, []);
   return (
     <main className="min-h-[100dvh] bg-neutral-950 text-white">
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-neutral-950/95 px-5 py-4 backdrop-blur">
+      <header className="relative z-30 border-b border-white/10 bg-neutral-950/95 px-5 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center gap-4">
           <a
             href="/story-chat"

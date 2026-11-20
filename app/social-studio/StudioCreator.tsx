@@ -594,7 +594,7 @@ export default function StudioCreator({
       </fieldset>
       <details
         open={!result}
-        className="rounded-2xl border border-white/10 bg-neutral-900/50 p-5 sm:p-6"
+        className="rounded-2xl border border-white/10 bg-neutral-900/50 p-3 sm:p-6"
       >
         <summary className="cursor-pointer text-xl font-semibold">
           2 · Generate your prompt
@@ -685,7 +685,7 @@ export default function StudioCreator({
       {prompt && (
         <details
           open={!result}
-          className="rounded-2xl border border-white/10 bg-neutral-900/50 p-5 sm:p-6"
+          className="rounded-2xl border border-white/10 bg-neutral-900/50 p-3 sm:p-6"
         >
           <summary className="cursor-pointer text-xl font-semibold">
             3 · Generate your poster
@@ -746,7 +746,7 @@ export default function StudioCreator({
         )}
       </div>
       {active && (
-        <div className="rounded-2xl border border-white/10 bg-neutral-900/50 p-5 sm:p-6">
+        <div className="rounded-2xl border border-white/10 bg-neutral-900/50 p-3 sm:p-6">
           <h3 className="text-xl font-semibold">
             4 · Review and schedule each platform
           </h3>
@@ -830,11 +830,7 @@ export default function StudioCreator({
             </div>
             <div className="space-y-4">
               <p className="text-sm text-neutral-400">
-                This caption and hashtag set was written specifically for{" "}
-                <span className="capitalize text-white">
-                  {channelName(active.platform)}
-                </span>
-                . Edit anything before saving.
+                <span className="capitalize text-white">{channelName(active.platform)}</span> caption and hashtags. Edit before saving.
               </p>
               <label className="block text-sm">
                 {active.platform === "youtube" ? "YouTube title" : "Post title"}
