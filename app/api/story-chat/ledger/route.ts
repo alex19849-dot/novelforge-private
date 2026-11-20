@@ -457,7 +457,14 @@ CHARACTER VOICE
 Maintain one operational voice profile for every established main POV
 character. Preserve a profile unless the Story Bible or completed prose shows a
 genuine stable change. Never canonise a weak generated tic as the intended
-voice.
+voice. Ground each profile in the established age, upbringing, education,
+work, personality and cultural or regional background, without inventing
+missing biographical facts. Separate current residence from the dialect the
+character grew up speaking; moving abroad does not automatically replace it.
+Distinguish scene-age changes and deliberate adaptation from a permanent
+voice change. Correct profile descriptions that merely preserve flowery
+phrasing or a generic literary narrator against the author's direction and
+established character facts; do not treat those output habits as canon.
 
 Make the profiles observably different. Use narrativeRhythm for syntax, line
 length and decision speed; vocabulary for register, domain language and
