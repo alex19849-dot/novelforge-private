@@ -858,14 +858,14 @@ export default function SocialStudioPage() {
             <div className="p-5 sm:p-7">
               <label htmlFor="creative-guidance" className="text-lg font-bold">What do you want to create?</label>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-400">
-                Describe the mood, story tension and words you want readers to notice. Each concept should suit this book, with clear type and a composition of its own.
+                Describe the mood, story tension and words you want readers to notice. Use a romantic scene with clear title and author text. Physical-book mockups and invented covers are not allowed.
               </p>
               <textarea
                 id="creative-guidance"
                 value={instructions}
                 onChange={(event) => { setInstructions(event.target.value); clearResults(); }}
                 rows={4}
-                placeholder="Describe the style, layout, wording, imagery, colours, effects, cover placement, tropes, icons and call to action you want..."
+                placeholder="Describe the style, layout, wording, imagery, colours, effects, tropes and call to action you want..."
                 className="mt-4 w-full resize-y rounded-2xl border border-white/10 bg-neutral-950 px-4 py-4 leading-6 text-white outline-none placeholder:text-neutral-600 focus:border-pink-500"
               />
 

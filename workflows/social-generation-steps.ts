@@ -1,3 +1,4 @@
+import {ARTWORK_ASSET_POLICY_VERSION,assertVerifiedArtwork} from '../lib/social-asset-policy';
 import OpenAI from 'openai';
 import { FatalError, getWorkflowMetadata } from 'workflow';
 import { createHash } from 'node:crypto';
@@ -19,7 +20,7 @@ import {learnedPostingHours} from '../lib/social-strategy';
 import {validateStrategyCopy} from '../lib/social-strategy-validation';
 import {generalReaderBook} from '../lib/social-planner';
 type Assignment=StrategyAssignment;
-type Job={id:string;user_id:string;status:string;job_type:'plan'|'media';start_date:string;cancel_requested:boolean;config:{books:PlanBook[];platforms:SocialPlatform[];guidance:string;strategy?:{settings:StrategySettings;recent:{platform:string;caption:string}[];report:LearningReport|null}}};
+type Job={id:string;user_id:string;status:string;job_type:'plan'|'media';start_date:string;cancel_requested:boolean;config:{books:PlanBook[];platforms:SocialPlatform[];guidance:string;strategy?:{settings:StrategySettings;recent:{platform:string;caption:string;creativeBrief?:string}[];report:LearningReport|null}}};
 type Task={id:string;run_id:string;user_id:string;status:string;response_id:string|null;request:{assignments?:Assignment[];posts?:CalendarPost[];asset_mode?:'original_cover_overlay';music?:boolean};result:Record<string,unknown>};
 const ai=()=>new OpenAI({apiKey:process.env.OPENAI_API_KEY,timeout:30000,maxRetries:0});
 async function context(runId:string,taskId?:string) {
@@ -75,16 +76,16 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
       await recordProgress(job); return null;
     }
     let strategy=job.config.strategy;
-    if(strategy){const {data,error}=await db.from('social_posts').select('platform,caption').eq('user_id',job.user_id).neq('status','cancelled').order('created_at',{ascending:false}).limit(120);if(error)throw new Error('Recent content could not be checked.');strategy={...strategy,recent:data.map(p=>({platform:p.platform,caption:p.caption.slice(0,240)}))};}
+    if(strategy){const {data,error}=await db.from('social_posts').select('platform,caption,creative_brief').eq('user_id',job.user_id).neq('status','cancelled').order('created_at',{ascending:false}).limit(120);if(error)throw new Error('Recent content could not be checked.');strategy={...strategy,recent:data.map(p=>({platform:p.platform,caption:p.caption.slice(0,240),creativeBrief:p.creative_brief?.slice(0,1200)??''}))};}
     request=planRequest(job.config.platforms,open,job.config.books,job.config.guidance,strategy);
     const {error:saveError}=await db.from('social_generation_tasks').update({request:{assignments:open}}).eq('id',taskId).eq('user_id',job.user_id);
     if(saveError) throw new FatalError('The batch could not be saved before generation.');
   } else {
     const posts=task.request.posts!;const first=posts[0];
     // Reuse a completed feed/portrait asset when another platform still needs it.
-    const {data:existing,error}=await db.from('social_posts').select('*').eq('user_id',job.user_id).eq('campaign_id',first.campaign_id).not('media_path','is',null);
+    const {data:existing,error}=await db.from('social_posts').select('*').eq('user_id',job.user_id).eq('campaign_id',first.campaign_id).neq('status','cancelled').not('media_path','is',null);
     if(error) throw new FatalError('Existing artwork could not be checked.');
-    const match=(existing as CalendarPost[]).find(p=>p.book_slug===first.book_slug&&p.media_type===((first.platform==='tiktok'||first.platform==='youtube')?'video':first.planned_media_type)&&p.creative_brief===first.creative_brief&&((p.platform==='tiktok'||p.platform==='youtube'))===((first.platform==='tiktok'||first.platform==='youtube')));
+    const match=(existing as CalendarPost[]).find(p=>p.content_metadata?.artwork_asset_policy===ARTWORK_ASSET_POLICY_VERSION&&p.book_slug===first.book_slug&&p.media_type===((first.platform==='tiktok'||first.platform==='youtube')?'video':first.planned_media_type)&&p.creative_brief===first.creative_brief&&((p.platform==='tiktok'||p.platform==='youtube'))===((first.platform==='tiktok'||first.platform==='youtube')));
     if(match) { await attachMedia(job,task,match.media_path!,match.quality_notes??'',match.media_type!); return null; }
     const book=first.book_slug?job.config.books.find(b=>b.slug===first.book_slug)!:generalReaderBook();
     request={model:'gpt-6-astra',background:true,store:true,reasoning:{effort:'low'},max_output_tokens:1000,
@@ -119,7 +120,7 @@ async function attachMedia(job:Job,task:Task,path:string,notes:string,mediaType?
   const db=jobAdmin();let saved=0;
   for(const post of task.request.posts!) {
     // Optimistic version checks protect edits, approvals and reschedules made while AI runs.
-    const {data,error}=await db.from('social_posts').update({media_path:path,media_type:mediaType??post.planned_media_type,planned_media_type:mediaType??post.planned_media_type,quality_notes:notes}).eq('id',post.id).eq('user_id',job.user_id).eq('version',post.version).eq('status','draft').is('media_path',null).select('id');
+    const {data,error}=await db.from('social_posts').update({media_path:path,media_type:mediaType??post.planned_media_type,planned_media_type:mediaType??post.planned_media_type,quality_notes:notes,content_metadata:{...post.content_metadata,artwork_asset_policy:ARTWORK_ASSET_POLICY_VERSION}}).eq('id',post.id).eq('user_id',job.user_id).eq('version',post.version).eq('status','draft').is('media_path',null).select('id');
     if(error) throw new Error('Generated artwork could not be attached.');
     saved+=data.length;
   }
@@ -173,11 +174,14 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
       throw new FatalError(noImageMessage(response));
     }
     let artworkSource=Buffer.from(image.result,'base64');
+    const inspection=await inspectPoster(`data:image/jpeg;base64,${artworkSource.toString('base64')}`,{...book,author:'Marlow Quinn'},first.platform,first.creative_brief!,first.post_type);
+    try {assertVerifiedArtwork(inspection.qualityCheck);} catch(error){throw new FatalError(error instanceof Error?error.message:'Artwork asset check failed.');}
     if(task.request.asset_mode==='original_cover_overlay') artworkSource=Buffer.from(await compositeOriginalCover(artworkSource,await originalCoverBytes(book.coverUrl),(first.platform==='tiktok'||first.platform==='youtube')));
     const video=(first.platform==='tiktok'||first.platform==='youtube')||first.planned_media_type==='video';
     const track=video?chooseSocialTrack(first.campaign_id,first.post_type):null;
     const extension=video?'mp4':'jpg';
-    const file=`${taskId}${track?`-music-v${MUSIC_VERSION}-${track.id}`:''}.${extension}`;
+    const assetTag=createHash('sha256').update(ARTWORK_ASSET_POLICY_VERSION).digest('hex').slice(0,10);
+    const file=`${taskId}-assets-${assetTag}${track?`-music-v${MUSIC_VERSION}-${track.id}`:''}.${extension}`;
     const path=`${job.user_id}/calendar/${file}`;
     const {data:files,error:listError}=await db.storage.from('social-media').list(`${job.user_id}/calendar`,{search:file,limit:1});
     if(listError) throw new Error('Media storage could not be checked.');
@@ -187,7 +191,6 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
       const {error}=await db.storage.from('social-media').upload(path,media,{contentType:extension==='mp4'?'video/mp4':'image/jpeg',upsert:false});
       if(error&&error.statusCode!=='409') throw new Error('The generated media could not be uploaded. Retrying the same saved image.');
     }
-    const inspection=await inspectPoster(`data:image/jpeg;base64,${artworkSource.toString('base64')}`,{...book,author:'Marlow Quinn'},first.platform,first.creative_brief!,first.post_type);
     const notes=inspection.qualityCheck.decision==='review'?inspection.qualityCheck.summary:'';
     await attachMedia(job,task,path,notes,video?'video':'image');
   }
