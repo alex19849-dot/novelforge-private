@@ -710,13 +710,13 @@ export default function StudioCreator({
                   ? "Generate poster again"
                   : "Generate poster"}
             </button>
-            {pending && (
+            {prompt && (
               <button
                 type="button"
                 onClick={() => void checkProgress()}
                 className={secondary}
               >
-                Check progress
+                {pending ? "Check progress" : "Open saved result"}
               </button>
             )}
           </div>

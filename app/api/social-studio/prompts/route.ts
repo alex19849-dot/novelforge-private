@@ -55,7 +55,7 @@ export async function POST(request: Request) {
       {
         model: "gpt-6-astra",
         reasoning: { effort: "low" },
-        max_output_tokens: 1800,
+        max_output_tokens: 4000,
         text: {
           format: {
             type: "json_schema",
@@ -110,6 +110,10 @@ export async function POST(request: Request) {
       },
       { timeout: 90000, maxRetries: 0 },
     );
+    if (response.status && response.status !== "completed")
+      throw Error(
+        "The prompt response stopped before it finished. No image was requested.",
+      );
     const idea = JSON.parse(response.output_text);
     const facts = [book.blurb, ...book.tropes].join("\n").toLowerCase();
     if (

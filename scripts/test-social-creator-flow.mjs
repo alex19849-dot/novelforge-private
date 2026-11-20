@@ -12,6 +12,13 @@ const authShim =
   );
 registerHooks({
   resolve(specifier, context, next) {
+    if (specifier === "server-only")
+      return {
+        url: "data:text/javascript,export%20%7B%7D",
+        shortCircuit: true,
+      };
+    if (specifier.endsWith("/social-job-db"))
+      return { url: authShim, shortCircuit: true };
     if (specifier.endsWith("/social-job-server"))
       return { url: authShim, shortCircuit: true };
     if (specifier === "next/server") return next("next/server.js", context);
@@ -211,6 +218,10 @@ assert.ok(
 assert.equal(sceneIsTooSimilar("0000000000000000", "ffffffffffffffff"), false);
 const rows = new Map(),
   uploads = new Map();
+let imageCalls = 0,
+  copyCalls = 0,
+  emptyImage = false,
+  copyUnavailable = false;
 let modelCalls = 0,
   rejectBackground = false,
   freshHook = "Winter has a way of bringing rivals closer.",
@@ -249,7 +260,13 @@ class Query {
   }
   async execute(single = false) {
     let selected = [...rows.values()].filter((r) =>
-      this.filters.every(([k, v, e]) => (e ? r[k] === v : r[k] !== v)),
+      this.filters.every(([k, v, e]) =>
+        e
+          ? (k === "recipe->>recover_once" ? r.recipe?.recover_once : r[k]) ===
+            v
+          : (k === "recipe->>recover_once" ? r.recipe?.recover_once : r[k]) !==
+            v,
+      ),
     );
     if (this.operation === "insert") {
       const row = {
@@ -283,6 +300,9 @@ globalThis.studioTestDb = {
   storage: {
     from() {
       return {
+        async download(path) {
+          return { data: new Blob([uploads.get(path)]), error: null };
+        },
         async upload(path, bytes) {
           assert.ok(!uploads.has(path));
           uploads.set(path, bytes);
@@ -301,6 +321,20 @@ globalThis.fetch = async (input, init) => {
   if (url === "https://www.marlowquinn.com/api/books")
     return Response.json({ books: [book] });
   if (url === book.coverUrl) return new Response(cover);
+  if (url === "https://api.openai.com/v1/images/generations") {
+    modelCalls++;
+    imageCalls++;
+    const body = JSON.parse(init.body);
+    assert.equal(body.model, "gpt-image-2");
+    assert.equal(body.max_output_tokens, undefined);
+    return Response.json(
+      {
+        created: 1,
+        data: emptyImage ? [] : [{ b64_json: background.toString("base64") }],
+      },
+      { headers: { "x-request-id": "req-fixture-image" } },
+    );
+  }
   assert.equal(
     url,
     "https://api.openai.com/v1/responses",
@@ -319,7 +353,15 @@ globalThis.fetch = async (input, init) => {
       }),
       output: [],
     });
-  if (body.text?.format?.name === "platform_specific_romance_copy")
+  if (body.text?.format?.name === "platform_specific_romance_copy") {
+    copyCalls++;
+    if (copyUnavailable)
+      return Response.json(
+        {
+          error: { message: "Fixture copy unavailable", type: "server_error" },
+        },
+        { status: 503 },
+      );
     return Response.json({
       id: "copy",
       output_text: JSON.stringify({
@@ -327,6 +369,7 @@ globalThis.fetch = async (input, init) => {
       }),
       output: [],
     });
+  }
   if (body.model === "gpt-5.6-terra")
     return Response.json({
       id: "check",
@@ -397,8 +440,8 @@ try {
   );
   assert.equal(
     uploads.size,
-    3,
-    "One feed poster, one portrait poster and one MP4 are shared across platform variants",
+    4,
+    "One stored source, one feed poster, one portrait poster and one MP4 are shared across platform variants",
   );
   for (const [i, p] of result.posts.entries()) {
     const scheduled_at = londonSchedule("2027-01-10", `${18 + i}:00`);
@@ -443,15 +486,21 @@ try {
     ...rows.get(promptId),
     poster_state: "idle",
     poster_request_id: null,
+    poster_result: null,
   });
   rejectBackground = true;
   const uploadsBefore = uploads.size;
+  const usableCount = () =>
+    [...uploads.keys()].filter(
+      (path) => !path.endsWith("/background-source.jpg"),
+    ).length;
+  const usableBefore = usableCount();
   response = await api.POST(request(true, promptId, randomUUID()));
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /Background rejected/);
   assert.equal(
-    uploads.size,
-    uploadsBefore,
+    usableCount(),
+    usableBefore,
     "A rejected background is not saved as usable media",
   );
   const previousId = randomUUID();
@@ -477,12 +526,13 @@ try {
     ...rows.get(promptId),
     poster_state: "idle",
     poster_request_id: null,
+    poster_result: null,
   });
   rejectBackground = false;
   response = await api.POST(request(true, promptId, randomUUID()));
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /too similar/);
-  assert.equal(uploads.size, uploadsBefore);
+  assert.equal(usableCount(), usableBefore);
   const promptApi = await import("../app/api/social-studio/prompts/route.ts");
   const conceptRequest = (auth = true) =>
     new Request("https://fixture.invalid/api/social-studio/prompts", {
@@ -517,8 +567,92 @@ try {
   response = await promptApi.POST(conceptRequest());
   assert.equal(response.status, 200);
   assert.notEqual((await response.json()).recipe.key, concept.recipe.key);
+  rows.clear();
+  const emptyId = randomUUID();
+  rows.set(emptyId, {
+    id: emptyId,
+    user_id: "fixture-owner",
+    book_slug: book.slug,
+    status: "ready",
+    poster_state: "idle",
+    recipe,
+    hook,
+    prompt: promptText,
+  });
+  emptyImage = true;
+  const copyBefore = copyCalls,
+    imagesBefore = imageCalls;
+  response = await api.POST(request(true, emptyId, randomUUID()));
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /returned no image data/);
+  assert.equal(imageCalls, imagesBefore + 1, "No automatic image retry");
+  assert.equal(copyCalls, copyBefore + 1);
+  assert.equal(
+    rows.get(emptyId).poster_result.diagnostic.requestId,
+    "req-fixture-image",
+  );
+  assert.equal(rows.get(emptyId).poster_result.recovery.copies.length, 4);
+  emptyImage = false;
+  response = await api.POST(request(true, emptyId, randomUUID()));
+  assert.equal(
+    response.status,
+    200,
+    JSON.stringify(await response.clone().json()),
+  );
+  assert.equal(imageCalls, imagesBefore + 2);
+  assert.equal(
+    copyCalls,
+    copyBefore + 1,
+    "Completed captions are reused after an empty image response",
+  );
+  rows.clear();
+  const copyId = randomUUID();
+  rows.set(copyId, {
+    id: copyId,
+    user_id: "fixture-owner",
+    book_slug: book.slug,
+    status: "ready",
+    poster_state: "idle",
+    recipe,
+    hook,
+    prompt: promptText,
+  });
+  copyUnavailable = true;
+  const previousImageCalls = imageCalls;
+  response = await api.POST(request(true, copyId, randomUUID()));
+  assert.equal(response.status, 400);
+  assert.ok(rows.get(copyId).poster_result.recovery.sourcePath);
+  assert.equal(rows.get(copyId).poster_result.recovery.sourceChecked, true);
+  copyUnavailable = false;
+  response = await api.POST(request(true, copyId, randomUUID()));
+  assert.equal(
+    response.status,
+    200,
+    JSON.stringify(await response.clone().json()),
+  );
+  assert.equal(
+    imageCalls,
+    previousImageCalls + 1,
+    "A copy failure does not regenerate a paid background",
+  );
+  const recoveryApi = await import("../lib/social-studio-recovery.ts");
+  rows.set(copyId, {
+    ...rows.get(copyId),
+    poster_state: "failed",
+    recipe: { ...recipe, recover_once: "direct_image_v2_pending" },
+  });
+  const callsBeforeClaim = modelCalls;
+  assert.equal(await recoveryApi.claimStudioRecovery("another-owner"), null);
+  const authorised = await recoveryApi.claimStudioRecovery("fixture-owner");
+  assert.equal(authorised.promptId, copyId);
+  assert.equal(await recoveryApi.claimStudioRecovery("fixture-owner"), null);
+  assert.equal(
+    modelCalls,
+    callsBeforeClaim,
+    "Claiming recovery never starts an uncontrolled paid retry",
+  );
   console.log(
-    "PASS: 90 non-repeating directions; real prompt handler persists new ideas and rejects semantic repeats; distinct platform copy and hashtags; verified KU; original cover insertion in 8 layouts; authenticated poster flow; real MP4/music rendering; independent UK schedules; idempotent retries; duplicate-run rejection; failed scene inspection and near-duplicate backgrounds block storage. No paid API calls.",
+    "PASS: 90 non-repeating directions; real prompt handler persists new ideas and rejects semantic repeats; distinct platform copy and hashtags; verified KU; original cover insertion in 8 layouts; authenticated poster flow; real MP4/music rendering; independent UK schedules; idempotent retries; duplicate-run rejection; failed scene inspection and near-duplicate backgrounds block storage. Direct Images API, empty-image diagnostics, saved-copy reuse and saved-background reuse verified. No paid API calls.",
   );
 } finally {
   globalThis.fetch = oldFetch;

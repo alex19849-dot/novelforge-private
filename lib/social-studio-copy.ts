@@ -13,7 +13,7 @@ export async function studioPlatformCopy(
     {
       model: "gpt-6-astra",
       reasoning: { effort: "low" },
-      max_output_tokens: 3000,
+      max_output_tokens: 6000,
       text: {
         format: {
           type: "json_schema",
@@ -70,6 +70,12 @@ export async function studioPlatformCopy(
     },
     { timeout: 90000, maxRetries: 0 },
   );
+  if (response.status && response.status !== "completed")
+    throw Error(
+      "Platform copy stopped before it finished. Your background is saved for a copy-only retry.",
+    );
+  if (!response.output_text)
+    throw Error("The copy service returned no text. Your background is saved.");
   const copies = validatePlatformCopies(
     JSON.parse(response.output_text).posts,
     platforms,
