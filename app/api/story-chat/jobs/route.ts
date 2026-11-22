@@ -69,7 +69,8 @@ export async function GET(request: Request) {
       if (!uuid(id)) return json({ error: 'Invalid chapter job.' }, 400);
       query = query.eq('id', id);
     }
-    const { data: job, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const { data: jobMetadata, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const job: (NonNullable<typeof jobMetadata> & { result?: unknown }) | null = jobMetadata;
     if (error) throw new Error('Chapter progress could not be loaded.');
     if (job?.status === 'generating' && job.workflow_run_id) {
       const status = await getRun(job.workflow_run_id).status;
