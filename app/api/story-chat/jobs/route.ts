@@ -63,7 +63,7 @@ export async function GET(request: Request) {
   if (!uuid(storyId)) return json({ error: 'Choose a valid story.' }, 400);
   try {
     const db = jobAdmin();
-    let query = db.from('story_generation_jobs').select('id,status,stage,error_message,result,checkpoint,workflow_run_id,created_at,updated_at').eq('story_id', storyId).eq('user_id', user.id);
+    let query = db.from('story_generation_jobs').select('id,status,stage,error_message,workflow_run_id,created_at,updated_at').eq('story_id', storyId).eq('user_id', user.id);
     const id = url.searchParams.get('id');
     if (id) {
       if (!uuid(id)) return json({ error: 'Invalid chapter job.' }, 400);
@@ -76,7 +76,10 @@ export async function GET(request: Request) {
       if (['failed', 'cancelled'].includes(status)) {
         job.status = 'failed';
         job.error_message = 'The background worker stopped. Saved progress is kept. No model call was automatically repeated.';
-        job.result ??= job.checkpoint?.story ? { story: job.checkpoint.story, pending: job.checkpoint.pending ?? null } : null;
+        // Recovery data is large. Read it only when a worker actually stops.
+        const { data: recovery, error: recoveryError } = await db.from('story_generation_jobs').select('result,checkpoint').eq('id', job.id).eq('story_id', storyId).eq('user_id', user.id).maybeSingle();
+        if (recoveryError) throw new Error('Saved chapter recovery could not be loaded. It has not been cleared.');
+        job.result = recovery?.result ?? (recovery?.checkpoint?.story ? { story: recovery.checkpoint.story, pending: recovery.checkpoint.pending ?? null } : null);
         await db.from('story_generation_jobs').update({ status: job.status, error_message: job.error_message, result: job.result }).eq('id', job.id).eq('user_id', user.id).eq('status', 'generating');
       }
     }
@@ -84,8 +87,17 @@ export async function GET(request: Request) {
       job.status = 'failed'; job.error_message = 'The background chapter could not be started. Your original draft is kept.';
       await db.from('story_generation_jobs').update({ status: job.status, error_message: job.error_message }).eq('id', job.id).eq('user_id', user.id).eq('status', 'generating').is('workflow_run_id', null);
     }
-    const { checkpoint: _checkpoint, workflow_run_id: _run, ...summary } = job ?? {};
-    return json({ job: job ? summary : null });
+    const version = job ? [job.id, job.status, job.stage, job.updated_at].join(':') : '';
+    const unchanged = Boolean(version && url.searchParams.get('knownVersion') === version);
+    // Status polling never needs the full book snapshot. Terminal results are
+    // delivered once per version, including conflicts and failed-draft recovery.
+    if (job && job.status !== 'generating' && !unchanged && !('result' in job)) {
+      const { data: payload, error: payloadError } = await db.from('story_generation_jobs').select('result').eq('id', job.id).eq('story_id', storyId).eq('user_id', user.id).maybeSingle();
+      if (payloadError) throw new Error('The chapter result could not be loaded. Saved progress is kept.');
+      job.result = payload?.result ?? null;
+    }
+    const { workflow_run_id: _run, ...summary } = job ?? {};
+    return json({ job: job ? summary : null, version, unchanged });
   } catch (error) { return json({ error: error instanceof Error ? error.message : 'Chapter progress could not be loaded.' }, 503); }
 }
 

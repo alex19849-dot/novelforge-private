@@ -1086,6 +1086,7 @@ undone.`,
     let checking = false;
     let timer: ReturnType<typeof setTimeout>;
     let sawActive = false;
+    let knownJobVersion = "";
     setBackgroundCheckedFor("");
     setBackgroundBusy(false);
     backgroundJobRef.current = null;
@@ -1098,10 +1099,11 @@ undone.`,
         const { data: { session } } = await activeLibrarySession();
         if (!session?.access_token) { setBackgroundNotice("Sign in again to check or complete background chapters. Your saved draft is kept."); return; }
         const id = backgroundJobRef.current;
-        const response = await fetch(`/api/story-chat/jobs?storyId=${encodeURIComponent(storyId!)}${id ? `&id=${encodeURIComponent(id)}` : ""}`, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
-        const data = await readApiJson(response) as { job?: { id: string; status: string; stage: string; updated_at: string; error_message: string; result?: { story: StoryWorkspace; pending: PendingChapterGeneration | null; recoveryPending?: PendingChapterGeneration | null } } | null };
+        const response = await fetch(`/api/story-chat/jobs?storyId=${encodeURIComponent(storyId!)}${id ? `&id=${encodeURIComponent(id)}` : ""}${knownJobVersion ? `&knownVersion=${encodeURIComponent(knownJobVersion)}` : ""}`, { headers: { Authorization: `Bearer ${session.access_token}` }, cache: "no-store" });
+        const data = await readApiJson(response) as { version?: string; unchanged?: boolean; job?: { id: string; status: string; stage: string; updated_at: string; error_message: string; result?: { story: StoryWorkspace; pending: PendingChapterGeneration | null; recoveryPending?: PendingChapterGeneration | null } } | null };
         if (stopped || currentStoryRef.current?.id !== storyId) return;
         if (backgroundJobRef.current && backgroundJobRef.current !== id) return;
+        if (data.unchanged) return;
         const job = data.job;
         if (!job && backgroundSubmitInFlight.current) return;
         if (job?.status === "generating") {
@@ -1129,6 +1131,7 @@ undone.`,
           sawActive = false;
           setBackgroundBusy(false);
         }
+        knownJobVersion = data.version ?? "";
         setBackgroundCheckedFor(storyId!);
       } catch (error) {
         if (!stopped) setBackgroundNotice(error instanceof Error ? error.message : "Chapter progress could not be checked. Checking again shortly.");
