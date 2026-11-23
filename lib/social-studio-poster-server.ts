@@ -1,4 +1,5 @@
 import "server-only";
+import { assertCollageTypography } from "./social-poster-collage";
 import OpenAI from "openai";
 import { createHash, randomUUID } from "node:crypto";
 import { jobJson, jobAdmin } from "./social-job-server";
@@ -101,10 +102,14 @@ export async function renderStudioPoster(
       saved.hook,
     );
     const hook = reviewed.hook;
+    if (reviewed.recipe.designVersion === 3)
+      await assertCollageTypography(reviewed.book, reviewed.recipe, hook);
     const assetKey = createHash("sha256")
       .update(
         JSON.stringify({
           book,
+          designVersion: reviewed.recipe.designVersion,
+          fontPair: reviewed.recipe.fontPair,
           brief: body.prompt,
           layout: reviewed.recipe.layout,
           palette: reviewed.recipe.palette,

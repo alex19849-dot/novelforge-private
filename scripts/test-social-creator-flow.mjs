@@ -182,7 +182,7 @@ for (let layout = 0; layout < 4; layout++)
     const metadata = await sharp(poster).metadata();
     assert.equal(metadata.width, 1080);
     assert.equal(metadata.height, portrait ? 1920 : 1350);
-    const screen = kindleScreen(portrait, layout);
+    const screen = kindleScreen(portrait, layout, recipe.designVersion);
     await writeFile(
       `/tmp/studio-layout-${layout}-${portrait ? "portrait" : "feed"}.jpg`,
       poster,

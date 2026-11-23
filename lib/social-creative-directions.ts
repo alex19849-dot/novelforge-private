@@ -15,56 +15,12 @@ export const STUDIO_CHANNELS: SocialPlatform[] = [
   "youtube",
   "instagram",
 ];
-export const PALETTES = [
-  {
-    name: "wine and champagne",
-    dark: "#210c19",
-    light: "#fff0d1",
-    accent: "#e0b47c",
-  },
-  {
-    name: "evergreen and candlelight",
-    dark: "#082a25",
-    light: "#fff3d8",
-    accent: "#ddb565",
-  },
-  {
-    name: "storm blue and copper",
-    dark: "#11263e",
-    light: "#f4f3e9",
-    accent: "#eba778",
-  },
-  {
-    name: "plum and pearl",
-    dark: "#291733",
-    light: "#fff0fa",
-    accent: "#e4a8c7",
-  },
-  {
-    name: "midnight and warm peach",
-    dark: "#142037",
-    light: "#fff0e7",
-    accent: "#efb5a3",
-  },
-  {
-    name: "ruby and ivory",
-    dark: "#300e17",
-    light: "#fff6ed",
-    accent: "#f3b9a5",
-  },
-  {
-    name: "deep teal and amber",
-    dark: "#082a35",
-    light: "#fff4dd",
-    accent: "#f2c983",
-  },
-  {
-    name: "slate and moonlight",
-    dark: "#1b2635",
-    light: "#f4f5ff",
-    accent: "#bacbed",
-  },
-] as const;
+import {
+  DESIGN_PALETTES as PALETTES,
+  FONT_PAIRS,
+  DESIGN_LAYOUTS,
+} from "./social-poster-design";
+export { PALETTES };
 export const SCENES = [
   "an immersive wide scene from the verified story world",
   "an atmospheric architectural threshold or framing device",
@@ -88,6 +44,8 @@ export const HOOK_ANGLES = [
   "playful chemistry",
 ] as const;
 export type CreativeRecipe = {
+  designVersion?: 3;
+  fontPair?: number;
   fontStyle?: "serif" | "sans" | "script";
   key: string;
   sceneMode: number;
@@ -105,38 +63,73 @@ export type CreativeHistory = {
 export function nextCreativeDirection(
   history: CreativeHistory[],
   seed = 0,
-  book?: Pick<StudioBook, "subgenre">,
+  _book?: Pick<StudioBook, "subgenre">,
+  recentStyles: CreativeRecipe[] = history.map((h) => h.recipe),
 ): CreativeRecipe {
   const used = new Set(history.map((h) => h.concept_key));
+  const blockedLayouts = new Set(recentStyles.slice(0, 2).map((r) => r.layout));
+  const blockedPalettes = new Set(
+    recentStyles.slice(0, 3).map((r) => r.palette),
+  );
+  const lastPlacement = recentStyles[0]
+    ? Math.floor(recentStyles[0].layout % 3)
+    : -1;
+  const blockedColourFamilies = new Set(
+    recentStyles
+      .slice(0, 2)
+      .map((r) => PALETTES[r.palette % PALETTES.length].family),
+  );
+  const blockedFonts = new Set(
+    recentStyles
+      .slice(0, 2)
+      .map((r) => r.fontPair)
+      .filter((v) => v !== undefined),
+  );
   const candidates: CreativeRecipe[] = [];
-  for (let s = 0; s < SCENES.length; s++)
-    for (let l = 0; l < 4; l++)
-      for (let p = 0; p < PALETTES.length; p++)
-        for (let h = 0; h < HOOK_ANGLES.length; h++) {
-          const key = [s, l, p, h].join(":");
-          const festive = /christmas|holiday|festive/i.test(book?.subgenre ?? "");
-          if (!used.has(key) && (!festive || [0, 1, 5].includes(p)))
+  for (let sceneMode = 0; sceneMode < SCENES.length; sceneMode++)
+    for (let layout = 0; layout < DESIGN_LAYOUTS.length; layout++)
+      for (let palette = 0; palette < PALETTES.length; palette++)
+        for (let fontPair = 0; fontPair < FONT_PAIRS.length; fontPair++)
+          for (let hookAngle = 0; hookAngle < HOOK_ANGLES.length; hookAngle++) {
+            const key = [
+              "v3",
+              sceneMode,
+              layout,
+              palette,
+              fontPair,
+              hookAngle,
+            ].join(":");
+            if (
+              used.has(key) ||
+              blockedLayouts.has(layout) ||
+              layout % 3 === lastPlacement ||
+              blockedColourFamilies.has(PALETTES[palette].family) ||
+              blockedPalettes.has(palette) ||
+              blockedFonts.has(fontPair)
+            )
+              continue;
             candidates.push({
               key,
-              sceneMode: s,
-              layout: l,
-              palette: p,
-              hookAngle: h,
+              designVersion: 3,
+              sceneMode,
+              layout,
+              palette,
+              fontPair,
+              hookAngle,
+              fontStyle: FONT_PAIRS[fontPair].style,
             });
-        }
+          }
   if (!candidates.length)
     throw Error(
-      "All creative directions have been used. Add new directions before generating more.",
+      "No unused design combination remains. Add new styles before generating more.",
     );
   const penalty = (r: CreativeRecipe) =>
     history
       .slice(0, 8)
       .reduce(
-        (sum, h, i) =>
-          sum +
+        (n, h, i) =>
+          n +
           (h.recipe.sceneMode === r.sceneMode ? 12 : 0) +
-          (h.recipe.layout === r.layout && i < 2 ? 10 : 0) +
-          (h.recipe.palette === r.palette && i < 3 ? 8 : 0) +
           (h.recipe.hookAngle === r.hookAngle && i < 2 ? 4 : 0),
         0,
       );
@@ -188,14 +181,14 @@ export function buildCreativePrompt(
   return [
     `Create a romantic, eye-catching poster for ${book.title} by Marlow Quinn, grounded in this story's themes.`,
     `Scene: ${scene}`,
-    `Composition: ${["Kindle on the left, text on the right", "Kindle on the right, text on the left", "centred Kindle beneath the hook", "asymmetric editorial composition with a lower Kindle"][recipe.layout]}. Colour and light: ${palette.name}. Typography: ${typography}.`,
+    `Composition: ${recipe.designVersion === 3 ? DESIGN_LAYOUTS[recipe.layout].name : ["Kindle on the left, text on the right", "Kindle on the right, text on the left", "centred Kindle beneath the hook", "asymmetric editorial composition with a lower Kindle"][recipe.layout]}. Colour and light: ${palette.name}. Typography: ${recipe.designVersion === 3 ? FONT_PAIRS[recipe.fontPair ?? 0].name : typography}.`,
     `Exact opening hook: ${hook}`,
     `Include the ORIGINAL supplied book cover intact on a Kindle screen. The application inserts the genuine cover and Kindle frame after generating the scene. Never invent a paperback or redraw the cover.`,
     `Include these verified tropes: ${book.tropes.slice(0, 4).join(" • ")}.`,
     book.kindleUnlimited
       ? "Availability line: Available on Kindle Unlimited."
       : "Availability line: Available on Kindle. Kindle Unlimited is not verified for this book.",
-    "No AI-generated people. Do not copy recent scenes, props, compositions or hooks. Keep all text clear and readable on a phone.",
+    "No AI-generated people or hands. Do not copy recent scenes, props, compositions or hooks. Use tactile romance reading aesthetics. Keep text on opaque contrasting paper, tape, marker swashes or ribbons, never low-contrast text floating over busy imagery. No invented review stars. The application renders the selected font pairing, label arrangement and ink colours. Keep all text clear and readable on a phone.",
   ].join("\n\n");
 }
 export function validatePlatformCopies(
@@ -291,24 +284,40 @@ export function reviewedPosterBrief(
     throw Error("Keep the opening hook under 110 characters.");
   const composition =
     prompt.match(/^Composition:\s*([^\n.]+)/im)?.[1]?.toLowerCase() ?? "";
-  const layout = composition.includes("kindle on the left")
-    ? 0
-    : composition.includes("kindle on the right")
-      ? 1
-      : composition.includes("centred kindle")
-        ? 2
-        : composition.includes("asymmetric")
-          ? 3
-          : recipe.layout;
+  const designedLayout =
+    recipe.designVersion === 3
+      ? DESIGN_LAYOUTS.findIndex(
+          (l) => l.name.toLowerCase() === composition.trim(),
+        )
+      : -1;
+  const layout =
+    designedLayout >= 0
+      ? designedLayout
+      : composition.includes("kindle on the left")
+        ? 0
+        : composition.includes("kindle on the right")
+          ? 1
+          : composition.includes("centred kindle")
+            ? 2
+            : composition.includes("asymmetric")
+              ? 3
+              : recipe.layout;
   const typography =
     prompt.match(/Typography:\s*([^\n.]+)/i)?.[1]?.toLowerCase() ?? "";
-  const fontStyle = typography.includes("script")
-    ? "script"
-    : typography.includes("sans")
-    ? "sans"
-    : typography.includes("serif")
-      ? "serif"
-      : recipe.fontStyle;
+  const designedFont =
+    recipe.designVersion === 3
+      ? FONT_PAIRS.findIndex((f) => f.name.toLowerCase() === typography.trim())
+      : -1;
+  const fontStyle =
+    designedFont >= 0
+      ? FONT_PAIRS[designedFont].style
+      : typography.includes("script")
+        ? "script"
+        : typography.includes("sans")
+          ? "sans"
+          : typography.includes("serif")
+            ? "serif"
+            : recipe.fontStyle;
   const line = prompt.match(/^Include these verified tropes:\s*(.+)$/im)?.[1];
   let tropes = book.tropes.slice(0, 4);
   if (line) {
@@ -337,7 +346,12 @@ export function reviewedPosterBrief(
     throw Error("Kindle Unlimited is not verified for this book.");
   return {
     hook,
-    recipe: { ...recipe, layout, fontStyle },
+    recipe: {
+      ...recipe,
+      layout,
+      fontStyle,
+      ...(designedFont >= 0 ? { fontPair: designedFont } : {}),
+    },
     book: { ...book, tropes, kindleUnlimited: ku && book.kindleUnlimited },
   };
 }
