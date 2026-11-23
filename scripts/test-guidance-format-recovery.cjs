@@ -28,9 +28,13 @@ const story={storyBible:{premise:'Test'},storyState:{},messages:[{role:'user',co
  assert.throws(()=>validateGuidanceDraft(normaliseGuidanceHeadings(base.replace('Sam asks him to stay.',''))),/ENDING/);
  assert.throws(()=>validateGuidanceDraft(normaliseGuidanceHeadings(base.replace('Develop their attraction.',''))),/PURPOSE/);
  assert.throws(()=>validateGuidanceDraft(base.replace('Sam, first-person present.','')),/POV/);
- output=JSON.stringify({guidance:'Incomplete',question:''});let before=count;await assert.rejects(draftChapterGuidance(story,[]),/incomplete/);assert.equal(count,before+1);
+ output=JSON.stringify({guidance:'Incomplete',question:''});let before=count;const retained=await draftChapterGuidance(story,[]);assert.equal(retained.guidance,'');assert(retained.question.includes('Incomplete'));assert(retained.question.includes('kept the returned draft'));assert.equal(count,before+1);
  output=JSON.stringify({guidance:'',question:'Which POV?'});assert.equal((await draftChapterGuidance(story,[])).question,'Which POV?');
  for(const heading of ['WRITE CHAPTER 1','WRITE PROLOGUE','WRITE EPILOGUE']) validateGuidanceDraft(normaliseGuidanceHeadings(base.replace('WRITE CHAPTER 3',heading).replace('CONTINUITY FROM CHAPTER 2','CONTINUITY FROM STORY BIBLE')));
+ for (const header of ['WRITE CHAPTER 3 (Friday)', 'WRITE CHAPTER 3 approximately 3000 words', 'CHAPTER 3: Friday', 'WRITE CHAPTER 3 – Friday']) {
+ output=JSON.stringify({guidance:base.replace('WRITE CHAPTER 3',header),question:''});const fixed=await draftChapterGuidance(story,[]);assert(fixed.guidance.startsWith('WRITE CHAPTER 3\n'));assert(fixed.guidance.includes('Sam asks him to stay.'));
+ }
+ output=JSON.stringify({guidance:base.replace('WRITE CHAPTER 3\n',''),question:''});assert((await draftChapterGuidance(story,[])).guidance.startsWith('WRITE CHAPTER 3\n'));
  const authorBrief=base+'\n\nDETAILS\n- '+ 'Preserve the complete supplied event. '.repeat(8);story.messages=[{role:'user',content:authorBrief}];before=count;
  assert.equal((await draftChapterGuidance(story,[])).guidance,authorBrief.trim());assert.equal(count,before,'Author-supplied complete guidance still costs zero calls');
  console.log('PASS: heading variants and local JSON repair, same scene text, real incompleteness rejected, questions and special sections retained, no extra calls, supplied guidance unchanged. Offline only.');

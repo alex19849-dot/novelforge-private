@@ -57,13 +57,19 @@ export function parseGuidanceResponse(raw: string): unknown {
   }
 }
 
-export function normaliseGuidanceHeadings(text: string): string {
-  return text.trim().replace(/^```(?:text|markdown)?\s*\n?/i, '').replace(/\n?```\s*$/, '')
+export function normaliseGuidanceHeadings(text: string, requestedHeading = ''): string {
+  if (!text.trim()) return '';
+  const normalised = text.trim().replace(/^```(?:text|markdown)?\s*\n?/i, '').replace(/\n?```\s*$/, '')
     .split(/\r?\n/).map(line => {
       const candidate = line.trim().replace(/^#{1,6}\s+/, '')
         .replace(/^\*\*(.*?)\*\*(.*)$/, '$1$2').replace(/^__(.*?)__(.*)$/, '$1$2');
-      const title = candidate.match(/^((?:RE)?WRITE\s+(?:CHAPTER\s+\d+|PROLOGUE|EPILOGUE))\s*(?:[:.\-]\s*(.*))?$/i);
-      if (title) return title[1].replace(/\s+/g, ' ').toUpperCase() + (title[2] ? '\nTITLE: ' + title[2] : '');
+      // A title, parenthesis, word count or dash after the identity is decoration,
+      // not evidence that the paid chapter guidance is missing its identity.
+      const title = candidate.match(/^(?:(REWRITE|WRITE)\s+)?(CHAPTER\s+\d+|PROLOGUE|EPILOGUE)\b(.*)$/i);
+      if (title) {
+        const suffix = title[3].trim().replace(/^[:.\-\u2013\u2014]\s*/, '');
+        return (title[1] || 'WRITE').toUpperCase() + ' ' + title[2].replace(/\s+/g, ' ').toUpperCase() + (suffix ? '\nTITLE: ' + suffix : '');
+      }
       const field = candidate.match(/^(POV|POINT OF VIEW|TIME|TIMING)\s*:\s*(.*)$/i);
       if (field) return (/^(?:POV|POINT OF VIEW)$/i.test(field[1]) ? 'POV' : 'TIME') + ': ' + field[2];
       const heading = candidate.match(/^(PURPOSE|ENDING|ENDPOINT|EXCLUSIONS|CONTINUITY(?: FROM (?:CHAPTER\s+\d+|STORY BIBLE))?)\s*:?\s*$/i);
@@ -72,6 +78,18 @@ export function normaliseGuidanceHeadings(text: string): string {
       if (inline) return inline[1].toUpperCase().replace(/^ENDPOINT$/, 'ENDING') + '\n' + inline[2];
       return line;
     }).join('\n');
+  if (requestedHeading && !/^(?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE)\s*$/im.test(normalised)) {
+    return requestedHeading + '\n' + normalised;
+  }
+  return normalised;
+}
+
+export function requestedGuidanceHeading(message: string): string {
+  const firstLine = message.trim().split(/\r?\n/)[0];
+  const number = firstLine.match(/\bchapter\s+(\d+)\b/i)?.[1];
+  if (number) return (/\brewrite\b/i.test(firstLine) ? 'REWRITE' : 'WRITE') + ' CHAPTER ' + Number(number);
+  const special = requestedSpecialSection(firstLine.replace(/^(?:plan|outline)\s+/i, 'Write '));
+  return special ? 'WRITE ' + special.toUpperCase() : '';
 }
 
 export function validateGuidanceDraft(text: string): void {
@@ -107,6 +125,11 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
   if (supplied.length >= 400 && (suppliedHeadings.every(heading => heading.test(supplied)) || suppliedSpecialSection) && /^[-*]\s+\S/m.test(supplied)) {
     return { guidance: supplied, question: '' };
   }
+  if (supplied.length >= 400 && /^(?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE)\b/im.test(normaliseGuidanceHeadings(supplied))) {
+    const normalised = normaliseGuidanceHeadings(supplied);
+    try { validateGuidanceDraft(normalised); return { guidance: normalised, question: '' }; }
+    catch { /* A request with missing content still needs the planner. */ }
+  }
   const isPrologue = requestedSpecialSection(supplied.replace(/^(?:plan|outline)\s+/i, "Write ")) === "prologue";
   const priorState = isPrologue ? getStoryStateBeforeChapter(story.storyState, 0) : story.storyState;
   const previousCount = diagnostics.length;
@@ -122,8 +145,15 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
     const output: unknown = parseGuidanceResponse(response.output_text);
     assertChapterPlanSchema(output, schema);
     const result = output as { guidance: string; question: string };
-    const guidance = normaliseGuidanceHeadings(result.guidance);
-    if (guidance) validateGuidanceDraft(guidance);
+    const guidance = normaliseGuidanceHeadings(result.guidance, requestedGuidanceHeading(supplied));
+    if (guidance) {
+      try { validateGuidanceDraft(guidance); }
+      catch (error) {
+        // Keep the actual paid result visible in chat for review and correction.
+        // An incomplete draft is not approved or exposed as confirmable guidance.
+        return { guidance: '', question: `${error instanceof Error ? error.message : 'The guidance needs review.'}\n\nI have kept the returned draft below so it is not lost:\n\n${guidance}` };
+      }
+    }
     else if (!result.question.trim()) throw new Error('No chapter guidance was returned. No automatic retry was started.');
     return { guidance, question: result.question.trim() };
   } finally {
