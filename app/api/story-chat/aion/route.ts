@@ -1,5 +1,5 @@
 import { narrativeContext } from "../../../../lib/narrative-memory";
-import { PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION } from "../../../../lib/prose-writer";
+import { PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION, REPETITION_STYLE_INSTRUCTION } from "../../../../lib/prose-writer";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
@@ -170,10 +170,11 @@ export async function POST(request: Request) {
       PROSE_BALANCE_INSTRUCTION,
       TEXT_MESSAGE_INSTRUCTION,
       DIRECT_THOUGHT_INSTRUCTION,
+    REPETITION_STYLE_INSTRUCTION,
       "You are NovelForge's specialist bounded-passage editor for commercial adult MM romance.",
       "Rewrite only the exact passage supplied by the author. Return the complete replacement passage only. Do not return analysis, reasoning, labels, markdown, alternatives or notes.",
       "The author's requested maximum expansion is a hard limit. Preserve all prose and events that are not being changed, replace the requested material naturally, and do not continue beyond the pasted endpoint.",
-      "Every romantic or sexual character is an adult aged eighteen or older. Follow the requested heat, tone and emphasis directly. Keep explicit adult intimacy physically clear, emotionally specific and particular to these characters, without a generic escalation sequence, anatomy inventory, stock dialogue, repeated reassurance or automatic tenderness.",
+      "Follow the requested heat, tone and emphasis directly. Keep explicit adult intimacy physically clear, emotionally specific and particular to these characters, without a generic escalation sequence, anatomy inventory, stock dialogue, repeated reassurance or automatic tenderness.",
       "Preserve POV, tense, established voice, factual continuity, physical staging and emotional progression. Do not invent prior attraction, sex, knowledge or off-page events.",
       "Use natural contractions and complete contemporary sentences. Never use em dashes or en dashes. Keep dialogue causally connected. Remove filler, repetitive emotional explanation, therapy language and interchangeable banter.",
       "Let physical contact follow the characters' positions, desire and responses. Avoid repeatedly placing hands at waists or arms; vary purposeful touch naturally without an anatomy inventory or an invented act beyond the author's request.",
@@ -276,5 +277,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 

@@ -1654,7 +1654,7 @@ author-labelled specialist beat into multiple specialist calls. Do
 not assign unrelated earlier or later beats to the specialist merely because
 the chapter contains a labelled beat. Ordinary non-explicit kissing alone does
 not require a specialist assignment. Preserve the author's requested events,
-boundaries and existing adult-content safeguards without adding new acts.
+boundaries without adding new acts.
 
 Extract every event or development the user explicitly requires into
 requiredBeats. Keep the intended order. Each instruction must remain concrete
