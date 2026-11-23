@@ -30,6 +30,68 @@ Match the author's requested level of detail, normally several developed bullets
 For an existing chapter rewrite, use only chapters before the requested chapter as prior history; later chapters are future constraints, never events that have already happened at that point. Use the Story Bible, saved continuity and actual preceding chapter to ground facts. Distinguish proposed events from established history. Do not invent prior disclosures, meetings, exact wages, schedules, injuries, relationship milestones or supporting-character identities. Preserve exact amounts and times when supplied. If revising, return the complete revised guidance and preserve unaffected requirements. Do not recycle completed discoveries or conflicts. No new numerical word target unless supplied by the author or already established for this book. Use the author's explicit chapter number or the next saved chapter number. Do not change the Bible, saved chapters or canon. Nothing is approved until the author confirms.`;
 
 const schema = { type: 'object', additionalProperties: false, required: ['guidance', 'question'], properties: { guidance: { type: 'string' }, question: { type: 'string' } } };
+
+// Repair transport formatting only, never ask the model to regenerate paid work.
+export function parseGuidanceResponse(raw: string): unknown {
+  const source = raw.trim().replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/, '');
+  try { return JSON.parse(source); } catch { /* Try harmless string escaping below. */ }
+  let repaired = '', inString = false;
+  for (let i = 0; i < source.length; i++) {
+    const character = source[i];
+    if (character === '"') { inString = !inString; repaired += character; continue; }
+    if (inString && character === '\\') {
+      const next = source[i + 1];
+      if (next && /["\\/bfnrt]/.test(next)) { repaired += character + next; i++; continue; }
+      if (next === 'u' && /^[0-9a-f]{4}$/i.test(source.slice(i + 2, i + 6))) {
+        repaired += source.slice(i, i + 6); i += 5; continue;
+      }
+      // Aion sometimes escapes apostrophes/markdown (e.g. \\') inside JSON strings.
+      if (next && /['*\[\]_`]/.test(next)) { repaired += next; i++; continue; }
+    }
+    if (inString && character.charCodeAt(0) < 32) {
+      repaired += JSON.stringify(character).slice(1, -1);
+    } else repaired += character;
+  }
+  try { return JSON.parse(repaired); } catch {
+    throw new Error('Aion returned unreadable guidance data. Your chapters are unchanged; no automatic retry was started.');
+  }
+}
+
+export function normaliseGuidanceHeadings(text: string): string {
+  return text.trim().replace(/^```(?:text|markdown)?\s*\n?/i, '').replace(/\n?```\s*$/, '')
+    .split(/\r?\n/).map(line => {
+      const candidate = line.trim().replace(/^#{1,6}\s+/, '')
+        .replace(/^\*\*(.*?)\*\*(.*)$/, '$1$2').replace(/^__(.*?)__(.*)$/, '$1$2');
+      const title = candidate.match(/^((?:RE)?WRITE\s+(?:CHAPTER\s+\d+|PROLOGUE|EPILOGUE))\s*(?:[:.\-]\s*(.*))?$/i);
+      if (title) return title[1].replace(/\s+/g, ' ').toUpperCase() + (title[2] ? '\nTITLE: ' + title[2] : '');
+      const field = candidate.match(/^(POV|POINT OF VIEW|TIME|TIMING)\s*:\s*(.*)$/i);
+      if (field) return (/^(?:POV|POINT OF VIEW)$/i.test(field[1]) ? 'POV' : 'TIME') + ': ' + field[2];
+      const heading = candidate.match(/^(PURPOSE|ENDING|ENDPOINT|EXCLUSIONS|CONTINUITY(?: FROM (?:CHAPTER\s+\d+|STORY BIBLE))?)\s*:?\s*$/i);
+      if (heading) return heading[1].toUpperCase().replace(/^ENDPOINT$/, 'ENDING');
+      const inline = candidate.match(/^(PURPOSE|ENDING|ENDPOINT|EXCLUSIONS)\s*:\s*(\S.*)$/i);
+      if (inline) return inline[1].toUpperCase().replace(/^ENDPOINT$/, 'ENDING') + '\n' + inline[2];
+      return line;
+    }).join('\n');
+}
+
+export function validateGuidanceDraft(text: string): void {
+  const required: Array<[string, RegExp]> = [
+    ['chapter heading', /^(?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE)\s*$/im],
+    ['POV', /^POV:[ \t]*\S[^\n]*$/im], ['TIME', /^TIME:[ \t]*\S[^\n]*$/im],
+    ['PURPOSE', /^PURPOSE\s*\n+\s*\S/im], ['ENDING', /^ENDING\s*\n+\s*\S/im],
+    ['scene instructions', /^\s*[-*•]\s+\S/m],
+  ];
+  if (!/^(?:RE)?WRITE (?:CHAPTER 1|PROLOGUE)\s*$/im.test(text)) {
+    required.push(['continuity', /^CONTINUITY(?: FROM (?:CHAPTER\s+\d+|STORY BIBLE))?\s*\n+\s*\S/im]);
+  }
+  const missing = required.filter(([, pattern]) => !pattern.test(text)).map(([label]) => label);
+  for (const label of ['PURPOSE', 'ENDING']) {
+    const body = text.split(new RegExp('^' + label + '[ \\t]*$', 'im'))[1]?.trim();
+    if ((!body || /^(?:PURPOSE|ENDING|EXCLUSIONS|CONTINUITY(?: FROM .*)?|POV:.*|TIME:.*)$/i.test(body.split('\n')[0])) && !missing.includes(label)) missing.push(label);
+  }
+  if (missing.length) throw new Error(`The guidance draft was incomplete (missing ${missing.join(', ')}). Your chapters are unchanged; no automatic retry was started.`);
+}
+
 export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: Parameters<typeof createAionChapterPlan>[0]['diagnostics']) {
   // A full author-supplied brief already is the guidance. Do not pay a model
   // to rewrite it, or reject it because it uses the author's own scene headings.
@@ -57,21 +119,17 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
         recentChapters: isPrologue ? [] : story.chapters.slice(-3), conversation: story.messages.filter(message => message.role !== 'assistant' || !isGuidanceProposal(message.content)).slice(-12),
         guidanceBeingRevised: story.storyState.chapterGuidanceDraft?.text ?? null }) }
     ], schema, diagnostics, attempt: 1 });
-    const output: unknown = JSON.parse(response.output_text);
+    const output: unknown = parseGuidanceResponse(response.output_text);
     assertChapterPlanSchema(output, schema);
     const result = output as { guidance: string; question: string };
-    if (result.guidance.trim()) {
-      const headings = [/^(?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE)\s*$/im, /^POV:/im, /^TIME:/im, /^PURPOSE\s*$/im, /^ENDING\s*$/im, /^EXCLUSIONS\s*$/im];
-      // Chapter 1 has no preceding chapter. Opening continuity belongs to the Bible.
-      if (!/^(?:RE)?WRITE (?:CHAPTER 1|PROLOGUE)\s*$/im.test(result.guidance)) headings.push(/^CONTINUITY FROM CHAPTER/im);
-      for (const heading of headings) {
-        if (!heading.test(result.guidance)) throw new Error('The guidance draft was incomplete. Your chapters are unchanged; no automatic retry was started.');
-      }
-    } else if (!result.question.trim()) throw new Error('No chapter guidance was returned. No automatic retry was started.');
-    return { guidance: result.guidance.trim(), question: result.question.trim() };
+    const guidance = normaliseGuidanceHeadings(result.guidance);
+    if (guidance) validateGuidanceDraft(guidance);
+    else if (!result.question.trim()) throw new Error('No chapter guidance was returned. No automatic retry was started.');
+    return { guidance, question: result.question.trim() };
   } finally {
     diagnostics.slice(previousCount).forEach(d => { d.stage = 'chapter_guidance'; });
   }
 }
+
 
 
