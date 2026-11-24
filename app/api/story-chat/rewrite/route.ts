@@ -1,5 +1,5 @@
 import { selectPassageEditor, passageEditCost } from "../../../../lib/passage-editor";
-import { selectedProseWriter, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION, REPETITION_STYLE_INSTRUCTION } from "../../../../lib/prose-writer";
+import { selectedProseWriter, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION, REPETITION_STYLE_INSTRUCTION, AION_SENTENCE_RHYTHM_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 import OpenAI from "openai";
 import { requestStyleContext } from "../../../../lib/author-style-server";
@@ -119,7 +119,7 @@ export async function POST(request: Request) {
         maxRetries: 0, timeout: 240_000,
       });
       const response = await openrouter.chat.completions.create({
-        model, messages: [{ role: "system", content: system }, { role: "user", content: prompt }],
+        model, messages: [{ role: "system", content: system + "\n\n" + AION_SENTENCE_RHYTHM_INSTRUCTION }, { role: "user", content: prompt }],
         max_tokens: tokenLimit, temperature: 0.6, top_p: 0.9,
         frequency_penalty: 0, presence_penalty: 0,
       });

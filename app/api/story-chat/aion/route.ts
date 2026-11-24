@@ -1,5 +1,5 @@
 import { narrativeContext } from "../../../../lib/narrative-memory";
-import { PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION, REPETITION_STYLE_INSTRUCTION } from "../../../../lib/prose-writer";
+import { PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION, REPETITION_STYLE_INSTRUCTION, AION_SENTENCE_RHYTHM_INSTRUCTION } from "../../../../lib/prose-writer";
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
@@ -204,7 +204,7 @@ export async function POST(request: Request) {
             {
               role: "system",
               content:
-                "Return only one complete replacement passage. Reason internally as required by the provider, but never expose reasoning. Obey the author's hard length and passage boundaries.",
+                "Return only one complete replacement passage. Reason internally as required by the provider, but never expose reasoning. Obey the author's hard length and passage boundaries." + "\n\n" + AION_SENTENCE_RHYTHM_INSTRUCTION,
             },
             { role: "user", content: prompt },
           ],

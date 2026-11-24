@@ -1,7 +1,7 @@
 // NovelForge chapter and specialist prose writing.
 import OpenAI from "openai";
 import { routedSpecialistBeats } from "../../../../lib/specialist-routing";
-import { selectedProseWriter, proseCostEstimate, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION, REPETITION_STYLE_INSTRUCTION } from "../../../../lib/prose-writer";
+import { selectedProseWriter, proseCostEstimate, PROSE_BALANCE_INSTRUCTION, TEXT_MESSAGE_INSTRUCTION, DIRECT_THOUGHT_INSTRUCTION, REPETITION_STYLE_INSTRUCTION, AION_SENTENCE_RHYTHM_INSTRUCTION } from "../../../../lib/prose-writer";
 import { narrativeContext, CONTINUITY_CONSISTENCY_INSTRUCTION } from "../../../../lib/narrative-memory";
 import { priorProseContext, PROSE_HISTORY_LIMIT } from "../../../../lib/prose-history";
 
@@ -410,10 +410,12 @@ async function writeSpecialistScene(input: {
       messages: [
         {
           role: "system",
-          content:
+          content: [
+            AION_SENTENCE_RHYTHM_INSTRUCTION,
             input.continuation
               ? "Continue the author's current edited draft only. Follow the latest continuation guidance, including an explicitly changed endpoint, without replaying the original scene. Return new prose followed by <END_SECTION>. Reason internally but never expose reasoning."
               : "Return only the complete missing intimacy scene. Reason internally but never expose reasoning. Preserve the supplied boundaries exactly.",
+          ].join("\n\n"),
         },
         { role: "user", content: prompt },
       ],
