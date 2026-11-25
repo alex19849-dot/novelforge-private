@@ -1,9 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { getRun, start } from 'workflow/api';
+import { startBackground, backgroundStatus } from '../../../../lib/background-queue';
 import { jobAdmin } from '../../../../lib/social-job-db';
 import { prepareManuscriptReview, reviewCostQuote, reviewSourceKey, type ReviewSnapshot, type SavedReview } from '../../../../lib/manuscript-review';
-import { reviewManuscriptJob } from '../../../../workflows/manuscript-review';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -47,7 +46,7 @@ export async function POST(request: Request) {
     const { error: insertError } = await db.from('manuscript_review_jobs').insert({ id: body.id, story_id: body.storyId, user_id: user.id, source_key: sourceKey, input, approved_budget_usd: body.approvedBudgetUsd });
     if (insertError) return json({ error: insertError.code === '23505' ? 'A review is already starting. Refresh saved reviews to check progress.' : 'The review could not be saved. No model call was started.' }, 409);
     insertedId = body.id;
-    const run = await start(reviewManuscriptJob, [body.id]);
+    const run = await startBackground('review', [body.id], user.id);
     const { error: linkError } = await db.from('manuscript_review_jobs').update({ workflow_run_id: run.runId }).eq('id', body.id).eq('user_id', user.id);
     if (linkError) console.error('Review run could not be linked', body.id);
     const { data: job } = await db.from('manuscript_review_jobs').select(fields).eq('id', body.id).eq('user_id', user.id).single();
@@ -70,7 +69,7 @@ export async function GET(request: Request) {
       if (job.status !== 'generating') continue;
       let stopped = !job.workflow_run_id && Date.now() - Date.parse(job.created_at) > 600000;
       if (job.workflow_run_id) {
-        const state = await getRun(job.workflow_run_id).status;
+        const state = await backgroundStatus(job.workflow_run_id);
         stopped = ['failed','cancelled'].includes(state);
       }
       if (stopped) {

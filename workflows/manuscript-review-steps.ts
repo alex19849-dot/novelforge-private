@@ -3,7 +3,6 @@ import { requestManuscriptReview } from '../lib/manuscript-review-provider';
 import type { ReviewInput } from '../lib/manuscript-review';
 
 export async function runManuscriptReview(id: string) {
-  'use step';
   console.log('Reviewing saved manuscript', id);
   const db = jobAdmin();
   const { data: job, error } = await db.from('manuscript_review_jobs').select('id,status,input,approved_budget_usd,model_call_in_flight').eq('id',id).single();
@@ -19,7 +18,6 @@ export async function runManuscriptReview(id: string) {
 }
 runManuscriptReview.maxRetries = 0;
 export async function failManuscriptReview(id: string, message: string) {
-  'use step';
   console.error('Manuscript review stopped', id);
   const { error } = await jobAdmin().from('manuscript_review_jobs').update({ status: 'failed', error_message: `${message} Your manuscript is unchanged. No automatic retry was started.`, updated_at: new Date().toISOString() }).eq('id',id).eq('status','generating');
   if (error) throw new Error('The stopped review could not be recorded.');

@@ -1,3 +1,4 @@
+import { startBackground, recoverBackgroundDispatches } from '../../../../lib/background-queue';
 import { after } from "next/server";
 import {
   claimStudioRecovery,
@@ -24,6 +25,17 @@ export async function POST(request: Request) {
       { error: "Maintenance owner is not configured." },
       { status: 503 },
     );
+  // A no-model probe verifies private queue delivery before migrating the publisher.
+  const probe = await jobAdmin().from('background_queue_runs').select('id,status').eq('user_id', owner).eq('kind','probe').order('created_at',{ascending:false}).limit(1).maybeSingle();
+  if (probe.error) return Response.json({error:'Queue readiness could not be checked.'},{status:503});
+  if (!probe.data) {
+    const run = await startBackground('probe', [], owner);
+    return Response.json({queueProbe:run.runId,ready:false},{status:202});
+  }
+  if (probe.data.status !== 'completed') {
+    await recoverBackgroundDispatches();
+    return Response.json({queueProbe:probe.data.id,ready:false},{status:202});
+  }
   const checked = await jobAdmin()
     .from("social_publishing_settings")
     .update({ maintenance_checked_at: new Date().toISOString() })
@@ -33,6 +45,7 @@ export async function POST(request: Request) {
       { error: "Maintenance state unavailable." },
       { status: 503 },
     );
+  await recoverBackgroundDispatches();
   const recovery = await claimStudioRecovery(owner);
   if (recovery) after(() => runStudioRecovery(owner, recovery));
   const results = await Promise.allSettled([

@@ -1,4 +1,4 @@
-import {FatalError} from 'workflow';
+import {FatalError} from '../lib/background-context';
 import {jobAdmin} from '../lib/social-job-db';
 import {queueAnalytics} from '../lib/social-analytics-server';
 import {readPostMetricsBatch} from '../lib/social-analytics-provider';
@@ -12,11 +12,9 @@ async function active(owner:string,token:string){
  return db;
 }
 export async function queueAnalyticsRefresh(owner:string){
- 'use step';
  try{await queueAnalytics(owner);}catch{console.warn('Analytics will retry independently; publishing continues.');}
 }
 export async function prepareAnalytics(owner:string,token:string){
- 'use step';
  const db=await active(owner,token);
  const settings=await db.from('social_publishing_settings').select('channels').eq('user_id',owner).maybeSingle();
  if(settings.error)throw Error('Analytics channels could not be checked.');
@@ -32,7 +30,6 @@ export async function prepareAnalytics(owner:string,token:string){
  throw new FatalError('Analytics history exceeds the supported pagination window.');
 }
 export async function collectAnalyticsBatch(owner:string,token:string,ids:string[]){
- 'use step';
  const db=await active(owner,token);
  const batch=await readPostMetricsBatch(ids);
  let usable=0;
@@ -50,7 +47,6 @@ export async function collectAnalyticsBatch(owner:string,token:string,ids:string
 }
 export type AnalyticsCoverage={requested:number;received:number;usable:number;issues:{id:string;code:string}[]};
 export async function finishAnalytics(owner:string,token:string,coverage?:AnalyticsCoverage){
- 'use step';
  const db=await active(owner,token);
  const since=new Date(Date.now()-90*86400000).toISOString();
  const [history,preferences]=await Promise.all([
@@ -72,7 +68,6 @@ export async function finishAnalytics(owner:string,token:string,coverage?:Analyt
  if(error)throw Error('The measured strategy could not be saved.');
 }
 export async function failAnalytics(owner:string,token:string){
- 'use step';
  const {error}=await jobAdmin().from('social_learning_state').update({status:'error',collecting_until:null,next_collect_at:new Date(Date.now()+6*3600000).toISOString(),last_error:'Buffer analytics is unavailable or its permissions/schema changed. Publishing continues. Collection will retry; no missing results are invented.'}).eq('user_id',owner).eq('collection_token',token);
  if(error)throw Error('The analytics error could not be saved.');
 }

@@ -1,10 +1,9 @@
 import { approvedStyleFor } from '../../../../lib/author-style-server';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { start, getRun } from 'workflow/api';
+import { startBackground, backgroundStatus } from '../../../../lib/background-queue';
 import { jobAdmin } from '../../../../lib/social-job-db';
 import { chapterSourceFingerprint, type ChapterJobInput } from '../../../../lib/chapter-job';
-import { generateChapterJob } from '../../../../workflows/chapter-generation';
 import type { StoryWorkspace } from '../../../story-chat/types';
 
 export const runtime = 'nodejs';
@@ -45,7 +44,7 @@ export async function POST(request: Request) {
     const { error: insertError } = await db.from('story_generation_jobs').insert({ id: body.id, story_id: input.story.id, user_id: user.id, input, source_updated_at: saved.updated_at, status: 'generating' });
     if (insertError) return json({ error: insertError.code === '23505' ? 'This story already has a chapter job starting. Reopen it to see progress.' : 'The chapter job could not be saved.' }, 409);
     ownedJob = body.id;
-    const run = await start(generateChapterJob, [body.id]);
+    const run = await startBackground('chapter', [body.id], user.id);
     const { error: linkError } = await db.from('story_generation_jobs').update({ workflow_run_id: run.runId }).eq('id', body.id).eq('user_id', user.id);
     if (linkError) console.error('Chapter workflow ID could not be linked', body.id);
     return json({ job: { id: body.id, status: 'generating' } }, 202);
@@ -73,7 +72,7 @@ export async function GET(request: Request) {
     const job: (NonNullable<typeof jobMetadata> & { result?: unknown }) | null = jobMetadata;
     if (error) throw new Error('Chapter progress could not be loaded.');
     if (job?.status === 'generating' && job.workflow_run_id) {
-      const status = await getRun(job.workflow_run_id).status;
+      const status = await backgroundStatus(job.workflow_run_id);
       if (['failed', 'cancelled'].includes(status)) {
         job.status = 'failed';
         job.error_message = 'The background worker stopped. Saved progress is kept. No model call was automatically repeated.';

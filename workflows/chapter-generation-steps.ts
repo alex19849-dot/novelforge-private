@@ -42,7 +42,6 @@ function ledgerBatches(chapters: StoryChapter[], from?: number) {
 }
 
 export async function advanceChapterJob(id: string): Promise<boolean> {
-  'use step';
   const job = await getJob(id);
   if (job.status !== 'generating') return true;
   const input = job.input as ChapterJobInput;
@@ -196,7 +195,6 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
 advanceChapterJob.maxRetries = 0;
 
 export async function finishChapterJob(id: string) {
-  'use step';
   console.log('Saving chapter background result', id);
   const job = await getJob(id);
   if (job.status !== 'generating') return;
@@ -212,7 +210,6 @@ export async function finishChapterJob(id: string) {
 }
 
 export async function failChapterJob(id: string, message: string) {
-  'use step';
   console.error('Chapter background job stopped', id, message);
   const job = await getJob(id);
   if (job.status !== 'generating') return;

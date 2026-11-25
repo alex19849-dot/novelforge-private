@@ -1,0 +1,17 @@
+# Background queue migration, 25 November 2026
+
+The team exhausted its 50,000 Workflow Events allowance. The old publisher ran a durable step plus sleep at least every five minutes even without work, consuming approximately 43,200 events per 30 days before analytics or content generation.
+
+The active chapter, review, social generation, publisher and analytics producers now enqueue private Vercel Queue callbacks instead. Queue messages contain only a durable run ID and sequence. The small service-only `background_queue_runs` table holds stage state, dispatch deadlines and claims. Existing chapter input/checkpoint/result tables, paid-call-in-flight markers, source conflict checks and publishing claims remain authoritative.
+
+Each delivery claims one stage. Duplicate/stale messages cannot rerun a completed stage. Saving a stage and sending the next message are separate: the next stage remains in a durable outbox if sending fails, and old-message redelivery or existing signed maintenance redispatches its stable idempotency key. An expired running stage is not replayed because its provider outcome may be ambiguous. Its domain draft/result remains available for review. Existing model errors remain failures rather than automatic paid retries.
+
+The publisher waits directly until the next approved post or reconciliation time, with relay wakes only for dates beyond the queue delay ceiling. An empty calendar ends its run. Calendar edits rotate its lease and wake a fresh due-time check. Maintenance recognises deliberate sleeps and idle completion instead of restarting them as stale heartbeats. Existing Buffer submission claims and reconciliation protect against duplicates. Analytics remains frequency-limited by its existing claim RPC. Old publishing leases are fenced on cutover. Historical workflow source/deployments are retained; new active producers do not start Workflows.
+
+Social provider response IDs are now saved immediately after acceptance, with an atomic pre-submission marker preventing a second ambiguous paid submission. Finished assets and tasks are reused. Model choices, model prompts, heat, manuscript content, author editing, calendar approvals, scheduled times and website files were not changed.
+
+Private queue trigger: `novelforge-background`, fixed queue region `iad1`, metadata-only messages and seven-day retention. Callbacks are private to the queue infrastructure. Existing signed maintenance provides dispatch recovery and an authenticated zero-model queue probe. The SQL table is RLS-enabled with no client grants. No new service, paid plan or GPU was purchased.
+
+Validation: offline duplicate/concurrent delivery, failed next-send recovery, expired-stage non-replay, future wake timing, bounded queue delays, small payloads, producer migration and social provider-ID checkpoint cases. Full Next build passed (the installed Next version emitted its existing security advisory; it was not upgraded as part of this scoped infrastructure change). No paid chapter, review, artwork or model test was started. Live queue probe and publisher cutover verification are recorded in the project log.
+
+Limits: queues still use function/queue/database allowances. This is not unlimited free hosting or a refund of earlier Workflow Events. A stage interrupted after a paid request but before durable output saving may require author review rather than automatic replay. No stage-loss scenario is claimed to be exactly-once across an external provider without that provider's idempotency support.

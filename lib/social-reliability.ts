@@ -1,4 +1,4 @@
-export const PUBLISHER_VERSION='2026-11-20-studio-media-v2';
+export const PUBLISHER_VERSION='2026-11-25-due-time-queue-v1';
 export const STALE_PUBLISHER_MS=8*60_000;
 export const CATCH_UP_MS=6*3600_000;
 export function publisherNeedsRecovery(settings:{enabled:boolean;worker_version?:string;heartbeat_at?:string|null;updated_at?:string},now=Date.now()){

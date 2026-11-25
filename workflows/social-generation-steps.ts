@@ -1,6 +1,6 @@
 import {ARTWORK_ASSET_POLICY_VERSION,assertVerifiedArtwork} from '../lib/social-asset-policy';
 import OpenAI from 'openai';
-import { FatalError, getWorkflowMetadata } from 'workflow';
+import { FatalError, getWorkflowMetadata } from '../lib/background-context';
 import { createHash } from 'node:crypto';
 import { jobAdmin } from '../lib/social-job-db';
 import { planRequest } from '../lib/social-plan-request';
@@ -42,7 +42,6 @@ async function recordProgress(job:Job) {
   if(updateError) throw new Error('Progress could not be saved.');
 }
 export async function describeJob(runId:string) {
-  'use step';
   const {db,job}=await context(runId);
   const {error:registrationError}=await db.from('social_generation_runs').update({workflow_run_id:getWorkflowMetadata().workflowRunId}).eq('id',runId).eq('user_id',job.user_id).is('workflow_run_id',null);
   if(registrationError) throw new Error('The worker could not save its run reference.');
@@ -51,7 +50,6 @@ export async function describeJob(runId:string) {
   return data.map(t=>t.id);
 }
 export async function prepareTask(runId:string,taskId:string):Promise<'stop'|'skip'|'run'|'music'> {
-  'use step';
   const {db,job,task}=await context(runId,taskId);
   if(job.status!=='generating'||job.cancel_requested) return 'stop';
   if(['completed','skipped'].includes(task.status)) return 'skip';
@@ -60,7 +58,6 @@ export async function prepareTask(runId:string,taskId:string):Promise<'stop'|'sk
   return task.request.music?'music':'run';
 }
 export async function submitTask(runId:string,taskId:string):Promise<string|null> {
-  'use step';
   const {db,job,task}=await context(runId,taskId);
   if(task.response_id) return task.response_id;
   let request:OpenAI.Responses.ResponseCreateParamsNonStreaming;
@@ -92,7 +89,14 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
       input:[{role:'user',content:task.request.asset_mode==='original_cover_overlay'?[{type:'input_text',text:originalCoverBackgroundPrompt(first.creative_brief!,(first.platform==='tiktok'||first.platform==='youtube'),book.title)}]:[{type:'input_text',text:posterPrompt({...book,author:'Marlow Quinn'},first.platform,first.planned_media_type!,first.creative_brief!,'',first.post_type)}]}],
       tools:[{type:'image_generation',model:'gpt-image-2',size:'1024x1536',quality:'medium',output_format:'jpeg',output_compression:92,background:'opaque'}],tool_choice:{type:'image_generation'}};
   }
-  try { return (await ai().responses.create(request)).id; }
+  if(task.result?.submission_started) throw new FatalError('The earlier paid submission could not be confirmed. It was not sent again.');
+  const guarded=await db.from('social_generation_tasks').update({result:{...task.result,submission_started:true}}).eq('id',taskId).eq('user_id',job.user_id).is('response_id',null).eq('result',JSON.stringify(task.result)).select('id').maybeSingle();
+  if(guarded.error||!guarded.data)throw new FatalError('This paid submission was already claimed.');
+  try {
+    const response=await ai().responses.create(request);
+    await rememberResponse(runId,taskId,response.id);
+    return response.id;
+  }
   catch(error) {
     // Do not blindly resubmit an ambiguous paid request after a network error.
     // Only an explicit 429 is safe to retry before any response was accepted.
@@ -101,13 +105,11 @@ export async function submitTask(runId:string,taskId:string):Promise<string|null
   }
 }
 export async function rememberResponse(runId:string,taskId:string,responseId:string) {
-  'use step';
   const {db,job}=await context(runId,taskId);
   const {error}=await db.from('social_generation_tasks').update({response_id:responseId}).eq('id',taskId).eq('user_id',job.user_id);
   if(error) throw new Error('The AI response reference could not be saved.');
 }
 export async function pollResponse(runId:string,taskId:string,responseId:string) {
-  'use step';
   await context(runId,taskId);
   const response=await ai().responses.retrieve(responseId);
   return response.status??'failed';
@@ -129,7 +131,6 @@ async function attachMedia(job:Job,task:Task,path:string,notes:string,mediaType?
   await recordProgress(job);
 }
 export async function persistTask(runId:string,taskId:string,responseId:string) {
-  'use step';
   const {db,job,task}=await context(runId,taskId);
   if(task.status==='completed') return;
   // Large base64 images never enter the workflow event log or the browser.
@@ -196,13 +197,11 @@ export async function persistTask(runId:string,taskId:string,responseId:string) 
   }
 }
 export async function failTask(runId:string,taskId:string,message:string) {
-  'use step';
   const {db,job}=await context(runId,taskId);
   const {error}=await db.from('social_generation_tasks').update({status:'failed',error_message:message.slice(0,600)}).eq('id',taskId).eq('user_id',job.user_id);
   if(error) throw new Error('The task error could not be saved.');
 }
 export async function renderMusicTask(runId:string,taskId:string) {
-  'use step';
   const {db,job,task}=await context(runId,taskId);
   if(task.status==='completed'||task.status==='skipped') return;
   const original=task.request.posts?.[0];
@@ -245,7 +244,6 @@ export async function renderMusicTask(runId:string,taskId:string) {
   await complete(saved.length,saved.length?'Licensed backing music added.':'The post changed during export. Its current content was kept.',saved.length?'completed':'skipped');
 }
 export async function finishJob(runId:string,paused:boolean) {
-  'use step';
   const {db,job}=await context(runId);
   await recordProgress(job);
   const {data:failed,error}=await db.from('social_generation_tasks').select('error_message').eq('run_id',runId).eq('user_id',job.user_id).eq('status','failed');

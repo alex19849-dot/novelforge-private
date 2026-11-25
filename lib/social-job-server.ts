@@ -1,8 +1,7 @@
 import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { start } from 'workflow/api';
-import { generateSocialJob } from '../workflows/social-generation';
+import { startBackground } from './background-queue';
 import { addDays, londonDate, londonSchedule, SOCIAL_PLATFORMS } from './social-calendar';
 import type { CalendarPost, SocialPlatform } from './social-calendar';
 import { plannedTime } from './social-planner';
@@ -104,7 +103,7 @@ export async function queueSocialJob(request: Request,kind:'plan'|'media'|'music
     ownedRun=runId;
     const {error:taskError}=await admin.from('social_generation_tasks').insert(tasks.map(t=>({...t,run_id:runId,user_id:user.id})));
     if(taskError) throw new Error('The background tasks could not be saved.');
-    const workflow=await start(generateSocialJob,[runId]);
+    const workflow=await startBackground('social',[runId],user.id);
     await admin.from('social_generation_runs').update({workflow_run_id:workflow.runId}).eq('id',runId).eq('user_id',user.id);
     return jobJson({ok:true,runId,status:'generating'},202);
   }catch(error){

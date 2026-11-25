@@ -1,4 +1,4 @@
-import {getWorkflowMetadata} from 'workflow';
+import {getWorkflowMetadata} from '../lib/background-context';
 import {jobAdmin} from '../lib/social-job-db';
 import {publicationTooLate,reconciliationExpired} from '../lib/social-reliability';
 import {bufferPayload,BufferPublishError,createBufferPost,readBufferPost,recentBufferPosts,matchingBufferPosts} from '../lib/buffer-publishing';
@@ -33,7 +33,6 @@ async function reconcile(item:Publication,channels:any) {
   }
 }
 export async function registerPublisher(owner:string,lease:string,generation:number) {
-  'use step';
   const {data,error}=await jobAdmin().rpc('social_register_publisher',{p_owner:owner,p_lease:lease,p_generation:generation,p_worker:getWorkflowMetadata().workflowRunId});
   if(error) throw new Error('The automatic publisher could not register.');
   console.log('Social publisher registered',{owner,generation,active:data});
@@ -48,8 +47,7 @@ async function failBeforeSubmission(post:CalendarPost,message:string) {
     if(error) throw new Error('The publishing error details could not be saved.');
   }
 }
-export async function publishingTick(owner:string,lease:string,generation:number):Promise<{stop:boolean;delay:number}> {
-  'use step';
+export async function publishingTick(owner:string,lease:string,generation:number):Promise<{stop:boolean;delay:number|null}> {
   const db=jobAdmin(),worker=getWorkflowMetadata().workflowRunId;
   const {data:settings,error:settingsError}=await db.from('social_publishing_settings').select('*').eq('user_id',owner).single();
   if(settingsError) throw new Error('Publishing settings could not be loaded.');
@@ -100,7 +98,7 @@ export async function publishingTick(owner:string,lease:string,generation:number
     const {data:checks,error:checksError}=await db.from('social_publications').select('next_check_at').eq('user_id',owner).in('state',['submitting','accepted','uncertain']).not('next_check_at','is',null).order('next_check_at').limit(1);
     if(futureError||checksError) throw new Error('The next publishing time could not be checked.');
     const times=[...retryTimes,...[future[0]?.scheduled_at,checks[0]?.next_check_at].filter(Boolean).map(time=>Date.parse(time))];
-    return {stop:false,delay:Math.max(5,Math.min(300,Math.ceil((Math.min(...times,Date.now()+300_000)-Date.now())/1000)))};
+    return {stop:false,delay:times.length?Math.max(5,Math.ceil((Math.min(...times)-Date.now())/1000)):null};
   }catch(error) {
     const message=error instanceof Error?error.message:'The automatic publisher is retrying.';
     await db.from('social_publishing_settings').update({last_error:message,heartbeat_at:new Date().toISOString()}).eq('user_id',owner).eq('lease',lease);
@@ -109,7 +107,6 @@ export async function publishingTick(owner:string,lease:string,generation:number
   }
 }
 export async function advancePublisher(owner:string,lease:string,generation:number) {
-  'use step';
   const db=jobAdmin();
   const {data,error}=await db.from('social_publishing_settings').update({generation:generation+1,workflow_run_id:null}).eq('user_id',owner).eq('lease',lease).eq('generation',generation).eq('enabled',true).select('generation');
   if(error) throw new Error('The next publisher run could not be prepared.');
@@ -119,7 +116,6 @@ export async function advancePublisher(owner:string,lease:string,generation:numb
   return current.enabled&&current.lease===lease&&current.generation===generation+1?generation+1:null;
 }
 export async function reportPublisherHandoffFailure(owner:string,lease:string,generation:number) {
-  'use step';
   const {error}=await jobAdmin().from('social_publishing_settings').update({last_error:'The next publishing worker could not start. Automatic recovery is retrying in five minutes.'}).eq('user_id',owner).eq('lease',lease).eq('generation',generation).eq('enabled',true).is('workflow_run_id',null);
   if(error) throw new Error('The publishing handover error could not be saved.');
 }
