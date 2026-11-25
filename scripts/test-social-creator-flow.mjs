@@ -315,6 +315,8 @@ globalThis.studioTestDb = {
     },
   },
 };
+// A scene plan shares history storage but must never be treated as a poster recipe.
+rows.set('fixture-scene-history',{id:'fixture-scene-history',user_id:'fixture-owner',book_slug:book.slug,status:'ready',poster_state:'idle',recipe:{format:'scene-slides'},hook:'An unrelated scene hook.',scene:'A scene sequence'});
 const oldFetch = globalThis.fetch;
 globalThis.fetch = async (input, init) => {
   const url = String(input instanceof Request ? input.url : input);

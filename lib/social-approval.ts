@@ -1,6 +1,7 @@
 import type { CalendarPost } from './social-calendar';
 
 export function readyForApproval(post:Pick<CalendarPost,'status'|'scheduled_at'|'caption'|'platform'|'planned_media_type'|'media_path'|'media_type'|'title'|'hashtags'>,now=Date.now()) {
+  if((post as Partial<CalendarPost>).content_metadata?.native_audio_required)return false;
   if(post.status!=='draft'||!post.scheduled_at||Date.parse(post.scheduled_at)<=now||!Number.isFinite(Date.parse(post.scheduled_at))||!post.caption.trim()) return false;
   if((post.platform!=='facebook'||post.planned_media_type)&&(!post.media_path||!post.media_type)) return false;
   if(post.platform==='youtube'&&(post.media_type!=='video'||!post.title.trim()||post.title.length>100))return false;

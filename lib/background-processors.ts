@@ -29,6 +29,7 @@ export async function advanceBackground(run:BackgroundRun):Promise<{done?:boolea
     }catch{cp.coverage.requested+=ids.length;cp.coverage.issues.push(...ids.map((id:string)=>({id,code:'COLLECTION_ERROR'})));}
     return {checkpoint:{...cp,offset:cp.offset+ids.length}};
   }
+  if(run.kind==='social'&&run.args[1]==='scene-slides')return (await import('./social-scene-slides-server')).advanceSceneSlides(run);
   if(run.kind==='social') {
     const db=jobAdmin();
     const job=await db.from('social_generation_runs').select('status,cancel_requested').eq('id',id).eq('user_id',run.user_id).single();
@@ -68,6 +69,7 @@ export async function failBackground(run:BackgroundRun,message:string) {
   if(run.kind==='chapter')return failChapterJob(run.args[0],message);
   if(run.kind==='review')return failManuscriptReview(run.args[0],message);
   if(run.kind==='analytics')return failAnalytics(run.args[0],run.args[1]);
+  if(run.kind==='social'&&run.args[1]==='scene-slides')return (await import('./social-scene-slides-server')).failSceneSlides(run.user_id,run.args[0],run.args[2],message);
   if(run.kind==='social'){
     const saved=await jobAdmin().from('social_generation_runs').update({status:'failed',error_message:message,updated_at:new Date().toISOString()}).eq('id',run.args[0]).eq('user_id',run.user_id).eq('status','generating');
     if(saved.error)throw Error('Stopped generation could not be saved.');

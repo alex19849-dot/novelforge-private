@@ -13,6 +13,7 @@ const config: NextConfig = {
       "./assets/social-fonts/*",
     ],
     "/api/queues/background": [
+      "./assets/social-fonts/*",
       "./node_modules/@ffmpeg-installer/linux-x64/ffmpeg",
       "./assets/social-music/*.m4a",
     ],

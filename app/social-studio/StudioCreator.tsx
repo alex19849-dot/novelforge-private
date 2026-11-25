@@ -35,7 +35,13 @@ type PosterPost = {
   creativeBrief: string;
   includesCover: boolean;
 };
-type PosterResult = {
+export type PosterResult = {
+  format?: "scene-slides";
+  delivery?: "native" | "automatic";
+  sourceMode?: "excerpt" | "premise";
+  slideUrls?: string[];
+  cast?: string[];
+  trackId?: string | null;
   campaignId: string;
   promptId: string;
   bookSlug: string;
@@ -88,12 +94,20 @@ export default function StudioCreator({
   books,
   onSaved,
   onNavigate,
+  creation,
+  reviewOnly = false,
 }: {
+  creation?: PosterResult;
+  reviewOnly?: boolean;
   books: StudioBook[];
   onSaved: () => void;
   onNavigate: (view: "scheduled" | "drafts" | "settings") => void;
 }) {
-  const [book, setBook] = useState<StudioBook | null>(null),
+  const [book, setBook] = useState<StudioBook | null>(
+      creation
+        ? (books.find((b) => b.slug === creation.bookSlug) ?? null)
+        : null,
+    ),
     [notes, setNotes] = useState(""),
     [platforms, setPlatforms] = useState<SocialPlatform[]>([
       "facebook",
@@ -110,7 +124,7 @@ export default function StudioCreator({
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
     [activePlatform, setActivePlatform] = useState<SocialPlatform>("facebook");
-  const bookRef = useRef(""),
+  const bookRef = useRef(creation?.bookSlug ?? ""),
     receiptRef = useRef(""),
     appliedReceiptRef = useRef("");
   const inFlight = useRef(false);
@@ -164,9 +178,38 @@ export default function StudioCreator({
     setBusy("");
     setError("");
     setMessage(
-      "Your posters and separate platform copy are ready. Review them before choosing posting times.",
+      data.format === "scene-slides"
+        ? "Your three-slide sequence is ready. Review it and each platform’s copy before saving."
+        : "Your posters and separate platform copy are ready. Review them before choosing posting times.",
     );
   }
+  useEffect(() => {
+    if (!creation) return;
+    let live = true;
+    void (async () => {
+      const account = await supabase.auth.getUser();
+      if (!account.data.user) return;
+      const saved = await supabase
+        .from("social_posts")
+        .select("*")
+        .eq("user_id", account.data.user.id)
+        .in(
+          "id",
+          creation.posts.map((p) => p.id),
+        );
+      if (!live) return;
+      if (saved.error) {
+        setError(
+          "Saved posts could not be checked. Refresh before saving again.",
+        );
+        return;
+      }
+      acceptResult(creation, saved.data as CalendarPost[]);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [creation?.campaignId]);
   async function checkProgress() {
     if (!prompt) return;
     try {
@@ -215,7 +258,12 @@ export default function StudioCreator({
         .eq("status", "ready")
         .order("created_at", { ascending: false })
         .limit(6);
-      if (active && !rows.error) setRecent(rows.data as RecentCreation[]);
+      if (active && !rows.error)
+        setRecent(
+          (rows.data as RecentCreation[]).filter(
+            (row) => (row.recipe as any)?.format !== "scene-slides",
+          ),
+        );
     }
     void load();
     return () => {
@@ -356,6 +404,12 @@ export default function StudioCreator({
   async function save(post: Editable, approve: boolean) {
     if (!book || !result || inFlight.current) return;
     const schedule = approve || post.saved?.status === "approved";
+    if (schedule && result.delivery === "native") {
+      setError(
+        "This clean export needs music added in the platform app. Save a draft and download the MP4, then finish posting there.",
+      );
+      return;
+    }
     inFlight.current = true;
     setBusy(post.id);
     setError("");
@@ -364,7 +418,12 @@ export default function StudioCreator({
     try {
       const { data } = await supabase.auth.getUser();
       if (!data.user) throw Error("Sign in again before saving.");
-      const scheduled = post.date ? londonSchedule(post.date, post.time) : null;
+      const scheduled =
+        result.delivery === "native"
+          ? null
+          : post.date
+            ? londonSchedule(post.date, post.time)
+            : null;
       if (schedule && (!scheduled || Date.parse(scheduled) <= Date.now()))
         throw Error("Choose a future UK posting date and time.");
       const track = musicForPath(post.mediaPath);
@@ -384,6 +443,16 @@ export default function StudioCreator({
         creative_brief: post.creativeBrief,
         quality_notes: "",
         content_metadata: {
+          ...(result.format === "scene-slides"
+            ? {
+                format: "scene-slides",
+                native_audio_required: result.delivery === "native",
+                ai_generated: true,
+                source_mode: result.sourceMode,
+                slide_urls: result.slideUrls,
+                track_id: result.trackId,
+              }
+            : {}),
           version: 2,
           origin: "manual",
           family: "book_promotion",
@@ -542,195 +611,204 @@ export default function StudioCreator({
       aria-label="Create and schedule a book poster"
       className="space-y-6"
     >
-      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-neutral-900/60 p-4">
-        <img
-          src={book.coverUrl}
-          alt={`${book.title} original cover`}
-          className="h-24 w-16 object-contain"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="text-xs uppercase tracking-widest text-rose-200">
-            Selected book
-          </p>
-          <h2 className="mt-1 text-xl font-semibold">{book.title}</h2>
-          <p className="mt-1 text-sm text-neutral-400">
-            {book.kindleUnlimited
-              ? "Kindle Unlimited verified"
-              : "Kindle edition, KU not verified"}
-          </p>
-        </div>
-        <button
-          type="button"
-          disabled={Boolean(busy) || pending}
-          onClick={() => {
-            setBook(null);
-            setError("");
-            setMessage("");
-          }}
-          className={`${secondary} w-full sm:w-auto`}
-        >
-          Change book
-        </button>
-      </div>
-      <fieldset
-        disabled={Boolean(busy) || pending}
-        className="mt-4 flex flex-wrap gap-2"
-      >
-        <legend className="mb-2 text-sm font-medium">Choose platforms</legend>
-        {CHANNELS.map(([id, label]) => (
-          <label
-            key={id}
-            className={`flex cursor-pointer items-center gap-2 rounded-full border px-4 py-2.5 text-sm ${platforms.includes(id) ? "border-rose-200/50 bg-rose-200/10 text-rose-100" : "border-white/10 text-neutral-400"}`}
-          >
-            <input
-              type="checkbox"
-              checked={platforms.includes(id)}
-              onChange={(e) =>
-                setPlatforms((current) =>
-                  e.target.checked
-                    ? [...current, id]
-                    : current.filter((p) => p !== id),
-                )
-              }
+      {!reviewOnly && (
+        <>
+          <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-neutral-900/60 p-4">
+            <img
+              src={book.coverUrl}
+              alt={`${book.title} original cover`}
+              className="h-24 w-16 object-contain"
             />
-            {label}
-          </label>
-        ))}
-      </fieldset>
-      <details
-        open={!result}
-        className="rounded-2xl border border-white/10 bg-neutral-900/50 p-3 sm:p-6"
-      >
-        <summary className="cursor-pointer text-xl font-semibold">
-          2 · Generate your prompt
-        </summary>
-        <p className="mt-2 text-sm leading-6 text-neutral-400">
-          Each new direction avoids this book’s recent scenes, layouts, colours
-          and hooks. Your original cover goes inside a Kindle, with verified
-          tropes and availability.
-        </p>
-        <label className="mt-4 block text-sm">
-          Extra direction (optional)
-          <input
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs uppercase tracking-widest text-rose-200">
+                Selected book
+              </p>
+              <h2 className="mt-1 text-xl font-semibold">{book.title}</h2>
+              <p className="mt-1 text-sm text-neutral-400">
+                {book.kindleUnlimited
+                  ? "Kindle Unlimited verified"
+                  : "Kindle edition, KU not verified"}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={Boolean(busy) || pending}
+              onClick={() => {
+                setBook(null);
+                setError("");
+                setMessage("");
+              }}
+              className={`${secondary} w-full sm:w-auto`}
+            >
+              Change book
+            </button>
+          </div>
+          <fieldset
             disabled={Boolean(busy) || pending}
-            maxLength={2000}
-            placeholder="For example, make this one tender, festive or more intense…"
-            className={field}
-          />
-        </label>
-        <button
-          type="button"
-          disabled={Boolean(busy) || pending}
-          onClick={() => void generatePrompt()}
-          className={`${primary} mt-4`}
-        >
-          {busy === "prompt"
-            ? "Creating a fresh direction…"
-            : prompt
-              ? "Generate a different prompt"
-              : "Generate prompt"}
-        </button>
-        {recent.length > 0 && (
-          <details className="mt-4 border-t border-white/10 pt-4">
-            <summary className="cursor-pointer text-sm text-neutral-400">
-              Recent creations for this book
+            className="mt-4 flex flex-wrap gap-2"
+          >
+            <legend className="mb-2 text-sm font-medium">
+              Choose platforms
+            </legend>
+            {CHANNELS.map(([id, label]) => (
+              <label
+                key={id}
+                className={`flex cursor-pointer items-center gap-2 rounded-full border px-4 py-2.5 text-sm ${platforms.includes(id) ? "border-rose-200/50 bg-rose-200/10 text-rose-100" : "border-white/10 text-neutral-400"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={platforms.includes(id)}
+                  onChange={(e) =>
+                    setPlatforms((current) =>
+                      e.target.checked
+                        ? [...current, id]
+                        : current.filter((p) => p !== id),
+                    )
+                  }
+                />
+                {label}
+              </label>
+            ))}
+          </fieldset>
+          <details
+            open={!result}
+            className="rounded-2xl border border-white/10 bg-neutral-900/50 p-3 sm:p-6"
+          >
+            <summary className="cursor-pointer text-xl font-semibold">
+              2 · Generate your prompt
             </summary>
-            <ul className="mt-3 space-y-2">
-              {recent.map((row) => (
-                <li
-                  key={row.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-black/20 p-3"
-                >
-                  <span className="text-sm">
-                    {row.hook}
-                    <span className="ml-2 text-xs text-neutral-500">
-                      {new Date(row.created_at).toLocaleDateString("en-GB")}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    disabled={Boolean(busy) || pending}
-                    onClick={() => void resume(row)}
-                    className={secondary}
-                  >
-                    {row.poster_state === "ready"
-                      ? "Reopen poster"
-                      : row.poster_state === "generating"
-                        ? "Resume progress"
-                        : "Use this prompt"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </details>
-        )}
-        {prompt && (
-          <div className="mt-5">
-            <p className="mb-2 text-xs text-neutral-400">
-              {prompt.previousPrompts} previous direction
-              {prompt.previousPrompts === 1 ? "" : "s"} considered. Review and
-              edit before generating artwork.
+            <p className="mt-2 text-sm leading-6 text-neutral-400">
+              Each new direction avoids this book’s recent scenes, layouts,
+              colours and hooks. Your original cover goes inside a Kindle, with
+              verified tropes and availability.
             </p>
-            <label className="block text-sm font-medium">
-              Your poster prompt
-              <textarea
-                value={brief}
+            <label className="mt-4 block text-sm">
+              Extra direction (optional)
+              <input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 disabled={Boolean(busy) || pending}
-                onChange={(e) => setBrief(e.target.value)}
-                rows={9}
-                maxLength={6000}
+                maxLength={2000}
+                placeholder="For example, make this one tender, festive or more intense…"
                 className={field}
               />
             </label>
-          </div>
-        )}
-      </details>
-      {prompt && (
-        <details
-          open={!result}
-          className="rounded-2xl border border-white/10 bg-neutral-900/50 p-3 sm:p-6"
-        >
-          <summary className="cursor-pointer text-xl font-semibold">
-            3 · Generate your poster
-          </summary>
-          <p className="mt-2 text-sm leading-6 text-neutral-400">
-            The real cover is inserted intact. TikTok and YouTube receive a
-            vertical MP4 with licensed backing music.
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-3">
             <button
               type="button"
-              disabled={
-                Boolean(busy) || pending || !platforms.length || !brief.trim()
-              }
-              onClick={() => void generatePoster()}
-              className={primary}
+              disabled={Boolean(busy) || pending}
+              onClick={() => void generatePrompt()}
+              className={`${primary} mt-4`}
             >
-              {busy === "poster" || pending
-                ? "Creating and checking your poster…"
-                : result
-                  ? "Generate poster again"
-                  : "Generate poster"}
+              {busy === "prompt"
+                ? "Creating a fresh direction…"
+                : prompt
+                  ? "Generate a different prompt"
+                  : "Generate prompt"}
             </button>
-            {prompt && (
-              <button
-                type="button"
-                onClick={() => void checkProgress()}
-                className={secondary}
-              >
-                {pending ? "Check progress" : "Open saved result"}
-              </button>
+            {recent.length > 0 && (
+              <details className="mt-4 border-t border-white/10 pt-4">
+                <summary className="cursor-pointer text-sm text-neutral-400">
+                  Recent creations for this book
+                </summary>
+                <ul className="mt-3 space-y-2">
+                  {recent.map((row) => (
+                    <li
+                      key={row.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-black/20 p-3"
+                    >
+                      <span className="text-sm">
+                        {row.hook}
+                        <span className="ml-2 text-xs text-neutral-500">
+                          {new Date(row.created_at).toLocaleDateString("en-GB")}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        disabled={Boolean(busy) || pending}
+                        onClick={() => void resume(row)}
+                        className={secondary}
+                      >
+                        {row.poster_state === "ready"
+                          ? "Reopen poster"
+                          : row.poster_state === "generating"
+                            ? "Resume progress"
+                            : "Use this prompt"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             )}
-          </div>
-          <p className="mt-3 text-xs leading-5 text-neutral-500">
-            Uses your existing AI credits. Nothing is posted until you schedule
-            a platform. Scheduling turns on automatic publishing for approved
-            posts.
-          </p>
-        </details>
+            {prompt && (
+              <div className="mt-5">
+                <p className="mb-2 text-xs text-neutral-400">
+                  {prompt.previousPrompts} previous direction
+                  {prompt.previousPrompts === 1 ? "" : "s"} considered. Review
+                  and edit before generating artwork.
+                </p>
+                <label className="block text-sm font-medium">
+                  Your poster prompt
+                  <textarea
+                    value={brief}
+                    disabled={Boolean(busy) || pending}
+                    onChange={(e) => setBrief(e.target.value)}
+                    rows={9}
+                    maxLength={6000}
+                    className={field}
+                  />
+                </label>
+              </div>
+            )}
+          </details>
+          {prompt && (
+            <details
+              open={!result}
+              className="rounded-2xl border border-white/10 bg-neutral-900/50 p-3 sm:p-6"
+            >
+              <summary className="cursor-pointer text-xl font-semibold">
+                3 · Generate your poster
+              </summary>
+              <p className="mt-2 text-sm leading-6 text-neutral-400">
+                The real cover is inserted intact. TikTok and YouTube receive a
+                vertical MP4 with licensed backing music.
+              </p>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  disabled={
+                    Boolean(busy) ||
+                    pending ||
+                    !platforms.length ||
+                    !brief.trim()
+                  }
+                  onClick={() => void generatePoster()}
+                  className={primary}
+                >
+                  {busy === "poster" || pending
+                    ? "Creating and checking your poster…"
+                    : result
+                      ? "Generate poster again"
+                      : "Generate poster"}
+                </button>
+                {prompt && (
+                  <button
+                    type="button"
+                    onClick={() => void checkProgress()}
+                    className={secondary}
+                  >
+                    {pending ? "Check progress" : "Open saved result"}
+                  </button>
+                )}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-neutral-500">
+                Uses your existing AI credits. Nothing is posted until you
+                schedule a platform. Scheduling turns on automatic publishing
+                for approved posts.
+              </p>
+            </details>
+          )}
+        </>
       )}
       <div aria-live="polite">
         {error && (
@@ -753,7 +831,9 @@ export default function StudioCreator({
       {active && (
         <div className="rounded-2xl border border-white/10 bg-neutral-900/50 p-3 sm:p-6">
           <h3 className="text-xl font-semibold">
-            4 · Review and schedule each platform
+            {result?.delivery === "native"
+              ? "4 · Download and finish with platform music"
+              : "4 · Review and schedule each platform"}
           </h3>
           <div
             className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"
@@ -769,7 +849,13 @@ export default function StudioCreator({
                 className={`${secondary} capitalize ${activePlatform === p.platform ? "border-rose-200/50 bg-rose-200/10 text-rose-100" : ""}`}
               >
                 {channelName(p.platform)}
-                {p.saved ? p.saved.status === "approved" ? " · Scheduled" : p.saved.status === "draft" ? " · Draft" : " ✓" : ""}
+                {p.saved
+                  ? p.saved.status === "approved"
+                    ? " · Scheduled"
+                    : p.saved.status === "draft"
+                      ? " · Draft"
+                      : " ✓"
+                  : ""}
               </button>
             ))}
           </div>
@@ -798,7 +884,9 @@ export default function StudioCreator({
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Download poster
+                  {result?.format === "scene-slides"
+                    ? "Download first slide"
+                    : "Download poster"}
                 </a>
                 {active.videoUrl && (
                   <a
@@ -834,8 +922,19 @@ export default function StudioCreator({
               </div>
             </div>
             <div className="space-y-4">
+              {result?.delivery === "native" && (
+                <p className="rounded-xl border border-rose-200/20 p-3 text-sm text-rose-100">
+                  Clean export: save a draft and download the MP4. Add music
+                  using the TikTok, Instagram Reels or YouTube Shorts music
+                  picker, then post in that app. Automatic scheduling is
+                  disabled for this version.
+                </p>
+              )}
               <p className="text-sm text-neutral-400">
-                <span className="capitalize text-white">{channelName(active.platform)}</span> caption and hashtags. Edit before saving.
+                <span className="capitalize text-white">
+                  {channelName(active.platform)}
+                </span>{" "}
+                caption and hashtags. Edit before saving.
               </p>
               <label className="block text-sm">
                 {active.platform === "youtube" ? "YouTube title" : "Post title"}
@@ -880,36 +979,44 @@ export default function StudioCreator({
                   className={field}
                 />
               </label>
-              <fieldset
-                disabled={Boolean(busy)}
-                className="grid grid-cols-2 gap-3"
-              >
-                <legend className="mb-2 text-sm font-medium">
-                  Posting time for{" "}
-                  <span className="capitalize">
-                    {channelName(active.platform)}
-                  </span>
-                </legend>
-                <label className="min-w-0 text-sm">
-                  Date
-                  <input
-                    type="date"
-                    min={londonDate()}
-                    value={active.date}
-                    onChange={(e) => edit(active.id, { date: e.target.value })}
-                    className={field}
-                  />
-                </label>
-                <label className="min-w-0 text-sm">
-                  Time (UK)
-                  <input
-                    type="time"
-                    value={active.time}
-                    onChange={(e) => edit(active.id, { time: e.target.value })}
-                    className={field}
-                  />
-                </label>
-              </fieldset>
+              {result?.delivery !== "native" && (
+                <>
+                  <fieldset
+                    disabled={Boolean(busy)}
+                    className="grid grid-cols-2 gap-3"
+                  >
+                    <legend className="mb-2 text-sm font-medium">
+                      Posting time for{" "}
+                      <span className="capitalize">
+                        {channelName(active.platform)}
+                      </span>
+                    </legend>
+                    <label className="min-w-0 text-sm">
+                      Date
+                      <input
+                        type="date"
+                        min={londonDate()}
+                        value={active.date}
+                        onChange={(e) =>
+                          edit(active.id, { date: e.target.value })
+                        }
+                        className={field}
+                      />
+                    </label>
+                    <label className="min-w-0 text-sm">
+                      Time (UK)
+                      <input
+                        type="time"
+                        value={active.time}
+                        onChange={(e) =>
+                          edit(active.id, { time: e.target.value })
+                        }
+                        className={field}
+                      />
+                    </label>
+                  </fieldset>
+                </>
+              )}
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"
@@ -923,24 +1030,29 @@ export default function StudioCreator({
                   onClick={() => void save(active, false)}
                   className={secondary}
                 >
-                  {active.saved?.status === "approved" ? "Save changes" : "Save draft"}
+                  {active.saved?.status === "approved"
+                    ? "Save changes"
+                    : "Save draft"}
                 </button>
-                {active.platform !== "instagram" && (
-                  <button
-                    type="button"
-                    disabled={
-                      Boolean(busy) ||
-                      Boolean(
-                        active.saved &&
-                          !["draft", "approved"].includes(active.saved.status),
-                      )
-                    }
-                    onClick={() => void save(active, true)}
-                    className={primary}
-                  >
-                    {busy === active.id ? "Saving…" : "Approve & schedule"}
-                  </button>
-                )}
+                {active.platform !== "instagram" &&
+                  result?.delivery !== "native" && (
+                    <button
+                      type="button"
+                      disabled={
+                        Boolean(busy) ||
+                        Boolean(
+                          active.saved &&
+                            !["draft", "approved"].includes(
+                              active.saved.status,
+                            ),
+                        )
+                      }
+                      onClick={() => void save(active, true)}
+                      className={primary}
+                    >
+                      {busy === active.id ? "Saving…" : "Approve & schedule"}
+                    </button>
+                  )}
               </div>
               {active.platform === "instagram" && (
                 <p className="text-sm text-neutral-400">

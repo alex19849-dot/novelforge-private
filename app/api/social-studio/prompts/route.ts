@@ -39,12 +39,20 @@ export async function POST(request: Request) {
         .select("recipe")
         .eq("user_id", account.id)
         .order("created_at", { ascending: false })
-        .limit(12),
+        .limit(60),
     ]);
     if (bookHistory.error || styleHistory.error)
       throw Error("Design history could not be loaded. Nothing was generated.");
-    const history = (bookHistory.data ?? []) as CreativeHistory[];
-    const recentStyles = (styleHistory.data ?? []).map((row) => row.recipe);
+    const history = (bookHistory.data ?? []).filter(
+      (row) => row.recipe?.format !== "scene-slides",
+    ) as CreativeHistory[];
+    const recentStyles = (styleHistory.data ?? [])
+      .map((row) => row.recipe)
+      .filter(
+        (recipe) =>
+          Number.isInteger(recipe?.layout) && Number.isInteger(recipe?.palette),
+      )
+      .slice(0, 12);
     let recipe = nextCreativeDirection(
       history,
       randomInt(2 ** 30),

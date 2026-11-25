@@ -4,9 +4,11 @@ import { supabase } from "../../lib/supabaseClient";
 import StudioNav from "./StudioNav";
 import SocialCalendar from "./SocialCalendar";
 import StudioCreator from "./StudioCreator";
+import StudioSceneCreator from "./StudioSceneCreator";
 import type { StudioBook } from "../../lib/social-creative-directions";
 import type { StudioView, StudioCounts } from "../../lib/social-workspace";
 export default function SocialStudioPage() {
+  const [format, setFormat] = useState<"slides" | "poster">("slides");
   const [view, setView] = useState<StudioView>("scheduled"),
     [counts, setCounts] = useState<StudioCounts>({
       scheduled: 0,
@@ -82,6 +84,28 @@ export default function SocialStudioPage() {
           refreshKey={refresh}
         />
         <div hidden={view !== "create"}>
+          <div
+            role="group"
+            aria-label="Content format"
+            className="mb-6 flex flex-wrap gap-3"
+          >
+            {(
+              [
+                ["slides", "Scene slides"],
+                ["poster", "Book poster"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={format === id}
+                onClick={() => setFormat(id)}
+                className={`rounded-xl border px-5 py-3 text-sm font-semibold ${format === id ? "border-rose-200 bg-rose-200 text-neutral-950" : "border-white/20 text-neutral-300"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           {error && (
             <p
               role="alert"
@@ -94,6 +118,12 @@ export default function SocialStudioPage() {
             <p role="status" className="py-12 text-center text-neutral-400">
               Loading your books…
             </p>
+          ) : format === "slides" ? (
+            <StudioSceneCreator
+              books={books}
+              onSaved={() => setRefresh((n) => n + 1)}
+              onNavigate={setView}
+            />
           ) : (
             <StudioCreator
               books={books}

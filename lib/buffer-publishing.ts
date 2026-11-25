@@ -40,13 +40,14 @@ export function chooseMarlowChannels(channels:BufferChannel[],allowUnhealthy=fal
   return selected;
 }
 export function bufferPayload(post:CalendarPost,channel:BufferChannel,storageUrl:string) {
+  if(post.content_metadata?.native_audio_required)throw new Error('Add platform audio and finish this clean export in the platform app. It is not an automatic publishing item.');
   const text=[post.caption.trim(),post.hashtags.join(' ').trim()].filter(Boolean).join('\n\n');
   if(!text||text.length>(post.platform==='facebook'?10000:post.platform==='youtube'?5000:2200)) throw new Error(`${post.platform} caption and hashtags exceed its publishing limit.`);
   if(post.platform!=='facebook'&&!post.media_path) throw new Error(`${post.platform} needs media before publishing.`);
   if(post.media_path&&!['calendar','creations'].some(folder=>post.media_path!.startsWith(`${post.user_id}/${folder}/`))) throw new Error('The attached media does not belong to this account.');
   if(post.platform==='youtube'&&(!post.title.trim()||post.title.length>100||post.media_type!=='video')) throw new Error('YouTube needs an MP4 video and a title of at most 100 characters.');
   const assets=post.media_path?[post.media_type==='video'?{video:{url:storageUrl,metadata:{thumbnailOffset:1000}}}:{image:{url:storageUrl}}]:[];
-  const generated=Boolean(post.generation_run_id);
+  const generated=Boolean(post.generation_run_id||post.content_metadata?.ai_generated);
   const metadata=post.platform==='youtube'?{youtube:{title:post.title.trim(),categoryId:'24',madeForKids:false,privacy:'public',isAiGenerated:generated}}:post.platform==='instagram'?{instagram:{type:post.media_type==='video'?'reel':'post',shouldShareToFeed:true,isAiGenerated:generated}}:post.platform==='tiktok'?{tiktok:post.media_type==='video'?{isAiGenerated:generated}:{title:post.title}}:{facebook:{type:'post'}};
   return {channelId:channel.id,text,assets,metadata,mode:'shareNow',schedulingType:'automatic',needsApproval:false,saveToDraft:false,aiAssisted:generated,source:`novelforge:${post.id}`};
 }

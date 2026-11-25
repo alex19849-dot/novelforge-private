@@ -73,6 +73,8 @@ export async function renderStudioPoster(
         404,
       );
     const saved = found.data;
+    if (saved.recipe?.format === "scene-slides")
+      return jobJson({ error: "Open this creation in Scene slides." }, 400);
     if (saved.poster_request_id === body.requestId) {
       if (saved.poster_state === "ready") return jobJson(saved.poster_result);
       return jobJson(
