@@ -44,7 +44,18 @@ export async function GET(request: Request) {
   if (r.error || !r.data || r.data.recipe?.format !== "scene-slides")
     return jobJson({ error: "This sequence could not be found." }, 404);
   if (r.data.poster_state === "generating") await recoverBackgroundDispatches();
+  const previewUrls = (r.data.poster_result?.slidesRecovery?.images ?? [])
+    .filter(
+      (path: unknown) =>
+        typeof path === "string" && path.startsWith(user.id + "/creations/"),
+    )
+    .map(
+      (path: string) =>
+        jobAdmin().storage.from("social-media").getPublicUrl(path).data
+          .publicUrl,
+    );
   return jobJson({
+    previewUrls,
     status: r.data.poster_state,
     result: r.data.poster_result,
     error: r.data.poster_error,

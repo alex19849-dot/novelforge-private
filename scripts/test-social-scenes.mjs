@@ -355,6 +355,17 @@ try {
   const run = { ...queued[0], checkpoint: {} };
   for (let i = 0; i < 5; i++) {
     const step = await server.advanceSceneSlides(run);
+    if (i === 0) {
+      const visible = await api.GET(
+        new Request("https://fixture/slides?promptId=" + saved.id, {
+          headers: { Authorization: "Bearer fixture" },
+        }),
+      );
+      assert.equal(visible.status, 200);
+      const progress = await visible.json();
+      assert.equal(progress.previewUrls.length, 1);
+      assert.ok(progress.previewUrls[0].includes(owner + "/creations/"));
+    }
     if (i < 4) assert.ok(!step.done);
     else assert.equal(step.done, true);
   }

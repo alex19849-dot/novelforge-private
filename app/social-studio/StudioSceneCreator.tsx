@@ -49,6 +49,7 @@ export default function StudioSceneCreator({
     [error, setError] = useState(""),
     [recent, setRecent] = useState<any[]>([]);
   const [progress, setProgress] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const lock = useRef(false),
     current = useRef("");
   current.current = slug;
@@ -85,6 +86,7 @@ export default function StudioSceneCreator({
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
       if (d.result?.bookSlug !== current.current) return;
+      setPhotos(d.previewUrls ?? []);
       if (d.status === "generating") {
         const r = d.result?.slidesRecovery;
         setProgress(
@@ -144,6 +146,7 @@ export default function StudioSceneCreator({
       if (current.current !== selected) return;
       setPlan(d.plan);
       setPromptId(d.id);
+      setPhotos([]);
       setResult(null);
     } catch (e) {
       setError(
@@ -228,6 +231,7 @@ export default function StudioSceneCreator({
           disabled={!!busy || pending}
           onChange={(e) => {
             setSlug(e.target.value);
+            setPhotos([]);
             setPlan(null);
             setPromptId("");
             setResult(null);
@@ -540,6 +544,23 @@ export default function StudioSceneCreator({
         >
           {error}
         </p>
+      )}
+      {!result && photos.length > 0 && (
+        <div>
+          <p className="mb-2 text-sm text-neutral-400">
+            Saved scene photographs
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {photos.map((url, i) => (
+              <img
+                key={url}
+                src={url}
+                alt={`Saved scene photo ${i + 1}`}
+                className="w-full rounded-xl"
+              />
+            ))}
+          </div>
+        </div>
       )}
       {result && (
         <div>
