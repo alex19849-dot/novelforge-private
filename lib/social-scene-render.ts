@@ -6,7 +6,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { StudioBook } from "./social-creative-directions";
 import { SCENE_STYLES } from "./social-scene-design";
-import { sceneSeconds } from "./social-scene-slides";
+import { sceneTimings } from "./social-scene-slides";
 const run = promisify(execFile);
 const xml = (s: string) =>
   s.replace(
@@ -37,7 +37,7 @@ export async function sceneText(text: string, maxHeight = 510, size = 68, design
       .png()
       .toBuffer();
     const m = await sharp(bytes).metadata();
-    if (m.height! <= maxHeight) return { bytes, height: m.height! };
+    if (m.height! <= maxHeight) return { bytes, height: m.height!, width: m.width! };
   }
   throw Error(
     "This scene has too much text to read on a phone. Shorten the slide before generating images.",
@@ -69,11 +69,11 @@ export async function composeSceneCover(cover: Buffer, book: StudioBook, design 
   const veil=Buffer.from(`<svg width="1080" height="1920" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="shade" x2="0" y2="1"><stop stop-color="#08070d" stop-opacity=".8"/><stop offset=".42" stop-color="#08070d" stop-opacity=".42"/><stop offset=".74" stop-color="#08070d" stop-opacity=".62"/><stop offset="1" stop-color="#08070d" stop-opacity=".94"/></linearGradient></defs><rect width="1080" height="1920" fill="url(#shade)"/><rect x="177" y="354" width="726" height="1100" rx="40" fill="#08080c" fill-opacity=".6"/><rect x="192" y="340" width="696" height="1080" rx="36" fill="#1e1e22" stroke="#aaa7ab" stroke-width="3"/><text x="540" y="1389" text-anchor="middle" font-family="sans-serif" font-size="23" fill="#d8d2d4">kindle</text></svg>`);
   return sharp(background).composite([
     {input:veil},
-    {input:title.bytes,left:115,top:115},
+    {input:title.bytes,left:Math.round((1080-title.width)/2),top:115},
     {input:screen,left:210,top:365},
     // Opaque lower shade guarantees readable CTA against every scene and cover palette.
     {input:Buffer.from(`<svg width="1080" height="220" xmlns="http://www.w3.org/2000/svg"><rect width="1080" height="220" rx="16" fill="#100e16" fill-opacity=".96"/></svg>`),left:0,top:1460},
-    {input:cta.bytes,left:115,top:1490},
+    {input:cta.bytes,left:Math.round((1080-cta.width)/2),top:1490},
   ]).jpeg({quality:94}).toBuffer();
 }
 export async function renderSceneVideo(
@@ -85,7 +85,7 @@ export async function renderSceneVideo(
     throw Error(
       "A scene video needs exactly two story slides and a cover slide.",
     );
-  const seconds = [sceneSeconds(texts[0]), sceneSeconds(texts[1]), 4],
+  const seconds = sceneTimings(texts),
     dir = await mkdtemp(join(tmpdir(), "studio-scenes-"));
   try {
     const inputs: string[] = [];

@@ -4,7 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import type { StudioBook } from "../../lib/social-creative-directions";
 import type { SocialPlatform } from "../../lib/social-calendar";
 import type { ScenePlan, SceneDelivery } from "../../lib/social-scene-slides";
-import { SCENE_CHANNELS, sceneSeconds } from "../../lib/social-scene-slides";
+import { SCENE_CHANNELS, sceneTimings } from "../../lib/social-scene-slides";
 import { SOCIAL_TRACKS, SCENE_MOODS, type SceneMusicMood } from "../../lib/social-music";
 import StudioCreator, { type PosterResult } from "./StudioCreator";
 const field =
@@ -457,7 +457,7 @@ export default function StudioSceneCreator({
                   <h3 className="font-semibold">
                     Slide {i + 1} · {i === 0 ? "Hook" : "Build the tension"}{" "}
                     <span className="text-sm font-normal text-neutral-400">
-                      ({sceneSeconds(s.text)} seconds)
+                      ({sceneTimings(plan.slides.map(slide=>slide.text))[i]} seconds)
                     </span>
                   </h3>
                   <label className="mt-2 block text-sm">

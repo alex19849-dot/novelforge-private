@@ -77,3 +77,18 @@ assert.notDeepEqual(revealA,revealB,'Final reveal uses the actual scene photogra
 const screen=await sharp(await sharp(revealA).extract({left:330,top:385,width:400,height:940}).toBuffer()).stats();
 assert.ok(Math.abs(screen.channels[0].mean-119)<8,'Large Kindle screen retains the original cover');
 console.log('PASS: shorter premise copy, exact-excerpt preservation, actual scene-backed cover reveal, large original-cover insertion.');
+const {sceneTimings}=await import('../lib/social-scene-slides.ts');
+assert.deepEqual(sceneTimings(['A short romantic scene with about the same reading time.','Another short romantic scene with about the same reading time.']),[6,6,3]);
+assert.equal(sceneTimings([Array(24).fill('word').join(' '),Array(24).fill('word').join(' ')]).reduce((a,b)=>a+b),15);
+assert.ok(sceneTimings([Array(46).fill('word').join(' '),Array(46).fill('word').join(' ')]).reduce((a,b)=>a+b)>15,'Long exact extracts keep enough reading time');
+for(const [top,height] of [[100,210],[1480,190]]) {
+  const {data,info}=await sharp(revealA).extract({left:0,top,width:1080,height}).raw().toBuffer({resolveWithObject:true});
+  let left=1080,right=0;
+  for(let y=0;y<info.height;y++)for(let x=0;x<info.width;x++) {
+    const i=(y*info.width+x)*info.channels;
+    if(data[i]>230&&data[i+1]>225&&data[i+2]>215){left=Math.min(left,x);right=Math.max(right,x);}
+  }
+  assert.ok(right>left,'Final-slide lettering is visible');
+  assert.ok(Math.abs((left+right)/2-540)<12,'Title and CTA share the Kindle centre line');
+}
+console.log('PASS: 15-second default pace and centred final-slide title/Kindle/CTA; long exact excerpts remain readable.');

@@ -27,10 +27,15 @@ const normal = (v: string) =>
     .replace(/\s+/g, " ")
     .trim();
 export function sceneSeconds(text: string) {
-  return Math.max(
-    6,
-    Math.min(15, Math.ceil(text.trim().split(/\s+/).length / 2.7 + 1.5)),
-  );
+  return Math.max(4, Math.ceil(text.trim().split(/\s+/).filter(Boolean).length / 4));
+}
+/** Twelve seconds for the story and three for the cover. Long exact extracts retain reading time. */
+export function sceneTimings(texts:string[]):[number,number,number] {
+  const words=texts.map(t=>Math.max(1,t.trim().split(/\s+/).filter(Boolean).length));
+  const minimum=texts.map(sceneSeconds);
+  const story=Math.max(12,minimum[0]+minimum[1]);
+  const first=Math.max(minimum[0],Math.min(story-minimum[1],Math.round(story*words[0]/(words[0]+words[1]))));
+  return [first,story-first,3];
 }
 export function validateScenePlan(value: unknown, excerpt: string): ScenePlan {
   const p = value as ScenePlan;

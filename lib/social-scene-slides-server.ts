@@ -6,6 +6,7 @@ import { studioBook } from "./social-studio-catalogue";
 import { startBackground, type BackgroundRun } from "./background-queue";
 import {
   validateScenePlan,
+  sceneTimings,
   scenePlatformList,
   scenePhotoPrompt,
   type ScenePlan,
@@ -80,6 +81,7 @@ export async function queueSceneSlides(owner: string, body: any) {
   const priorOutput=row.poster_result;
   const existingOutput = old && row.poster_state === "ready" && old.copyKey === oldCopyKey &&
     old.delivery === delivery && (old.trackId??null) === (delivery === "automatic" ? track?.id??null : null) &&
+    priorOutput?.duration === sceneTimings(plan.slides.map(s=>s.text)).reduce((a,b)=>a+b,0) &&
     priorOutput?.slideUrls?.length===3 && priorOutput?.posts?.length &&
     priorOutput.posts.every((p:any)=>uuid(p.id)&&p.mediaType==='video'&&p.mediaPath?.startsWith(owner+'/creations/'))
     ? {posts:priorOutput.posts,slideUrls:priorOutput.slideUrls,duration:priorOutput.duration} : null;

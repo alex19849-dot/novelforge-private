@@ -122,7 +122,7 @@ globalThis.sceneDb = {
   },
 };
 process.env.OPENAI_API_KEY = "fixture-no-paid-calls";
-const { validateScenePlan, sceneSeconds, scenePhotoPrompt, SCENE_CHANNELS, scenePlatformList } = await import(
+const { validateScenePlan, sceneSeconds, scenePhotoPrompt, sceneTimings, SCENE_CHANNELS, scenePlatformList } = await import(
   "../lib/social-scene-slides.ts"
 );
 const { readyForApproval } = await import("../lib/social-approval.ts");
@@ -159,7 +159,8 @@ assert.throws(
     ),
   /incomplete/,
 );
-assert.ok(sceneSeconds(plan.slides[0].text) >= 6);
+assert.ok(sceneSeconds(plan.slides[0].text) >= 4);
+assert.equal(sceneTimings(plan.slides.map(s=>s.text)).reduce((a,b)=>a+b,0),15);
 assert.match(scenePhotoPrompt(plan, 1), /same two men/);
 assert.notEqual(plan.cast[0], plan.cast[1]);
 const excerpt = "He opened the door. His rival was there. Neither man moved.";
@@ -387,6 +388,7 @@ try {
   assert.equal(finished.poster_result.posts.length, 4);
   assert.equal(finished.poster_result.slideUrls.length, 3);
   assert.equal(finished.poster_result.delivery, "native");
+  assert.equal(finished.poster_result.duration,15,"Standard scene sequences run for 15 seconds");
   const fb=finished.poster_result.posts.find(p=>p.platform==='facebook');
   assert.ok(fb.caption.includes(book.amazonUrl));
   assert.equal(fb.hashtags.length,3);
