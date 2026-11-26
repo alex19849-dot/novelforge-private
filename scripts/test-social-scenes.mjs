@@ -249,6 +249,7 @@ const copies = [
     hashtags: ["#Shorts", "#MMRomance", "#RivalsToLovers"],
   },
 ];
+let planCalls = 0;
 let generations = 0,
   edits = 0,
   copyCalls = 0,
@@ -278,7 +279,15 @@ globalThis.fetch = async (input, init) => {
   assert.equal(u, "https://api.openai.com/v1/responses");
   const b = JSON.parse(init.body);
   let output;
-  if (b.text.format.name === "romantic_scene_slides") output = plan;
+  if (b.text.format.name === "romantic_scene_slides") {
+    planCalls++;
+    const evidence=JSON.parse(b.input.find(x=>x.role==='user').content);
+    assert.equal(evidence.savedStory.kind,'manuscript','Automatic planning reads the saved book without supplied descriptions');
+    assert.ok(evidence.savedStory.passage.includes('rival'));
+    assert.deepEqual(evidence.savedStory.bible.characters,plan.cast);
+    assert.ok(evidence.creativeTreatment.shotDirection);
+    output = plan;
+  }
   else if (b.text.format.name === "scene_identity_check") {
     checks++;
     output = { decision: "pass", reason: "Fixture cast continuity check." };
@@ -294,6 +303,7 @@ globalThis.fetch = async (input, init) => {
     output: [],
   });
 };
+rows.set('owned-story',{id:'owned-story',user_id:owner,title:book.title,form:{premise:book.blurb,characters:plan.cast},chapters:[{id:'opening',number:1,content:('The two adult rivals share a cabin. He notices his rival looking at him. ').repeat(12)}]});
 try {
   const api = await import("../app/api/social-studio/slides/route.ts"),
     server = await import("../lib/social-scene-slides-server.ts");
@@ -415,6 +425,8 @@ try {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+  assert.equal(saved.source,"manuscript");
+  assert.ok(Number.isInteger(saved.plan.design));
   const post = {
     id: randomUUID(),
     user_id: owner,
@@ -543,6 +555,11 @@ try {
   const auto = rows.get(saved.id).poster_result.slidesRecovery;
   assert.equal(auto.delivery,'automatic','New scene exports default to automatic publishing');
   assert.ok(auto.trackId && auto.trackId !== 'sun-in-your-eyes','Default automatically selects a new mood-matched track');
+  const planCallsBeforeRepeat=planCalls, imagesBeforeRepeat=generations+edits;
+  const repeated=await api.POST(req({action:'plan',bookSlug:book.slug}));
+  assert.equal(repeated.status,400,'Repeated sequence cannot proceed to images');
+  assert.equal(planCalls-planCallsBeforeRepeat,2,'One bounded text-only correction is attempted automatically');
+  assert.equal(generations+edits,imagesBeforeRepeat,'Repeated plan requests do not request new paid images');
   console.log(
     "PASS: authenticated scene planning and exact-excerpt validation; owned durable queue claims; one generated shot plus reference edit; cast check; three platform captions; actual three-slide 1080x1920 H264 video; clean export without audio; duplicate prevention; native-audio approval and provider fences; generated-human AI metadata. Cached photos survive text changes and soundtrack retries; AAC backing audio export verified. No paid API calls or published posts.",
   );

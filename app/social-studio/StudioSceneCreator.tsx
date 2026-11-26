@@ -55,7 +55,7 @@ export default function StudioSceneCreator({
   const [musicError, setMusicError] = useState("");
   const sceneMusicKey = JSON.stringify(plan && [plan.hook, plan.slides]);
   useEffect(() => {
-    if (!plan || delivery !== "automatic" || musicManual) return;
+    if (!plan || pending || delivery !== "automatic" || musicManual) return;
     let live = true;
     const controller = new AbortController();
     setMusicLoading(true);
@@ -76,7 +76,7 @@ export default function StudioSceneCreator({
       })();
     }, 350);
     return () => {live=false; clearTimeout(timer); controller.abort();};
-  }, [sceneMusicKey, promptId, musicMood, musicExcluded, delivery, musicManual]);
+  }, [sceneMusicKey, promptId, musicMood, musicExcluded, delivery, musicManual, pending]);
   const selectedTrack = SOCIAL_TRACKS.find(t => t.id === trackId);
   const musicChanged = !!result && (result.delivery !== delivery || (delivery === "automatic" && (musicLoading || !!musicError || (result.trackId ?? "none") !== trackId)));
   const [progress, setProgress] = useState("");
@@ -133,10 +133,19 @@ export default function StudioSceneCreator({
         );
       }
       if (d.status === "ready") {
+        if (pending || !result) {
+          setDelivery(d.result.delivery ?? "automatic");
+          setTrackId(d.result.trackId ?? "none");
+          setMusicManual(true);
+          setMusicLoading(false);
+        }
         setResult(d.result);
         setPending(false);
         setBusy("");
         setError("");
+      } else if (d.status === "idle" && pending) {
+        setPending(false);
+        setError("Your scene plan is saved. Select Create my slides to start its images without recreating the plan.");
       } else if (d.status === "failed") {
         setPending(false);
         setBusy("");
@@ -153,7 +162,7 @@ export default function StudioSceneCreator({
     const timer = setInterval(() => void check(), 7000);
     return () => clearInterval(timer);
   }, [pending, promptId, slug]);
-  async function makePlan() {
+  async function makePlan(andGenerate = false) {
     if (lock.current || !slug) return;
     lock.current = true;
     setBusy("plan");
@@ -175,17 +184,33 @@ export default function StudioSceneCreator({
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
       if (current.current !== selected) return;
-      setMusicManual(false);
+      setMusicManual(andGenerate);
       setMusicMood("auto");
       setMusicExcluded([]);
-      setTrackId("");
+      setTrackId(andGenerate ? "auto" : "");
       setPlan(d.plan);
       setPromptId(d.id);
       setPhotos([]);
       setResult(null);
+      if (andGenerate) {
+        setBusy("images");
+        setMusicLoading(false);
+        setPending(true);
+        setProgress("Starting your scene task…");
+        const queued = await fetch("/api/social-studio/slides", {
+          method:"POST", headers:await headers(),
+          body:JSON.stringify({action:"generate",promptId:d.id,requestId:crypto.randomUUID(),plan:d.plan,platforms,delivery:"automatic",trackId:"auto"}),
+          signal:AbortSignal.timeout(60000),
+        });
+        const q=await queued.json();
+        if(!queued.ok) {setPending(false); throw Error(q.error || "Your sequence could not start.");}
+        setDelivery("automatic");
+        setProgress("Creating your scenes in the background…");
+        setPending(true);
+      }
     } catch (e) {
       setError(
-        e instanceof Error ? e.message : "The plan could not be generated.",
+        e instanceof Error ? e.message : "The sequence could not be generated.",
       );
     } finally {
       setBusy("");
@@ -246,6 +271,13 @@ export default function StudioSceneCreator({
     ) as ScenePlan["slides"];
     setPlan({ ...plan, slides });
   }
+  function chooseBook(value:string) {
+    setSlug(value); setPhotos([]); setPlan(null); setDelivery("automatic");
+    setMusicManual(false); setMusicLoading(false); setMusicError(""); setMusicExcluded([]);
+    setMusicMood("auto"); setTrackId(""); setPromptId(""); setResult(null);
+    setError(""); setExcerpt(""); setCastNotes(""); setNotes("");
+  }
+  const selectedBook=books.find(b=>b.slug===slug);
   return (
     <section className="space-y-5" aria-label="Create romantic scene slides">
       <div>
@@ -253,43 +285,42 @@ export default function StudioSceneCreator({
           Tell the story in three slides.
         </h2>
         <p className="mt-2 text-sm leading-6 text-neutral-400">
-          Two connected romantic moments, then your book cover. Realistic
-          fictional adult men, readable story text and one vertical video for
-          TikTok, Reels and Shorts.
+          Choose a book and Studio creates the story moments, distinct realistic
+          adult characters, readable slides, cover reveal, music and platform captions.
+          No scene hunting or character descriptions needed.
         </p>
       </div>
-      <label className="block text-sm">
-        1 · Choose your book
-        <select
-          className={field}
-          value={slug}
-          disabled={!!busy || pending}
-          onChange={(e) => {
-            setSlug(e.target.value);
-            setPhotos([]);
-            setPlan(null);
-            setDelivery("automatic");
-            setMusicManual(false);
-            setMusicExcluded([]);
-            setMusicMood("auto");
-            setTrackId("");
-            setPromptId("");
-            setResult(null);
-            setError("");
-            setExcerpt("");
-            setCastNotes("");
-          }}
-        >
-          <option value="">Select a book</option>
-          {books.map((b) => (
-            <option key={b.slug} value={b.slug}>
-              {b.title}
-            </option>
+      {!selectedBook ? (
+        <div aria-label="Choose your book by its cover" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {books.map(item => (
+            <button key={item.slug} type="button" disabled={!!busy || pending} onClick={() => chooseBook(item.slug)}
+              className="group overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/70 text-left hover:border-rose-200/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-rose-200 disabled:opacity-40">
+              <div className="flex h-52 items-center justify-center bg-black/30 p-4">
+                <img src={item.coverUrl} alt={`${item.title} cover`} loading="lazy" className="h-full max-w-full object-contain shadow-xl" />
+              </div>
+              <div className="p-4"><h3 className="font-semibold">{item.title}</h3><p className="mt-1 text-sm text-neutral-400">{item.subgenre}</p></div>
+            </button>
           ))}
-        </select>
-      </label>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-white/10 bg-neutral-900/60 p-4">
+          <img src={selectedBook.coverUrl} alt={`${selectedBook.title} selected cover`} className="h-24 w-16 object-contain" />
+          <div className="min-w-0 flex-1"><p className="text-xs uppercase tracking-widest text-rose-200">Selected book</p><h3 className="mt-1 text-xl font-semibold">{selectedBook.title}</h3></div>
+          <button type="button" className={secondary} disabled={!!busy || pending} onClick={() => chooseBook("")}>Change book</button>
+        </div>
+      )}
       {!!slug && (
         <>
+          <div className="rounded-2xl border border-rose-200/20 bg-rose-200/5 p-4">
+            <button className={button + " w-full"} disabled={!!busy || pending} onClick={() => void (plan && !result ? generate() : makePlan(true))}>
+              {pending ? progress || "Creating your slides…" : busy === "plan" ? "Reading your book and finding a fresh hook…" : busy === "images" ? "Starting your scenes…" : result ? "Create another unique sequence" : "Create my slides"}
+            </button>
+            <p className="mt-3 text-sm leading-6 text-neutral-300">
+              Studio uses your saved story and character details when available, chooses a new moment
+              and varies the visual treatment against recent sequences. Review the finished video,
+              then choose posting times. You can leave this page while the images render.
+            </p>
+          </div>
           {recent.length > 0 && (
             <details className="text-sm">
               <summary className="cursor-pointer text-rose-200">
@@ -335,11 +366,10 @@ export default function StudioSceneCreator({
             </details>
           )}
           <details
-            open={!plan && !result}
             className="rounded-2xl border border-white/10 p-4"
           >
             <summary className="cursor-pointer text-lg font-semibold">
-              2 · Pick the story moment
+              Optional overrides
             </summary>
             <label className="mt-4 block text-sm">
               Paste a scene from your manuscript (optional)
@@ -354,10 +384,8 @@ export default function StudioSceneCreator({
               />
             </label>
             <p className="mt-2 text-xs leading-5 text-neutral-400">
-              With a passage, the two slides use exact manuscript extracts.
-              Without one, they use original scene-style promotional copy
-              grounded in the book description, clearly labelled as a premise
-              adaptation.
+              Leave everything blank for automatic creation. Studio reads the saved
+              book itself. Add a passage only if you want that exact wording used.
             </p>
             <label className="mt-4 block text-sm">
               What do the two men look like? (optional)
@@ -396,16 +424,15 @@ export default function StudioSceneCreator({
           </details>
           {plan && (
             <details
-              open={!result}
               className="rounded-2xl border border-white/10 p-4"
             >
               <summary className="cursor-pointer text-lg font-semibold">
-                3 · Review the two scenes and cover reveal
+                Adjust scenes, appearance or music (optional)
               </summary>
               <p className="mt-3 text-sm text-rose-200">
                 {plan.sourceMode === "excerpt"
                   ? "Exact manuscript excerpts"
-                  : "Premise adaptation, not a manuscript quote"}
+                  : "Original story-based teaser, not a manuscript quote"}
               </p>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 {plan.cast.map((cast, i) => (
@@ -526,6 +553,7 @@ export default function StudioSceneCreator({
                     <select className={field} value={trackId} disabled={!!busy || pending || musicLoading}
                       onChange={e => {setTrackId(e.target.value); setMusicManual(true); setMusicError("");}}>
                       {!trackId && <option value="">{musicLoading ? "Matching music…" : "Choose a track"}</option>}
+                      {trackId === "auto" && <option value="auto">Match music automatically</option>}
                       <option value="none">No music</option>
                       {SOCIAL_TRACKS.filter(t => !t.legacy || t.id === trackId).map(t => <option key={t.id} value={t.id}>{t.title} · {t.artist}</option>)}
                     </select>
@@ -633,7 +661,7 @@ export default function StudioSceneCreator({
             MP4 below for TikTok, Reels and Shorts.
           </p>
           {musicChanged && <p role="status" className="my-4 rounded-xl border border-rose-200/30 p-4 text-sm text-rose-100">
-            Your soundtrack choice has changed. Open step 3 and select Render updated sequence before scheduling.
+            Your soundtrack choice has changed. Open the optional adjustments and select Render updated sequence before scheduling.
             Saved scene photographs are reused, with no new image requests.
           </p>}
           {!musicChanged && <StudioCreator

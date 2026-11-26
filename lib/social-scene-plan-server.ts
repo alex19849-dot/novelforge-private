@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { jobAdmin } from "./social-job-db";
 import { studioBook } from "./social-studio-catalogue";
 import { validateScenePlan } from "./social-scene-slides";
+import { loadSceneStory } from "./social-scene-source";
+import { nextSceneDirection, scenePlanRepeats } from "./social-scene-design";
 import { sceneText } from "./social-scene-render";
 export async function createScenePlan(owner: string, body: any) {
   const book = await studioBook(String(body.bookSlug ?? "")),
@@ -13,15 +15,18 @@ export async function createScenePlan(owner: string, body: any) {
   const db = jobAdmin(),
     recent = await db
       .from("social_creative_prompts")
-      .select("recipe,hook,scene")
+      .select("book_slug,recipe,hook,scene")
       .eq("user_id", owner)
       .eq("recipe->>format", "scene-slides")
       .order("created_at", { ascending: false })
-      .limit(12);
+      .limit(60);
   if (recent.error) throw Error("Recent scene designs could not be checked.");
+  const id = randomUUID();
+  const sameBook=(recent.data??[]).filter(r=>r.book_slug===book.slug);
+  const storySource = excerpt ? {kind:'catalogue' as const} : await loadSceneStory(owner, book, sameBook, id);
+  const direction=nextSceneDirection(recent.data??[], parseInt(id.slice(0,8),16));
   const sourceMode = excerpt ? "excerpt" : "premise";
-  const response = await new OpenAI().responses.create(
-    {
+  const request: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
       model: "gpt-6-astra",
       reasoning: { effort: "low" },
       max_output_tokens: 6000,
@@ -74,40 +79,58 @@ export async function createScenePlan(owner: string, body: any) {
           content: JSON.stringify({
             book,
             excerpt,
+            savedStory: storySource,
+            creativeTreatment: direction,
             appearanceDirection: String(body.castNotes ?? "").slice(0, 2000),
             creativeDirection: String(body.notes ?? "").slice(0, 1500),
-            avoid: recent.data?.map((r) => ({
+            avoid: recent.data?.slice(0,24).map((r) => ({
+              bookSlug: r.book_slug,
               hook: r.hook,
               scene: r.scene,
               cast: r.recipe?.scenePlan?.cast,
             })),
             instructions: [
+              "AUTOMATIC CREATION: the user has only selected a book. Independently choose the two romantic moments, emotional hook, setting, wardrobe, camera directions and two distinct fictional adult appearances. Never ask for a scene, passage or descriptions. Saved character canon is authoritative, including ages, hair, eyes, body types and fantasy traits. Do not change established people to manufacture variety. All characters may appear anywhere in the bible.characters list, so identify the protagonists from the premise and passage rather than assuming the first two entries are leads. If details are absent, art-direct plausible adult appearances yourself; preserve them across this sequence. Vary wardrobe where the passage permits and do not reuse generic stock faces from other books.",
+              "Use the supplied savedStory.passage as evidence for a scene when available, together with the bible and verified blurb. The source has been chosen automatically from a different manuscript section. Turn a supported moment into an engaging teaser; do not invent plot events, change relationships or reveal endings. If there is no saved manuscript, create a premise-based teaser automatically from the catalogue. Do not claim original promotional copy is a verbatim book excerpt.",
+              "Apply the creativeTreatment angle and camera pair when compatible with the source. Source facts take precedence over a suggested angle. Make a fresh scene composition, emotional beat, hook wording, body language, setting detail and lighting treatment relative to previous sequences. No recurring cabin/window/sofa/standing-embrace template. Do not transplant characters or settings from another book. Romance should feel intimate, cinematic and story-specific, never corporate or decorated with bows and ribbons.",
               "Return exactly two story slides. Slide one must stop a reader scrolling immediately; slide two raises romantic tension and ends before the payoff, without giving away the resolution. No trope lists or buy-now text in these two slides. The third slide is added separately with the genuine cover.",
               "Each slide text is 8 to 40 words, maximum 280 characters, self-contained enough to understand and linked to the next. Hook is a short label under 100 characters, no em or en dashes.",
               excerpt
                 ? "EXCERPT mode: every slide.text must be an EXACT continuous excerpt of the supplied passage. Copy it verbatim into sourceQuote as well. Choose a compelling pair in narrative order; do not rewrite, add dialogue, add hooks to the excerpt, or change the meaning. The independent hook field can describe the tension."
-                : "PREMISE mode: write original scene-style promotional narrative using ONLY the verified blurb, without quotation marks, invented dialogue, specific invented plot incidents, names not in the blurb or claims that the text is an excerpt. sourceQuote must be empty. It is a premise adaptation, not a manuscript quote.",
+                : "PREMISE mode: write original scene-style promotional narrative using the verified book blurb and saved story evidence provided here, without quotation marks, invented dialogue, specific invented plot incidents, names not in the supplied book or story evidence or claims that the text is an excerpt. sourceQuote must be empty. It is a premise adaptation, not a manuscript quote.",
               "Cast descriptions: exactly two fictional adult male leads, clearly distinct ages/faces/hair/builds/wardrobes, believable attractive masculinity. Use exact appearances and ages if supplied in the source; otherwise specify clearly adult men in their twenties or older. Do not use public figures. Avoid identical faces, same hairstyle on both, grey suits by default, standard AI eyebrow scars, waxy skin or endlessly repeating the same appearance profiles. Natural skin texture, individual face structure and natural body proportions.",
               "Image prompts are two different moments/angles in one coherent romantic setting, not decorative artwork. Describe gaze, distance, restrained physical chemistry, source-appropriate emotion and weather/light. Keep clothing and identity consistent across both. Photorealistic fictional adults, no over-airbrushed AI look. These are social-media teaser photographs: clothed adults and romantic tension, with no explicit sexual acts. Natural hands or hands outside frame. Do not request typography, cover art, borders, ribbons or logos in photographs. Avoid a generic embrace in every sequence. Frame faces above the lower third reserved for story text.",
             ],
           }),
         },
       ],
-    },
-    { timeout: 100000, maxRetries: 0 },
-  );
+    };
+  const ai=new OpenAI();
+  let response=await ai.responses.create(request,{timeout:70000,maxRetries:0});
   if (
     (response.status && response.status !== "completed") ||
     !response.output_text
   )
     throw Error("The scene plan did not finish. No images were requested.");
-  const plan = validateScenePlan(JSON.parse(response.output_text), excerpt);
+  let plan = {...validateScenePlan(JSON.parse(response.output_text), excerpt), design:direction.look};
+  if (!excerpt && scenePlanRepeats(plan,sameBook)) {
+    // One bounded text-only correction. Never request images for a repeated plan.
+    response=await ai.responses.create({...request,input:[
+      ...(Array.isArray(request.input)?request.input:[]),
+      {role:'assistant',content:response.output_text},
+      {role:'user',content:'That sequence repeats a previous hook or scene. Choose a substantially different supported moment, visual composition and wording from the supplied story evidence. Keep character canon. Return a completely fresh sequence in the same JSON schema.'},
+    ]},{timeout:30000,maxRetries:0});
+    if ((response.status && response.status!=='completed') || !response.output_text)
+      throw Error('The fresh scene selection did not finish. No images were requested.');
+    plan={...validateScenePlan(JSON.parse(response.output_text),excerpt),design:direction.look};
+    if(scenePlanRepeats(plan,sameBook))
+      throw Error('Studio could not find a sufficiently different sequence on this attempt. No images were requested. Your previous work is kept.');
+  }
   if (plan.cast[0] === plan.cast[1])
     throw Error("The two character descriptions must be different.");
-  for (const slide of plan.slides) await sceneText(slide.text);
-  const id = randomUUID(),
-    prompt = JSON.stringify(plan, null, 2),
-    recipe = { format: "scene-slides", scenePlan: plan, excerpt, sourceMode };
+  for (const slide of plan.slides) await sceneText(slide.text, 510, 68, plan.design);
+  const prompt = JSON.stringify(plan, null, 2),
+    recipe = { format: "scene-slides", scenePlan: plan, excerpt, sourceMode, sceneDirection:direction, storySource:{kind:storySource.kind,storyId:storySource.storyId,chapterId:storySource.chapterId,sourceKey:storySource.sourceKey} };
   const saved = await db.from("social_creative_prompts").insert({
     id,
     user_id: owner,
@@ -120,5 +143,5 @@ export async function createScenePlan(owner: string, body: any) {
     status: "ready",
   });
   if (saved.error) throw Error("The scene plan could not be saved.");
-  return { id, bookSlug: book.slug, plan };
+  return { id, bookSlug: book.slug, plan, source:storySource.kind };
 }

@@ -8,6 +8,7 @@ export type ScenePlan = {
   format: "scene-slides";
   sourceMode: "excerpt" | "premise";
   hook: string;
+  design?: number;
   cast: [string, string];
   slides: [SceneSlide, SceneSlide];
 };
@@ -96,6 +97,7 @@ export function validateScenePlan(value: unknown, excerpt: string): ScenePlan {
     format: "scene-slides",
     sourceMode: p.sourceMode,
     hook: p.hook.trim(),
+    ...(Number.isInteger(p.design) && p.design! >= 0 && p.design! < 6 ? {design:p.design} : {}),
     cast: [p.cast[0].trim(), p.cast[1].trim()],
     slides: p.slides.map((s) => ({
       text: s.text.trim(),

@@ -58,7 +58,7 @@ export async function queueSceneSlides(owner: string, body: any) {
   const track = SOCIAL_TRACKS.find((t) => t.id === requestedTrack);
   if (requestedTrack && requestedTrack !== "none" && !track)
     throw Error("Choose one of the available previewable tracks.");
-  for (const slide of plan.slides) await sceneText(slide.text);
+  for (const slide of plan.slides) await sceneText(slide.text,510,68,plan.design);
   const book = await studioBook(row.book_slug),
     cacheKey = createHash("sha256")
       .update(
@@ -318,9 +318,9 @@ export async function advanceSceneSlides(run: BackgroundRun) {
     originalCoverBytes(book.coverUrl),
   ]);
   const frames = await Promise.all([
-    composeSceneFrame(first, plan.slides[0].text),
-    composeSceneFrame(second, plan.slides[1].text),
-    composeSceneCover(cover, book),
+    composeSceneFrame(first, plan.slides[0].text,plan.design),
+    composeSceneFrame(second, plan.slides[1].text,plan.design),
+    composeSceneCover(cover, book,plan.design),
   ]);
   const paths = frames.map((_, i) => prefix + `/slide-${i + 1}.jpg`);
   for (let i = 0; i < 3; i++) await upload(paths[i], frames[i], "image/jpeg");
