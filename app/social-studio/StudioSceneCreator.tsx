@@ -5,7 +5,7 @@ import type { StudioBook } from "../../lib/social-creative-directions";
 import type { SocialPlatform } from "../../lib/social-calendar";
 import type { ScenePlan, SceneDelivery } from "../../lib/social-scene-slides";
 import { SCENE_CHANNELS, sceneSeconds } from "../../lib/social-scene-slides";
-import { SOCIAL_TRACKS } from "../../lib/social-music";
+import { SOCIAL_TRACKS, SCENE_MOODS, type SceneMusicMood } from "../../lib/social-music";
 import StudioCreator, { type PosterResult } from "./StudioCreator";
 const field =
   "mt-2 w-full rounded-xl border border-white/15 bg-neutral-950 px-3 py-3 text-sm leading-6 outline-none focus:border-rose-300";
@@ -42,12 +42,43 @@ export default function StudioSceneCreator({
       "instagram",
       "youtube",
     ]),
-    [delivery, setDelivery] = useState<SceneDelivery>("native"),
-    [trackId, setTrackId] = useState("none"),
+    [delivery, setDelivery] = useState<SceneDelivery>("automatic"),
+    [trackId, setTrackId] = useState(""),
     [busy, setBusy] = useState(""),
     [pending, setPending] = useState(false),
     [error, setError] = useState(""),
     [recent, setRecent] = useState<any[]>([]);
+  const [musicMood, setMusicMood] = useState<SceneMusicMood | "auto">("auto");
+  const [musicManual, setMusicManual] = useState(false);
+  const [musicExcluded, setMusicExcluded] = useState<string[]>([]);
+  const [musicLoading, setMusicLoading] = useState(false);
+  const [musicError, setMusicError] = useState("");
+  const sceneMusicKey = JSON.stringify(plan && [plan.hook, plan.slides]);
+  useEffect(() => {
+    if (!plan || delivery !== "automatic" || musicManual) return;
+    let live = true;
+    const controller = new AbortController();
+    setMusicLoading(true);
+    setMusicError("");
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const r = await fetch("/api/social-studio/slides", {
+            method: "POST", headers: await headers(), signal: controller.signal,
+            body: JSON.stringify({action:"music", promptId, plan, mood:musicMood, exclude:musicExcluded}),
+          });
+          const d = await r.json();
+          if (!r.ok) throw Error(d.error || "Music could not be matched.");
+          if (live) setTrackId(d.trackId);
+        } catch (e) {
+          if (live) { setTrackId(""); setMusicError(e instanceof Error ? e.message : "Music could not be matched."); }
+        } finally { if (live) setMusicLoading(false); }
+      })();
+    }, 350);
+    return () => {live=false; clearTimeout(timer); controller.abort();};
+  }, [sceneMusicKey, promptId, musicMood, musicExcluded, delivery, musicManual]);
+  const selectedTrack = SOCIAL_TRACKS.find(t => t.id === trackId);
+  const musicChanged = !!result && (result.delivery !== delivery || (delivery === "automatic" && (musicLoading || !!musicError || (result.trackId ?? "none") !== trackId)));
   const [progress, setProgress] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const lock = useRef(false),
@@ -144,6 +175,10 @@ export default function StudioSceneCreator({
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
       if (current.current !== selected) return;
+      setMusicManual(false);
+      setMusicMood("auto");
+      setMusicExcluded([]);
+      setTrackId("");
       setPlan(d.plan);
       setPromptId(d.id);
       setPhotos([]);
@@ -158,7 +193,7 @@ export default function StudioSceneCreator({
     }
   }
   async function generate() {
-    if (lock.current || !plan || !promptId) return;
+    if (lock.current || !plan || !promptId || (delivery === "automatic" && (musicLoading || !trackId))) return;
     lock.current = true;
     setBusy("images");
     setError("");
@@ -233,6 +268,11 @@ export default function StudioSceneCreator({
             setSlug(e.target.value);
             setPhotos([]);
             setPlan(null);
+            setDelivery("automatic");
+            setMusicManual(false);
+            setMusicExcluded([]);
+            setMusicMood("auto");
+            setTrackId("");
             setPromptId("");
             setResult(null);
             setError("");
@@ -268,6 +308,15 @@ export default function StudioSceneCreator({
                       onClick={() => {
                         setPromptId(row.id);
                         setPlan(row.recipe.scenePlan);
+                        const prior = row.poster_result;
+                        const priorDelivery = prior?.delivery ?? prior?.slidesRecovery?.delivery;
+                        setDelivery(priorDelivery ?? "automatic");
+                        const priorTrack = prior?.trackId ?? prior?.slidesRecovery?.trackId;
+                        setTrackId(priorTrack ?? (priorDelivery ? "none" : ""));
+                        setMusicManual(!!priorTrack || !!priorDelivery);
+                        setMusicExcluded([]);
+                        setMusicError("");
+                        setMusicLoading(false);
                         setExcerpt(row.recipe.excerpt ?? "");
                         setResult(
                           row.poster_state === "ready"
@@ -451,64 +500,57 @@ export default function StudioSceneCreator({
               </fieldset>
               <label className="mt-5 block text-sm">
                 Music and publishing
-                <select
-                  className={field}
-                  value={delivery}
-                  disabled={!!busy || pending}
-                  onChange={(e) => setDelivery(e.target.value as SceneDelivery)}
-                >
-                  <option value="native">
-                    Use platform music (finish in each app)
-                  </option>
-                  <option value="automatic">
-                    Schedule TikTok / Shorts with selected audio
-                  </option>
+                <select className={field} value={delivery} disabled={!!busy || pending}
+                  onChange={e => {setDelivery(e.target.value as SceneDelivery); setMusicLoading(false); if (e.target.value === "automatic") {setMusicManual(false); setTrackId("");}}}>
+                  <option value="automatic">Automatic music and scheduling</option>
+                  <option value="native">Add platform music yourself (manual posting)</option>
                 </select>
               </label>
               {delivery === "native" ? (
                 <p className="mt-2 text-sm leading-6 text-neutral-400">
-                  Exports a clean video without baked-in music. Download it,
-                  open TikTok, Reels or Shorts, choose an available sound in
-                  that platform’s music picker, and finish posting there. Studio
-                  will save a draft and will not silently auto-post this
-                  version.
+                  Optional clean export. Download the video and finish it in the platform app.
+                  This version saves as a draft and does not publish automatically.
                 </p>
               ) : (
-                <>
-                  <label className="mt-3 block text-sm">
-                    Backing audio
-                    <select
-                      className={field}
-                      value={trackId}
-                      disabled={!!busy || pending}
-                      onChange={(e) => setTrackId(e.target.value)}
-                    >
-                      <option value="none">No music</option>
-                      {SOCIAL_TRACKS.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.title} · {t.artist}
-                        </option>
-                      ))}
+                <div className="mt-3 rounded-xl border border-rose-200/20 bg-rose-200/5 p-4">
+                  <label className="block text-sm">
+                    Soundtrack mood
+                    <select className={field} value={musicMood} disabled={!!busy || pending}
+                      onChange={e => {setMusicMood(e.target.value as SceneMusicMood | "auto"); setMusicManual(false); setMusicExcluded([]);}}>
+                      <option value="auto">Match the scene automatically</option>
+                      {SCENE_MOODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                     </select>
                   </label>
-                  {trackId !== "none" && (
-                    <audio
-                      className="mt-3 w-full"
-                      controls
-                      preload="none"
-                      src={SOCIAL_TRACKS.find((t) => t.id === trackId)?.source}
-                    />
-                  )}
-                  <p className="mt-2 text-xs text-neutral-400">
-                    These are previewable backing tracks, not platform trending
-                    sounds. Instagram remains manual.
+                  <label className="mt-3 block text-sm">
+                    Track
+                    <select className={field} value={trackId} disabled={!!busy || pending || musicLoading}
+                      onChange={e => {setTrackId(e.target.value); setMusicManual(true); setMusicError("");}}>
+                      {!trackId && <option value="">{musicLoading ? "Matching music…" : "Choose a track"}</option>}
+                      <option value="none">No music</option>
+                      {SOCIAL_TRACKS.filter(t => !t.legacy || t.id === trackId).map(t => <option key={t.id} value={t.id}>{t.title} · {t.artist}</option>)}
+                    </select>
+                  </label>
+                  {selectedTrack && !musicLoading && <>
+                    <p className="mt-3 text-sm text-rose-100">{selectedTrack.description}</p>
+                    <audio key={trackId} className="mt-3 w-full" controls preload="none" aria-label={`Preview ${selectedTrack.title}`}
+                      src={selectedTrack.source + `#t=${selectedTrack.start ?? 8},${(selectedTrack.start ?? 8) + (selectedTrack.seconds ?? 40)}`} />
+                  </>}
+                  <button type="button" className={secondary + " mt-3"} disabled={!!busy || pending || musicLoading}
+                    onClick={() => {setMusicManual(false); setMusicExcluded(prev => [...prev, trackId].filter(Boolean).slice(-30));}}>
+                    {musicLoading ? "Matching music…" : "Change track"}
+                  </button>
+                  {musicError && <p role="alert" className="mt-3 text-sm text-red-200">{musicError}</p>}
+                  <p className="mt-3 text-sm leading-6 text-neutral-300">
+                    Music is included in the finished video. Recent tracks are rotated within the chosen mood.
+                    Preview, then schedule TikTok and YouTube Shorts here. Instagram remains manual.
                   </p>
-                </>
+                  <p className="mt-2 text-xs text-neutral-400">Licensed backing music, not platform trending sounds. No extra subscription.</p>
+                </div>
               )}
               <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   className={button}
-                  disabled={!!busy || pending || !platforms.length}
+                  disabled={!!busy || pending || !platforms.length || (delivery === "automatic" && (musicLoading || !trackId))}
                   onClick={() => void generate()}
                 >
                   {pending
@@ -590,14 +632,18 @@ export default function StudioSceneCreator({
             Use the three images for a TikTok photo carousel, or download the
             MP4 below for TikTok, Reels and Shorts.
           </p>
-          <StudioCreator
+          {musicChanged && <p role="status" className="my-4 rounded-xl border border-rose-200/30 p-4 text-sm text-rose-100">
+            Your soundtrack choice has changed. Open step 3 and select Render updated sequence before scheduling.
+            Saved scene photographs are reused, with no new image requests.
+          </p>}
+          {!musicChanged && <StudioCreator
             key={result.campaignId}
             books={books}
             onSaved={onSaved}
             onNavigate={onNavigate}
             creation={result}
             reviewOnly
-          />
+          />}
         </div>
       )}
     </section>

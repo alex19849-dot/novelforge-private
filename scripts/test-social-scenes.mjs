@@ -493,6 +493,14 @@ try {
     rows.get(saved.id).poster_result.slidesRecovery.images.length,
     2,
   );
+  const musicDenied = await api.POST(new Request('https://fixture/slides',{method:'POST',body:JSON.stringify({action:'music',plan:editedPlan})}));
+  assert.equal(musicDenied.status,401);
+  rows.set('foreign-music',{id:'foreign-music',user_id:'different-owner',recipe:{format:'scene-slides'},poster_result:{trackId:'babe'}});
+  const matchedResponse = await api.POST(req({action:'music',plan:editedPlan,mood:'sensual',promptId:saved.id,exclude:['j-b-r-b-music','thinking-about-you','baileys']}));
+  assert.equal(matchedResponse.status,200);
+  assert.equal((await matchedResponse.json()).trackId,'babe','Music matching reads only the owner history');
+  const badMusic = await api.POST(req({action:'music',plan:editedPlan,mood:'invented'}));
+  assert.equal(badMusic.status,400);
   const thirdReceipt = randomUUID();
   await server.queueSceneSlides(owner, {
     promptId: saved.id,
@@ -500,7 +508,7 @@ try {
     plan: editedPlan,
     platforms: ["tiktok", "instagram", "youtube"],
     delivery: "automatic",
-    trackId: "sun-in-your-eyes",
+    trackId: "babe",
   });
   await server.advanceSceneSlides({ ...queued[2], checkpoint: {} });
   assert.equal(
@@ -510,7 +518,7 @@ try {
   );
   const audioResult = rows.get(saved.id).poster_result;
   assert.equal(audioResult.delivery, "automatic");
-  assert.equal(audioResult.trackId, "sun-in-your-eyes");
+  assert.equal(audioResult.trackId, "babe");
   const audioDir = await mkdtemp(join(tmpdir(), "scene-audio-test-"));
   try {
     const file = join(audioDir, "with-audio.mp4");
@@ -530,6 +538,11 @@ try {
   } finally {
     await rm(audioDir, { recursive: true, force: true });
   }
+  const defaultMusicReceipt = randomUUID();
+  await server.queueSceneSlides(owner, {promptId:saved.id, requestId:defaultMusicReceipt, plan:editedPlan, platforms:['tiktok','youtube']});
+  const auto = rows.get(saved.id).poster_result.slidesRecovery;
+  assert.equal(auto.delivery,'automatic','New scene exports default to automatic publishing');
+  assert.ok(auto.trackId && auto.trackId !== 'sun-in-your-eyes','Default automatically selects a new mood-matched track');
   console.log(
     "PASS: authenticated scene planning and exact-excerpt validation; owned durable queue claims; one generated shot plus reference edit; cast check; three platform captions; actual three-slide 1080x1920 H264 video; clean export without audio; duplicate prevention; native-audio approval and provider fences; generated-human AI metadata. Cached photos survive text changes and soundtrack retries; AAC backing audio export verified. No paid API calls or published posts.",
   );

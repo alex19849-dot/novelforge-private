@@ -13,7 +13,7 @@ import type {
   CreativeRecipe,
 } from "../../lib/social-creative-directions";
 import { readyForApproval } from "../../lib/social-approval";
-import { MUSIC_LICENSE, musicForPath } from "../../lib/social-music";
+import { MUSIC_LICENSE, musicForPath, SOCIAL_TRACKS } from "../../lib/social-music";
 type Prompt = {
   id: string;
   prompt: string;
@@ -426,7 +426,7 @@ export default function StudioCreator({
             : null;
       if (schedule && (!scheduled || Date.parse(scheduled) <= Date.now()))
         throw Error("Choose a future UK posting date and time.");
-      const track = musicForPath(post.mediaPath);
+      const track = result.format === "scene-slides" ? SOCIAL_TRACKS.find(t => t.id === result.trackId) : musicForPath(post.mediaPath);
       const values = {
         book_slug: book.slug,
         book_title: book.title,

@@ -1,5 +1,6 @@
 import { jobUser, jobAdmin, jobJson } from "../../../../lib/social-job-server";
 import { createScenePlan } from "../../../../lib/social-scene-plan-server";
+import { recommendSceneMusic } from "../../../../lib/social-scene-music";
 import { queueSceneSlides } from "../../../../lib/social-scene-slides-server";
 import { recoverBackgroundDispatches } from "../../../../lib/background-queue";
 export const runtime = "nodejs";
@@ -9,13 +10,15 @@ export async function POST(request: Request) {
   if (!user) return jobJson({ error: "Sign in to Social Studio first." }, 401);
   try {
     const body = await request.json();
-    if (!["plan", "generate"].includes(body.action))
-      return jobJson({ error: "Choose plan or generate." }, 400);
+    if (!["plan", "generate", "music"].includes(body.action))
+      return jobJson({ error: "Choose plan, generate or music." }, 400);
     return jobJson(
-      body.action === "plan"
+      body.action === "music"
+        ? await recommendSceneMusic(user.id, body)
+        : body.action === "plan"
         ? await createScenePlan(user.id, body)
         : await queueSceneSlides(user.id, body),
-      body.action === "plan" ? 200 : 202,
+      body.action === "generate" ? 202 : 200,
     );
   } catch (e) {
     return jobJson(

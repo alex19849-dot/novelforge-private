@@ -18,6 +18,7 @@ import {
 } from "./social-scene-render";
 import { studioPlatformCopy } from "./social-studio-copy";
 import { originalCoverBytes } from "./social-cover-artwork";
+import { recommendSceneMusic } from "./social-scene-music";
 import { SOCIAL_TRACKS } from "./social-music";
 import { socialTrackAudio } from "./social-music-render";
 const uuid = (s: unknown): s is string =>
@@ -50,9 +51,12 @@ export async function queueSceneSlides(owner: string, body: any) {
     };
   const plan = validateScenePlan(body.plan, String(row.recipe.excerpt ?? "")),
     platforms = scenePlatformList(body.platforms),
-    delivery = body.delivery === "automatic" ? "automatic" : "native";
-  const track = SOCIAL_TRACKS.find((t) => t.id === body.trackId);
-  if (body.trackId && body.trackId !== "none" && !track)
+    delivery = body.delivery === "native" ? "native" : "automatic";
+  const requestedTrack = delivery === "automatic" && (!body.trackId || body.trackId === "auto")
+    ? (await recommendSceneMusic(owner, { ...body, promptId: row.id })).trackId
+    : body.trackId;
+  const track = SOCIAL_TRACKS.find((t) => t.id === requestedTrack);
+  if (requestedTrack && requestedTrack !== "none" && !track)
     throw Error("Choose one of the available previewable tracks.");
   for (const slide of plan.slides) await sceneText(slide.text);
   const book = await studioBook(row.book_slug),
@@ -320,8 +324,9 @@ export async function advanceSceneSlides(run: BackgroundRun) {
   ]);
   const paths = frames.map((_, i) => prefix + `/slide-${i + 1}.jpg`);
   for (let i = 0; i < 3; i++) await upload(paths[i], frames[i], "image/jpeg");
-  const track = SOCIAL_TRACKS.find((t) => t.id === r.trackId),
-    video = await renderSceneVideo(
+  const track = SOCIAL_TRACKS.find((t) => t.id === r.trackId);
+  if (r.trackId && !track) throw Error("The selected music is unavailable. Choose another track before rendering.");
+  const video = await renderSceneVideo(
       frames,
       plan.slides.map((s) => s.text),
       track ? await socialTrackAudio(track) : undefined,
