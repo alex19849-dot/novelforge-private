@@ -14,6 +14,7 @@ export type ScenePlan = {
 };
 export type SceneDelivery = "native" | "automatic";
 export const SCENE_CHANNELS: SocialPlatform[] = [
+  "facebook",
   "tiktok",
   "instagram",
   "youtube",
@@ -111,7 +112,7 @@ export function scenePlatformList(value: unknown) {
     (p) => Array.isArray(value) && value.includes(p),
   );
   if (!p.length)
-    throw Error("Choose TikTok, Instagram Reels or YouTube Shorts.");
+    throw Error("Choose Facebook, TikTok, Instagram Reels or YouTube Shorts.");
   return p;
 }
 export function scenePhotoPrompt(plan: ScenePlan, index: number) {

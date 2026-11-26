@@ -122,7 +122,7 @@ globalThis.sceneDb = {
   },
 };
 process.env.OPENAI_API_KEY = "fixture-no-paid-calls";
-const { validateScenePlan, sceneSeconds, scenePhotoPrompt } = await import(
+const { validateScenePlan, sceneSeconds, scenePhotoPrompt, SCENE_CHANNELS, scenePlatformList } = await import(
   "../lib/social-scene-slides.ts"
 );
 const { readyForApproval } = await import("../lib/social-approval.ts");
@@ -214,7 +214,10 @@ const image = await sharp({
   })
     .jpeg()
     .toBuffer();
+assert.ok(SCENE_CHANNELS.includes('facebook'));
+assert.deepEqual(scenePlatformList(['facebook']),['facebook']);
 const copies = [
+  {platform:'facebook',title:'A Real Romance by Marlow Quinn',caption:'Would you stay in a cabin with the rival you cannot stop wanting? A Real Romance by Marlow Quinn brings two adult rivals closer, with winter chemistry and an attraction neither expected. Read on Kindle Unlimited: '+book.amazonUrl,hashtags:['#MMRomance','#GayBooks','#ForcedProximity']},
   {
     platform: "tiktok",
     title: "A Real Romance MM rivals romance",
@@ -294,7 +297,7 @@ globalThis.fetch = async (input, init) => {
   } else {
     assert.equal(b.text.format.name, "platform_specific_romance_copy");
     copyCalls++;
-    output = { posts: copies };
+    output = { posts: copies.filter(p=>b.text.format.schema.properties.posts.items.properties.platform.enum.includes(p.platform)) };
   }
   return Response.json({
     id: "fixture",
@@ -341,7 +344,7 @@ try {
       promptId: saved.id,
       requestId: receipt,
       plan,
-      platforms: ["tiktok", "instagram", "youtube"],
+      platforms: ["facebook", "tiktok", "instagram", "youtube"],
       delivery: "native",
     }),
   );
@@ -381,9 +384,12 @@ try {
   }
   const finished = rows.get(saved.id);
   assert.equal(finished.poster_state, "ready");
-  assert.equal(finished.poster_result.posts.length, 3);
+  assert.equal(finished.poster_result.posts.length, 4);
   assert.equal(finished.poster_result.slideUrls.length, 3);
   assert.equal(finished.poster_result.delivery, "native");
+  const fb=finished.poster_result.posts.find(p=>p.platform==='facebook');
+  assert.ok(fb.caption.includes(book.amazonUrl));
+  assert.equal(fb.hashtags.length,3);
   assert.equal(generations, 1);
   assert.equal(edits, 2);
   assert.equal(copyCalls, 1);
@@ -480,7 +486,7 @@ try {
     promptId: saved.id,
     requestId: secondReceipt,
     plan: editedPlan,
-    platforms: ["tiktok", "instagram", "youtube"],
+    platforms: ["facebook", "tiktok", "instagram", "youtube"],
     delivery: "automatic",
     trackId: "none",
   });
@@ -521,7 +527,7 @@ try {
     promptId: saved.id,
     requestId: thirdReceipt,
     plan: editedPlan,
-    platforms: ["tiktok", "instagram", "youtube"],
+    platforms: ["facebook", "tiktok", "instagram", "youtube"],
     delivery: "automatic",
     trackId: "babe",
   });
@@ -532,6 +538,14 @@ try {
     "A deliberate soundtrack retry does not pay for new pictures",
   );
   const audioResult = rows.get(saved.id).poster_result;
+  const fbReady=audioResult.posts.find(p=>p.platform==='facebook');
+  assert.ok(fbReady,'Facebook is retained in the completed automatic sequence');
+  const fbPost={...post,id:fbReady.id,platform:'facebook',caption:fbReady.caption,title:fbReady.title,hashtags:fbReady.hashtags,media_path:fbReady.mediaPath,content_metadata:{native_audio_required:false,ai_generated:true}};
+  assert.ok(readyForApproval(fbPost,Date.parse('2029-01-01T00:00:00Z')),'Facebook video can be approved on its own UK schedule');
+  const fbPayload=bufferPayload(fbPost,{id:'facebook-channel'},'https://fixture.invalid/scene.mp4');
+  assert.equal(fbPayload.channelId,'facebook-channel');
+  assert.equal(fbPayload.assets[0].video.url,'https://fixture.invalid/scene.mp4');
+  assert.ok(fbPayload.text.includes(book.amazonUrl));
   assert.equal(audioResult.delivery, "automatic");
   assert.equal(audioResult.trackId, "babe");
   const audioDir = await mkdtemp(join(tmpdir(), "scene-audio-test-"));
@@ -558,13 +572,27 @@ try {
   const auto = rows.get(saved.id).poster_result.slidesRecovery;
   assert.equal(auto.delivery,'automatic','New scene exports default to automatic publishing');
   assert.ok(auto.trackId && auto.trackId !== 'sun-in-your-eyes','Default automatically selects a new mood-matched track');
+  await server.advanceSceneSlides({...queued[3],checkpoint:{}});
+  const kept=rows.get(saved.id).poster_result.slidesRecovery.copies;
+  const beforeAdd=copyCalls;
+  const addFacebook=randomUUID();
+  await server.queueSceneSlides(owner,{promptId:saved.id,requestId:addFacebook,plan:editedPlan,platforms:['facebook','tiktok','youtube'],delivery:'automatic',trackId:'babe'});
+  const addRun={...queued[4],checkpoint:{}};
+  await server.advanceSceneSlides(addRun);
+  assert.equal(copyCalls,beforeAdd+1,'Adding Facebook requests only its missing platform copy');
+  const expanded=rows.get(saved.id).poster_result.slidesRecovery.copies;
+  for(const c of kept) assert.deepEqual(expanded.find(p=>p.platform===c.platform),c,'Existing channel copy stays unchanged');
+  assert.ok(expanded.find(p=>p.platform==='facebook').caption.includes(book.amazonUrl));
+  await server.advanceSceneSlides(addRun);
+  assert.equal(rows.get(saved.id).poster_state,'ready');
+  assert.equal(generations+edits,3,'Restoring Facebook reuses the existing photographs');
   const planCallsBeforeRepeat=planCalls, imagesBeforeRepeat=generations+edits;
   const repeated=await api.POST(req({action:'plan',bookSlug:book.slug}));
   assert.equal(repeated.status,400,'Repeated sequence cannot proceed to images');
   assert.equal(planCalls-planCallsBeforeRepeat,2,'One bounded text-only correction is attempted automatically');
   assert.equal(generations+edits,imagesBeforeRepeat,'Repeated plan requests do not request new paid images');
   console.log(
-    "PASS: authenticated scene planning and exact-excerpt validation; owned durable queue claims; one generated shot plus reference edit; cast check; three platform captions; actual three-slide 1080x1920 H264 video; clean export without audio; duplicate prevention; native-audio approval and provider fences; generated-human AI metadata. Cached photos survive text changes and soundtrack retries; AAC backing audio export verified. No paid API calls or published posts.",
+    "PASS: authenticated scene planning and exact-excerpt validation; owned durable queue claims; one generated shot plus reference edit; cast check; four platform captions including Facebook; actual three-slide 1080x1920 H264 video; clean export without audio; duplicate prevention; native-audio approval and provider fences; generated-human AI metadata. Cached photos survive text changes and soundtrack retries; AAC backing audio export verified. No paid API calls or published posts.",
   );
 } finally {
   globalThis.fetch = originalFetch;

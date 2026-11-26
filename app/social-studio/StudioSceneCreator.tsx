@@ -37,11 +37,7 @@ export default function StudioSceneCreator({
     [plan, setPlan] = useState<ScenePlan | null>(null),
     [promptId, setPromptId] = useState(""),
     [result, setResult] = useState<PosterResult | null>(null),
-    [platforms, setPlatforms] = useState<SocialPlatform[]>([
-      "tiktok",
-      "instagram",
-      "youtube",
-    ]),
+    [platforms, setPlatforms] = useState<SocialPlatform[]>([...SCENE_CHANNELS]),
     [delivery, setDelivery] = useState<SceneDelivery>("automatic"),
     [trackId, setTrackId] = useState(""),
     [busy, setBusy] = useState(""),
@@ -517,11 +513,7 @@ export default function StudioSceneCreator({
                         )
                       }
                     />
-                    {p === "instagram"
-                      ? "Instagram Reels (manual)"
-                      : p === "youtube"
-                        ? "YouTube Shorts"
-                        : "TikTok"}
+                    {{facebook:"Facebook",instagram:"Instagram Reels (manual)",youtube:"YouTube Shorts",tiktok:"TikTok"}[p]}
                   </label>
                 ))}
               </fieldset>
@@ -570,7 +562,7 @@ export default function StudioSceneCreator({
                   {musicError && <p role="alert" className="mt-3 text-sm text-red-200">{musicError}</p>}
                   <p className="mt-3 text-sm leading-6 text-neutral-300">
                     Music is included in the finished video. Recent tracks are rotated within the chosen mood.
-                    Preview, then schedule TikTok and YouTube Shorts here. Instagram remains manual.
+                    Preview, then schedule Facebook, TikTok and YouTube Shorts here. Instagram remains manual.
                   </p>
                   <p className="mt-2 text-xs text-neutral-400">Licensed backing music, not platform trending sounds. No extra subscription.</p>
                 </div>
@@ -658,7 +650,7 @@ export default function StudioSceneCreator({
           )}
           <p className="my-4 text-sm text-neutral-400">
             Use the three images for a TikTok photo carousel, or download the
-            MP4 below for TikTok, Reels and Shorts.
+            MP4 below for Facebook, TikTok, Reels and Shorts.
           </p>
           {musicChanged && <p role="status" className="my-4 rounded-xl border border-rose-200/30 p-4 text-sm text-rose-100">
             Your soundtrack choice has changed. Open the optional adjustments and select Render updated sequence before scheduling.

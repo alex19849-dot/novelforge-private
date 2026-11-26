@@ -73,6 +73,10 @@ export async function queueSceneSlides(owner: string, body: any) {
       .digest("hex");
   const previous = row.poster_result?.slidesRecovery,
     old = previous?.cacheKey === cacheKey ? previous : null;
+  // Adding a channel keeps the other channels' copy when the book and scenes are unchanged.
+  const oldCopyKey = old?.platforms ? createHash("sha256")
+    .update(JSON.stringify({book,plan,platforms:old.platforms})).digest("hex") : null;
+  const reusableCopies = old?.copyKey === oldCopyKey ? (old.copies??[]) : [];
   const recovery = {
     cacheKey,
     copyKey,
@@ -82,7 +86,7 @@ export async function queueSceneSlides(owner: string, body: any) {
     trackId: delivery === "automatic" ? (track?.id ?? null) : null,
     images: old?.images ?? [],
     checked: old?.checked ?? false,
-    copies: old?.copyKey === copyKey ? (old.copies ?? []) : [],
+    copies: reusableCopies.filter((c:any)=>platforms.includes(c.platform)),
     imageRequestIds: old?.imageRequestIds ?? [],
     stage: "photos",
   };
@@ -305,10 +309,11 @@ export async function advanceSceneSlides(run: BackgroundRun) {
     return { checkpoint: { stage: "copy" } };
   }
   const book = await studioBook(row.book_slug);
-  if (!r.copies?.length) {
-    r.copies = await studioPlatformCopy(
+  const missingPlatforms = r.platforms.filter((p:string)=>!r.copies?.some((c:any)=>c.platform===p));
+  if (missingPlatforms.length) {
+    const extra = await studioPlatformCopy(
       book,
-      r.platforms,
+      missingPlatforms,
       plan.hook,
       JSON.stringify({
         sourceMode: plan.sourceMode,
@@ -317,6 +322,7 @@ export async function advanceSceneSlides(run: BackgroundRun) {
           "Promote the romantic attraction in this scene sequence, not a trope list or dense plot synopsis. Lead with a gripping standalone hook in everyday language for a reader who knows nothing about the book. No unexplained jargon, confusing backstory or abstract metaphors. Do not say scene premise or premise adaptation in the caption, and do not describe original promotional narrative as a manuscript quotation.",
       }),
     );
+    r.copies = r.platforms.map((p:string)=>[...(r.copies??[]),...extra].find((c:any)=>c.platform===p));
     await save();
     return { checkpoint: { stage: "render" } };
   }
