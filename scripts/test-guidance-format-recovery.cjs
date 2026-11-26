@@ -23,6 +23,22 @@ const story={storyBible:{premise:'Test'},storyState:{},messages:[{role:'user',co
  assert.deepEqual(parseGuidanceResponse('{"guidance":"Sam\\\'s plan","question":""}'),{guidance:"Sam's plan",question:''});
  assert.deepEqual(parseGuidanceResponse('{"guidance":"line one\nline two","question":""}'),{guidance:'line one\nline two',question:''});
  assert.deepEqual(parseGuidanceResponse('```json\n{"guidance":"ok","question":""}\n```'),{guidance:'ok',question:''});
+ for (const reversed of [false,true]) {
+   const dialogue = base.replace('Show their conversation and private reactions.', 'He says "Stay here." Keep Sam\'s private reaction.');
+   const body = JSON.stringify(dialogue).slice(1,-1).replace(/\\"/g,'"');
+   output = reversed ? '{"question":"","guidance":"'+body+'"}' : '{"guidance":"'+body+'","question":""}';
+   const before=count;
+   assert.equal((await draftChapterGuidance(story,[])).guidance,dialogue);
+   assert.equal(count,before+1,'Malformed quotes repaired locally without another model call');
+ }
+ output=base;assert.equal((await draftChapterGuidance(story,[])).guidance,base,'Complete plain-text guidance is preserved');
+ for(const raw of ['{"guidance":"unfinished', '{"guidance":"bad\\q","question":""}', JSON.stringify({guidance:base}), 'WRITE CHAPTER 3\nPOV: Sam']) {
+   output=raw;const before=count;
+   const result=await draftChapterGuidance(story,[]);
+   assert.equal(result.guidance,'','Unreadable/incomplete data is never confirmable');
+   assert(result.question.endsWith(raw),'Original paid output remains visible');
+   assert.equal(count,before+1,'No paid retry');
+ }
  assert.throws(()=>parseGuidanceResponse('{"guidance":"unfinished'),/unreadable/);
  assert.throws(()=>parseGuidanceResponse('{"guidance":"bad\\q","question":""}'),/unreadable/);
  assert.throws(()=>validateGuidanceDraft(normaliseGuidanceHeadings(base.replace('Sam asks him to stay.',''))),/ENDING/);

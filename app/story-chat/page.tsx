@@ -1902,6 +1902,7 @@ device.`,
 
     setInput("");
     setIsThinking(true);
+    setBackgroundNotice("");
 
     try {
       if (discardsChapterGuidance(trimmedMessage)) {

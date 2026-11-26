@@ -52,9 +52,34 @@ export function parseGuidanceResponse(raw: string): unknown {
       repaired += JSON.stringify(character).slice(1, -1);
     } else repaired += character;
   }
-  try { return JSON.parse(repaired); } catch {
-    throw new Error('Aion returned unreadable guidance data. Your chapters are unchanged; no automatic retry was started.');
+  try { return JSON.parse(repaired); } catch { /* Recover the known two-string envelope below. */ }
+  // JSON mode can still return unescaped dialogue quotes inside the guidance.
+  // Only recover a complete, closed two-field envelope. Never complete truncated JSON.
+  const fields = source.match(/^\{\s*"guidance"\s*:\s*"([\s\S]*)"\s*,\s*"question"\s*:\s*"([\s\S]*)"\s*\}$/)
+    ?? source.match(/^\{\s*"question"\s*:\s*"([\s\S]*)"\s*,\s*"guidance"\s*:\s*"([\s\S]*)"\s*\}$/);
+  if (fields) {
+    const decode = (value: string): string => {
+      let encoded = '';
+      for (let i = 0; i < value.length; i++) {
+        const c = value[i];
+        if (c === '\\') {
+          const next = value[++i];
+          if (next && /["\\/bfnrt]/.test(next)) encoded += '\\' + next;
+          else if (next === 'u' && /^[0-9a-f]{4}$/i.test(value.slice(i + 1, i + 5))) {
+            encoded += '\\u' + value.slice(i + 1, i + 5); i += 4;
+          } else if (next && /['*\[\]_`]/.test(next)) encoded += next;
+          else throw new Error('Invalid string escape');
+        } else encoded += JSON.stringify(c).slice(1, -1);
+      }
+      return JSON.parse('"' + encoded + '"');
+    };
+    try {
+      const firstIsGuidance = /^\{\s*"guidance"/.test(source);
+      const values = [decode(fields[1]), decode(fields[2])];
+      return { guidance: values[firstIsGuidance ? 0 : 1], question: values[firstIsGuidance ? 1 : 0] };
+    } catch { /* Keep malformed paid output visible for author review below. */ }
   }
+  throw new Error('Aion returned unreadable guidance data. Your chapters are unchanged; no automatic retry was started.');
 }
 
 export function normaliseGuidanceHeadings(text: string, requestedHeading = ''): string {
@@ -142,8 +167,21 @@ export async function draftChapterGuidance(story: StoryWorkspace, diagnostics: P
         recentChapters: isPrologue ? [] : story.chapters.slice(-3), conversation: story.messages.filter(message => message.role !== 'assistant' || !isGuidanceProposal(message.content)).slice(-12),
         guidanceBeingRevised: story.storyState.chapterGuidanceDraft?.text ?? null }) }
     ], schema, diagnostics, attempt: 1 });
-    const output: unknown = parseGuidanceResponse(response.output_text);
-    assertChapterPlanSchema(output, schema);
+    let output: unknown;
+    try {
+      output = parseGuidanceResponse(response.output_text);
+      assertChapterPlanSchema(output, schema);
+    } catch {
+      // A complete plain-text brief is usable even if the provider ignored JSON.
+      // Other output is retained as an unapproved chat draft, never silently lost.
+      const raw = response.output_text.trim();
+      const plain = normaliseGuidanceHeadings(raw);
+      if (/^(?:RE)?WRITE (?:CHAPTER \d+|PROLOGUE|EPILOGUE)\b/.test(plain)) {
+        try { validateGuidanceDraft(plain); return { guidance: plain, question: '' }; }
+        catch { /* Incomplete plain text must remain unapproved. */ }
+      }
+      return { guidance: '', question: 'Aion returned guidance in a format I could not safely read. Your chapters are unchanged; no automatic retry was started.\n\nI have kept the returned draft below so it is not lost. It needs review before it can be confirmed:\n\n' + raw };
+    }
     const result = output as { guidance: string; question: string };
     const guidance = normaliseGuidanceHeadings(result.guidance, requestedGuidanceHeading(supplied));
     if (guidance) {
