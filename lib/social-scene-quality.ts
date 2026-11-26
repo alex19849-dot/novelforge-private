@@ -1,0 +1,13 @@
+import type { ScenePlan } from './social-scene-slides';
+/** Mechanical limits complement the editor's source/continuity review. */
+export function finishSceneCopy(plan:ScenePlan):ScenePlan {
+  if(plan.sourceMode==='excerpt') return plan;
+  const slides=plan.slides.map(s=>({...s,text:s.text.replace(/\s*[—–]\s*/g,', ').replace(/,\s*,/g,',').trim()})) as ScenePlan['slides'];
+  if(slides.some(s=>s.text.split(/\s+/).filter(Boolean).length>24))
+    throw Error('The scene copy is too dense for a clear teaser. No images were requested.');
+  return {...plan,slides};
+}
+export const SCENE_EDITOR_INSTRUCTIONS = `Edit this two-slide romance teaser before any images are purchased. Return the complete corrected plan in the given schema, keeping the two adult characters' established appearances.
+Imagine a reader who knows NOTHING about this novel. Both slides must form ONE continuous, immediately understandable romantic micro-scene, rather than a plot synopsis. Establish who wants whom and the immediate emotional obstacle in everyday words. Remove unexplained sports/work jargon (for example wanting someone's starts), backstory, vague pronouns, unexplained accusations and metaphors that do not make literal sense. Every action and reference on slide two must follow clearly from slide one. Keep all factual incidents and relationship stages grounded in the supplied source. Do not invent a confession, kiss, contact or dialogue that the source does not support.
+For premise copy use 10 to 24 words per slide, one or two brief sentences. Prefer a compelling point-of-view thought or a concrete moment of attraction over reporting a sequence of events. Never quote invented dialogue or imply this is verbatim manuscript text. No em or en dashes. For exact excerpt mode, preserve the exact selected wording and sourceQuote; choose more intelligible source extracts instead of rewriting.
+The images must visibly read as romantic attraction: source-supported close proximity, softened eye contact, a look drawn to the other man's mouth, restrained mutual longing, an almost-touch or a real affectionate gesture when supported. Choose at least two specific visual cues to attraction and describe them. A pair of stern men standing a metre apart, a business conversation, looking at shopping bags or unrelated eyelines are not enough. Conflict and masculinity can coexist with attraction. Do not add arbitrary kissing or physical escalation. Keep these same men, clothes, room, props, time and lighting across both images; vary the angle and the developing beat. Leave the payoff unresolved. No generic embrace template or decorative ribbons.`;

@@ -124,7 +124,7 @@ export default function StudioSceneCreator({
           !r
             ? "Queued for generation…"
             : r.images.length < 2
-              ? `Creating photo ${r.images.length + 1} of 2…`
+              ? r.repairCount ? "Improving the romantic connection…" : `Creating photo ${r.images.length + 1} of 2…`
               : !r.checked
                 ? "Checking cast continuity and image quality…"
                 : !r.copies?.length
@@ -598,10 +598,10 @@ export default function StudioSceneCreator({
                 </button>
               </div>
               <p className="mt-3 text-xs leading-5 text-neutral-500">
-                Two image requests are used for a new visual plan. The second
-                uses the first as its identity reference. Completed images are
-                saved for deliberate retries. You can leave this tab while
-                generation runs.
+                Studio checks clarity, character continuity and romantic chemistry,
+                with at most one automatic visual correction. Saved photographs
+                are reused when you change text or music. You can leave this tab
+                while generation runs.
               </p>
             </details>
           )}

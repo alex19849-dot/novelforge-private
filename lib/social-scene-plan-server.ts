@@ -6,6 +6,7 @@ import { studioBook } from "./social-studio-catalogue";
 import { validateScenePlan } from "./social-scene-slides";
 import { loadSceneStory } from "./social-scene-source";
 import { nextSceneDirection, scenePlanRepeats } from "./social-scene-design";
+import { finishSceneCopy, SCENE_EDITOR_INSTRUCTIONS } from "./social-scene-quality";
 import { sceneText } from "./social-scene-render";
 export async function createScenePlan(owner: string, body: any) {
   const book = await studioBook(String(body.bookSlug ?? "")),
@@ -94,7 +95,7 @@ export async function createScenePlan(owner: string, body: any) {
               "Use the supplied savedStory.passage as evidence for a scene when available, together with the bible and verified blurb. The source has been chosen automatically from a different manuscript section. Turn a supported moment into an engaging teaser; do not invent plot events, change relationships or reveal endings. If there is no saved manuscript, create a premise-based teaser automatically from the catalogue. Do not claim original promotional copy is a verbatim book excerpt.",
               "Apply the creativeTreatment angle and camera pair when compatible with the source. Source facts take precedence over a suggested angle. Make a fresh scene composition, emotional beat, hook wording, body language, setting detail and lighting treatment relative to previous sequences. No recurring cabin/window/sofa/standing-embrace template. Do not transplant characters or settings from another book. Romance should feel intimate, cinematic and story-specific, never corporate or decorated with bows and ribbons.",
               "Return exactly two story slides. Slide one must stop a reader scrolling immediately; slide two raises romantic tension and ends before the payoff, without giving away the resolution. No trope lists or buy-now text in these two slides. The third slide is added separately with the genuine cover.",
-              "Each slide text is 8 to 40 words, maximum 280 characters, self-contained enough to understand and linked to the next. Hook is a short label under 100 characters, no em or en dashes.",
+              "Each slide text is 10 to 24 words, maximum 180 characters, self-contained for someone who knows nothing about the story, and linked into ONE continuous romantic micro-scene. No unexplained sports jargon, backstory or abstract summaries. Both slides must explicitly convey attraction, Hook is a short label under 100 characters, no em or en dashes.",
               excerpt
                 ? "EXCERPT mode: every slide.text must be an EXACT continuous excerpt of the supplied passage. Copy it verbatim into sourceQuote as well. Choose a compelling pair in narrative order; do not rewrite, add dialogue, add hooks to the excerpt, or change the meaning. The independent hook field can describe the tension."
                 : "PREMISE mode: write original scene-style promotional narrative using the verified book blurb and saved story evidence provided here, without quotation marks, invented dialogue, specific invented plot incidents, names not in the supplied book or story evidence or claims that the text is an excerpt. sourceQuote must be empty. It is a premise adaptation, not a manuscript quote.",
@@ -106,23 +107,30 @@ export async function createScenePlan(owner: string, body: any) {
       ],
     };
   const ai=new OpenAI();
-  let response=await ai.responses.create(request,{timeout:70000,maxRetries:0});
+  let response=await ai.responses.create(request,{timeout:50000,maxRetries:0});
   if (
     (response.status && response.status !== "completed") ||
     !response.output_text
   )
     throw Error("The scene plan did not finish. No images were requested.");
-  let plan = {...validateScenePlan(JSON.parse(response.output_text), excerpt), design:direction.look};
+  const proposed = validateScenePlan(JSON.parse(response.output_text), excerpt);
+  const edited=await ai.responses.create({...request,max_output_tokens:5000,input:[
+    {role:'system',content:SCENE_EDITOR_INSTRUCTIONS},
+    {role:'user',content:JSON.stringify({book,savedStory:storySource,excerpt,proposed})},
+  ]},{timeout:30000,maxRetries:0});
+  if ((edited.status && edited.status!=='completed') || !edited.output_text)
+    throw Error('The scene clarity check did not finish. No images were requested.');
+  let plan = {...finishSceneCopy(validateScenePlan(JSON.parse(edited.output_text), excerpt)), design:direction.look};
   if (!excerpt && scenePlanRepeats(plan,sameBook)) {
     // One bounded text-only correction. Never request images for a repeated plan.
     response=await ai.responses.create({...request,input:[
       ...(Array.isArray(request.input)?request.input:[]),
-      {role:'assistant',content:response.output_text},
-      {role:'user',content:'That sequence repeats a previous hook or scene. Choose a substantially different supported moment, visual composition and wording from the supplied story evidence. Keep character canon. Return a completely fresh sequence in the same JSON schema.'},
+      {role:'assistant',content:JSON.stringify(plan)},
+      {role:'user',content:'That sequence repeats a previous hook or scene. Choose a substantially different supported moment, visual composition and wording from the supplied story evidence. Keep character canon, one coherent romantic moment and at most 24 words per slide. Use plain language with no unexplained backstory or jargon. Make attraction visible through close body language and mutually drawn eye contact. Return a completely fresh sequence in the same JSON schema.'},
     ]},{timeout:30000,maxRetries:0});
     if ((response.status && response.status!=='completed') || !response.output_text)
       throw Error('The fresh scene selection did not finish. No images were requested.');
-    plan={...validateScenePlan(JSON.parse(response.output_text),excerpt),design:direction.look};
+    plan={...finishSceneCopy(validateScenePlan(JSON.parse(response.output_text),excerpt)),design:direction.look};
     if(scenePlanRepeats(plan,sameBook))
       throw Error('Studio could not find a sufficiently different sequence on this attempt. No images were requested. Your previous work is kept.');
   }

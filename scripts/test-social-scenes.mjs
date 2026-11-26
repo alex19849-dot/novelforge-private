@@ -280,17 +280,17 @@ globalThis.fetch = async (input, init) => {
   const b = JSON.parse(init.body);
   let output;
   if (b.text.format.name === "romantic_scene_slides") {
-    planCalls++;
     const evidence=JSON.parse(b.input.find(x=>x.role==='user').content);
     assert.equal(evidence.savedStory.kind,'manuscript','Automatic planning reads the saved book without supplied descriptions');
     assert.ok(evidence.savedStory.passage.includes('rival'));
     assert.deepEqual(evidence.savedStory.bible.characters,plan.cast);
-    assert.ok(evidence.creativeTreatment.shotDirection);
+    if (!evidence.proposed) {planCalls++; assert.ok(evidence.creativeTreatment.shotDirection);}
+    else assert.deepEqual(evidence.proposed.cast,plan.cast,"Editor preserves the cast");
     output = plan;
   }
   else if (b.text.format.name === "scene_identity_check") {
     checks++;
-    output = { decision: "pass", reason: "Fixture cast continuity check." };
+    output = checks === 1 ? {decision:"reject",reason:"The same men are present but the second shot looks like a business conversation. Add source-supported romantic eye contact."} : { decision: "pass", reason: "Fixture cast continuity and romantic chemistry check." };
   } else {
     assert.equal(b.text.format.name, "platform_specific_romance_copy");
     copyCalls++;
@@ -363,7 +363,7 @@ try {
     "Concurrent generation does not enqueue a second charged task",
   );
   const run = { ...queued[0], checkpoint: {} };
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     const step = await server.advanceSceneSlides(run);
     if (i === 0) {
       const visible = await api.GET(
@@ -376,7 +376,7 @@ try {
       assert.equal(progress.previewUrls.length, 1);
       assert.ok(progress.previewUrls[0].includes(owner + "/creations/"));
     }
-    if (i < 4) assert.ok(!step.done);
+    if (i < 6) assert.ok(!step.done);
     else assert.equal(step.done, true);
   }
   const finished = rows.get(saved.id);
@@ -385,13 +385,16 @@ try {
   assert.equal(finished.poster_result.slideUrls.length, 3);
   assert.equal(finished.poster_result.delivery, "native");
   assert.equal(generations, 1);
-  assert.equal(edits, 1);
+  assert.equal(edits, 2);
   assert.equal(copyCalls, 1);
-  assert.equal(checks, 1);
+  assert.equal(finished.poster_result.slidesRecovery.repairCount,1);
+  assert.ok(finished.poster_result.slidesRecovery.images[1].includes("-repair-1"));
+  assert.ok(finished.poster_result.slidesRecovery.previousImages.length===1,"Earlier image is kept for recovery");
+  assert.equal(checks, 2);
   assert.deepEqual(await server.advanceSceneSlides(run), { done: true });
   assert.equal(
     generations + edits,
-    2,
+    3,
     "Redelivery never repeats completed image calls",
   );
   const videoPath = finished.poster_result.posts[0].mediaPath,
@@ -488,7 +491,7 @@ try {
   );
   const secondRun = { ...queued[1], checkpoint: {} };
   await server.advanceSceneSlides(secondRun);
-  assert.equal(generations + edits, 2);
+  assert.equal(generations + edits, 3);
   await server.failSceneSlides(owner, saved.id, receipt, "Stale task error");
   assert.equal(
     rows.get(saved.id).poster_state,
@@ -525,7 +528,7 @@ try {
   await server.advanceSceneSlides({ ...queued[2], checkpoint: {} });
   assert.equal(
     generations + edits,
-    2,
+    3,
     "A deliberate soundtrack retry does not pay for new pictures",
   );
   const audioResult = rows.get(saved.id).poster_result;

@@ -64,3 +64,16 @@ for(let design=0;design<SCENE_STYLES.length;design++) {
 }
 assert.ok(signatures.size>3,'Distinct treatments produce different rendered slides');
 console.log('PASS: automatic owner-scoped manuscript/bible selection; exact book matching; complete draft preferred; no ending chapters; source-section rotation; catalogue fallback without manual input; 60 fresh visual directions; repeat detection; six real rendered font/colour treatments with >7:1 text contrast.');
+const {finishSceneCopy}=await import('../lib/social-scene-quality.ts');
+const qualityPlan={format:'scene-slides',sourceMode:'premise',hook:'A clear romantic hook',cast:['one','two'],slides:[{text:'He came to apologise—but leaving is harder.',imagePrompt:'first',sourceQuote:''},{text:'He wants his rival. Now his rival knows.',imagePrompt:'second',sourceQuote:''}]};
+assert.equal(finishSceneCopy(qualityPlan).slides[0].text,'He came to apologise, but leaving is harder.');
+assert.throws(()=>finishSceneCopy({...qualityPlan,slides:[{...qualityPlan.slides[0],text:Array(25).fill('word').join(' ')},qualityPlan.slides[1]]}),/too dense/);
+assert.equal(finishSceneCopy({...qualityPlan,sourceMode:'excerpt'}).slides[0].text,qualityPlan.slides[0].text,'Exact excerpts are never rewritten');
+const backgroundA=await sharp({create:{width:1080,height:1920,channels:3,background:'#7a4330'}}).jpeg().toBuffer();
+const backgroundB=await sharp({create:{width:1080,height:1920,channels:3,background:'#234c70'}}).jpeg().toBuffer();
+const revealA=await composeSceneCover(photo,{...book,title:'Holiday Hookup'},5,backgroundA);
+const revealB=await composeSceneCover(photo,{...book,title:'Holiday Hookup'},5,backgroundB);
+assert.notDeepEqual(revealA,revealB,'Final reveal uses the actual scene photograph');
+const screen=await sharp(await sharp(revealA).extract({left:330,top:385,width:400,height:940}).toBuffer()).stats();
+assert.ok(Math.abs(screen.channels[0].mean-119)<8,'Large Kindle screen retains the original cover');
+console.log('PASS: shorter premise copy, exact-excerpt preservation, actual scene-backed cover reveal, large original-cover insertion.');
