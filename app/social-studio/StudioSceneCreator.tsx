@@ -123,7 +123,7 @@ export default function StudioSceneCreator({
               ? r.repairCount ? "Improving the romantic connection…" : `Creating photo ${r.images.length + 1} of 2…`
               : !r.checked
                 ? "Checking cast continuity and image quality…"
-                : !r.copies?.length
+                : (!r.copies?.length || r.copies.length < (r.platforms?.length ?? 0))
                   ? "Writing platform captions…"
                   : "Rendering your three-slide video…",
         );

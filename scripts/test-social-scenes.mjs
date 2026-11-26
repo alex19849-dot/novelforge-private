@@ -586,6 +586,23 @@ try {
   await server.advanceSceneSlides(addRun);
   assert.equal(rows.get(saved.id).poster_state,'ready');
   assert.equal(generations+edits,3,'Restoring Facebook reuses the existing photographs');
+  const beforeChannelAdd=rows.get(saved.id).poster_result;
+  const originalPosts=structuredClone(beforeChannelAdd.posts);
+  const dropReceipt=randomUUID();
+  await server.queueSceneSlides(owner,{promptId:saved.id,requestId:dropReceipt,plan:editedPlan,platforms:['tiktok','youtube'],delivery:'automatic',trackId:'babe'});
+  assert.equal((await server.advanceSceneSlides({...queued[5],checkpoint:{}})).done,true,'Channel-only changes reuse the existing video');
+  const restoreReceipt=randomUUID(), uploadCount=uploads.size;
+  await server.queueSceneSlides(owner,{promptId:saved.id,requestId:restoreReceipt,plan:editedPlan,platforms:['facebook','tiktok','youtube'],delivery:'automatic',trackId:'babe'});
+  const restoreRun={...queued[6],checkpoint:{}};
+  await server.advanceSceneSlides(restoreRun);
+  await server.advanceSceneSlides(restoreRun);
+  const restored=rows.get(saved.id).poster_result;
+  for(const p of originalPosts.filter(p=>p.platform!=='facebook')) {
+    const keptPost=restored.posts.find(x=>x.platform===p.platform);
+    assert.equal(keptPost.id,p.id,'Adding Facebook preserves existing scheduled-post IDs');
+    assert.equal(keptPost.mediaPath,p.mediaPath,'Existing scheduled media is unchanged');
+  }
+  assert.equal(uploads.size,uploadCount,'Adding Facebook needs no new image or video uploads');
   const planCallsBeforeRepeat=planCalls, imagesBeforeRepeat=generations+edits;
   const repeated=await api.POST(req({action:'plan',bookSlug:book.slug}));
   assert.equal(repeated.status,400,'Repeated sequence cannot proceed to images');

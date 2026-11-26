@@ -77,6 +77,12 @@ export async function queueSceneSlides(owner: string, body: any) {
   const oldCopyKey = old?.platforms ? createHash("sha256")
     .update(JSON.stringify({book,plan,platforms:old.platforms})).digest("hex") : null;
   const reusableCopies = old?.copyKey === oldCopyKey ? (old.copies??[]) : [];
+  const priorOutput=row.poster_result;
+  const existingOutput = old && row.poster_state === "ready" && old.copyKey === oldCopyKey &&
+    old.delivery === delivery && (old.trackId??null) === (delivery === "automatic" ? track?.id??null : null) &&
+    priorOutput?.slideUrls?.length===3 && priorOutput?.posts?.length &&
+    priorOutput.posts.every((p:any)=>uuid(p.id)&&p.mediaType==='video'&&p.mediaPath?.startsWith(owner+'/creations/'))
+    ? {posts:priorOutput.posts,slideUrls:priorOutput.slideUrls,duration:priorOutput.duration} : null;
   const recovery = {
     cacheKey,
     copyKey,
@@ -84,6 +90,8 @@ export async function queueSceneSlides(owner: string, body: any) {
     platforms,
     delivery,
     trackId: delivery === "automatic" ? (track?.id ?? null) : null,
+    existingOutput,
+    previousPosts: reusableCopies.length ? (priorOutput?.posts?.length ? priorOutput.posts : old?.previousPosts??[]) : [],
     images: old?.images ?? [],
     checked: old?.checked ?? false,
     copies: reusableCopies.filter((c:any)=>platforms.includes(c.platform)),
@@ -182,6 +190,11 @@ export async function advanceSceneSlides(run: BackgroundRun) {
       throw Error(
         "Scene progress could not be saved. No image will be automatically repeated.",
       );
+  }
+  async function finish(complete:any) {
+    const saved=await db.from("social_creative_prompts").update({poster_state:"ready",poster_result:complete,poster_error:""})
+      .eq("id",id).eq("user_id",run.user_id).eq("poster_request_id",receipt).eq("poster_state","generating");
+    if(saved.error) throw Error("The finished sequence could not be recorded. Check progress before trying again.");
   }
   async function download(path: string) {
     if (!path.startsWith(run.user_id + "/creations/"))
@@ -326,6 +339,20 @@ export async function advanceSceneSlides(run: BackgroundRun) {
     await save();
     return { checkpoint: { stage: "render" } };
   }
+  if (r.existingOutput) {
+    // Adding a channel must not replace the video or IDs of posts already scheduled.
+    const original=r.existingOutput;
+    await finish({...result,delivery:r.delivery,sourceMode:plan.sourceMode,cast:plan.cast,
+      slideUrls:original.slideUrls,duration:original.duration,trackId:r.trackId,
+      posts:r.copies.map((c:any)=>{
+        const prior=original.posts.find((p:any)=>p.platform===c.platform);
+        const asset=prior??original.posts[0];
+        return {...c,id:prior?.id??randomUUID(),mediaPath:asset.mediaPath,mediaType:'video',posterUrl:asset.posterUrl,
+          videoUrl:asset.videoUrl,creativeBrief:JSON.stringify(plan),includesCover:true};
+      }),
+    });
+    return {done:true};
+  }
   const [first, second, cover] = await Promise.all([
     download(r.images[0]),
     download(r.images[1]),
@@ -358,7 +385,7 @@ export async function advanceSceneSlides(run: BackgroundRun) {
     trackId: r.trackId,
     posts: r.copies.map((c: any) => ({
       ...c,
-      id: randomUUID(),
+      id: r.previousPosts?.find((p:any)=>p.platform===c.platform)?.id ?? randomUUID(),
       mediaPath: videoPath,
       mediaType: "video",
       posterUrl: url(paths[0]),
@@ -367,20 +394,6 @@ export async function advanceSceneSlides(run: BackgroundRun) {
       includesCover: true,
     })),
   };
-  const saved = await db
-    .from("social_creative_prompts")
-    .update({
-      poster_state: "ready",
-      poster_result: complete,
-      poster_error: "",
-    })
-    .eq("id", id)
-    .eq("user_id", run.user_id)
-    .eq("poster_request_id", receipt)
-    .eq("poster_state", "generating");
-  if (saved.error)
-    throw Error(
-      "The finished sequence could not be recorded. Check progress before trying again.",
-    );
+  await finish(complete);
   return { done: true };
 }
