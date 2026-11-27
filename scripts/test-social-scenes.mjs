@@ -137,13 +137,13 @@ const plan = {
   ],
   slides: [
     {
-      text: "He came to the cabin to be alone. Sharing it with his rival was never part of the plan.",
+      text: "I came to the cabin to be alone. Sharing it with my rival was never part of the plan.",
       imagePrompt:
         "Two distinct adult men face each other across a small cabin table in warm winter light.",
       sourceQuote: "",
     },
     {
-      text: "Now his rival is standing a little too close. And leaving is the last thing on his mind.",
+      text: "Now he is standing too close. And leaving is the last thing on my mind.",
       imagePrompt:
         "The same two men and clothing, now standing near the window with charged eye contact and natural expressions.",
       sourceQuote: "",
@@ -283,7 +283,12 @@ globalThis.fetch = async (input, init) => {
   assert.equal(u, "https://api.openai.com/v1/responses");
   const b = JSON.parse(init.body);
   let output;
-  if (b.text.format.name === "romantic_scene_slides") {
+  if (b.text.format.name === 'scene_hook_candidates') {
+    const input=JSON.parse(b.input.find(x=>x.role==='user').content), source=input.sources[0];
+    output={candidates:[1,2,3].map(id=>({id,sourceKey:source.key,narrator:'The first adult lead',first:plan.slides[0].text,second:plan.slides[1].text,evidence:[source.passage.slice(0,40),source.passage.slice(-50)],firstAction:'arriving',secondAction:'a charged approach'}))};
+  } else if (b.text.format.name === 'scene_hook_judgment') {
+    output={scores:[1,2,3].map(id=>({id,grounded:true,clarity:9,curiosity:9,romance:9,escalation:9,isSynopsis:false,reason:'An unresolved romantic problem with a developing action.'}))};
+  } else if (b.text.format.name === "romantic_scene_slides") {
     const evidence=JSON.parse(b.input.find(x=>x.role==='user').content);
     assert.equal(evidence.savedStory.kind,'manuscript','Automatic planning reads the saved book without supplied descriptions');
     assert.ok(evidence.savedStory.passage.includes('rival'));
@@ -294,7 +299,7 @@ globalThis.fetch = async (input, init) => {
   }
   else if (b.text.format.name === "scene_identity_check") {
     checks++;
-    output = checks === 1 ? {decision:"reject",reason:"The same men are present but the second shot looks like a business conversation. Add source-supported romantic eye contact."} : { decision: "pass", reason: "Fixture cast continuity and romantic chemistry check." };
+    output = checks === 1 ? {identityConsistent:true,anatomyNatural:true,romanticCharge:9,shot1:{framing:'medium',action:'standing_or_smiling'},shot2:{framing:'medium',action:'standing_or_smiling'},reason:'Similar smiling poses do not develop the scene.'} : {identityConsistent:true,anatomyNatural:true,romanticCharge:9,shot1:{framing:'medium',action:'approach'},shot2:{framing:'close',action:'touch'},reason:'A genuinely closer developing action.'};
   } else {
     assert.equal(b.text.format.name, "platform_specific_romance_copy");
     copyCalls++;

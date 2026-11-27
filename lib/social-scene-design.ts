@@ -2,7 +2,7 @@ export const SCENE_STYLES = [
   {name:'Midnight cinema',ink:'#ffffff',panel:'#101018',accent:'#e7bfd2',font:'DM Sans Bold',file:'DMSans.ttf',align:'left',backdrop:'#15121f'},
   {name:'Wine and cream',ink:'#fff8e8',panel:'#3b1028',accent:'#ffcf99',font:'DM Serif Display',file:'DMSerifDisplay-Regular.ttf',align:'left',backdrop:'#280c20'},
   {name:'Ivory romance',ink:'#281827',panel:'#fff6e8',accent:'#9d2b57',font:'DM Serif Display',file:'DMSerifDisplay-Regular.ttf',align:'centre',backdrop:'#301b30'},
-  {name:'Electric midnight',ink:'#ffffff',panel:'#101e39',accent:'#85e3ff',font:'Bebas Neue',file:'BebasNeue-Regular.ttf',align:'left',backdrop:'#0d1830'},
+  {name:'Electric midnight',ink:'#ffffff',panel:'#101e39',accent:'#85e3ff',font:'DM Serif Display',file:'DMSerifDisplay-Regular.ttf',align:'left',backdrop:'#0d1830'},
   {name:'Emerald after dark',ink:'#fff8e8',panel:'#102e29',accent:'#c2e8cc',font:'DM Sans Bold',file:'DMSans.ttf',align:'centre',backdrop:'#0c211e'},
   {name:'Rose ink',ink:'#30102b',panel:'#ffe4ee',accent:'#932b59',font:'DM Sans Bold',file:'DMSans.ttf',align:'left',backdrop:'#3b1732'},
 ] as const;

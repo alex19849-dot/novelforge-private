@@ -126,7 +126,7 @@ export function scenePhotoPrompt(plan: ScenePlan, index: number) {
     `Lead one: ${plan.cast[0]}`,
     `Lead two: ${plan.cast[1]}`,
     index === 1
-      ? "CONTINUITY REFERENCE: preserve the exact same two men, identities, clothing and setting from the supplied first image. Create a genuinely different angle/action for the next moment. Do not exchange their identities."
+      ? "CHARACTER REFERENCE ONLY: the supplied image is a cropped identity/wardrobe reference, NOT the composition to edit. Rebuild the second shot from scratch. Preserve the two men and clothing, but change the camera side, shot scale and body action substantially. Use a CLOSE-UP or intimate over-the-shoulder close shot instead of another medium two-shot. Do not reproduce the original pose, background arrangement, eyeline or cup-holding composition. Show the actual next romantic action."
       : "Establish the two distinct adult leads so their identities can be carried into the next shot.",
     `Scene direction: ${plan.slides[index].imagePrompt}`,
   ].join("\n\n");

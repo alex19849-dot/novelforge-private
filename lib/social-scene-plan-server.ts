@@ -6,9 +6,12 @@ import { studioBook } from "./social-studio-catalogue";
 import { validateScenePlan } from "./social-scene-slides";
 import { loadSceneStory } from "./social-scene-source";
 import { nextSceneDirection, scenePlanRepeats } from "./social-scene-design";
-import { finishSceneCopy, SCENE_EDITOR_INSTRUCTIONS } from "./social-scene-quality";
+import { createSceneHook } from "./social-scene-hooks-server";
+import { finishSceneCopy } from "./social-scene-quality";
 import { sceneText } from "./social-scene-render";
 export async function createScenePlan(owner: string, body: any) {
+  const deadline=Date.now()+105000;
+  const ai=new OpenAI();
   const book = await studioBook(String(body.bookSlug ?? "")),
     excerpt = String(body.excerpt ?? "").trim();
   if (excerpt.length > 18000)
@@ -24,9 +27,21 @@ export async function createScenePlan(owner: string, body: any) {
   if (recent.error) throw Error("Recent scene designs could not be checked.");
   const id = randomUUID();
   const sameBook=(recent.data??[]).filter(r=>r.book_slug===book.slug);
-  const storySource = excerpt ? {kind:'catalogue' as const} : await loadSceneStory(owner, book, sameBook, id);
+  let storySource = excerpt ? {kind:'catalogue' as const} : await loadSceneStory(owner, book, sameBook, id);
   const direction=nextSceneDirection(recent.data??[], parseInt(id.slice(0,8),16));
   const sourceMode = excerpt ? "excerpt" : "premise";
+  const hookSelection=excerpt?null:await createSceneHook(ai,book,
+    storySource.alternatives?.length ? storySource.alternatives : [{key:storySource.sourceKey??'catalogue',passage:storySource.passage??book.blurb}],
+    storySource.bible,sameBook.slice(0,16).map(r=>({hook:r.hook,text:r.recipe?.scenePlan?.slides?.map((s:any)=>s.text)})),deadline);
+  if(hookSelection){
+    const selected=storySource.alternatives?.find(s=>s.key===hookSelection.candidate.sourceKey);
+    if(selected)storySource={...storySource,sourceKey:selected.key,chapterId:selected.chapterId,passage:selected.passage};
+  }
+  const lockCopy=(value:unknown)=>{
+    const p=validateScenePlan(value,excerpt);
+    if(!hookSelection)return p;
+    return {...p,hook:hookSelection.candidate.first.slice(0,98),slides:p.slides.map((s,i)=>({...s,text:i===0?hookSelection.candidate.first:hookSelection.candidate.second,sourceQuote:''})) as typeof p.slides};
+  };
   const request: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
       model: "gpt-6-astra",
       reasoning: { effort: "low" },
@@ -82,6 +97,11 @@ export async function createScenePlan(owner: string, body: any) {
             excerpt,
             savedStory: storySource,
             creativeTreatment: direction,
+            selectedHook:hookSelection?.candidate,
+            shotContract: {
+              first:'A wide or medium establishing shot that clearly stages the FIRST romantic action.',
+              second:'A close-up, over-the-shoulder close-up or intimate detail that stages the SECOND action. Different scale AND camera side AND body action; never repeat the first pose with a small crop.',
+            },
             appearanceDirection: String(body.castNotes ?? "").slice(0, 2000),
             creativeDirection: String(body.notes ?? "").slice(0, 1500),
             avoid: recent.data?.slice(0,24).map((r) => ({
@@ -91,6 +111,7 @@ export async function createScenePlan(owner: string, body: any) {
               cast: r.recipe?.scenePlan?.cast,
             })),
             instructions: [
+              "The selectedHook copy has already passed an independent hook comparison. Return its first and second strings EXACTLY as slide text. Do not rewrite them as a plot report. Art-direct the specified developing actions with concrete body language. These must be two visibly different shots: establishing context first, emotional/physical escalation in a closer composition second. A change in crop, tiny head turn, smile or near-identical pose is not progression. Use the source-supported kiss/touch when it is the romantic action; do not automatically dilute it to two men looking at each other.",
               "AUTOMATIC CREATION: the user has only selected a book. Independently choose the two romantic moments, emotional hook, setting, wardrobe, camera directions and two distinct fictional adult appearances. Never ask for a scene, passage or descriptions. Saved character canon is authoritative, including ages, hair, eyes, body types and fantasy traits. Do not change established people to manufacture variety. All characters may appear anywhere in the bible.characters list, so identify the protagonists from the premise and passage rather than assuming the first two entries are leads. If details are absent, art-direct plausible adult appearances yourself; preserve them across this sequence. Vary wardrobe where the passage permits and do not reuse generic stock faces from other books.",
               "Use the supplied savedStory.passage as evidence for a scene when available, together with the bible and verified blurb. The source has been chosen automatically from a different manuscript section. Turn a supported moment into an engaging teaser; do not invent plot events, change relationships or reveal endings. If there is no saved manuscript, create a premise-based teaser automatically from the catalogue. Do not claim original promotional copy is a verbatim book excerpt.",
               "Apply the creativeTreatment angle and camera pair when compatible with the source. Source facts take precedence over a suggested angle. Make a fresh scene composition, emotional beat, hook wording, body language, setting detail and lighting treatment relative to previous sequences. No recurring cabin/window/sofa/standing-embrace template. Do not transplant characters or settings from another book. Romance should feel intimate, cinematic and story-specific, never corporate or decorated with bows and ribbons.",
@@ -106,31 +127,20 @@ export async function createScenePlan(owner: string, body: any) {
         },
       ],
     };
-  const ai=new OpenAI();
-  let response=await ai.responses.create(request,{timeout:50000,maxRetries:0});
-  if (
-    (response.status && response.status !== "completed") ||
-    !response.output_text
-  )
+  let response=await ai.responses.create(request,{timeout:Math.max(4000,Math.min(35000,deadline-Date.now())),maxRetries:0});
+  if ((response.status && response.status!=="completed") || !response.output_text)
     throw Error("The scene plan did not finish. No images were requested.");
-  const proposed = validateScenePlan(JSON.parse(response.output_text), excerpt);
-  const edited=await ai.responses.create({...request,max_output_tokens:5000,input:[
-    {role:'system',content:SCENE_EDITOR_INSTRUCTIONS},
-    {role:'user',content:JSON.stringify({book,savedStory:storySource,excerpt,proposed})},
-  ]},{timeout:30000,maxRetries:0});
-  if ((edited.status && edited.status!=='completed') || !edited.output_text)
-    throw Error('The scene clarity check did not finish. No images were requested.');
-  let plan = {...finishSceneCopy(validateScenePlan(JSON.parse(edited.output_text), excerpt)), design:direction.look};
+  let plan={...finishSceneCopy(lockCopy(JSON.parse(response.output_text))),design:direction.look};
   if (!excerpt && scenePlanRepeats(plan,sameBook)) {
     // One bounded text-only correction. Never request images for a repeated plan.
     response=await ai.responses.create({...request,input:[
       ...(Array.isArray(request.input)?request.input:[]),
       {role:'assistant',content:JSON.stringify(plan)},
-      {role:'user',content:'That sequence repeats a previous hook or scene. Choose a substantially different supported moment, visual composition and wording from the supplied story evidence. Keep character canon, one coherent romantic moment and at most 24 words per slide. Use plain language with no unexplained backstory or jargon. Make attraction visible through close body language and mutually drawn eye contact. Return a completely fresh sequence in the same JSON schema.'},
-    ]},{timeout:30000,maxRetries:0});
+      {role:'user',content:'The visual directions repeat a previous scene. Keep the already selectedHook first/second wording EXACTLY. Choose substantially different source-supported staging and camera compositions for those actions. Preserve character canon. Return the same JSON schema.'},
+    ]},{timeout:Math.max(4000,Math.min(20000,deadline-Date.now())),maxRetries:0});
     if ((response.status && response.status!=='completed') || !response.output_text)
       throw Error('The fresh scene selection did not finish. No images were requested.');
-    plan={...finishSceneCopy(validateScenePlan(JSON.parse(response.output_text),excerpt)),design:direction.look};
+    plan={...finishSceneCopy(lockCopy(JSON.parse(response.output_text))),design:direction.look};
     if(scenePlanRepeats(plan,sameBook))
       throw Error('Studio could not find a sufficiently different sequence on this attempt. No images were requested. Your previous work is kept.');
   }
@@ -138,7 +148,7 @@ export async function createScenePlan(owner: string, body: any) {
     throw Error("The two character descriptions must be different.");
   for (const slide of plan.slides) await sceneText(slide.text, 510, 68, plan.design);
   const prompt = JSON.stringify(plan, null, 2),
-    recipe = { format: "scene-slides", scenePlan: plan, excerpt, sourceMode, sceneDirection:direction, storySource:{kind:storySource.kind,storyId:storySource.storyId,chapterId:storySource.chapterId,sourceKey:storySource.sourceKey} };
+    recipe = { format: "scene-slides", scenePlan: plan, excerpt, sourceMode, sceneDirection:direction, hookReview:hookSelection?{selected:hookSelection.candidate,scores:hookSelection.allScores}:null, qualityVersion:2, storySource:{kind:storySource.kind,storyId:storySource.storyId,chapterId:storySource.chapterId,sourceKey:storySource.sourceKey} };
   const saved = await db.from("social_creative_prompts").insert({
     id,
     user_id: owner,

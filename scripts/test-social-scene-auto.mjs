@@ -65,8 +65,8 @@ for(let design=0;design<SCENE_STYLES.length;design++) {
 assert.ok(signatures.size>3,'Distinct treatments produce different rendered slides');
 console.log('PASS: automatic owner-scoped manuscript/bible selection; exact book matching; complete draft preferred; no ending chapters; source-section rotation; catalogue fallback without manual input; 60 fresh visual directions; repeat detection; six real rendered font/colour treatments with >7:1 text contrast.');
 const {finishSceneCopy}=await import('../lib/social-scene-quality.ts');
-const qualityPlan={format:'scene-slides',sourceMode:'premise',hook:'A clear romantic hook',cast:['one','two'],slides:[{text:'He came to apologise—but leaving is harder.',imagePrompt:'first',sourceQuote:''},{text:'He wants his rival. Now his rival knows.',imagePrompt:'second',sourceQuote:''}]};
-assert.equal(finishSceneCopy(qualityPlan).slides[0].text,'He came to apologise, but leaving is harder.');
+const qualityPlan={format:'scene-slides',sourceMode:'premise',hook:'A clear romantic hook',cast:['one','two'],slides:[{text:'I came to apologise—but leaving is harder.',imagePrompt:'first',sourceQuote:''},{text:'He wants his rival. Now his rival knows.',imagePrompt:'second',sourceQuote:''}]};
+assert.equal(finishSceneCopy(qualityPlan).slides[0].text,'I came to apologise, but leaving is harder.');
 assert.throws(()=>finishSceneCopy({...qualityPlan,slides:[{...qualityPlan.slides[0],text:Array(25).fill('word').join(' ')},qualityPlan.slides[1]]}),/too dense/);
 assert.equal(finishSceneCopy({...qualityPlan,sourceMode:'excerpt'}).slides[0].text,qualityPlan.slides[0].text,'Exact excerpts are never rewritten');
 const backgroundA=await sharp({create:{width:1080,height:1920,channels:3,background:'#7a4330'}}).jpeg().toBuffer();
