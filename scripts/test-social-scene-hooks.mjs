@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {registerHooks} from 'node:module';import{existsSync}from'node:fs';import{fileURLToPath}from'node:url';
-registerHooks({resolve(s,c,n){if(s.startsWith('.')&&c.parentURL&&existsSync(fileURLToPath(new URL(s+'.ts',c.parentURL))))return n(s+'.ts',c);return n(s,c);}});
+registerHooks({resolve(s,c,n){if(s==='server-only')return{url:'data:text/javascript,export{}',shortCircuit:true};if(s.startsWith('.')&&c.parentURL&&existsSync(fileURLToPath(new URL(s+'.ts',c.parentURL))))return n(s+'.ts',c);return n(s,c);}});
 const {hookCandidateIssues,selectSceneHook}=await import('../lib/social-scene-hooks.ts');
 const {sceneVisualIssues,scenePhotosRepeat,sceneIdentityReference}=await import('../lib/social-scene-visual.ts');
 const {finishSceneCopy}=await import('../lib/social-scene-quality.ts');
@@ -24,3 +24,17 @@ const picture=await sharp(Buffer.from('<svg width="600" height="900"><rect width
 assert.equal(await scenePhotosRepeat(picture,picture),true);
 const ref=await sceneIdentityReference(picture);assert.equal((await sharp(ref).metadata()).height,960);
 console.log('PASS: actual reported plot-copy regression rejected; independent hook score thresholds; evidence grounding; same-action/same-framing photographs blocked; structural duplicates blocked; cropped identity reference.');
+
+const {createSceneHook}=await import('../lib/social-scene-hooks-server.ts');
+const requests=[];
+const fakeAi={responses:{create:async request=>{
+  requests.push(request);
+  const judging=request.text.format.name==='scene_hook_judgment';
+  return {status:'completed',output_text:JSON.stringify(judging?{scores:[{...score(1),curiosity:requests.length===2?6:9,reason:'Opening needs a clear relationship limit.'}]}:{candidates:[good,good,good]})};
+}}};
+const retry=await createSceneHook(fakeAi,{},[source],{},[],Date.now()+10000);
+assert.equal(retry.candidate.first,good.first);
+const repair=JSON.parse(requests[2].input[1].content).feedback;
+assert.ok(repair.includes(good.first),'The correction must receive the actual failed wording, not only scores for anonymous IDs');
+assert.ok(repair.includes('Opening needs a clear relationship limit.'));
+console.log('PASS: bounded hook correction receives exact failed concepts and editor feedback.');
