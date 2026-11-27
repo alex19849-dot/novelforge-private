@@ -2693,7 +2693,7 @@ transition ${
                     Story Bible
                   </button>
                 )}
-                {story && <button type="button" onClick={() => { setActiveTab("review"); setIsMenuOpen(false); }} className={`w-full rounded-xl px-4 py-3 text-left font-semibold ${activeTab === "review" ? "bg-white/10 text-white" : "text-neutral-400 hover:bg-white/5 hover:text-white"}`}>Review manuscript</button>}
+                {story && <button type="button" onClick={() => { setActiveTab("review"); setIsMenuOpen(false); }} className={`w-full rounded-xl px-4 py-3 text-left font-semibold ${activeTab === "review" ? "bg-white/10 text-white" : "text-neutral-400 hover:bg-white/5 hover:text-white"}`}>Manuscript editor</button>}
                 {story && <button type="button" onClick={() => { setActiveTab("memory"); setIsMenuOpen(false); }} className={`w-full rounded-xl px-4 py-3 text-left font-semibold ${activeTab === "memory" ? "bg-white/10 text-white" : "text-neutral-400 hover:bg-white/5 hover:text-white"}`}>Memory</button>}
               </div>
 
