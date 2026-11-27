@@ -1110,7 +1110,8 @@ undone.`,
           sawActive = true;
           backgroundJobRef.current = job.id;
           setBackgroundBusy(true);
-          setBackgroundNotice(`Chapter generation is running in the background (${job.stage}). You can leave this tab or app.`);
+          const editorialStages: Record<string,string> = { editorial: "checking chapter style", editorial_repair: "correcting repeated prose", editorial_verify: "checking the corrections" };
+          setBackgroundNotice(`Chapter generation is running in the background (${editorialStages[job.stage] ?? job.stage}). You can leave this tab or app.`);
         } else {
           // The worker saves into the existing story/draft storage. Reload it
           // before re-enabling autosave, including after returning from mobile.

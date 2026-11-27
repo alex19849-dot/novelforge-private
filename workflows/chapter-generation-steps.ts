@@ -1,4 +1,6 @@
-import { memoryCoverage } from "../lib/narrative-memory";
+import { memoryCoverage, memorySourceHash } from "../lib/narrative-memory";
+import { EDITORIAL_VERSION, editorialPassed, editorialTargets, updateWriterRegions, applyEditorialEdits, reserveEditorialBudget, type EditorialTarget, type EditorialEdit } from '../lib/prose-editorial';
+import { buildEditorialReview, buildEditorialRepair, parseEditorialRepairs, readEditorialReview, executeEditorialCall, editorialLimit, type EditorialContext } from '../lib/prose-editorial-server';
 import { priorProseContext } from '../lib/prose-history';
 import { jobAdmin } from '../lib/social-job-db';
 import type { ChapterJobInput } from '../lib/chapter-job';
@@ -9,7 +11,7 @@ import { POST as writeChapter } from '../app/api/story-chat/write/route';
 import { POST as reviewChapter } from '../app/api/story-chat/quality/route';
 import { POST as ledgerChapter } from '../app/api/story-chat/ledger/route';
 
-type Phase = 'prepare' | 'preledger' | 'plan' | 'write' | 'specialist' | 'quality' | 'ledger' | 'ready';
+type Phase = 'prepare' | 'preledger' | 'plan' | 'write' | 'specialist' | 'editorial' | 'editorial_repair' | 'editorial_verify' | 'quality' | 'ledger' | 'ready';
 type Checkpoint = {
   story: StoryWorkspace;
   pending?: PendingChapterGeneration;
@@ -18,6 +20,7 @@ type Checkpoint = {
   ledgerBatches?: StoryChapter[][];
   ledgerIndex?: number;
   lastGeneratedSection?: string;
+  editorialWork?: { sourceHash: string; contextHash: string; reservedUsd: number; targets: EditorialTarget[]; replacements: Record<string, string>; candidate?: string; edits?: EditorialEdit[] };
   error?: string;
 };
 
@@ -41,6 +44,44 @@ function ledgerBatches(chapters: StoryChapter[], from?: number) {
   return Array.from({ length: Math.ceil(selected.length / 3) }, (_, i) => selected.slice(i * 3, i * 3 + 3));
 }
 
+function editorialContext(state: Checkpoint, input: ChapterJobInput, content = state.pending!.draft): EditorialContext {
+  const pending = state.pending!;
+  const boundary = pending.generatedChapter.kind === 'prologue' ? 0 : pending.generatedChapter.replaceChapterNumber;
+  return { content, chapters: state.story.chapters.filter(c => boundary === null || c.number < boundary), storyBible: state.story.storyBible,
+    storyState: getStoryStateBeforeChapter(state.story.storyState, boundary), chapterBrief: pending.chapterBrief,
+    pov: pending.generatedChapter.povCharacter, authorStyleContext: input.authorStyleContext ?? '' };
+}
+function editorialContextHash(context: EditorialContext): string {
+  const { lastGenerationDiagnostics: _diagnostics, workspaceMetadata: _metadata, authorStyleContext: _style, parkedChapterDrafts: _parked, chapterGuidanceDraft: _guidance, ...state } = context.storyState as StoryWorkspace['storyState'] & { workspaceMetadata?: unknown };
+  const stable = (v: unknown): unknown => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([,x]) => x !== undefined).sort(([a],[b]) => a.localeCompare(b)).map(([k,x]) => [k,stable(x)])) : v;
+  return memorySourceHash(JSON.stringify(stable({ chapters: context.chapters.map(c => [c.number, memorySourceHash(c.content)]), bible: context.storyBible, brief: context.chapterBrief, pov: context.pov, style: context.authorStyleContext, state })));
+}
+function acceptEditorial(state: Checkpoint, input: ChapterJobInput, contextHash: string) {
+  const pending = state.pending!, work = state.editorialWork;
+  const content = work?.candidate ?? pending.draft;
+  let regions = pending.writerRegions ?? [];
+  // Recompute provenance using only the precise bounded replacements.
+  let intermediate = pending.draft;
+  for (const edit of [...(work?.edits ?? [])].sort((a,b) => b.start - a.start)) {
+    const next = intermediate.slice(0,edit.start) + edit.replacement + intermediate.slice(edit.start + edit.original.length);
+    regions = updateWriterRegions(intermediate,next,regions,edit.writer); intermediate = next;
+  }
+  let lastSection = pending.lastSection;
+  if (lastSection && content !== pending.draft) {
+    const start = pending.draft.lastIndexOf(lastSection), end = start + lastSection.length;
+    const edits = work?.edits ?? [];
+    const crossing = edits.some(e => e.start < start && e.start + e.original.length > start || e.start < end && e.start + e.original.length > end);
+    const shift = (offset: number) => edits.filter(e => e.start + e.original.length <= offset).reduce((n,e) => n + e.replacement.length - e.original.length, 0);
+    lastSection = start < 0 || crossing ? undefined : content.slice(start + shift(start), end + shift(end));
+  }
+  state.pending = { ...pending, draft: content, lastSection,
+    writerRegions: regions, writerRegionsSourceHash: memorySourceHash(content), diagnostics: state.diagnostics, savedAt: new Date().toISOString(),
+    automaticEditorial: { version: EDITORIAL_VERSION, status: 'passed', originalHash: work?.sourceHash ?? memorySourceHash(content), checkedHash: memorySourceHash(content), contextHash,
+      edits: work?.edits ?? [], reservedUsd: work?.reservedUsd ?? 0 } };
+  delete state.editorialWork;
+  state.phase = input.operation === 'complete' ? 'quality' : 'ready';
+}
+
 export async function advanceChapterJob(id: string): Promise<boolean> {
   const job = await getJob(id);
   if (job.status !== 'generating') return true;
@@ -48,6 +89,8 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
   const state: Checkpoint = job.checkpoint?.phase ? job.checkpoint : {
     story: input.story, pending: input.pending, phase: 'prepare', diagnostics: input.pending?.diagnostics ?? [],
   };
+  // A deployment can resume a pre-editorial writer checkpoint from the old worker.
+  if (state.phase === 'ready' && state.pending && !state.error && input.operation !== 'memory' && state.lastGeneratedSection && !editorialPassed(state.pending.automaticEditorial,state.pending.draft,editorialContextHash(editorialContext(state,input)))) state.phase = 'editorial';
   console.log('Chapter background stage', id, state.phase);
   if (!['prepare', 'ready'].includes(state.phase)) {
     const { data, error } = await jobAdmin().from('story_generation_jobs').update({ model_call_in_flight: true }).eq('id', id).eq('status', 'generating').eq('model_call_in_flight', false).select('id').maybeSingle();
@@ -75,8 +118,9 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
         } else state.phase = 'plan';
       } else {
         if (!state.pending) throw new Error('A saved chapter draft is required.');
+        if (state.pending.writerRegionsSourceHash !== memorySourceHash(state.pending.draft)) state.pending = { ...state.pending, writerRegions: undefined };
         if (input.operation === 'complete') {
-          state.phase = !state.pending.draft.trim() ? 'write' : state.pending.draft.includes('[[AION_SCENE_') ? 'specialist' : 'quality';
+          state.phase = !state.pending.draft.trim() ? 'write' : state.pending.draft.includes('[[AION_SCENE_') ? 'specialist' : 'editorial';
         } else state.phase = state.pending.draft.includes('[[AION_SCENE_') ? 'specialist' : 'write';
       }
     } else if (state.phase === 'preledger' || state.phase === 'ledger') {
@@ -147,10 +191,52 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       if (specialist && draft === pending.draft.trim()) throw new Error('Aion returned an unchanged chapter draft.');
       state.diagnostics.push(...data.diagnostics);
       state.lastGeneratedSection = specialist || action === 'start' ? draft : section;
-      state.pending = { ...pendingReset(pending), draft, lastSection: state.lastGeneratedSection, repetitionWarnings: data.warnings, diagnostics: state.diagnostics, savedAt: new Date().toISOString() };
-      state.phase = draft.includes('[[AION_SCENE_') ? 'specialist' : 'ready';
+      const aion = specialist || data.diagnostics.some(d => d.provider === 'openrouter' && d.model === 'aion-labs/aion-3.5');
+      state.pending = { ...pendingReset(pending), automaticEditorial: undefined, writerRegions: updateWriterRegions(pending.draft,draft,pending.writerRegions,aion ? 'aion' : 'astra'), writerRegionsSourceHash: memorySourceHash(draft), draft, lastSection: state.lastGeneratedSection, repetitionWarnings: data.warnings, diagnostics: state.diagnostics, savedAt: new Date().toISOString() };
+      delete state.editorialWork;
+      state.phase = draft.includes('[[AION_SCENE_') ? 'specialist' : 'editorial';
+    } else if (state.phase === 'editorial') {
+      const context = editorialContext(state,input), contextHash = editorialContextHash(context);
+      if (editorialPassed(state.pending?.automaticEditorial, context.content, contextHash)) {
+        state.phase = input.operation === 'complete' ? 'quality' : 'ready';
+      } else {
+        const review = buildEditorialReview(context);
+        state.editorialWork = { sourceHash: memorySourceHash(context.content), contextHash, reservedUsd: reserveEditorialBudget(0,review.call.ceilingUsd,editorialLimit()), targets: [], replacements: {} };
+        const report = readEditorialReview(await executeEditorialCall(review.call,state.diagnostics),review.material);
+        state.editorialWork.targets = editorialTargets(context.content,review.material.paragraphs,report,state.pending?.writerRegions);
+        if (!state.editorialWork.targets.length) acceptEditorial(state,input,contextHash);
+        else state.phase = 'editorial_repair';
+      }
+    } else if (state.phase === 'editorial_repair') {
+      const work = state.editorialWork;
+      if (!work || memorySourceHash(state.pending!.draft) !== work.sourceHash) throw Error('The saved draft changed during automatic editing. No replacement was applied.');
+      const remaining = work.targets.filter(t => !Object.hasOwn(work.replacements,t.id));
+      const writer = remaining[0]?.writer;
+      if (!writer) throw Error('The automatic repair checkpoint is incomplete.');
+      const targets = remaining.filter(t => t.writer === writer);
+      const repair = buildEditorialRepair(editorialContext(state,input),targets,writer);
+      work.reservedUsd = reserveEditorialBudget(work.reservedUsd,repair.ceilingUsd,editorialLimit());
+      const replacements = parseEditorialRepairs(await executeEditorialCall(repair,state.diagnostics),targets);
+      work.replacements = { ...work.replacements, ...replacements };
+      if (work.targets.every(t => Object.hasOwn(work.replacements,t.id))) {
+        const result = applyEditorialEdits(state.pending!.draft,work.targets,work.replacements);
+        work.candidate = result.content; work.edits = result.edits;
+        state.phase = 'editorial_verify';
+      }
+    } else if (state.phase === 'editorial_verify') {
+      const work = state.editorialWork;
+      if (!work?.candidate || !work.edits?.length || memorySourceHash(state.pending!.draft) !== work.sourceHash) throw Error('The saved repair could not be verified against its source.');
+      const review = buildEditorialReview(editorialContext(state,input,work.candidate),work.edits);
+      work.reservedUsd = reserveEditorialBudget(work.reservedUsd,review.call.ceilingUsd,editorialLimit());
+      const report = readEditorialReview(await executeEditorialCall(review.call,state.diagnostics),review.material,work.edits);
+      if (report.overflow || report.findings.length || report.preservation.some(p => !p.preserved)) throw Error('The automatic edit did not pass its recheck. The original draft is saved; it has not been marked ready or submitted for another paid rewrite.');
+      acceptEditorial(state,input,work.contextHash);
     } else if (state.phase === 'quality') {
       const pending = state.pending!;
+      // Also covers legacy saved quality checkpoints and the old manual override.
+      if (!editorialPassed(pending.automaticEditorial,pending.draft,editorialContextHash(editorialContext(state,input)))) {
+        state.phase = 'editorial'; await saveCheckpoint(id,state); return false;
+      }
       const override = pending.qualityOverrideReady === true && pending.qualityCheckedDraft === pending.draft;
       if (!override) {
         const data = await readApiJson(await reviewChapter(request({ storyBible: state.story.storyBible, storyState: getStoryStateBeforeChapter(state.story.storyState, pending.generatedChapter.kind === 'prologue' ? 0 : pending.generatedChapter.replaceChapterNumber), chapterBrief: pending.chapterBrief, chapterTitle: pending.generatedChapter.title, povCharacter: pending.generatedChapter.povCharacter, chapterContent: pending.draft, minimumWordCount: pending.minimumWordCount, maximumWordCount: pending.maximumWordCount })));
@@ -199,6 +285,7 @@ export async function finishChapterJob(id: string) {
   const job = await getJob(id);
   if (job.status !== 'generating') return;
   const state = job.checkpoint as Checkpoint;
+  if (!state.error && state.pending && (state.lastGeneratedSection || (job.input as ChapterJobInput).operation === 'complete') && !editorialPassed(state.pending.automaticEditorial,state.pending.draft,editorialContextHash(editorialContext(state,job.input as ChapterJobInput)))) throw Error('The chapter has not passed automatic editing. Its draft is saved, but it is not ready.');
   // Recovery copies are workspace metadata, not prose/continuity input.
   const parked = (job.input as ChapterJobInput).story.storyState.parkedChapterDrafts;
   if (parked && !state.story.storyState.parkedChapterDrafts) state.story = { ...state.story, storyState: { ...state.story.storyState, parkedChapterDrafts: parked } };

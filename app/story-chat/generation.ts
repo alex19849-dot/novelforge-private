@@ -1,4 +1,5 @@
 import type { ChapterPlan, GenerationDiagnostic, StoryBible, StoryChapter, StoryChatResponse, StoryState, StoryWorkspace } from "./types";
+import type { EditorialReceipt, WriterRegion } from '../../lib/prose-editorial';
 
 export type PendingChapterGeneration = {
   storyId: string;
@@ -16,6 +17,10 @@ export type PendingChapterGeneration = {
   qualityOverrideReady?: boolean;
   qualityTechnicalError?: string;
   diagnostics?: GenerationDiagnostic[];
+  /** Server-generated check receipt and reversible, bounded edits. Never author-style evidence. */
+  automaticEditorial?: EditorialReceipt;
+  writerRegions?: WriterRegion[];
+  writerRegionsSourceHash?: string;
 };
 
 export type SectionAction = "start" | "continue" | "rewrite";
@@ -599,6 +604,7 @@ export function applyGeneratedChapter(
                 povCharacter:
                   chapterMetadata.povCharacter.trim() || chapter.povCharacter,
                 content: content.trim(),
+                automaticEditorial: pending.automaticEditorial,
                 updatedAt: now,
               }
             : chapter,
@@ -619,6 +625,7 @@ export function applyGeneratedChapter(
         title: chapterMetadata.title.trim() || `Chapter ${nextChapterNumber}`,
         povCharacter: chapterMetadata.povCharacter.trim(),
         content: content.trim(),
+        automaticEditorial: pending.automaticEditorial,
         createdAt: now,
         updatedAt: now,
       },

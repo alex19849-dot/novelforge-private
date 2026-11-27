@@ -57,6 +57,7 @@ export type StoryChapter = {
   content: string;
   createdAt: string;
   updatedAt: string;
+  automaticEditorial?: import('../../lib/prose-editorial').EditorialReceipt;
 };
 
 export type ChapterLedgerEntry = {
