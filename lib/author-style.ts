@@ -15,7 +15,17 @@ export function cleanStyleRules(value: unknown): StyleRule[] {
 export function styleContext(profile: Pick<StyleProfile,'rules'>): string {
   const rules = cleanStyleRules(profile.rules).filter(r => r.status === 'approved').slice(0,16);
   if (!rules.length) return '';
-  return 'AUTHOR-APPROVED WRITING PREFERENCES, shared across books\nApply these as style guidance, not story facts, character knowledge or additional events. Current deliberate author directions and established individual character voices take precedence. Preserve substantial inner thoughts, feelings, attraction, emotional contradictions and all requested heat and scene detail. Do not turn tightening into removing interiority or shortening intimate scenes.\n' + rules.map(r => '- ' + r.instruction).join('\n');
+  return 'AUTHOR WRITING PREFERENCES, shared across books\nApply these as style guidance, not story facts, character knowledge or additional events. Current deliberate author directions and established individual character voices take precedence. Preserve substantial inner thoughts, feelings, attraction, emotional contradictions and all requested heat and scene detail. Do not turn tightening into removing interiority or shortening intimate scenes.\n' + rules.map(r => '- ' + r.instruction).join('\n');
+}
+// Activation is an application decision based on saved corrections, not another model call.
+export function activateSupportedStyleRules(rules: StyleRule[], eligibleIds: Set<string>): StyleRule[] {
+  let slots = Math.max(0, 16 - rules.filter(r => r.status === 'approved').length);
+  return rules.map(rule => {
+    const evidence = [...new Set(rule.evidenceIds)];
+    if (rule.status !== 'suggested' || !slots || evidence.length < 2 || !evidence.every(id => eligibleIds.has(id))) return rule;
+    slots--;
+    return { ...rule, status: 'approved' as const };
+  });
 }
 export function changedStylePassage(before: string, after: string) {
   if (before === after) return null;

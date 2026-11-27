@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { jobAdmin } from '../../../../lib/social-job-db';
 import { styleUser, loadStyleProfile } from '../../../../lib/author-style-server';
 import { memorySourceHash, narrativeContext } from '../../../../lib/narrative-memory';
-import { STYLE_MODEL, STYLE_OUTPUT_LIMIT, cleanStyleRules, stylePrompt, styleQuote, groundedStyleSuggestions, groundedStyleFindings, type StyleEdit } from '../../../../lib/author-style';
+import { STYLE_MODEL, STYLE_OUTPUT_LIMIT, cleanStyleRules, activateSupportedStyleRules, stylePrompt, styleQuote, groundedStyleSuggestions, groundedStyleFindings, type StyleEdit } from '../../../../lib/author-style';
 export const runtime='nodejs';
 export const maxDuration=180;
 const json=(v:unknown,status=200)=>NextResponse.json(v,{status,headers:{'Cache-Control':'no-store'}});
@@ -46,6 +46,20 @@ export async function POST(request:Request){
     const {error:initError}=await db.from('author_style_profiles').upsert({user_id:user.id},{onConflict:'user_id',ignoreDuplicates:true});
     if(initError)throw new Error('Your writing style profile could not be opened.');
     profile=await loadStyleProfile(user.id);
+    if(body.action==='sync_preferences'){
+      const candidates=profile.rules.filter(r=>r.status==='suggested');
+      if(!candidates.length||profile.rules.filter(r=>r.status==='approved').length>=16)return json({activated:0});
+      const ids=[...new Set(candidates.flatMap(r=>r.evidenceIds))];
+      if(!ids.length)return json({activated:0});
+      const {data:evidence,error:evidenceError}=await db.from('author_style_edits').select('id').eq('user_id',user.id).neq('status','ignored').in('id',ids);
+      if(evidenceError)throw new Error('Saved preference evidence could not be checked.');
+      const rules=activateSupportedStyleRules(profile.rules,new Set((evidence??[]).map(e=>e.id)));
+      const activated=rules.filter((r,i)=>r.status==='approved'&&profile.rules[i].status==='suggested').length;
+      if(!activated)return json({activated:0});
+      const {data,error}=await db.from('author_style_profiles').update({rules,revision:profile.revision+1}).eq('user_id',user.id).eq('revision',profile.revision).select('revision').maybeSingle();
+      if(error||!data)return json({error:'Preferences changed while updating. Refresh to load the latest version.'},409);
+      return json({activated});
+    }
     if(body.action==='settings'||body.action==='rule'){
       if(body.revision!==profile.revision)return json({error:'Preferences changed on another device. Reload them first.'},409);
       let rules=profile.rules;let enabled=profile.enabled;
@@ -103,13 +117,15 @@ export async function POST(request:Request){
     const {data:stillPending,error:evidenceError}=await db.from('author_style_edits').select('id').eq('user_id',user.id).eq('status','pending').in('id',edits.map(e=>e.id));
     if(evidenceError)throw new Error('Correction evidence could not be rechecked.');
     const eligible=new Set((stillPending??[]).map(e=>e.id));
-    const next=suggestions.filter(r=>r.evidenceIds.every(id=>eligible.has(id))&&!existing.some(e=>e.instruction.toLowerCase()===r.instruction.toLowerCase()));
-    const {data:stored,error:saveError}=await db.from('author_style_profiles').update({rules:[...existing,...next].slice(0,60),revision:latest.revision+1}).eq('user_id',user.id).eq('lock_id',lease).eq('revision',latest.revision).select('revision').maybeSingle();
+    const next=suggestions.filter(r=>r.evidenceIds.every(id=>eligible.has(id))&&!existing.some(e=>e.instruction.toLowerCase()===r.instruction.toLowerCase())).slice(0,Math.max(0,60-existing.length));
+    const rules=activateSupportedStyleRules([...existing,...next].slice(0,60),eligible);
+    const learned=next.filter(r=>rules.some(saved=>saved.id===r.id&&saved.status==='approved')).length;
+    const {data:stored,error:saveError}=await db.from('author_style_profiles').update({rules,revision:latest.revision+1}).eq('user_id',user.id).eq('lock_id',lease).eq('revision',latest.revision).select('revision').maybeSingle();
     if(saveError||!stored)throw new Error('The preferences could not be saved. No automatic retry was started.');
     const used=[...new Set(next.flatMap(r=>r.evidenceIds))];
     if(used.length){const {error:markError}=await db.from('author_style_edits').update({status:'analysed'}).eq('user_id',user.id).in('id',used).eq('status','pending');
     if(markError)throw new Error('Suggestions were saved, but some evidence is still pending. Reload before analysing again.');}
-    return json({suggestions:next.length,diagnostic});
+    return json({suggestions:next.length,activated:learned,deferred:next.length-learned,diagnostic});
   }catch(e){return json({error:e instanceof Error&&e.name==='TimeoutError'?'The analyst timed out. No automatic retry was started.':e instanceof Error?e.message:'Style analysis failed.',diagnostic},502);}
   finally{if(lease)await db.from('author_style_profiles').update({lock_id:null,lock_until:null}).eq('user_id',user.id).eq('lock_id',lease);}
 }
