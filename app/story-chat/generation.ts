@@ -22,7 +22,7 @@ export type PendingChapterGeneration = {
   writerRegions?: WriterRegion[];
   writerRegionsSourceHash?: string;
   authorProtection?: import('../../lib/author-prose-protection').AuthorProtection;
-  editorialReviewRecovery?: { sourceHash: string; contextHash: string; report: unknown; reservedUsd: number; repair?: { targets: import('../../lib/prose-editorial').EditorialTarget[]; replacements: Record<string,string>; reservedUsd: number } };
+  editorialReviewRecovery?: { sourceHash: string; contextHash: string; report: unknown; reservedUsd: number; repair?: { targets: import('../../lib/prose-editorial').EditorialTarget[]; replacements: Record<string,string>; reservedUsd: number }; rejectedVerification?: { candidateHash: string; reason: string; reservedUsd: number } };
 };
 
 export type SectionAction = "start" | "continue" | "rewrite";

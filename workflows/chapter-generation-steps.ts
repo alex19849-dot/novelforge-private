@@ -85,6 +85,12 @@ function acceptEditorial(state: Checkpoint, input: ChapterJobInput, contextHash:
   delete state.editorialWork;
   state.phase = input.operation === 'complete' ? 'quality' : 'ready';
 }
+function retainOriginalAfterInvalidReport(state: Checkpoint, input: ChapterJobInput, contextHash: string, reason: string) {
+  // Reject the model's ungrounded output, not the author's current chapter.
+  // No proposal is applied, no clean pass claimed, and no paid retry started.
+  if (state.editorialWork) { delete state.editorialWork.candidate; state.editorialWork.edits=[]; }
+  acceptEditorial(state,input,contextHash,[{ id:'unusable_editorial_report',reason }]);
+}
 
 export async function advanceChapterJob(id: string): Promise<boolean> {
   const job = await getJob(id);
@@ -209,24 +215,36 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
         const recovery = state.pending?.editorialReviewRecovery;
         const reusable = recovery?.sourceHash === sourceHash && recovery.contextHash === contextHash;
         state.editorialWork = { sourceHash, contextHash, reservedUsd: reusable ? recovery.reservedUsd : reserveEditorialBudget(0,review.call.ceilingUsd,editorialLimit()), targets: [], replacements: {} };
-        const raw = reusable ? recovery.report : await executeEditorialCall(review.call,state.diagnostics);
-        const previousCheck = state.diagnostics.at(-1);
-        if (!reusable) state.editorialWork.reservedUsd = reconcileEditorialCost(state.editorialWork.reservedUsd,review.call.ceilingUsd,previousCheck?.costUsd);
-        else if (previousCheck?.stage === 'automatic_prose_check' && typeof previousCheck.costUsd === 'number' && previousCheck.costUsd >= 0 && previousCheck.costUsd <= recovery.reservedUsd) state.editorialWork.reservedUsd = previousCheck.costUsd;
-        // Retain an unusable report too, so an address-format fix can validate
-        // it later without billing the analyst again for unchanged source.
-        state.pending = { ...state.pending!, editorialReviewRecovery: { sourceHash, contextHash, report: raw, reservedUsd: state.editorialWork.reservedUsd } };
-        const report = readEditorialReview(raw,review.material);
-        state.editorialWork.targets = editorialTargets(context.content,review.material.paragraphs,report,state.pending?.writerRegions,state.pending?.authorProtection);
-        const savedRepair = reusable ? recovery.repair : undefined;
-        if (savedRepair && Array.isArray(savedRepair.targets) && savedRepair.targets.length === state.editorialWork.targets.length && state.editorialWork.targets.every(t => savedRepair.targets.some(old => old.id === t.id && old.start === t.start && old.end === t.end && old.original === t.original && old.writer === t.writer))) {
-          // Reuse paid replacements only against the identical checked source,
-          // context, protected ranges and recomputed repair ownership.
-          state.editorialWork.replacements = { ...savedRepair.replacements };
-          state.editorialWork.reservedUsd = savedRepair.reservedUsd;
+        if (reusable && recovery.rejectedVerification?.candidateHash) {
+          state.editorialWork.reservedUsd=recovery.rejectedVerification.reservedUsd;
+          retainOriginalAfterInvalidReport(state,input,contextHash,recovery.rejectedVerification.reason);
+        } else {
+          const raw = reusable ? recovery.report : await executeEditorialCall(review.call,state.diagnostics);
+          const previousCheck = state.diagnostics.at(-1);
+          if (!reusable) state.editorialWork.reservedUsd = reconcileEditorialCost(state.editorialWork.reservedUsd,review.call.ceilingUsd,previousCheck?.costUsd);
+          else if (previousCheck?.stage === 'automatic_prose_check' && typeof previousCheck.costUsd === 'number' && previousCheck.costUsd >= 0 && previousCheck.costUsd <= recovery.reservedUsd) state.editorialWork.reservedUsd = previousCheck.costUsd;
+          // Retain an unusable report too, so an address-format fix can validate
+          // it later without billing the analyst again for unchanged source.
+          state.pending = { ...state.pending!, editorialReviewRecovery: { ...(reusable ? recovery : {}),sourceHash, contextHash, report: raw, reservedUsd: state.editorialWork.reservedUsd } };
+          let report: ReturnType<typeof readEditorialReview> | undefined;
+          try {
+            report = readEditorialReview(raw,review.material);
+            state.editorialWork.targets = editorialTargets(context.content,review.material.paragraphs,report,state.pending?.writerRegions,state.pending?.authorProtection);
+          } catch (error) {
+            retainOriginalAfterInvalidReport(state,input,contextHash,error instanceof Error ? error.message : 'The editorial report could not be verified.');
+          }
+          if (state.editorialWork && report) {
+            const savedRepair = reusable ? recovery.repair : undefined;
+            if (savedRepair && Array.isArray(savedRepair.targets) && savedRepair.targets.length === state.editorialWork.targets.length && state.editorialWork.targets.every(t => savedRepair.targets.some(old => old.id === t.id && old.start === t.start && old.end === t.end && old.original === t.original && old.writer === t.writer))) {
+              // Reuse paid replacements only against the identical checked source,
+              // context, protected ranges and recomputed repair ownership.
+              state.editorialWork.replacements = { ...savedRepair.replacements };
+              state.editorialWork.reservedUsd = savedRepair.reservedUsd;
+            }
+            if (!state.editorialWork.targets.length) acceptEditorial(state,input,contextHash);
+            else state.phase = 'editorial_repair';
+          }
         }
-        if (!state.editorialWork.targets.length) acceptEditorial(state,input,contextHash);
-        else state.phase = 'editorial_repair';
       }
     } else if (state.phase === 'editorial_repair') {
       const work = state.editorialWork;
@@ -260,11 +278,15 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       work.reservedUsd = reserveEditorialBudget(work.reservedUsd,review.call.ceilingUsd,editorialLimit());
       const raw = await executeEditorialCall(review.call,state.diagnostics);
       work.reservedUsd = reconcileEditorialCost(work.reservedUsd,review.call.ceilingUsd,state.diagnostics.at(-1)?.costUsd);
-      const report = readEditorialReview(raw,review.material,work.edits);
-      const unresolved = new Set(editorialTargets(work.candidate,review.material.paragraphs,report,[],context.authorProtection).flatMap(t => t.findings.map(f => f.id)));
-      const result = verifiedEditorialEdits(state.pending!.draft,work.targets.filter(t=>work.edits!.some(e=>e.id===t.id)),work.replacements,work.candidate,work.edits,{ ...report,findings:report.findings.filter(f=>unresolved.has(f.id)) },state.pending!.authorProtection);
-      work.candidate=result.content; work.edits=result.edits;
-      acceptEditorial(state,input,work.contextHash,[...(work.retained ?? []),...result.retained]);
+      try {
+        const report = readEditorialReview(raw,review.material,work.edits);
+        const unresolved = new Set(editorialTargets(work.candidate,review.material.paragraphs,report,[],context.authorProtection).flatMap(t => t.findings.map(f => f.id)));
+        const result = verifiedEditorialEdits(state.pending!.draft,work.targets.filter(t=>work.edits!.some(e=>e.id===t.id)),work.replacements,work.candidate,work.edits,{ ...report,findings:report.findings.filter(f=>unresolved.has(f.id)) },state.pending!.authorProtection);
+        work.candidate=result.content; work.edits=result.edits;
+        acceptEditorial(state,input,work.contextHash,[...(work.retained ?? []),...result.retained]);
+      } catch (error) {
+        retainOriginalAfterInvalidReport(state,input,work.contextHash,error instanceof Error ? error.message : 'The correction check could not be verified.');
+      }
     } else if (state.phase === 'quality') {
       const pending = state.pending!;
       // Also covers legacy saved quality checkpoints and the old manual override.

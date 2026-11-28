@@ -210,8 +210,21 @@ function harness(input, options={}) {
   h=harness({operation:'complete',story,pending:{...pending,draft:authoredDraft,authorProtection}},{report:authorReport,replacement:()=>replacement});
   await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'completed');assert.equal(h.row.result.pending.draft,replacement+'\n\n'+authorText);assert.equal(h.row.result.pending.authorProtection.ranges[0].text,authorText);assert.equal(h.calls.filter(c=>c.includes('repair')).length,1);
   h=harness({operation:'complete',story,pending:{...pending,draft:original}},{report:args=>({...report(args),findings:[{id:'bad',category:'sentence_pattern',paragraphIds:['p999'],evidence:[{sourceId:'p1',quote:original}],reason:'Bad address.',direction:'Do not guess.'}]})});
-  await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'failed');assert(h.row.result.pending.editorialReviewRecovery);const recover=clone(h.row.result.pending);
-  h=harness({operation:'complete',story,pending:recover});await h.workflow.generateChapterJob('job');assert.deepEqual(h.calls,[],'An unchanged malformed report is retained, not bought again');assert.equal(h.row.result.pending.draft,original);
+  await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'completed');assert.equal(h.row.result.pending.automaticEditorial.status,'checked_with_issues');assert.equal(h.row.result.pending.draft,original);const recover=clone(h.row.result.pending);
+  h=harness({operation:'complete',story,pending:recover});await h.workflow.generateChapterJob('job');assert.deepEqual(h.calls,['ledger'],'An unchanged rejected report is not bought again');assert.equal(h.row.result.story.chapters[0].content,original);
+  // A final checker can return invented quotations or omit preservation IDs.
+  // Neither is permission to apply corrections or to fail the whole chapter.
+  for (const badVerification of ['quote','preservation']) {
+    h=harness({operation:'write',action:'start',story,pending},{prose:authoredDraft,report:args=>{const r=authorReport(args);if(args.reviewCount>1){if(badVerification==='quote')r.findings=[{id:'bad',category:'sentence_pattern',paragraphIds:['p1'],evidence:[{sourceId:'p1',quote:'This quote does not exist in the manuscript.'}],reason:'Bad evidence.',direction:'Never apply.'}];else r.preservation=[];}return r;},replacement:()=>replacement});
+    // Protect the deliberate paragraph even though new writer output is mocked.
+    await h.steps.advanceChapterJob('job');await h.steps.advanceChapterJob('job');
+    h.row.checkpoint.pending.authorProtection=authorProtection;
+    await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'completed');assert.equal(h.row.result.pending.draft,authoredDraft);assert.equal(h.row.result.pending.automaticEditorial.status,'checked_with_issues');assert.equal(h.row.result.pending.automaticEditorial.edits.length,0);assert.equal(h.row.result.pending.authorProtection.ranges[0].text,authorText);
+    assert.equal(h.calls.filter(c=>c==='automatic_prose_recheck').length,1);assert.equal(h.calls.filter(c=>c.includes('repair')).length,1);
+  }
+  const legacyRejected=clone(paidRecovery);
+  legacyRejected.editorialReviewRecovery.rejectedVerification={candidateHash:'known-rejected-candidate',reason:'The editorial finding has no matching manuscript evidence.',reservedUsd:.01};
+  h=harness({operation:'complete',story,pending:legacyRejected});await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'completed');assert.deepEqual(h.calls,['quality'],'The already-paid invalid final check must not be bought again');assert.equal(h.row.result.pending.draft,repeatedReply);assert.equal(h.row.result.pending.automaticEditorial.status,'checked_with_issues');
   process.env.NOVELFORGE_AUTO_EDIT_MAX_USD='0.000001';
   h=harness({operation:'write',action:'start',story,pending});await h.workflow.generateChapterJob('job');assert.deepEqual(h.calls,['write'],'A cost rejection must happen before a model submission');assert.equal(h.row.status,'failed');delete process.env.NOVELFORGE_AUTO_EDIT_MAX_USD;
   console.log('PASS: browser-independent plan/write/specialist chain, checkpointed progress, failed-call draft recovery, resumed handoff, accepted-draft completion, no automatic paid replay and concurrent-edit fingerprints.');

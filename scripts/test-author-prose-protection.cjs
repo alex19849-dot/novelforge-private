@@ -52,6 +52,9 @@ async function submit(content,protection,extra={}){inserted=undefined;return api
  assert.deepEqual(inserted.input.pending.editorialReviewRecovery.repair.replacements,savedWork.replacements);
  const query=queries.at(-1);assert(query.filters.some(([k,v])=>k==='user_id'&&v===owner));assert(query.filters.some(([k,v])=>k==='story_id'&&v===storyId));
  assert(query.filters.some(([k,v])=>k==='checkpoint->editorialWork->>sourceHash'&&v===sourceHash));assert(query.filters.some(([k,v])=>k==='checkpoint->editorialWork->>contextHash'&&v==='exact-context'));
+ repairHistory=[{draft:after,work:{...savedWork,candidate:'Unverified candidate.'},error_message:'The editorial finding has no matching manuscript evidence.'}];
+ assert.equal((await submit(after,protectedText,{...extra,diagnostics:[{stage:'automatic_prose_recheck'}]})).status,202);
+ assert.equal(inserted.input.pending.editorialReviewRecovery.rejectedVerification.reason,'The editorial finding has no matching manuscript evidence.');
  repairHistory=[{draft:after+'Changed.',work:savedWork}];
  assert.equal((await submit(after,protectedText,extra)).status,202);assert.equal(inserted.input.pending.editorialReviewRecovery.repair,undefined,'A changed source never receives an old paid repair');
  console.log('PASS: manual edits, accepted rewrites and undo protected verbatim; deletion joins, continuation and neighbouring automatic edits; overlapping/disjoint findings; legacy owner-scoped baseline recovery and no baseline guessing. No live model/database calls.');

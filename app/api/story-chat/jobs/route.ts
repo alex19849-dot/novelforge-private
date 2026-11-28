@@ -59,12 +59,13 @@ export async function POST(request: Request) {
       input.pending.authorProtection = protectAuthorChanges(typeof source?.baseline === 'string' ? source.baseline : '',input.pending.draft);
     }
     input.authorStyleContext = await approvedStyleFor(user.id);
-    if (input.operation === 'complete' && input.pending?.editorialReviewRecovery && !input.pending.editorialReviewRecovery.repair && input.pending.diagnostics?.at(-1)?.stage?.startsWith('automatic_prose_repair_')) {
+    const lastEditorialStage=input.pending?.diagnostics?.at(-1)?.stage;
+    if (input.operation === 'complete' && input.pending?.editorialReviewRecovery && !input.pending.editorialReviewRecovery.repair && (lastEditorialStage?.startsWith('automatic_prose_repair_') || lastEditorialStage==='automatic_prose_recheck')) {
       // Older failed jobs saved the paid replacements in the checkpoint, but
       // did not expose them to the client. Recover metadata, never old prose.
       const recovery=input.pending.editorialReviewRecovery;
       const { data: previous,error: recoveryError } = await db.from('story_generation_jobs')
-        .select('work:checkpoint->editorialWork,draft:checkpoint->pending->>draft')
+        .select('work:checkpoint->editorialWork,draft:checkpoint->pending->>draft,error_message')
         .eq('story_id',input.story.id).eq('user_id',user.id)
         .eq('checkpoint->editorialWork->>sourceHash',memorySourceHash(input.pending.draft))
         .eq('checkpoint->editorialWork->>contextHash',recovery.contextHash)
@@ -74,6 +75,11 @@ export async function POST(request: Request) {
       const work=saved?.work && typeof saved.work==='object' && !Array.isArray(saved.work) ? saved.work : null;
       if (saved?.draft===input.pending.draft && work?.sourceHash===recovery.sourceHash && work.contextHash===recovery.contextHash && Array.isArray(work.targets) && work.replacements && typeof work.replacements==='object' && !Array.isArray(work.replacements) && Object.values(work.replacements).every(r=>typeof r==='string') && typeof work.reservedUsd==='number' && Number.isFinite(work.reservedUsd) && work.reservedUsd>=0) {
         input.pending.editorialReviewRecovery={ ...recovery,repair:{ targets:work.targets as unknown as import('../../../../lib/prose-editorial').EditorialTarget[],replacements:work.replacements as Record<string,string>,reservedUsd:work.reservedUsd } };
+        // An old completed recheck with invalid source evidence cannot certify
+        // corrections. Keep today's draft; never purchase that recheck again.
+        if (lastEditorialStage==='automatic_prose_recheck' && typeof work.candidate==='string' && saved.error_message==='The editorial finding has no matching manuscript evidence.') {
+          input.pending.editorialReviewRecovery.rejectedVerification={ candidateHash:memorySourceHash(work.candidate),reason:saved.error_message,reservedUsd:work.reservedUsd };
+        }
       }
     }
     const { error: insertError } = await db.from('story_generation_jobs').insert({ id: body.id, story_id: input.story.id, user_id: user.id, input, source_updated_at: saved.updated_at, status: 'generating' });
