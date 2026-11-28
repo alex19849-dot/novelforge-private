@@ -34,14 +34,25 @@ const page=fs.readFileSync('app/story-chat/page.tsx','utf8');assert(page.include
 const owner='11111111-1111-4111-8111-111111111111',storyId='22222222-2222-4222-8222-222222222222',jobId='33333333-3333-4333-8333-333333333333';
 const metadata={title:'Chapter 1',povCharacter:'Sam',kind:'chapter',replaceChapterNumber:null,content:''};
 const story={id:storyId,title:'Test',storyBible:{},chapters:[],storyState:{},messages:[]};
-let history=[{baseline:before,chapter:metadata}],inserted,queries=[],starts=0;
-const db={from(table){const filters=[],q={select(s){q.selection=s;return q;},eq(k,v){filters.push([k,v]);return q;},in(k,v){filters.push([k,v]);return q;},order(){return q;},limit:async()=>{queries.push({table,selection:q.selection,filters});return{data:history,error:null};},update(){return q;},is(){return q;},insert(v){inserted=v;return q;},single:async()=>({data:{form:{},chapters:[],story_state:{},updated_at:'now'},error:null}),maybeSingle:async()=>({data:null,error:null}),then(ok,no){return Promise.resolve({data:inserted??null,error:null}).then(ok,no);}};return q;}};
+let history=[{baseline:before,chapter:metadata}],repairHistory=[],inserted,queries=[],starts=0;
+const db={from(table){const filters=[],q={select(s){q.selection=s;return q;},eq(k,v){filters.push([k,v]);return q;},in(k,v){filters.push([k,v]);return q;},order(){return q;},limit:async()=>{queries.push({table,selection:q.selection,filters});return{data:q.selection.startsWith('work:')?repairHistory:history,error:null};},update(){return q;},is(){return q;},insert(v){inserted=v;return q;},single:async()=>({data:{form:{},chapters:[],story_state:{},updated_at:'now'},error:null}),maybeSingle:async()=>({data:null,error:null}),then(ok,no){return Promise.resolve({data:inserted??null,error:null}).then(ok,no);}};return q;}};
 const api=load('app/api/story-chat/jobs/route.ts',{'../../../../lib/author-style-server':{approvedStyleFor:async()=>''},'@supabase/supabase-js':{createClient:()=>({auth:{getUser:async()=>({data:{user:{id:owner}},error:null})}})},'next/server':{NextResponse:{json:(v,o)=>new Response(JSON.stringify(v),{status:o?.status??200})}},'../../../../lib/background-queue':{startBackground:async()=>{starts++;return{runId:'queue:test'};},backgroundStatus:async()=>''},'../../../../lib/social-job-db':{jobAdmin:()=>db}});
-async function submit(content,protection){inserted=undefined;return api.POST(new Request('http://test',{method:'POST',headers:{authorization:'Bearer owner','Content-Type':'application/json'},body:JSON.stringify({id:jobId,input:{operation:'complete',story,pending:{storyId,generatedChapter:metadata,chapterBrief:'{}',draft:content,authorProtection:protection}},sourceFingerprint:load('lib/chapter-job.ts').chapterSourceFingerprint(story)})}));}
+async function submit(content,protection,extra={}){inserted=undefined;return api.POST(new Request('http://test',{method:'POST',headers:{authorization:'Bearer owner','Content-Type':'application/json'},body:JSON.stringify({id:jobId,input:{operation:'complete',story,pending:{storyId,generatedChapter:metadata,chapterBrief:'{}',draft:content,authorProtection:protection,...extra}},sourceFingerprint:load('lib/chapter-job.ts').chapterSourceFingerprint(story)})}));}
 (async()=>{
  assert.equal((await submit(after)).status,202);assert.equal(inserted.input.pending.authorProtection.ranges[0].text,'My own revised thought belongs here.');assert.equal(inserted.input.pending.draft,after);
  assert(queries[0].filters.some(([k,v])=>k==='user_id'&&v===owner));assert(queries[0].filters.some(([k,v])=>k==='story_id'&&v===storyId));assert.equal(queries[0].selection,'baseline:checkpoint->pending->>draft,chapter:checkpoint->pending->generatedChapter');
  const count=queries.length;assert.equal((await submit(after,protectedText)).status,202);assert.equal(queries.length,count,'New clients with valid author locks do not need a history read');
  history=[];assert.equal((await submit(after)).status,202);assert.equal(inserted.input.pending.authorProtection.ranges.length,3);assert.equal(starts,3);
+ const sourceHash=load('lib/narrative-memory.ts').memorySourceHash(after);
+ const recovery={sourceHash,contextHash:'exact-context',report:{findings:[]},reservedUsd:.01};
+ const savedWork={sourceHash,contextHash:'exact-context',targets:[{id:'f1',original:'Known source.'}],replacements:{f1:'Known correction.'},reservedUsd:.02};
+ repairHistory=[{draft:after,work:savedWork}];
+ const extra={editorialReviewRecovery:recovery,diagnostics:[{stage:'automatic_prose_repair_astra'}]};
+ assert.equal((await submit(after,protectedText,extra)).status,202);
+ assert.deepEqual(inserted.input.pending.editorialReviewRecovery.repair.replacements,savedWork.replacements);
+ const query=queries.at(-1);assert(query.filters.some(([k,v])=>k==='user_id'&&v===owner));assert(query.filters.some(([k,v])=>k==='story_id'&&v===storyId));
+ assert(query.filters.some(([k,v])=>k==='checkpoint->editorialWork->>sourceHash'&&v===sourceHash));assert(query.filters.some(([k,v])=>k==='checkpoint->editorialWork->>contextHash'&&v==='exact-context'));
+ repairHistory=[{draft:after+'Changed.',work:savedWork}];
+ assert.equal((await submit(after,protectedText,extra)).status,202);assert.equal(inserted.input.pending.editorialReviewRecovery.repair,undefined,'A changed source never receives an old paid repair');
  console.log('PASS: manual edits, accepted rewrites and undo protected verbatim; deletion joins, continuation and neighbouring automatic edits; overlapping/disjoint findings; legacy owner-scoped baseline recovery and no baseline guessing. No live model/database calls.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

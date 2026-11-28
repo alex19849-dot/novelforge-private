@@ -179,9 +179,29 @@ function harness(input, options={}) {
   const edited={...checkedPending,draft:replacement+' Manual change.'};
   h=harness({operation:'complete',story,pending:edited});await h.workflow.generateChapterJob('job');assert(h.calls.includes('automatic_prose_check'),'A manual edit invalidates the old check');
   h=harness({operation:'write',action:'start',story,pending},{prose:original,report:args=>{const r=report(args);if(args.reviewCount>1)r.preservation[0].preserved=false;return r;},replacement:()=>replacement});
-  await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'failed');assert.equal(h.row.result.pending.draft,original,'A destructive repair must never replace the original');assert.equal(h.row.result.pending.automaticEditorial,undefined);assert.equal(h.calls.filter(c=>c.includes('repair')).length,1);
+  await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'completed');assert.equal(h.row.result.pending.draft,original,'A destructive repair must never replace the original');assert.equal(h.row.result.pending.automaticEditorial.status,'checked_with_issues');assert.equal(h.row.result.pending.automaticEditorial.edits.length,0);assert.equal(h.calls.filter(c=>c.includes('repair')).length,1);
   h=harness({operation:'write',action:'start',story,pending},{prose:original,report:args=>report({...args,reviewCount:1}),replacement:()=>replacement});
-  await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'failed');assert.equal(h.row.result.pending.draft,original,'Unresolved repetition does not get marked ready');
+  await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'completed');assert.equal(h.row.result.pending.draft,original,'An unresolved replacement keeps the original without blocking completion');assert.equal(h.row.result.pending.automaticEditorial.status,'checked_with_issues');
+  // Recover already-paid corrections, then verify once without rebuying the
+  // analyst report or writer batch. Even very short replies may be tightened.
+  const repeatedReply='“Eight. At eight. Eight sharp.”';
+  h=harness({operation:'complete',story,pending:{...pending,draft:repeatedReply}},{report,replacement:()=> '“Eight.”'});
+  await h.steps.advanceChapterJob('job');await h.steps.advanceChapterJob('job');await h.steps.advanceChapterJob('job');
+  assert.equal(h.row.checkpoint.phase,'editorial_verify');assert(h.row.checkpoint.pending.editorialReviewRecovery.repair);
+  const paidRecovery=clone(h.row.checkpoint.pending);
+  h=harness({operation:'complete',story,pending:paidRecovery},{report:args=>report({...args,reviewCount:2})});
+  await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'completed');assert.equal(h.row.result.pending.draft,'“Eight.”');
+  assert.deepEqual(h.calls,['automatic_prose_recheck','quality'],'Retained corrections need only preservation verification, never another initial check/writer');
+  // If one original writer loses detail, retain that passage and keep the
+  // other writer's verified correction; no new repair or approval round.
+  h=harness({operation:'generate',story},{markers:true,mainProse:original+'\n\n[[AION_SCENE_1]]\n\n[[AION_SCENE_2]]',firstFilledProse:original+'\n\n'+intimate+'\n\n[[AION_SCENE_2]]',filledProse:combined,report:args=>{const r=mixedReport(args);if(args.reviewCount>1)r.preservation.find(p=>p.id==='f2').preserved=false;return r;},replacement:t=>t.id==='f1'?replacement:'He leans in.'});
+  await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'completed');assert.equal(h.row.result.pending.draft,replacement+'\n\n'+intimate+'\n\nHis hand drops. He steps back.');
+  assert.equal(h.row.result.pending.automaticEditorial.status,'checked_with_issues');assert.deepEqual(h.row.result.pending.automaticEditorial.edits.map(e=>e.id),['f1']);
+  const retainedPending=clone(h.row.result.pending);
+  assert(!load('lib/prose-editorial.ts').editorialPassed(retainedPending.automaticEditorial,retainedPending.draft),'Partial checks must never claim a clean pass');
+  assert(load('lib/prose-editorial.ts').editorialProcessed(retainedPending.automaticEditorial,retainedPending.draft));
+  assert.equal(load('lib/prose-editorial.ts').restoreEditorialOriginal(retainedPending.draft,retainedPending.automaticEditorial),combined);
+  h=harness({operation:'complete',story,pending:retainedPending});await h.workflow.generateChapterJob('job');assert.deepEqual(h.calls,['quality'],'A retained-original check does not start another paid edit loop');
   h=harness({operation:'write',action:'start',story,pending},{failEditor:true});await h.workflow.generateChapterJob('job');assert.equal(h.row.status,'failed');assert.equal(h.row.result.pending.draft,'New prose.');assert.deepEqual(h.calls,['write','automatic_prose_check']);
   const authorText='My deliberate revised thought stays exactly as written.';
   const authoredDraft=original+'\n\n'+authorText;

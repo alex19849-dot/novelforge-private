@@ -6,6 +6,7 @@ import { jobAdmin } from '../../../../lib/social-job-db';
 import { chapterSourceFingerprint, type ChapterJobInput } from '../../../../lib/chapter-job';
 import type { StoryWorkspace } from '../../../story-chat/types';
 import { validAuthorProtection, protectAuthorChanges } from '../../../../lib/author-prose-protection';
+import { memorySourceHash } from '../../../../lib/narrative-memory';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -58,6 +59,23 @@ export async function POST(request: Request) {
       input.pending.authorProtection = protectAuthorChanges(typeof source?.baseline === 'string' ? source.baseline : '',input.pending.draft);
     }
     input.authorStyleContext = await approvedStyleFor(user.id);
+    if (input.operation === 'complete' && input.pending?.editorialReviewRecovery && !input.pending.editorialReviewRecovery.repair && input.pending.diagnostics?.at(-1)?.stage?.startsWith('automatic_prose_repair_')) {
+      // Older failed jobs saved the paid replacements in the checkpoint, but
+      // did not expose them to the client. Recover metadata, never old prose.
+      const recovery=input.pending.editorialReviewRecovery;
+      const { data: previous,error: recoveryError } = await db.from('story_generation_jobs')
+        .select('work:checkpoint->editorialWork,draft:checkpoint->pending->>draft')
+        .eq('story_id',input.story.id).eq('user_id',user.id)
+        .eq('checkpoint->editorialWork->>sourceHash',memorySourceHash(input.pending.draft))
+        .eq('checkpoint->editorialWork->>contextHash',recovery.contextHash)
+        .order('created_at',{ascending:false}).limit(1);
+      if (recoveryError) throw new Error('Your draft is kept. The saved paid correction could not be loaded; it has not been submitted again.');
+      const saved=previous?.[0];
+      const work=saved?.work && typeof saved.work==='object' && !Array.isArray(saved.work) ? saved.work : null;
+      if (saved?.draft===input.pending.draft && work?.sourceHash===recovery.sourceHash && work.contextHash===recovery.contextHash && Array.isArray(work.targets) && work.replacements && typeof work.replacements==='object' && !Array.isArray(work.replacements) && Object.values(work.replacements).every(r=>typeof r==='string') && typeof work.reservedUsd==='number' && Number.isFinite(work.reservedUsd) && work.reservedUsd>=0) {
+        input.pending.editorialReviewRecovery={ ...recovery,repair:{ targets:work.targets as unknown as import('../../../../lib/prose-editorial').EditorialTarget[],replacements:work.replacements as Record<string,string>,reservedUsd:work.reservedUsd } };
+      }
+    }
     const { error: insertError } = await db.from('story_generation_jobs').insert({ id: body.id, story_id: input.story.id, user_id: user.id, input, source_updated_at: saved.updated_at, status: 'generating' });
     if (insertError) return json({ error: insertError.code === '23505' ? 'This story already has a chapter job starting. Reopen it to see progress.' : 'The chapter job could not be saved.' }, 409);
     ownedJob = body.id;

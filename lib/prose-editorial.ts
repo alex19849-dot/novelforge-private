@@ -6,7 +6,8 @@ export const EDITORIAL_MODEL = 'gpt-5.4-mini-2026-03-17';
 export type ProseAuthor = 'astra' | 'aion';
 export type WriterRegion = { start: number; end: number; writer: ProseAuthor };
 export type EditorialEdit = { id: string; start: number; original: string; replacement: string; writer: ProseAuthor };
-export type EditorialReceipt = { version: number; originalHash: string; checkedHash: string; contextHash: string; status: 'passed'; edits: EditorialEdit[]; reservedUsd: number };
+export type EditorialIssue = { id: string; reason: string };
+export type EditorialReceipt = { version: number; originalHash: string; checkedHash: string; contextHash: string; status: 'passed' | 'checked_with_issues'; edits: EditorialEdit[]; reservedUsd: number; retained?: EditorialIssue[] };
 export type ProseParagraph = { id: string; start: number; end: number; text: string };
 export type ProseEvidence = { id: string; text: string };
 export type ProseSignal = { id: string; category: string; evidenceIds: string[]; reason: string };
@@ -20,8 +21,12 @@ export function proseParagraphs(content: string): ProseParagraph[] {
 export function editorialPassed(receipt: EditorialReceipt | undefined, content: string, contextHash?: string): boolean {
   return receipt?.version === EDITORIAL_VERSION && receipt.status === 'passed' && receipt.checkedHash === memorySourceHash(content) && (contextHash === undefined || receipt.contextHash === contextHash);
 }
+/** A completed check can retain original wording without claiming a clean pass. */
+export function editorialProcessed(receipt: EditorialReceipt | undefined, content: string, contextHash?: string): boolean {
+  return editorialPassed(receipt,content,contextHash) || Boolean(receipt?.version === EDITORIAL_VERSION && receipt.status === 'checked_with_issues' && receipt.retained?.length && receipt.checkedHash === memorySourceHash(content) && (contextHash === undefined || receipt.contextHash === contextHash));
+}
 export function restoreEditorialOriginal(content: string, receipt: EditorialReceipt): string {
-  if (!editorialPassed(receipt,content)) throw Error('The chapter changed after automatic editing. Recovery would overwrite newer edits.');
+  if (!editorialProcessed(receipt,content)) throw Error('The chapter changed after automatic editing. Recovery would overwrite newer edits.');
   let delta = 0;
   const mapped = receipt.edits.slice().sort((a,b) => a.start - b.start).map(e => {
     const start = e.start + delta; delta += e.replacement.length - e.original.length;
@@ -208,14 +213,36 @@ export function applyEditorialEdits(content: string, targets: EditorialTarget[],
     if (validAuthorProtection(content,protection) && overlapsAuthorProtection(t.start,t.end,protection)) throw Error('An automatic replacement targets your edited text. Your draft is kept.');
     if (t.end > lastStart || content.slice(t.start, t.end) !== t.original || typeof replacement !== 'string' || !replacement.trim() || /\[\[AION_SCENE_|<END_SECTION>|```|<\/?think\b/i.test(replacement)) throw Error('An editorial replacement did not match its saved source passage.');
     if (replacement === t.original) throw Error('The editorial writer returned the unchanged faulty passage.');
-    // A length floor catches obvious summaries. The semantic recheck also compares every action, thought and detail.
-    if (replacement.trim().split(/\s+/).length < t.original.trim().split(/\s+/).length * .8) throw Error('An editorial replacement removed too much of the original passage.');
+    // Removing a genuinely redundant reply can legitimately shorten a target.
+    // No candidate is published until the separate semantic preservation check.
     edits.push({ id: t.id, start: t.start, original: t.original, replacement: replacement.trim(), writer: t.writer });
     result = result.slice(0, t.start) + replacement.trim() + result.slice(t.end);
     lastStart = t.start;
   }
   assertAuthorChangesKept(content,result,protection);
   return { content: result, edits: edits.sort((a,b) => a.start - b.start) };
+}
+
+/** Keep individually verified edits; retain exact originals for rejected ones.
+ * The report examined the full candidate. Reverting a rejected edit is recorded
+ * as an unresolved issue, never represented as a fresh clean-candidate pass.
+ */
+export function verifiedEditorialEdits(content: string, targets: EditorialTarget[], replacements: Record<string,string>, candidate: string, edits: EditorialEdit[], report: EditorialReport, protection?: AuthorProtection) {
+  const retained: EditorialIssue[] = [];
+  const rejected = new Set<string>();
+  for (const check of report.preservation) if (!check.preserved) { rejected.add(check.id); retained.push({ id:check.id,reason:check.reason }); }
+  const paragraphs = proseParagraphs(candidate);
+  let delta = 0;
+  const ranges = edits.map(e => { const start=e.start+delta; delta+=e.replacement.length-e.original.length; return { id:e.id,start,end:start+e.replacement.length }; });
+  for (const finding of report.findings) {
+    const affected = finding.paragraphIds.map(id => paragraphs.find(p => p.id === id)).filter((p): p is ProseParagraph => Boolean(p));
+    for (const edit of ranges) if (affected.some(p => p.start < edit.end && p.end > edit.start)) rejected.add(edit.id);
+    retained.push({ id:finding.id,reason:finding.reason });
+  }
+  if (report.overflow) { edits.forEach(e => rejected.add(e.id)); retained.push({ id:'overflow',reason:'The bounded check could not verify all proposed changes; originals retained.' }); }
+  const keep=targets.filter(t=>!rejected.has(t.id));
+  const result=applyEditorialEdits(content,keep,replacements,protection);
+  return { ...result,retained };
 }
 
 export function maximumEditorialCost(prompt: string, outputTokens: number, writer: 'mini' | ProseAuthor): number {

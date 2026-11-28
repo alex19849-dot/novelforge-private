@@ -34,7 +34,7 @@ const replacement='I close the latch. He looks over, waiting for an answer that 
 const changed=pure.applyEditorialEdits(chapter,targets,{f1:replacement});
 assert.equal(changed.content,chapter.replace(targets[0].original,replacement));
 assert.equal(changed.edits[0].original,targets[0].original);
-assert.throws(()=>pure.applyEditorialEdits(chapter,targets,{f1:'A summary.'}),/removed too much/);
+assert.equal(pure.applyEditorialEdits(chapter,targets,{f1:'A summary.'}).edits[0].replacement,'A summary.','Length alone does not decide preservation; candidates require semantic recheck');
 assert.throws(()=>pure.applyEditorialEdits(chapter,targets,{f1:targets[0].original}),/unchanged/);
 assert.throws(()=>pure.applyEditorialEdits(chapter,targets,{f1:'```A replacement```'}),/did not match/);
 assert.throws(()=>pure.editorialTargets(chapter,material.paragraphs,{...report,overflow:true}),/more problems/);
