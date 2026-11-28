@@ -1,5 +1,6 @@
 import type { GenerationDiagnostic, StoryBible, StoryState } from '../app/story-chat/types';
 import { narrativeContext, projectNarrativeMemory, memorySourceHash } from './narrative-memory';
+import { validAuthorProtection, overlapsAuthorProtection, type AuthorProtection } from './author-prose-protection';
 import { EDITORIAL_MODEL, editorialEvidence, maximumEditorialCost, validateEditorialReport, type EditorialEdit, type EditorialTarget, type EditorialReport } from './prose-editorial';
 
 export const EDITORIAL_CHECK_OUTPUT = 3400;
@@ -7,6 +8,7 @@ export const EDITORIAL_REPAIR_OUTPUT = 2400;
 export type EditorialContext = {
   content: string; chapters: Array<{ number: number; content: string }>; storyBible: StoryBible;
   storyState: StoryState; chapterBrief: string; pov: string; authorStyleContext?: string;
+  authorProtection?: AuthorProtection;
 };
 export type EditorialCall = { writer: 'mini' | 'astra' | 'aion'; stage: string; prompt: string; system: string; schema: Record<string, unknown>; maxOutput: number; ceilingUsd: number };
 
@@ -52,6 +54,8 @@ export function buildEditorialReview(context: EditorialContext, edits: Editorial
     'AUTHOR GUIDANCE / CONTRACT (author intent, not a request for replacement prose):\n' + context.chapterBrief,
     'POV:\n' + context.pov,
     'AUTHOR STYLE PREFERENCES:\n' + (context.authorStyleContext ?? ''),
+    'AUTHOR-EDITED PARAGRAPHS, KEEP VERBATIM:\n' + JSON.stringify(validAuthorProtection(context.content,context.authorProtection) ? material.paragraphs.filter(p => overlapsAuthorProtection(p.start,p.end,context.authorProtection)).map(p => p.id) : []),
+    'The listed author-edited paragraphs are deliberate accepted wording. Do not request replacements for them or treat their difference from an earlier draft as a fault. Check surrounding unprotected prose against the current author version. Never restore deleted text, an old generated passage or an old implication. If a candidate signal concerns only protected wording, classify it as intentional. Current manual edits take priority over generic style preferences.',
     'STORY BIBLE (context):\n' + JSON.stringify(context.storyBible),
     'GROUNDED MEMORY (claims are context; source quotes below support comparison):\n' + JSON.stringify(grounded.map(r => ({ sourceId: `memory:${r.id}`, kind: r.kind, status: r.status, claim: r.claim }))),
     `PRIOR BOOK SAMPLES (${material.sampledChapterCount} of ${material.priorChapterCount} earlier chapters sampled; not a full-manuscript review):\n` + JSON.stringify(material.evidence),

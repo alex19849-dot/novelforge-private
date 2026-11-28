@@ -1,4 +1,5 @@
 import { memoryCoverage, memorySourceHash } from "../lib/narrative-memory";
+import { protectAuthorChanges, assertAuthorChangesKept } from '../lib/author-prose-protection';
 import { EDITORIAL_VERSION, editorialPassed, editorialTargets, updateWriterRegions, applyEditorialEdits, reserveEditorialBudget, type EditorialTarget, type EditorialEdit } from '../lib/prose-editorial';
 import { buildEditorialReview, buildEditorialRepair, parseEditorialRepairs, readEditorialReview, executeEditorialCall, editorialLimit, type EditorialContext } from '../lib/prose-editorial-server';
 import { priorProseContext } from '../lib/prose-history';
@@ -49,12 +50,13 @@ function editorialContext(state: Checkpoint, input: ChapterJobInput, content = s
   const boundary = pending.generatedChapter.kind === 'prologue' ? 0 : pending.generatedChapter.replaceChapterNumber;
   return { content, chapters: state.story.chapters.filter(c => boundary === null || c.number < boundary), storyBible: state.story.storyBible,
     storyState: getStoryStateBeforeChapter(state.story.storyState, boundary), chapterBrief: pending.chapterBrief,
-    pov: pending.generatedChapter.povCharacter, authorStyleContext: input.authorStyleContext ?? '' };
+    pov: pending.generatedChapter.povCharacter, authorStyleContext: input.authorStyleContext ?? '',
+    authorProtection: content === pending.draft ? pending.authorProtection : assertAuthorChangesKept(pending.draft,content,pending.authorProtection) };
 }
 function editorialContextHash(context: EditorialContext): string {
   const { lastGenerationDiagnostics: _diagnostics, workspaceMetadata: _metadata, authorStyleContext: _style, parkedChapterDrafts: _parked, chapterGuidanceDraft: _guidance, ...state } = context.storyState as StoryWorkspace['storyState'] & { workspaceMetadata?: unknown };
   const stable = (v: unknown): unknown => Array.isArray(v) ? v.map(stable) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([,x]) => x !== undefined).sort(([a],[b]) => a.localeCompare(b)).map(([k,x]) => [k,stable(x)])) : v;
-  return memorySourceHash(JSON.stringify(stable({ chapters: context.chapters.map(c => [c.number, memorySourceHash(c.content)]), bible: context.storyBible, brief: context.chapterBrief, pov: context.pov, style: context.authorStyleContext, state })));
+  return memorySourceHash(JSON.stringify(stable({ chapters: context.chapters.map(c => [c.number, memorySourceHash(c.content)]), bible: context.storyBible, brief: context.chapterBrief, pov: context.pov, style: context.authorStyleContext, protection: context.authorProtection?.ranges.map(r => r.text), state })));
 }
 function acceptEditorial(state: Checkpoint, input: ChapterJobInput, contextHash: string) {
   const pending = state.pending!, work = state.editorialWork;
@@ -76,6 +78,7 @@ function acceptEditorial(state: Checkpoint, input: ChapterJobInput, contextHash:
   }
   state.pending = { ...pending, draft: content, lastSection,
     writerRegions: regions, writerRegionsSourceHash: memorySourceHash(content), diagnostics: state.diagnostics, savedAt: new Date().toISOString(),
+    authorProtection: assertAuthorChangesKept(pending.draft,content,pending.authorProtection), editorialReviewRecovery: undefined,
     automaticEditorial: { version: EDITORIAL_VERSION, status: 'passed', originalHash: work?.sourceHash ?? memorySourceHash(content), checkedHash: memorySourceHash(content), contextHash,
       edits: work?.edits ?? [], reservedUsd: work?.reservedUsd ?? 0 } };
   delete state.editorialWork;
@@ -192,7 +195,8 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       state.diagnostics.push(...data.diagnostics);
       state.lastGeneratedSection = specialist || action === 'start' ? draft : section;
       const aion = specialist || data.diagnostics.some(d => d.provider === 'openrouter' && d.model === 'aion-labs/aion-3.5');
-      state.pending = { ...pendingReset(pending), automaticEditorial: undefined, writerRegions: updateWriterRegions(pending.draft,draft,pending.writerRegions,aion ? 'aion' : 'astra'), writerRegionsSourceHash: memorySourceHash(draft), draft, lastSection: state.lastGeneratedSection, repetitionWarnings: data.warnings, diagnostics: state.diagnostics, savedAt: new Date().toISOString() };
+      state.pending = { ...pendingReset(pending), automaticEditorial: undefined, editorialReviewRecovery: undefined,
+        authorProtection: protectAuthorChanges(pending.draft,draft,pending.authorProtection,false), writerRegions: updateWriterRegions(pending.draft,draft,pending.writerRegions,aion ? 'aion' : 'astra'), writerRegionsSourceHash: memorySourceHash(draft), draft, lastSection: state.lastGeneratedSection, repetitionWarnings: data.warnings, diagnostics: state.diagnostics, savedAt: new Date().toISOString() };
       delete state.editorialWork;
       state.phase = draft.includes('[[AION_SCENE_') ? 'specialist' : 'editorial';
     } else if (state.phase === 'editorial') {
@@ -200,10 +204,16 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       if (editorialPassed(state.pending?.automaticEditorial, context.content, contextHash)) {
         state.phase = input.operation === 'complete' ? 'quality' : 'ready';
       } else {
-        const review = buildEditorialReview(context);
-        state.editorialWork = { sourceHash: memorySourceHash(context.content), contextHash, reservedUsd: reserveEditorialBudget(0,review.call.ceilingUsd,editorialLimit()), targets: [], replacements: {} };
-        const report = readEditorialReview(await executeEditorialCall(review.call,state.diagnostics),review.material);
-        state.editorialWork.targets = editorialTargets(context.content,review.material.paragraphs,report,state.pending?.writerRegions);
+        const review = buildEditorialReview(context), sourceHash = memorySourceHash(context.content);
+        const recovery = state.pending?.editorialReviewRecovery;
+        const reusable = recovery?.sourceHash === sourceHash && recovery.contextHash === contextHash;
+        state.editorialWork = { sourceHash, contextHash, reservedUsd: reusable ? recovery.reservedUsd : reserveEditorialBudget(0,review.call.ceilingUsd,editorialLimit()), targets: [], replacements: {} };
+        const raw = reusable ? recovery.report : await executeEditorialCall(review.call,state.diagnostics);
+        // Retain an unusable report too, so an address-format fix can validate
+        // it later without billing the analyst again for unchanged source.
+        state.pending = { ...state.pending!, editorialReviewRecovery: { sourceHash, contextHash, report: raw, reservedUsd: state.editorialWork.reservedUsd } };
+        const report = readEditorialReview(raw,review.material);
+        state.editorialWork.targets = editorialTargets(context.content,review.material.paragraphs,report,state.pending?.writerRegions,state.pending?.authorProtection);
         if (!state.editorialWork.targets.length) acceptEditorial(state,input,contextHash);
         else state.phase = 'editorial_repair';
       }
@@ -219,17 +229,18 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       const replacements = parseEditorialRepairs(await executeEditorialCall(repair,state.diagnostics),targets);
       work.replacements = { ...work.replacements, ...replacements };
       if (work.targets.every(t => Object.hasOwn(work.replacements,t.id))) {
-        const result = applyEditorialEdits(state.pending!.draft,work.targets,work.replacements);
+        const result = applyEditorialEdits(state.pending!.draft,work.targets,work.replacements,state.pending!.authorProtection);
         work.candidate = result.content; work.edits = result.edits;
         state.phase = 'editorial_verify';
       }
     } else if (state.phase === 'editorial_verify') {
       const work = state.editorialWork;
       if (!work?.candidate || !work.edits?.length || memorySourceHash(state.pending!.draft) !== work.sourceHash) throw Error('The saved repair could not be verified against its source.');
-      const review = buildEditorialReview(editorialContext(state,input,work.candidate),work.edits);
+      const context = editorialContext(state,input,work.candidate);
+      const review = buildEditorialReview(context,work.edits);
       work.reservedUsd = reserveEditorialBudget(work.reservedUsd,review.call.ceilingUsd,editorialLimit());
       const report = readEditorialReview(await executeEditorialCall(review.call,state.diagnostics),review.material,work.edits);
-      if (report.overflow || report.findings.length || report.preservation.some(p => !p.preserved)) throw Error('The automatic edit did not pass its recheck. The original draft is saved; it has not been marked ready or submitted for another paid rewrite.');
+      if (report.overflow || editorialTargets(work.candidate,review.material.paragraphs,report,[],context.authorProtection).length || report.preservation.some(p => !p.preserved)) throw Error('The automatic edit did not pass its recheck. The original draft is saved; it has not been marked ready or submitted for another paid rewrite.');
       acceptEditorial(state,input,work.contextHash);
     } else if (state.phase === 'quality') {
       const pending = state.pending!;

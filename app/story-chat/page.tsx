@@ -1,6 +1,7 @@
 "use client";
 import { sectionLabel, specialSectionTitle } from "../../lib/story-section";
 import { recordStyleCorrection } from "../../lib/author-style-client";
+import { protectAuthorChanges } from "../../lib/author-prose-protection";
 import { bounded, readStoryLibrary, type LibrarySession } from "../../lib/story-library-client";
 
 import { requestsChapterGeneration, continuesPendingChapter } from "../../lib/chapter-request";
@@ -1383,6 +1384,8 @@ device.`,
       if (isDraft && latestPending) {
         const nextPending: PendingChapterGeneration = {
           ...latestPending, draft: content, lastSection: undefined,
+          authorProtection: protectAuthorChanges(latestPending.draft,content,latestPending.authorProtection),
+          automaticEditorial: undefined, editorialReviewRecovery: undefined,
           repetitionWarnings: [], qualityReview: undefined, qualityCheckedDraft: undefined,
           qualityOverrideReady: undefined, qualityTechnicalError: undefined,
           diagnostics: [...(latestPending.diagnostics ?? []), ...diagnostics],
@@ -1455,6 +1458,8 @@ device.`,
     const content = undoPassageRewrite(current, undo);
     if (draft && pending) {
       const nextPending = { ...pending, draft: content, lastSection: undefined,
+        authorProtection: protectAuthorChanges(pending.draft,content,pending.authorProtection),
+        automaticEditorial: undefined, editorialReviewRecovery: undefined,
         repetitionWarnings: [], qualityReview: undefined, qualityCheckedDraft: undefined,
         qualityOverrideReady: undefined, qualityTechnicalError: undefined };
       currentPendingRef.current = nextPending;
@@ -1738,6 +1743,9 @@ device.`,
     savePendingGeneration({
       ...pendingGeneration,
       draft: content,
+      authorProtection: protectAuthorChanges(pendingGeneration.draft,content,pendingGeneration.authorProtection),
+      automaticEditorial: undefined,
+      editorialReviewRecovery: undefined,
       lastSection:
         pendingGeneration.lastSection &&
         content.includes(pendingGeneration.lastSection)

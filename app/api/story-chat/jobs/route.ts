@@ -5,6 +5,7 @@ import { startBackground, backgroundStatus } from '../../../../lib/background-qu
 import { jobAdmin } from '../../../../lib/social-job-db';
 import { chapterSourceFingerprint, type ChapterJobInput } from '../../../../lib/chapter-job';
 import type { StoryWorkspace } from '../../../story-chat/types';
+import { validAuthorProtection, protectAuthorChanges } from '../../../../lib/author-prose-protection';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -40,6 +41,22 @@ export async function POST(request: Request) {
     if (error || !saved) return json({ error: 'This story could not be found in your account. Save it before generating.' }, 404);
     const remote = { storyBible: saved.form, chapters: saved.chapters ?? [], storyState: saved.story_state ?? {} } as StoryWorkspace;
     if (chapterSourceFingerprint(remote) !== body.sourceFingerprint) return json({ error: 'This story changed on another device. Reopen it before generating so newer edits are preserved.' }, 409);
+    if (input.pending?.draft.trim() && input.operation !== 'generate' && input.operation !== 'memory' && !validAuthorProtection(input.pending.draft,input.pending.authorProtection)) {
+      // Older installed clients did not mark manual edits. Compare their
+      // current draft with the saved writer output, not a previous user input.
+      const { data: history, error: historyError } = await db.from('story_generation_jobs')
+        .select('baseline:checkpoint->pending->>draft,chapter:checkpoint->pending->generatedChapter')
+        .eq('story_id',input.story.id).eq('user_id',user.id).in('input->>operation',['generate','write'])
+        .order('created_at',{ascending:false}).limit(8);
+      if (historyError) throw new Error('Your edited draft is kept. Its original writer output could not be checked before automatic editing.');
+      const metadata = input.pending.generatedChapter;
+      const source = history?.find(row => typeof row.baseline === 'string' && row.chapter && typeof row.chapter === 'object' && !Array.isArray(row.chapter) &&
+        row.chapter.title === metadata.title && row.chapter.povCharacter === metadata.povCharacter &&
+        row.chapter.replaceChapterNumber === metadata.replaceChapterNumber && (row.chapter.kind ?? 'chapter') === (metadata.kind ?? 'chapter'));
+      // If no trustworthy baseline remains, prefer protecting current author
+      // text over guessing which older generated version should take priority.
+      input.pending.authorProtection = protectAuthorChanges(typeof source?.baseline === 'string' ? source.baseline : '',input.pending.draft);
+    }
     input.authorStyleContext = await approvedStyleFor(user.id);
     const { error: insertError } = await db.from('story_generation_jobs').insert({ id: body.id, story_id: input.story.id, user_id: user.id, input, source_updated_at: saved.updated_at, status: 'generating' });
     if (insertError) return json({ error: insertError.code === '23505' ? 'This story already has a chapter job starting. Reopen it to see progress.' : 'The chapter job could not be saved.' }, 409);

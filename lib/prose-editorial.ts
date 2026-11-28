@@ -1,4 +1,5 @@
 import { memorySourceHash } from './narrative-memory';
+import { validAuthorProtection, overlapsAuthorProtection, assertAuthorChangesKept, type AuthorProtection } from './author-prose-protection';
 
 export const EDITORIAL_VERSION = 1;
 export const EDITORIAL_MODEL = 'gpt-5.4-mini-2026-03-17';
@@ -142,17 +143,20 @@ export function editorialEvidence(content: string, chapters: Array<{ number: num
 }
 
 export function validateEditorialReport(raw: unknown, material: ReturnType<typeof editorialEvidence>, changes: EditorialEdit[] = []): EditorialReport {
-  const r = raw as EditorialReport;
+  const r = structuredClone(raw) as EditorialReport;
   if (!r || !Array.isArray(r.findings) || !Array.isArray(r.signalAssessments) || !Array.isArray(r.preservation) || typeof r.overflow !== 'boolean' || r.findings.length > 8) throw Error('The editorial check returned an invalid report.');
   const sources = new Map([...material.paragraphs.map(p => [p.id, p.text] as const), ...material.evidence.map(e => [e.id, e.text] as const)]);
-  const found = new Set<string>(), occupied = new Set<string>();
+  const found = new Set<string>();
   const categories = ['opening', 'aftermath', 'sentence_pattern', 'gesture', 'dialogue_pattern', 'repeated_emotional_work', 'duplicate'];
   for (const f of r.findings) {
-    if (!f || typeof f.id !== 'string' || found.has(f.id) || !categories.includes(f.category) || !Array.isArray(f.paragraphIds) || !f.paragraphIds.length || f.paragraphIds.length > 3 || !Array.isArray(f.evidence) || !f.evidence.length || !f.reason?.trim() || !f.direction?.trim()) throw Error('The editorial report contains an invalid finding.');
+    if (!f || typeof f.id !== 'string' || !categories.includes(f.category) || !Array.isArray(f.paragraphIds) || !f.paragraphIds.length || f.paragraphIds.length > 8 || !Array.isArray(f.evidence) || !f.evidence.length || !f.reason?.trim() || !f.direction?.trim()) throw Error('The editorial report contains an invalid finding.');
+    if (found.has(f.id)) f.id = `${f.id}:${found.size + 1}`;
     found.add(f.id);
     const indexes = f.paragraphIds.map(id => material.paragraphs.findIndex(p => p.id === id));
-    if (indexes.some((n, i) => n < 0 || occupied.has(f.paragraphIds[i]) || i > 0 && n !== indexes[i - 1] + 1)) throw Error('Editorial passages overlap or do not match this draft.');
-    f.paragraphIds.forEach(id => occupied.add(id));
+    if (indexes.some(n => n < 0)) throw Error('The editorial report referenced a paragraph outside the current draft. Your text is kept.');
+    // Known IDs can arrive out of order, be duplicated or be shared by several
+    // valid findings. Canonicalise references; merge repair ownership below.
+    f.paragraphIds = [...new Set(indexes)].sort((a,b) => a - b).map(i => material.paragraphs[i].id);
     if (f.evidence.some(e => typeof e?.quote !== 'string' || e.quote.length < 8 || !sources.get(e.sourceId)?.includes(e.quote))) throw Error('The editorial finding has no matching manuscript evidence.');
     if (!f.evidence.some(e => f.paragraphIds.includes(e.sourceId))) throw Error('The editorial finding does not quote the affected passage.');
     if (['opening','aftermath','gesture','dialogue_pattern','repeated_emotional_work'].includes(f.category) && new Set(f.evidence.map(e => `${e.sourceId}:${e.quote}`)).size < 2) throw Error('A recurring pattern needs more than one supporting example.');
@@ -163,23 +167,38 @@ export function validateEditorialReport(raw: unknown, material: ReturnType<typeo
   return r;
 }
 
-export function editorialTargets(content: string, paragraphs: ProseParagraph[], report: EditorialReport, regions: WriterRegion[] = []): EditorialTarget[] {
+export function editorialTargets(content: string, paragraphs: ProseParagraph[], report: EditorialReport, regions: WriterRegion[] = [], protection?: AuthorProtection): EditorialTarget[] {
   if (report.overflow) throw Error('The editorial check found more problems than the bounded automatic repair can handle.');
-  return report.findings.map(f => {
-    const first = paragraphs.find(p => p.id === f.paragraphIds[0])!, last = paragraphs.find(p => p.id === f.paragraphIds.at(-1))!;
+  const locked = validAuthorProtection(content,protection) ? protection : undefined;
+  const targets: EditorialTarget[] = [];
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i], findings = report.findings.filter(f => f.paragraphIds.includes(p.id));
+    if (!findings.length || overlapsAuthorProtection(p.start,p.end,locked)) continue;
     // Legacy drafts lack provenance. Route intimate prose to Aion rather than the general editor.
-    const sourceRegions = regions.filter(r => r.end > first.start && r.start < last.end);
-    const original = content.slice(first.start, last.end);
+    const sourceRegions = regions.filter(r => r.end > p.start && r.start < p.end);
+    const original = p.text;
     const writer = sourceRegions.some(r => r.writer === 'aion') || !regions.length && /\b(?:cock|condom|lube|orgasm|rimming|penetrat\w*)\b/i.test(original) ? 'aion' : 'astra';
-    return { id: f.id, start: first.start, end: last.end, original, writer, findings: [f] };
-  });
+    const last = targets.at(-1);
+    // Each source paragraph is replaced at most once. Do not pull in an
+    // intervening unflagged/protected paragraph or cross a writer boundary.
+    if (last && last.writer === writer && paragraphs[i - 1]?.end === last.end && proseParagraphs(last.original).length < 3) {
+      last.end = p.end; last.original = content.slice(last.start,p.end);
+      last.findings = [...new Map([...last.findings,...findings].map(f => [f.id,f])).values()];
+    } else {
+      const base = findings[0].id;
+      const id = targets.some(t => t.id === base) ? `${base}:${p.id}` : base;
+      targets.push({ id, start: p.start, end: p.end, original, writer, findings });
+    }
+  }
+  return targets;
 }
-export function applyEditorialEdits(content: string, targets: EditorialTarget[], replacements: Record<string, string>): { content: string; edits: EditorialEdit[] } {
+export function applyEditorialEdits(content: string, targets: EditorialTarget[], replacements: Record<string, string>, protection?: AuthorProtection): { content: string; edits: EditorialEdit[] } {
   let result = content;
   const edits: EditorialEdit[] = [];
   let lastStart = content.length;
   for (const t of targets.slice().sort((a,b) => b.start - a.start)) {
     const replacement = replacements[t.id];
+    if (validAuthorProtection(content,protection) && overlapsAuthorProtection(t.start,t.end,protection)) throw Error('An automatic replacement targets your edited text. Your draft is kept.');
     if (t.end > lastStart || content.slice(t.start, t.end) !== t.original || typeof replacement !== 'string' || !replacement.trim() || /\[\[AION_SCENE_|<END_SECTION>|```|<\/?think\b/i.test(replacement)) throw Error('An editorial replacement did not match its saved source passage.');
     if (replacement === t.original) throw Error('The editorial writer returned the unchanged faulty passage.');
     // A length floor catches obvious summaries. The semantic recheck also compares every action, thought and detail.
@@ -188,6 +207,7 @@ export function applyEditorialEdits(content: string, targets: EditorialTarget[],
     result = result.slice(0, t.start) + replacement.trim() + result.slice(t.end);
     lastStart = t.start;
   }
+  assertAuthorChangesKept(content,result,protection);
   return { content: result, edits: edits.sort((a,b) => a.start - b.start) };
 }
 
@@ -198,6 +218,6 @@ export function maximumEditorialCost(prompt: string, outputTokens: number, write
   return Math.ceil((input * rates[0] + outputTokens * rates[1]) / 1e6 * 1e6) / 1e6;
 }
 export function reserveEditorialBudget(spent: number, next: number, limit: number): number {
-  if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(next) || next <= 0 || spent + next > limit + 1e-9) throw Error('The automatic editing cost limit was reached. The draft is saved; no further paid request was started.');
+  if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(spent) || spent < 0 || !Number.isFinite(next) || next <= 0 || spent + next > limit + 1e-9) throw Error('The automatic editing cost limit was reached. The draft is saved; no further paid request was started.');
   return Math.round((spent + next) * 1e6) / 1e6;
 }

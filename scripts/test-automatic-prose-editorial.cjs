@@ -16,9 +16,9 @@ const finding={id:'f1',category:'sentence_pattern',paragraphIds:['p2'],evidence:
 const report={...cleanReport(material),findings:[finding],signalAssessments:material.signals.map(s=>({id:s.id,disposition:s.category==='clause chain'?'repair':'intentional',reason:'Specific contextual assessment.'}))};
 pure.validateEditorialReport(report,material);
 assert.throws(()=>pure.validateEditorialReport({...report,findings:[{...finding,evidence:[{sourceId:'p2',quote:'Invented evidence from somewhere else.'}]}]},material),/matching manuscript evidence/);
-assert.throws(()=>pure.validateEditorialReport({...report,findings:[finding,{...finding,id:'f2'}]},material),/overlap/);
+const sharedReport=pure.validateEditorialReport({...report,findings:[finding,{...finding,id:'f2'}]},material);assert.equal(pure.editorialTargets(chapter,material.paragraphs,sharedReport).length,1);assert.equal(pure.editorialTargets(chapter,material.paragraphs,sharedReport)[0].findings.length,2,'Shared paragraph receives one combined repair, retaining both directions');
 assert.throws(()=>pure.validateEditorialReport({...report,findings:[{...finding,category:'gesture'}]},material),/more than one/);
-assert.throws(()=>pure.validateEditorialReport({...report,findings:[{...finding,paragraphIds:['p2','p1']}]},material),/overlap/);
+assert.deepEqual(pure.validateEditorialReport({...report,findings:[{...finding,paragraphIds:['p2','p1','p2']}]},material).findings[0].paragraphIds,['p1','p2']);assert.throws(()=>pure.validateEditorialReport({...report,findings:[{...finding,paragraphIds:['p999']}]},material),/outside the current draft/);
 let regions=pure.updateWriterRegions('',chapter,[],'astra');
 const marker='[[AION_SCENE_1]]';const framework='Opening.\n\n'+marker+'\n\nEnding.';
 let frameworkRegions=pure.updateWriterRegions('',framework,[],'astra');

@@ -21,6 +21,8 @@ export type PendingChapterGeneration = {
   automaticEditorial?: EditorialReceipt;
   writerRegions?: WriterRegion[];
   writerRegionsSourceHash?: string;
+  authorProtection?: import('../../lib/author-prose-protection').AuthorProtection;
+  editorialReviewRecovery?: { sourceHash: string; contextHash: string; report: unknown; reservedUsd: number };
 };
 
 export type SectionAction = "start" | "continue" | "rewrite";
