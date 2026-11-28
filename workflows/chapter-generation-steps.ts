@@ -1,6 +1,6 @@
 import { memoryCoverage, memorySourceHash } from "../lib/narrative-memory";
 import { protectAuthorChanges, assertAuthorChangesKept } from '../lib/author-prose-protection';
-import { EDITORIAL_VERSION, editorialPassed, editorialTargets, updateWriterRegions, applyEditorialEdits, reserveEditorialBudget, type EditorialTarget, type EditorialEdit } from '../lib/prose-editorial';
+import { EDITORIAL_VERSION, editorialPassed, editorialTargets, updateWriterRegions, applyEditorialEdits, reserveEditorialBudget, reconcileEditorialCost, type EditorialTarget, type EditorialEdit } from '../lib/prose-editorial';
 import { buildEditorialReview, buildEditorialRepair, parseEditorialRepairs, readEditorialReview, executeEditorialCall, editorialLimit, type EditorialContext } from '../lib/prose-editorial-server';
 import { priorProseContext } from '../lib/prose-history';
 import { jobAdmin } from '../lib/social-job-db';
@@ -209,6 +209,9 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
         const reusable = recovery?.sourceHash === sourceHash && recovery.contextHash === contextHash;
         state.editorialWork = { sourceHash, contextHash, reservedUsd: reusable ? recovery.reservedUsd : reserveEditorialBudget(0,review.call.ceilingUsd,editorialLimit()), targets: [], replacements: {} };
         const raw = reusable ? recovery.report : await executeEditorialCall(review.call,state.diagnostics);
+        const previousCheck = state.diagnostics.at(-1);
+        if (!reusable) state.editorialWork.reservedUsd = reconcileEditorialCost(state.editorialWork.reservedUsd,review.call.ceilingUsd,previousCheck?.costUsd);
+        else if (previousCheck?.stage === 'automatic_prose_check' && typeof previousCheck.costUsd === 'number' && previousCheck.costUsd >= 0 && previousCheck.costUsd <= recovery.reservedUsd) state.editorialWork.reservedUsd = previousCheck.costUsd;
         // Retain an unusable report too, so an address-format fix can validate
         // it later without billing the analyst again for unchanged source.
         state.pending = { ...state.pending!, editorialReviewRecovery: { sourceHash, contextHash, report: raw, reservedUsd: state.editorialWork.reservedUsd } };
@@ -226,7 +229,9 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       const targets = remaining.filter(t => t.writer === writer);
       const repair = buildEditorialRepair(editorialContext(state,input),targets,writer);
       work.reservedUsd = reserveEditorialBudget(work.reservedUsd,repair.ceilingUsd,editorialLimit());
-      const replacements = parseEditorialRepairs(await executeEditorialCall(repair,state.diagnostics),targets);
+      const raw = await executeEditorialCall(repair,state.diagnostics);
+      work.reservedUsd = reconcileEditorialCost(work.reservedUsd,repair.ceilingUsd,state.diagnostics.at(-1)?.costUsd);
+      const replacements = parseEditorialRepairs(raw,targets);
       work.replacements = { ...work.replacements, ...replacements };
       if (work.targets.every(t => Object.hasOwn(work.replacements,t.id))) {
         const result = applyEditorialEdits(state.pending!.draft,work.targets,work.replacements,state.pending!.authorProtection);
@@ -239,7 +244,9 @@ export async function advanceChapterJob(id: string): Promise<boolean> {
       const context = editorialContext(state,input,work.candidate);
       const review = buildEditorialReview(context,work.edits);
       work.reservedUsd = reserveEditorialBudget(work.reservedUsd,review.call.ceilingUsd,editorialLimit());
-      const report = readEditorialReview(await executeEditorialCall(review.call,state.diagnostics),review.material,work.edits);
+      const raw = await executeEditorialCall(review.call,state.diagnostics);
+      work.reservedUsd = reconcileEditorialCost(work.reservedUsd,review.call.ceilingUsd,state.diagnostics.at(-1)?.costUsd);
+      const report = readEditorialReview(raw,review.material,work.edits);
       if (report.overflow || editorialTargets(work.candidate,review.material.paragraphs,report,[],context.authorProtection).length || report.preservation.some(p => !p.preserved)) throw Error('The automatic edit did not pass its recheck. The original draft is saved; it has not been marked ready or submitted for another paid rewrite.');
       acceptEditorial(state,input,work.contextHash);
     } else if (state.phase === 'quality') {

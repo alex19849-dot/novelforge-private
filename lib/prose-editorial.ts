@@ -157,10 +157,17 @@ export function validateEditorialReport(raw: unknown, material: ReturnType<typeo
     // Known IDs can arrive out of order, be duplicated or be shared by several
     // valid findings. Canonicalise references; merge repair ownership below.
     f.paragraphIds = [...new Set(indexes)].sort((a,b) => a - b).map(i => material.paragraphs[i].id);
-    if (f.evidence.some(e => typeof e?.quote !== 'string' || e.quote.length < 8 || !sources.get(e.sourceId)?.includes(e.quote))) throw Error('The editorial finding has no matching manuscript evidence.');
+    const normaliseEvidence = (text: string) => text.replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/gu,' ').trim();
+    if (f.evidence.some(e => typeof e?.quote !== 'string' || !/[\p{L}\p{N}]/u.test(e.quote) || !sources.has(e.sourceId) || !normaliseEvidence(sources.get(e.sourceId)!).includes(normaliseEvidence(e.quote)))) throw Error('The editorial finding has no matching manuscript evidence.');
     if (!f.evidence.some(e => f.paragraphIds.includes(e.sourceId))) throw Error('The editorial finding does not quote the affected passage.');
     if (['opening','aftermath','gesture','dialogue_pattern','repeated_emotional_work'].includes(f.category) && new Set(f.evidence.map(e => `${e.sourceId}:${e.quote}`)).size < 2) throw Error('A recurring pattern needs more than one supporting example.');
   }
+  // Findings are the editorial report. Signal assessments account only for
+  // candidates the application actually supplied, not invented category scores.
+  // Legacy valid reports sometimes included these extra labels; ignore only
+  // those unrelated labels, never an unassessed real candidate.
+  const expectedSignals = new Set(material.signals.map(s => s.id));
+  r.signalAssessments = r.signalAssessments.filter(a => expectedSignals.has(a?.id));
   const assessments = new Map(r.signalAssessments.map(a => [a?.id, a]));
   if (assessments.size !== r.signalAssessments.length || assessments.size !== material.signals.length || material.signals.some(s => { const a = assessments.get(s.id); return !a || !['repair','intentional','not_problem'].includes(a.disposition) || !a.reason?.trim() || a.disposition === 'repair' && !r.findings.some(f => f.evidence.some(e => s.evidenceIds.includes(e.sourceId))); })) throw Error('The editorial check did not account for every repetition signal.');
   if (r.preservation.length !== changes.length || new Set(r.preservation.map(p => p?.id)).size !== changes.length || changes.some(c => !r.preservation.some(p => p?.id === c.id && typeof p.preserved === 'boolean' && p.reason?.trim()))) throw Error('The editorial recheck did not verify every changed passage.');
@@ -220,4 +227,10 @@ export function maximumEditorialCost(prompt: string, outputTokens: number, write
 export function reserveEditorialBudget(spent: number, next: number, limit: number): number {
   if (!Number.isFinite(limit) || limit <= 0 || !Number.isFinite(spent) || spent < 0 || !Number.isFinite(next) || next <= 0 || spent + next > limit + 1e-9) throw Error('The automatic editing cost limit was reached. The draft is saved; no further paid request was started.');
   return Math.round((spent + next) * 1e6) / 1e6;
+}
+/** Release unused reservation only after known provider usage, never assumed free traffic. */
+export function reconcileEditorialCost(reserved: number, ceiling: number, cost: number | null | undefined): number {
+  if (cost === null || cost === undefined) return reserved;
+  if (!Number.isFinite(cost) || cost < 0 || cost > ceiling + .000001 || ceiling > reserved + .000001) throw Error('The editorial provider cost could not be reconciled. Further paid requests have stopped.');
+  return Math.ceil(Math.max(0,reserved - ceiling + cost) * 1e6) / 1e6;
 }
