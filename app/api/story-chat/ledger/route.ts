@@ -611,7 +611,6 @@ ${JSON.stringify(chaptersToAnalyse, null, 2)}
 
     if (!Array.isArray(entry.narrativeRecords)) throw new Error(`The continuity model omitted structured memory for chapter ${sourceChapter.number}.`);
     const narrativeMemory = groundNarrativeRecords(entry.narrativeRecords, sourceChapter);
-    if (entry.narrativeRecords.length && !narrativeMemory.records.length) throw new Error(`None of chapter ${sourceChapter.number}'s proposed memory records could be grounded in its prose. No unsupported memory was saved.`);
     return {
       narrativeMemory,
       chapterNumber: sourceChapter.number,

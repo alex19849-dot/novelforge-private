@@ -111,7 +111,8 @@ export function memoryCoverage(state: Partial<StoryState>, chapters: StoryChapte
   const ordered = [...chapters].sort((a, b) => a.number - b.number);
   let complete = 0;
   for (const chapter of ordered) {
-    if (chapter.number >= dirty || !state.chapterLedger?.some(e => e.chapterNumber === chapter.number && e.narrativeMemory?.version === MEMORY_VERSION && e.narrativeMemory.sourceHash === memorySourceHash(chapter.content))) break;
+    if (chapter.number >= dirty || !state.chapterLedger?.some(e => e.chapterNumber === chapter.number && e.narrativeMemory?.version === MEMORY_VERSION && e.narrativeMemory.sourceHash === memorySourceHash(chapter.content) &&
+      (e.narrativeMemory.records.length > 0 || !e.narrativeMemory.rejectedEvidence))) break;
     complete++;
   }
   return { complete, total: chapters.length, needsBuild: complete !== chapters.length, fromChapter: ordered[complete]?.number, remaining: ordered.slice(complete) };
